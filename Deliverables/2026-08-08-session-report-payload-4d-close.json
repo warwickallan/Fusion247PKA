@@ -1,7 +1,7 @@
 {
   "session_date": "2026-08-08",
   "branch": "main",
-  "closing_head": "b52e6da",
+  "closing_head": "9de03b7c370d03ba26f8c2cdda9f7902738c70cd",
   "map_path": "Deliverables/2026-08-04-proofline-wayfinder-plan.md",
   "deliverable_path": "Deliverables/2026-08-08-session-performance-report-subphase-4d-close.md",
   "host": "claude",
@@ -22,9 +22,24 @@
   "allocation_rework_pct": null,
   "allocation_waiting_pct": null,
   "specialists": [
-    { "specialist": "veritas", "dispatches": 3, "tokens": 229037, "notes": "4D phase check across three rounds: HOLD (20/22), D-1 rejected on a temp-dir escape my fix introduced, then PASS on all 22 at 7afac1d. Three genuine product corrections." },
-    { "specialist": "pax", "dispatches": 1, "tokens": 164764, "notes": "Adversarial evaluation of CAPAE as built. Found the live brief was the repo's own test fixture, the opening-brief snapshot never called, and the effectiveness fraction unrenderable." },
-    { "specialist": "nolan", "dispatches": 1, "tokens": 147554, "notes": "Independent architecture challenge. Measured CAPAE's footprint in operating law at ZERO and the brief at ~78 tokens; withdrew half of his own prior recommendation." }
+    {
+      "specialist": "veritas",
+      "dispatches": 3,
+      "tokens": 229037,
+      "notes": "4D phase check across three rounds: HOLD (20/22), D-1 rejected on a temp-dir escape my fix introduced, then PASS on all 22 at 7afac1d. Three genuine product corrections."
+    },
+    {
+      "specialist": "pax",
+      "dispatches": 1,
+      "tokens": 164764,
+      "notes": "Adversarial evaluation of CAPAE as built. Found the live brief was the repo's own test fixture, the opening-brief snapshot never called, and the effectiveness fraction unrenderable."
+    },
+    {
+      "specialist": "nolan",
+      "dispatches": 1,
+      "tokens": 147554,
+      "notes": "Independent architecture challenge. Measured CAPAE's footprint in operating law at ZERO and the brief at ~78 tokens; withdrew half of his own prior recommendation."
+    }
   ],
   "findings": [
     {
