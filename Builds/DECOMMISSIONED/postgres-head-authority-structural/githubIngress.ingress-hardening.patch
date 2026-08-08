@@ -1,0 +1,124 @@
+diff --git a/services/control-plane/ingress/githubIngress.mjs b/services/control-plane/ingress/githubIngress.mjs
+index 5595728..c570951 100644
+--- a/services/control-plane/ingress/githubIngress.mjs
++++ b/services/control-plane/ingress/githubIngress.mjs
+@@ -8,9 +8,12 @@
+ //      with NO DB write. GitHub signs the raw bytes, so we must verify the exact bytes.
+ //   2. REQUIRE a delivery id (X-GitHub-Delivery) — it is the idempotency pivot; without it we
+ //      cannot dedup, so we reject fail-closed.
+-//   3. Write an IMMUTABLE agent_event envelope keyed by the delivery id (ON CONFLICT DO NOTHING
+-//      => a redelivery is ingested at most once). The payload stored is POINTERS + a hash of the
+-//      raw body only — never the whole GitHub payload (audit-integrity without hoarding content).
++//   3. Write an IMMUTABLE agent_event envelope keyed by a NAMESPACED delivery key ('github:<id>',
++//      so it can never collide with the runtime's reserved 'job:'/'effect:' ledger namespaces).
++//      ON CONFLICT DO NOTHING => a redelivery is ingested at most once; and the dedup is BOUND TO
++//      payload_hash — a redelivery reusing a delivery id with a DIFFERENT body is REJECTED (409)
++//      fail-closed (divergent-body), never silently collapsed into the first event. The payload
++//      stored is POINTERS + a hash of the raw body only — never the whole GitHub payload.
+ //   4. For a CHECKPOINT-BEARING event: upsert the build + checkpoint (head canonicalised to a
+ //      full lower-case SHA at the boundary), ADVANCE the authoritative current head for the build
+ //      (WP-D0: ops.advance_build_head — monotonic, and it supersedes any live merge_gate bound to
+@@ -30,6 +33,17 @@ import { canonicalizeShaOrNull } from '../review/reviewHandler.mjs';
+ 
+ const SIG_PREFIX = 'sha256=';
+ 
++// Namespaced ingress delivery-key prefix (before-live hardening). The event ledger reserves the
++// 'job:' and 'effect:' delivery-key namespaces for the runtime (see worker/events.mjs). A raw
++// GitHub delivery id could in principle look like one of those; prefixing every ingress key with
++// 'github:' keeps webhook keys in their OWN namespace so they can never collide with — or forge —
++// a reserved lifecycle/effect key. The external delivery id is still returned verbatim as eventId.
++const INGRESS_DELIVERY_NS = 'github:';
++const ingressDeliveryKey = (deliveryId) => `${INGRESS_DELIVERY_NS}${deliveryId}`;
++const DIVERGENT_REJECTION = Object.freeze({
++  accepted: false, status: 409, reason: 'divergent-body redelivery (same delivery id, different body)',
++});
++
+ /** Case-insensitive header read (GitHub headers arrive lower-cased; be tolerant). */
+ function header(headers, name) {
+   if (!headers) return undefined;
+@@ -50,6 +64,12 @@ export function verifyGithubSignature({ rawBody, signatureHeader, secret }) {
+     return { ok: false, reason: 'missing or malformed X-Hub-Signature-256' };
+   }
+   const provided = signatureHeader.slice(SIG_PREFIX.length);
++  // STRICT HEX (before-live hardening): the digest MUST be exactly 64 hex chars (sha256). Reject
++  // trailing junk / wrong length / non-hex BEFORE decode — Buffer.from(x,'hex') silently truncates
++  // on the first non-hex nibble, so a fail-closed shape check must gate it explicitly.
++  if (!/^[0-9a-fA-F]{64}$/.test(provided)) {
++    return { ok: false, reason: 'signature is not a 64-char hex sha256 digest' };
++  }
+   // rawBody must be the exact bytes GitHub signed. Accept a Buffer or a string.
+   const bodyBuf = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody ?? ''), 'utf8');
+   let expected;
+@@ -184,22 +204,29 @@ export async function ingestWebhook(pool, { headers = {}, rawBody, secret } = {}
+ 
+   // Non-checkpoint event: record the immutable envelope only (idempotent), then return.
+   if (!checkpoint) {
+-    const inserted = await appendEvent(pool, {
+-      buildId: null,
+-      deliveryKey: deliveryId,
+-      eventKind: `github.${eventType}`,
+-      actor: null,
+-      payloadHash: rawHash,
+-      payload: { deliveryId, eventType, repo: payload?.repository?.full_name ?? null },
+-      classification: 'internal',
+-    });
++    let inserted;
++    try {
++      inserted = await appendEvent(pool, {
++        buildId: null,
++        deliveryKey: ingressDeliveryKey(deliveryId),
++        eventKind: `github.${eventType}`,
++        actor: null,
++        payloadHash: rawHash,
++        payload: { deliveryId, eventType, repo: payload?.repository?.full_name ?? null },
++        classification: 'internal',
++        verifyPayloadHashOnConflict: true,
++      });
++    } catch (err) {
++      if (err.code === 'DIVERGENT_REDELIVERY') { log?.warn?.('ingress.divergent_redelivery', { deliveryId }); return { ...DIVERGENT_REJECTION }; }
++      throw err;
++    }
+     return { accepted: true, deduped: !inserted, eventId: deliveryId, checkpoint: null };
+   }
+ 
+   // Checkpoint-bearing event: build + checkpoint + envelope atomically on a pinned client, then
+   // enqueue the review job (its own atomic txn). Both halves are idempotent; a crash between
+   // them heals on redelivery.
+-  let buildId, checkpointId, eventDeduped;
++  let buildId, checkpointId, eventDeduped, divergent = false;
+   const client = await pool.connect();
+   try {
+     await client.query('begin');
+@@ -211,9 +238,12 @@ export async function ingestWebhook(pool, { headers = {}, rawBody, secret } = {}
+     // WP-D0: advance the authoritative current head + supersede any stale live gate, atomically
+     // with the checkpoint upsert (monotonic, redelivery-safe — see ops.advance_build_head).
+     await advanceBuildHead(client, { buildId, checkpointId, headSha: checkpoint.headSha });
++    // Delivery-dedup is bound to payload_hash: a redelivery under the SAME delivery id but a
++    // DIFFERENT body throws DIVERGENT_REDELIVERY, rolling back the WHOLE txn (build/checkpoint/
++    // advance/event) — no partial write, no enqueue — rather than silently proceeding.
+     eventDeduped = !(await appendEvent(client, {
+       buildId,
+-      deliveryKey: deliveryId,
++      deliveryKey: ingressDeliveryKey(deliveryId),
+       eventKind: `github.${eventType}`,
+       actor: null,
+       payloadHash: rawHash,
+@@ -222,14 +252,17 @@ export async function ingestWebhook(pool, { headers = {}, rawBody, secret } = {}
+         buildRef: checkpoint.buildRef, checkpointRef: checkpoint.checkpointRef, headSha: checkpoint.headSha,
+       },
+       classification: 'internal',
++      verifyPayloadHashOnConflict: true,
+     }));
+     await client.query('commit');
+   } catch (err) {
+     await client.query('rollback').catch(() => {});
+-    throw err;
++    if (err.code === 'DIVERGENT_REDELIVERY') divergent = true;
++    else throw err;
+   } finally {
+     client.release();
+   }
++  if (divergent) { log?.warn?.('ingress.divergent_redelivery', { deliveryId }); return { ...DIVERGENT_REJECTION }; }
+ 
+   // (4) enqueue the review job — idempotent on (checkpointId, headSha).
+   const { job, deduped: jobDeduped } = await enqueue(pool, {
