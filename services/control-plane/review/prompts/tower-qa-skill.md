@@ -9,11 +9,12 @@ owner: Warwick
 author: Keel (BUILD-020 WP-2G, WO-2026-08-05-05), 2026-08-05
 approved_by: Warwick
 approved_at: 2026-08-05
-ratified_wording_at_head: 17738bfa46d92b2c835f57f55c2ca4a10e09765e — Warwick ratified this exact prose (sections 1-9 below) as it stood at this head, for standing live use and this proof run. This commit changes only the frontmatter above; the governing text is byte-identical to 17738bf
+ratified_wording_at_head: ef4883d529ea3145214339186cae0ddc48d2a256 — Warwick ratified this exact prose (sections 1-9 below) as COMMITTED at this head, on 2026-08-08, for standing live use and for the BUILD-020 4C merge-class review. This commit changes only the frontmatter above and the provenance note below; the governing text is byte-identical to ef4883d. His ratification is of the COMMITTED WORDING AND GIT HEAD, never of one platform-specific raw-text hash — see the provenance note
+previously_ratified_at_head: 17738bfa46d92b2c835f57f55c2ca4a10e09765e — the 2026-08-05 ratification, superseded by ef4883d above and retained for history
 scope: the EXTERNAL Codex reviewer at PR and release level — the live merge-class route (tower-loop/reviewDiff.mjs, tower-loop/mergeCheck.mjs, tower-loop/watcher.mjs, tower-loop/demo-merge-review.mjs)
 companion: services/control-plane/review/prompts/reviewer-classification-amendment.md — APPROVED and governs_live, loaded and delivered WITH this file on the live route; it is not restated here
 supersedes: Builds/BUILD-010-fusion-tower/baton-mvp/tower-qa-skill.md (version 2, status approved) — a build record, not a runtime home
-needs: nothing further — ratified. The live loader's own hash check binds this to the exact head this commit produces, per §8
+needs: nothing further — ratified at ef4883d on 2026-08-08. The live loader's own hash check is DELIVERY-INTEGRITY evidence (loaded+validated bytes == bytes delivered to Codex), not the identity of the ratification, per §8 and the provenance note
 change_history: recorded in Git. This file is loaded FRESH per review turn; the SHA-256 of the exact bytes loaded is recomputed over the bytes actually delivered and fails closed on mismatch
 ---
 
@@ -27,34 +28,49 @@ change_history: recorded in Git. This file is loaded FRESH per review turn; the 
 > `product-qa-runtime-orientation.md`, which remains an unratified draft, is not loaded by the
 > live Codex route, and is not a WP-2D blocker** (Warwick, 2026-08-05).
 >
-> **⚠️ PROVENANCE — AMENDED TWICE ON 2026-08-07, RATIFICATION PIN NOW STALE.**
+> **✅ RATIFIED BY WARWICK, 2026-08-08, AT COMMITTED HEAD `ef4883d529ea3145214339186cae0ddc48d2a256`**
+> — **for standing live use and for the BUILD-020 4C merge-class review.** This supersedes the
+> earlier "pin now stale / ratification pending" note, which described the 2026-08-07/08 amendment
+> window and is no longer true. **The commit carrying this note changes ONLY frontmatter and this
+> provenance block; the governing text is byte-identical to `ef4883d`.**
+>
+> **What he ratified, in his own terms:** the current **human-outcome review model** and the final
+> **Question 2** framing — a reviewer examines the estate **as it exists at the current merge
+> boundary**, checks for unresolved reconciliation/convergence debt from previous completed work and
+> for current pre-merge defects that should prevent this merge, and **does not certify a future
+> post-merge estate.** It **preserves Codex's existing technical QA responsibilities** and **creates
+> no post-merge Codex gate.**
+>
+> **⚠️ HIS HASH RULING — read this before quoting any hash as the identity of his approval.**
+> **The ratification is of the COMMITTED WORDING AND GIT HEAD, not of one platform-specific raw-text
+> SHA-256.** LF and CRLF checkouts produce **different raw hashes for the same committed text**, and
+> that difference is expected rather than a defect. **The runtime fingerprint remains
+> DELIVERY-INTEGRITY EVIDENCE**: its job is to prove that the exact locally loaded and validated
+> contract bytes are the exact bytes delivered to Codex. **It is NOT the cross-platform identity of
+> this ratification**, and a future reader must not treat a hash mismatch across platforms as
+> evidence that the ratified wording changed — compare the committed text at `ef4883d` instead.
+>
+> **How this prose reached `ef4883d`** — authorship history, retained because ratification does not
+> erase it:
 >
 > 1. §3b (merge-class estate convergence), its blocking condition in §5, and §6's pointer to it were
->    added under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`, Amendment 2), on Warwick's
->    instruction relayed by Larry.
-> 0. **§3b's Question 2 was REFRAMED ONTO THE OBSERVABLE PRESENT** (`WO-2026-08-08-4C-11`), the last
->    change before ratification. It previously asked whether merging *would* leave the estate
->    converged — a prediction about a state that only exists after the merge. It now asks whether the
->    estate, **as it exists at the merge boundary**, is sufficiently reconciled and free of unresolved
->    convergence debt from previous completed work for the merge to proceed. The nine checks are
->    retained and re-expressed in the present tense; the four terms below are unchanged; no existing
->    duty was withdrawn and no review stage was added.
+>    added under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`, Amendment 2).
 > 2. **The EXACT-HEAD MODEL WAS REJECTED BY WARWICK** and §§1, 2, 3, 3b, 4 and 5 were rebased onto
 >    the human-outcome model (`WO-2026-08-07-4C-03`, Amendment 1). Warwick, verbatim: *"The
 >    exact-head model itself is part of the design mistake."* **The gate is a human outcome at a
 >    meaningful work boundary; a SHA is a receipt attached underneath it.** §2 carries the correction
 >    and the commissioning question; the companion amendment carries the matching round discipline.
->    §3b was reframed so the two HUMAN QUESTIONS are the heading and the nine checks are the evidence
+>    §3b was reframed so the HUMAN QUESTIONS are the heading and the nine checks are the evidence
 >    beneath them, per Warwick: *"Record SHAs and diffs as evidence where useful. Do not make Git
 >    metadata the goal."*
->
-> **The `ratified_wording_at_head: 17738bf` pin above therefore no longer describes this file's
-> prose, and was deliberately left byte-identical rather than fabricated forward: only Warwick
-> ratifies wording.** The frontmatter authorisation flags are likewise untouched, so the loader still
-> treats this contract as runnable — **Larry owns that window and is responsible for obtaining
-> explicit ratification of the amended prose before any live review runs under it.** This note
-> records authorship and pending ratification; **it does not qualify the amended sections' authority
-> as reviewer-facing law, and a reviewer receiving these bytes applies them in full.**
+> 3. **The four terms** — RECONCILE · MERGE · CONVERGENCE · CLOSE — were separated
+>    (`WO-2026-08-08-4C-09`), because *merge* had been carrying both a Git operation and the
+>    estate-wide outcome.
+> 4. **§3b's Question 2 was REFRAMED ONTO THE OBSERVABLE PRESENT** (`WO-2026-08-08-4C-11`), the last
+>    change before ratification. It previously asked whether merging *would* leave the estate
+>    converged — a prediction about a state that only exists after the merge. The nine checks are
+>    retained and re-expressed in the present tense; no existing duty was withdrawn and no review
+>    stage was added.
 >
 > **Runtime-home note, recorded so the next reader does not repeat the search.** This is the
 > durable home of Codex's operating law. `services/control-plane/review/towerReview.mjs` and

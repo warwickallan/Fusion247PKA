@@ -84,19 +84,29 @@ decision-grade and defaults to fail-closed under R1. (Every finding therefore ca
 
 ### Merge-class round discipline
 
-> **⚠️ PROVENANCE — ADDED AND THEN REBASED, BOTH ON 2026-08-07.**
+> **✅ RATIFIED BY WARWICK, 2026-08-08, AT COMMITTED HEAD `ef4883d529ea3145214339186cae0ddc48d2a256`**
+> — for **standing live use** and for the **BUILD-020 4C merge-class review**, alongside
+> `tower-qa-skill.md`, which this file is loaded and delivered with. This supersedes the earlier
+> "ratification owed" note. **The commit carrying this note changes ONLY this provenance block; the
+> governing text is byte-identical to `ef4883d`.**
 >
-> 1. Added under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`, Amendment 2), on Warwick's
->    instruction relayed by Larry.
+> **His hash ruling applies here too:** the ratification is of the **committed wording and Git head**,
+> not of one platform-specific raw-text SHA-256 — LF and CRLF checkouts yield different raw hashes for
+> the same committed text. The runtime fingerprint is **delivery-integrity evidence** (loaded and
+> validated bytes == bytes delivered to Codex), **not** the cross-platform identity of the
+> ratification. Canonical statement in `tower-qa-skill.md`'s provenance note; not restated further.
+>
+> **How this subsection reached `ef4883d`**, retained because ratification does not erase authorship:
+>
+> 1. Added under BUILD-020 Sub-phase 4C (`WO-2026-08-07-4C-01`, Amendment 2).
 > 2. **Rebased off the exact-head model** (`WO-2026-08-07-4C-03`, Amendment 1) after Warwick
->    rejected it: *"The exact-head model itself is part of the design mistake."* The gate now binds
->    to the **logical product boundary** and carries Warwick's commissioning question verbatim.
+>    rejected it: *"The exact-head model itself is part of the design mistake."* The gate binds to the
+>    **logical product boundary** and carries his commissioning question verbatim.
+> 3. The **four terms** were separated (`WO-2026-08-08-4C-09`), and the merge-class question restated
+>    in the **present tense** (`WO-2026-08-08-4C-11`).
 >
-> **It is NOT part of the 2026-07-19 approved text recorded in `source_of_truth` above, and the
-> frontmatter was deliberately left byte-identical rather than fabricated forward — only Warwick
-> ratifies wording.** Explicit ratification of this subsection is owed alongside the
-> `tower-qa-skill.md` amendments of the same date. This records authorship; it does not qualify the
-> clause's authority as reviewer-facing law.
+> **It remains NOT part of the 2026-07-19 approved text recorded in `source_of_truth` above** — that
+> field records the original classification amendment's provenance and is unchanged.
 
 **THE BOUNDARY IS LOGICAL, NEVER A SHA** (Warwick, 2026-08-07 — binding). The merge-class gate is the
 **merge candidate and the outcome it promises**, not an exact head. A SHA is a **receipt recording
