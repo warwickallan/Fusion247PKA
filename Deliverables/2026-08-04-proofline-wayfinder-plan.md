@@ -2939,6 +2939,18 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 > 3. **No family is EFFECTIVE, and none may be claimed.** Zero qualified exposures have occurred under 4D. **The maximum truthful claim is that the loop can now name a family, carry it, and count a recurrence.**
 >
 > **📌 The pilot family is FF-01 `work-order-not-generated`** — Warwick's steer moved it there from both specialists' tonight-centred choices. **Its next qualified exposure is the next real Work Order.** Not manufactured, not scheduled.
+>
+> ### 🔁 HANDOVER TO THE NEXT SESSION — 2026-08-08. **Read this first if you are a fresh Larry.**
+>
+> **Warwick corrected the push gate at the machine-policy layer and it is VERIFIED ON DISK.** `C:\ProgramData\ClaudeCode\managed-settings.json` now carries ordinary main-pushes under **`ask`** and keeps `--force`, `-f`, `--force=`, **`--force-with-lease` (both forms — a gap that was genuinely unguarded before)**, `origin +*`, both `--delete` forms, `* :*` and `branch -D` under **`deny`**. **The session that made the change could not use it: Claude Code loads permissions at startup, and the push was still denied there. A relaunch was required.**
+>
+> **⛔ FIRST ACTION FOR THE FRESH SESSION — `git push origin main`. SIX COMMITS ARE BANKED LOCALLY AND UNPUSHED:** `e750ddb` · `4f565b7` · `4901917` · `bc40bf7` · `8763aa2` · `92058d4`. **Working tree was CLEAN at handover.** Buzz cannot review any 4D work until this lands.
+>
+> **🔬 AND IT IS A REAL TEST, SO REPORT WHAT ACTUALLY HAPPENS.** `permissions.ask` was **empty** before 2026-08-08, so that path is **unexercised on this machine**. **A prompt appearing = the gate works. A silent successful push = the gate is GONE rather than softened, which is worse than the original deny** — say so plainly rather than reporting a successful push.
+>
+> **Also owed, and neither is done:** delete the dead `C:\Fusion247PKA-build-020-trial` shell (Warwick authorised it 2026-08-08 as D-2; the previous session was anchored inside it and could not remove its own working directory) · and the **real `/close-session` → real fresh-launch acceptance**, which remains required before BUILD-020 finishes.
+>
+> **⚠️ Warwick's decision, still open:** Supabase reports **RLS DISABLED** on `session_report.rotation` and `session_report.specialist_dispatch` — both readable and writable by anyone holding the anon key. **Not auto-fixed on purpose**: enabling RLS without policies would break the Cockpit's read path. His call.
 
 > ### ⛔ HISTORICAL FROM HERE DOWN IN THIS SECTION — Sub-phase 4C, **CLOSED by Warwick 2026-08-08 (Amendment 15).**
 >
