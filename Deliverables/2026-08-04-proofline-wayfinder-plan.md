@@ -2912,6 +2912,26 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 >
 > **If it never arrives**, say so plainly and record it as an unbanked dispatch. **Do not write the report yourself** — the session cannot be its own sole witness, and that is the whole reason the step exists.
 
+> ### 🧭 FORWARD ROUTE — Warwick, 2026-08-08. **ORIENTATION ONLY. This does NOT change the current 4D route and nothing below is actionable yet.**
+>
+> ```
+> 4D — Finish CAPAE
+>       ↓
+> 4E — Prepare/reconcile the EXISTING BUILD-015 AsdAIr Wayfinder
+>       ↓
+> BUILD-015 — Resume that Wayfinder and do the AsdAIr work
+>       ↓
+> 4F — Return to BUILD-020, evaluate the whole method, reconcile and CLOSE
+> ```
+>
+> **⛔ 4E IS NOT THE ASDAIR BUILD.** His governing distinction, verbatim: **«Prepare AsdAIr before the jump. Execute AsdAIr only after the jump.»** 4E is a bounded BUILD-020 preparatory/evaluation phase whose only purpose is to establish that the existing BUILD-015 Wayfinder is truthful, reconciled and safe for a fresh Larry to land on. **Detailed authority is Warwick's `BUILD-015-PREJUMP-WAYFINDER-HANDOVER`, which governs when 4E is reached — not before.**
+>
+> **4E must establish:** the existing BUILD-015 Wayfinder is still the canonical AsdAIr map · reconciled against current repository/runtime/evidence truth · stale and superseded instructions cannot misdirect the next Larry · Pax's seven historic broken links truthfully classified · Proofline lessons that genuinely matter carried across **without copying Proofline machinery** · canonical post-Proofline lineage explicit · ONE truthful prepared post-jump phase · ONE gate question · ONE exact first post-jump action · unresolved facts explicitly deferred · **no AsdAIr functionality executed during preparation.**
+>
+> **BUILD-015 is the AsdAIr build and already exists. Do not create another one.** The first fresh BUILD-015 session resolves canonical merged state **by execution** before trusting prepared assumptions.
+>
+> **4F is the final exam of BUILD-020 — an EXAMINATION, not another governance programme.** The graduation question, his words: **«Can Warwick name a new destination and a fresh Larry reliably create and run the next build using the estate produced by BUILD-020?»** A bounded defect that invalidates a BUILD-020 claim may be corrected and retested; **an enhancement, a theoretical improvement, a prettier dashboard or a clever new mechanism is NOT automatically BUILD-020 work.**
+
 ### 🎯 THE ONE CURRENT NEXT ACTION — **Sub-phase 4D: CAPAE.** Opened by Warwick 2026-08-08 (Amendment 15).
 
 **The action: challenge Warwick's CAPAE Brief against the real estate, then bring him ONE concise decision brief. No implementation until he rules on it.**
