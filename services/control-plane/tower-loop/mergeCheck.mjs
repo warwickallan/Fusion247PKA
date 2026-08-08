@@ -155,6 +155,13 @@ const failLine = (r) => `PROBE FAILED: ${r.cmd} — ${String(r.stderr || 'no std
  * @param {string}   [args.cwd]           repository to enumerate (the local checkout Tower runs in)
  * @param {Function} [args.spawn]         injectable spawn — the one seam, shared with gitEvidence
  * @param {string}   [args.mainRef]       the canonical ref convergence is measured against
+ * @param {string}   [args.candidateRef]  WO-2026-08-08-4C-13 — the MERGE CANDIDATE under review
+ *   (the PR head). Every non-contained tip is additionally probed for ancestry OF THIS REF, which
+ *   is what distinguishes "this ref converges WITH the merge being reviewed and stops being
+ *   non-contained the moment it lands" from "this ref is independent of it and is real potential
+ *   debt". Absent, unresolvable, or unprobeable ⇒ UNRESOLVED for every ref. NEVER a default that
+ *   reads as either answer: an instrument that guesses when it cannot tell is worse than one that
+ *   says nothing.
  * @param {number}   [args.maxBytes]      hard cap on the rendered block
  * @param {number}   [args.maxRefsProbed] hard cap on distinct tips probed for stranded files
  */
@@ -162,6 +169,7 @@ export async function gatherConvergenceEvidence({
   cwd = DEFAULT_REPO_ROOT,
   spawn = nodeSpawn,
   mainRef = 'main',
+  candidateRef = null,
   maxBytes = MAX_CONVERGENCE_BYTES,
   maxRefsProbed = MAX_REFS_PROBED,
   timeoutMs = CONVERGENCE_PROBE_TIMEOUT_MS,
@@ -252,25 +260,51 @@ export async function gatherConvergenceEvidence({
   const unprobedTips = uniqueTips.length - probedTips.length;
   const canonicalTree = mainTreeRes.ok ? mainTreeRes.stdout.trim() : null;
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // WO-2026-08-08-4C-13 — THE MERGE CANDIDATE, and the question the block could not answer.
+  //
+  // Codex flagged the reviewed packet for "a contributing non-contained prior branch without
+  // visible content-level reconciliation". The block stated, correctly, that a ref was not
+  // contained in `main` and that it CONTRIBUTES. It had no way to state the one further fact that
+  // decides what that means for THIS review: whether the ref is already an ancestor of the merge
+  // candidate. An ancestor converges with this merge and ceases to be non-contained the instant it
+  // lands; a ref independent of the candidate does not, and is real potential debt.
+  //
+  // Both were rendering identically. The finding was legitimate — the EVIDENCE was insufficient,
+  // not the verdict wrong — so what is added here is a FACT per ref, gathered by execution, with
+  // no reconciliation conclusion computed. Codex still judges.
+  //
+  // The candidate itself appears among the non-contained tips and is trivially its own ancestor,
+  // so it renders `true`. That is correct and is left visible rather than special-cased: the
+  // candidate does converge with this merge, for the most obvious possible reason.
+  // ══════════════════════════════════════════════════════════════════════════
+  let candidateSha = null;
+  if (candidateRef) {
+    const candRes = record(await git('rev-parse', '--verify', `${candidateRef}^{commit}`));
+    if (candRes.ok) candidateSha = candRes.stdout.trim();
+  }
+
   /** sha → divergence record. EVERY field defaults to an explicit UNRESOLVED, never to a clean value. */
   const divergence = new Map();
   const GONE_RE = /not a (?:tree|valid) object|unknown revision|bad object|does not exist|ambiguous argument/i;
 
   const tipResults = await mapLimit(probedTips, PROBE_CONCURRENCY, async (sha) => {
-    const [anc, added, modified, mt] = await Promise.all([
+    const [anc, added, modified, mt, candAnc] = await Promise.all([
       git('merge-base', '--is-ancestor', sha, mainRef),
       git('diff', '--numstat', '--diff-filter=A', mainRef, sha),
       git('diff', '--numstat', '--diff-filter=M', mainRef, sha),
       canonicalTree ? git('merge-tree', '--write-tree', mainRef, sha) : Promise.resolve(null),
+      candidateSha ? git('merge-base', '--is-ancestor', sha, candidateSha) : Promise.resolve(null),
     ]);
-    probesRun += canonicalTree ? 4 : 3;
-    return { sha, anc, added, modified, mt };
+    probesRun += (canonicalTree ? 4 : 3) + (candidateSha ? 1 : 0);
+    return { sha, anc, added, modified, mt, candAnc };
   });
 
-  for (const { sha, anc, added, modified, mt } of tipResults) {
+  for (const { sha, anc, added, modified, mt, candAnc } of tipResults) {
     const d = {
       contained: 'UNRESOLVED', absent: 'UNRESOLVED', modified: 'UNRESOLVED',
-      contribution: 'UNRESOLVED', tree: null, conflicts: null, gone: false, sample: [],
+      contribution: 'UNRESOLVED', ancestorOfCandidate: 'UNRESOLVED',
+      tree: null, conflicts: null, gone: false, sample: [],
     };
     // A tip that has gone is a fact about a moving estate — never clean, never an error.
     if (GONE_RE.test(added.stderr) || GONE_RE.test(modified.stderr)) {
@@ -311,6 +345,17 @@ export async function gatherConvergenceEvidence({
       d.contribution = 'UNRESOLVED';
       failures.push(mt);
     }
+
+    // THE SAME FAIL-SAFE, for the same reason. `--is-ancestor` signals by exit code: 0 ancestor,
+    // 1 not an ancestor, anything else unresolved. A probe that could not run leaves the field at
+    // its UNRESOLVED default — it never falls back to `false`, which a reviewer would read as
+    // "independent of this merge, therefore stranded", nor to `true`, which would read as
+    // "already carried by this merge". Both are conclusions the evidence does not support.
+    if (candAnc) {
+      if (candAnc.ok) d.ancestorOfCandidate = 'true';
+      else if (candAnc.code === 1) d.ancestorOfCandidate = 'false';
+      else failures.push(candAnc);
+    }
     divergence.set(sha, d);
   }
 
@@ -325,8 +370,11 @@ export async function gatherConvergenceEvidence({
     const trees = d.tree
       ? ` (merged tree ${d.tree.slice(0, 12)} ${d.tree === canonicalTree ? '==' : '!='} canonical ${String(canonicalTree).slice(0, 12)}${d.conflicts ? ', merge CONFLICTS' : ''})`
       : '';
+    const cand = d.ancestorOfCandidate === 'UNRESOLVED'
+      ? '  ancestor_of_merge_candidate=UNRESOLVED — GAP IN THE EVIDENCE'
+      : `  ancestor_of_merge_candidate=${d.ancestorOfCandidate}`;
     return `contained_in_main=${d.contained}  files_absent_from_main=${d.absent}  `
-      + `files_modified_vs_main=${d.modified}  ${contribution}${trees}`;
+      + `files_modified_vs_main=${d.modified}  ${contribution}${trees}${cand}`;
   };
 
   // ── render ─────────────────────────────────────────────────────────────────
@@ -368,7 +416,14 @@ export async function gatherConvergenceEvidence({
   // probes failed. A truncation that removes the failure report would be the worst possible cut.
   out.push(`probes: ${probesRun} run, ${failures.length} FAILED${failures.length ? ' — sections below name each one' : ''}`);
   out.push(`canonical_tree: ${canonicalTree ?? 'UNRESOLVED — merge_contribution cannot be computed for any ref'}`);
-  out.push('method: containment via `git merge-base --is-ancestor`; same-path divergence via `git diff --numstat` against the canonical ref; merge contribution via `git merge-tree --write-tree`. Ref NAMES are never used to classify.');
+  // WO-2026-08-08-4C-13 — named at the top because every `ancestor_of_merge_candidate` field below
+  // is meaningless without knowing which ref it was measured against.
+  out.push(`merge_candidate: ${candidateRef
+    ? (candidateSha
+      ? `${candidateRef} @ ${candidateSha}`
+      : `${candidateRef} (UNRESOLVED — it did not resolve in this checkout, so ancestor_of_merge_candidate is UNRESOLVED for every ref)`)
+    : 'NONE SUPPLIED — ancestor_of_merge_candidate is UNRESOLVED for every ref. That is missing evidence, not a finding about any ref.'}`);
+  out.push('method: containment via `git merge-base --is-ancestor`; same-path divergence via `git diff --numstat` against the canonical ref; merge contribution via `git merge-tree --write-tree`; ancestry of the merge candidate via `git merge-base --is-ancestor <tip> <candidate>`. Ref NAMES are never used to classify.');
   // The reviewer-facing framing the correction requires. Short by design: Codex answers the human
   // question in §3b; this block only supplies evidence for it.
   out.push('⚠️ A PATH-ONLY MEASURE DOES NOT PROVE CONVERGENCE. `files_absent_from_main=0` means only that this ref adds no NEW pathnames — a ref that MODIFIES files the canonical ref already has can hold unique work and still score 0. Judge `files_modified_vs_main` and `merge_contribution` together; `merge_contribution=NOTHING` is the only field that says a ref contributes nothing.');
@@ -377,6 +432,9 @@ export async function gatherConvergenceEvidence({
   // estate-wide end state. Saying so here stops a reviewer reading a per-ref Git fact as an
   // estate-level conclusion, and stops a later reader "tidying" the field name.
   out.push('TERMS: `merge_contribution` is the NARROW GIT SENSE — what a Git merge of this ref into the canonical ref would add. CONVERGENCE is the estate-wide END STATE, and no single field here reports it.');
+  // WO-2026-08-08-4C-13 — the distinction the block previously could not draw, spelled out for the
+  // reviewer. Facts only: what the field means, and what it explicitly does NOT mean.
+  out.push('READING `ancestor_of_merge_candidate`: `true` means the tip is already an ANCESTOR of the merge candidate named above — this merge carries its work, and the tip stops being non-contained the moment this merge lands. `false` means the tip is INDEPENDENT of this merge — landing it changes nothing about the tip, which therefore remains potential estate debt. `UNRESOLVED` means the relation could NOT be determined and must never be read as either. This is a Git ancestry fact; it is not a reconciliation decision and no reconciliation decision is computed here.');
   out.push('SCOPE OF THIS BLOCK: it evidences estate STATE only. It does NOT evidence RECONCILIATION DECISIONS (integrate / decommission / already-satisfied / discard) — those are taken outside the diff, and if they are claimed they must be evidenced separately. Absence of reconciliation evidence here is a GAP, never a finding that no reconciliation was needed.');
   out.push('This block states facts only. It contains no convergence verdict, score or boolean.');
 
@@ -455,6 +513,8 @@ export async function gatherConvergenceEvidence({
   const unresolved = [...divergence.values()].filter((d) => d.contribution === 'UNRESOLVED' && !d.gone).length;
   if (gone) out.push(`  ${gone} tip(s) disappeared during enumeration (concurrent convergence) — recorded as unmeasurable, not as zero.`);
   if (unresolved) out.push(`  ⚠️ ${unresolved} tip(s) have merge_contribution=UNRESOLVED — that is missing evidence, NOT a finding of "contributes nothing".`);
+  const candUnresolved = [...divergence.values()].filter((d) => d.ancestorOfCandidate === 'UNRESOLVED' && !d.gone).length;
+  if (candUnresolved) out.push(`  ⚠️ ${candUnresolved} tip(s) have ancestor_of_merge_candidate=UNRESOLVED — that is missing evidence, NOT a finding that the tip is independent of this merge.`);
 
   // ── [R] recovery pins ──────────────────────────────────────────────────────
   // DELIBERATE CHOICE, stated rather than silent: refs under `refs/recovery/**` are EXCLUDED from
@@ -648,7 +708,12 @@ export async function runMergeCheck({
   // against the checkout Tower is running in, so the inventory describes the estate as it is at
   // the moment of review rather than whenever someone last wrote a note about it. `spawn` is the
   // same seam gatherGitEvidence took above.
-  const convergence = await gatherConvergence({ cwd, spawn });
+  // WO-2026-08-08-4C-13 — the merge candidate is the head under review, and it is the ref every
+  // `ancestor_of_merge_candidate` field is measured against. `ev.head_sha` is the RESOLVED head
+  // from the git evidence gathered immediately above rather than the caller's argument, so the
+  // inventory and the diff describe the same commit. If it is not an object this checkout holds,
+  // the field fails safe to UNRESOLVED — that is handled inside the gatherer, not papered over here.
+  const convergence = await gatherConvergence({ cwd, spawn, candidateRef: ev.head_sha ?? headSha ?? null });
   console.error(`[mergeCheck] convergence inventory: ${Buffer.byteLength(convergence.text, 'utf8')} bytes, `
     + `${convergence.probes_run} probes, ${convergence.probes_failed} failed, truncated=${convergence.truncated}`);
   const packet = {

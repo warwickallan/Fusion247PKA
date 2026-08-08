@@ -951,7 +951,15 @@ export async function processTurn(pool, turnId, deps = REAL_DEPS) {
         // the route that actually fires: staging the inventory only into mergeCheck.mjs's CLI
         // entrypoint would have worked when the command was run by hand and silently not worked
         // here, which is the "works if you invoke the right thing" failure, not durability.
-        const convergence = await doGatherConvergence({ cwd: REPO_ROOT });
+        // WO-2026-08-08-4C-13 — the same merge candidate the review is about, so each non-contained
+        // tip can be reported as an ancestor of this merge (converges with it) or independent of it
+        // (potential debt). `evidence.head_sha` is the RESOLVED head from the evidence gathered for
+        // this same turn; the turn row's head is the fallback. Unresolvable ⇒ UNRESOLVED, never a
+        // guess — the gatherer owns that fail-safe.
+        const convergence = await doGatherConvergence({
+          cwd: REPO_ROOT,
+          candidateRef: evidence?.head_sha ?? turnRow.head_sha ?? null,
+        });
         const packet = buildMergePacket({ turnRow, evidence, buildRef, larryClaim: turnRow.larry_response, openFindings, convergence });
         const mr = await doMergeReview({ qaSkillText: qa.text, packet, cwd: REPO_ROOT });
         mergeReviewRecord = {
