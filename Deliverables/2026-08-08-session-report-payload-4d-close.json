@@ -65,6 +65,12 @@
       "exposure": "none-this-session",
       "summary": "No real Work Order was issued this session. The three specialist commissions are reviews, not Work Orders under SOP-022, so the pilot family had no qualified opportunity. Recorded rather than left silent.",
       "evidence_ref": "Deliverables/2026-08-08-subagent-token-ledger-4d-close.md"
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "clean",
+      "summary": "PAX AWARDED, not Larry: four surfaces re-cut in the same commit as the change that contradicted them - rotate.md steps 6/12 and both Bars, the Wayfinder 4D block, and the handover block. Prior exposure was Amendment 14 heading, which failed. IMPROVED. First clean exposure the estate has recorded.",
+      "evidence_ref": "Deliverables/2026-08-08-session-performance-report-subphase-4d-close.md"
     }
   ],
   "unestablished": [
@@ -74,7 +80,8 @@
     "model per specialist - not exposed in the Agent return",
     "documentation-versus-product change volume - left to Pax, who can compute it from the commit range",
     "evidenced allocation across product/admin/assurance/rework/waiting - left to Pax",
-    "record-amended-body-not-recut exposure disposition - deliberately NOT self-awarded by Larry; Pax grades it"
+    "Opening-brief snapshot was taken MID-SESSION (12:16Z) not at the true start (08:26Z) - Veritas N-3 firing in production; Pax graded on other evidence and flagged it",
+    "Session identity is three-way divergent: dispatch b52e6da, payload 9de03b7, HEAD 9084e03 - step 8 necessarily moves HEAD after the payload, so exact closing head is unachievable as the contract words it"
   ],
   "notes": "Sub-phase 4D CLOSED on Veritas PASS: all 22 acceptance items at 7afac1d, CI 31257962740 green with zero skipped steps, after three review rounds and three genuine product corrections. Findings above are the recurrences Larry can evidence against himself; the clean/recurrence judgement on record-amended-body-not-recut is deliberately left to Pax under step 5c, because awarding one's own clean exposure is exactly what Larry may not do. Pax's report is OUTSTANDING at rotation and is named here and on the map rather than left silent."
 }
