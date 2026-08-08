@@ -22,9 +22,12 @@ import {
   toHookOutput,
   findCanonical,
   buildDenyReason,
+  classifyPushSegment,
+  classifyPushCommand,
   LOCATION,
   DECISION,
   GUARDED_TOOLS,
+  PUSH_ASK_REASON,
 } from './worktree-guard.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -881,4 +884,93 @@ test('REAL PROCESS: --estate lets the guard fire from a checkout that knows noth
     rmSync(stranger, { recursive: true, force: true });
     e.cleanup();
   }
+});
+
+// ---------------------------------------------------------------------------
+// The main-push human gate (Warwick, 2026-08-08)
+// ---------------------------------------------------------------------------
+
+test('MAIN-PUSH GATE: ordinary pushes that reach main are ASK, in every form Larry actually uses', () => {
+  for (const cmd of [
+    'git push origin main',
+    'git push origin HEAD:main',
+    'git push -u origin main',
+    'git push origin build-020/x:main',
+    'git push origin refs/heads/main',
+    'git push',
+    'git push origin',
+    'cd C:/Fusion247PKA && git push origin main',
+  ]) {
+    assert.equal(classifyPushCommand(cmd), 'main', `should ASK: ${cmd}`);
+  }
+});
+
+test('MAIN-PUSH GATE: destructive push forms are DENIED, never merely asked', () => {
+  for (const cmd of [
+    'git push --force origin main',
+    'git push -f origin main',
+    'git push --force-with-lease origin main',
+    'git push --force-with-lease=main origin main',
+    'git push --force-if-includes origin main',
+    'git push --force=main origin main',
+    'git push origin +main',
+    'git push origin :main',
+    'git push --delete origin main',
+    'git push -d origin main',
+    'git push --mirror origin',
+    'git push --prune origin main',
+  ]) {
+    assert.equal(classifyPushCommand(cmd), 'destructive', `should DENY: ${cmd}`);
+  }
+});
+
+test('MAIN-PUSH GATE: things that are not a push to main are left alone', () => {
+  for (const cmd of [
+    'git push origin feature/x',
+    'git push origin main:feature-backup',
+    'git status',
+    'git log --oneline -3',
+    'git push --dry-run origin main',
+    'echo "do not push to main"',
+  ]) {
+    assert.equal(classifyPushCommand(cmd), null, `should DEFER: ${cmd}`);
+  }
+});
+
+test('MAIN-PUSH GATE: a push hidden behind command substitution asks rather than guesses', () => {
+  assert.equal(classifyPushCommand('git push origin $(git rev-parse --abbrev-ref HEAD)'), 'main');
+});
+
+test('MAIN-PUSH GATE: the hook EMITS permissionDecision "ask" with Warwick\'s reason', () => {
+  const out = toHookOutput({ decision: DECISION.ASK, reason: PUSH_ASK_REASON });
+  assert.equal(out.hookSpecificOutput.permissionDecision, 'ask');
+  assert.equal(out.hookSpecificOutput.permissionDecisionReason, PUSH_ASK_REASON);
+  assert.equal(out.hookSpecificOutput.hookEventName, 'PreToolUse');
+});
+
+test('MAIN-PUSH GATE (MUTATION): the gate fires when ALIGNED and when NO programme state exists', () => {
+  // The hole being closed: the location guard exits early in both of these
+  // cases, so a gate living inside decide() would never fire for the ordinary
+  // push. Both must still ASK.
+  const noState = guard(
+    { tool_name: 'Bash', tool_input: { command: 'git push origin main' }, cwd: tmpdir() },
+    { estateRoots: [tmpdir()] }
+  );
+  assert.equal(noState.decision, DECISION.ASK);
+  assert.equal(noState.reason, PUSH_ASK_REASON);
+
+  const aligned = guard(
+    { tool_name: 'Bash', tool_input: { command: 'git push origin main' }, cwd: process.cwd() },
+    { estateRoots: [process.cwd()] }
+  );
+  assert.equal(aligned.decision, DECISION.ASK);
+});
+
+test('MAIN-PUSH GATE (MUTATION): a force-push is denied even from the canonical worktree', () => {
+  const r = guard(
+    { tool_name: 'Bash', tool_input: { command: 'git push --force origin main' }, cwd: process.cwd() },
+    { estateRoots: [process.cwd()] }
+  );
+  assert.equal(r.decision, DECISION.DENY);
+  assert.match(r.reason, /denied outright/i);
 });

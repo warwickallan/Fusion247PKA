@@ -53,7 +53,9 @@ export const LOCATION = {
   NO_PROGRAMME: 'no-programme', // nothing active to be wrong about
 };
 
-export const DECISION = { ALLOW: 'allow', DENY: 'deny', DEFER: 'defer' };
+export const DECISION = { ALLOW: 'allow', DENY: 'deny', DEFER: 'defer', ASK: 'ask' };
+
+export const PUSH_ASK_REASON = 'Warwick approval required for push to main.';
 
 // ---------------------------------------------------------------------------
 // Path comparison
@@ -305,6 +307,86 @@ export function classifyBashCommand(command) {
   if (kinds.some((k) => k.kind === 'mutating')) return { kind: 'mutating', segments: kinds };
   if (kinds.some((k) => k.kind === 'unknown')) return { kind: 'unknown', segments: kinds };
   return { kind: 'read-only', segments: kinds };
+}
+
+// ---------------------------------------------------------------------------
+// The main-push human gate (Warwick, 2026-08-08)
+// ---------------------------------------------------------------------------
+// Warwick's required behaviour, and nothing more: an ordinary non-destructive
+// push to origin/main raises an approval prompt; force-push, history rewrite,
+// ref deletion and the other destructive push forms stay hard denied.
+//
+// This is deliberately INDEPENDENT of worktree alignment and of whether any
+// programme state exists. The gate is about the destination `main`, not about
+// where the session happens to be standing — a guard that only fires when
+// misaligned would leave the ordinary case (aligned, on main) ungated, which
+// is exactly the hole being closed.
+//
+// Direction of error is chosen on purpose: over-asking costs one prompt,
+// under-asking loses the human gate. Anything push-shaped that cannot be
+// positively established as NOT touching main asks.
+
+const DESTRUCTIVE_PUSH_FLAG =
+  /^(--force|-f|--force=.*|--force-with-lease(=.*)?|--force-if-includes|--mirror|--delete|-d|--prune)$/;
+
+export function classifyPushSegment(segment) {
+  const raw = String(segment ?? '');
+
+  let tokens = raw.split(/\s+/).filter(Boolean);
+  while (tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[0])) tokens = tokens.slice(1);
+  if (tokens.length === 0) return null;
+
+  const bin = tokens[0].replace(/^.*[\\/]/, '').toLowerCase();
+  if (bin !== 'git' && bin !== 'git.exe') return null;
+
+  let args = tokens.slice(1);
+  let i = 0;
+  while (i < args.length && (args[i] === '-C' || args[i] === '-c')) i += 2;
+  while (i < args.length && args[i].startsWith('-')) i += 1;
+  if ((args[i] || '').toLowerCase() !== 'push') return null;
+
+  const rest = args.slice(i + 1);
+
+  // Destructive forms first — these are denied outright and never merely asked.
+  for (const a of rest) {
+    if (DESTRUCTIVE_PUSH_FLAG.test(a)) return 'destructive';
+    // `origin +main` (forced refspec) and `origin :main` (ref deletion).
+    if (!a.startsWith('-') && (a.startsWith('+') || a.startsWith(':'))) return 'destructive';
+    if (!a.startsWith('-') && /:/.test(a) && a.split(':')[0] === '') return 'destructive';
+  }
+
+  // A dry run cannot move a remote ref, so it is not the gated event.
+  if (rest.some((a) => a === '--dry-run' || a === '-n')) return null;
+
+  const positional = rest.filter((a) => !a.startsWith('-'));
+
+  // `git push` / `git push origin` with no refspec pushes the current branch to
+  // its upstream. On this estate the working branch is main, and the guard
+  // cannot prove otherwise from the command text alone, so it asks.
+  if (positional.length <= 1) return 'main';
+
+  // An explicit refspec: the DESTINATION is what matters. `feature:main` is a
+  // push to main; `main:feature` is not.
+  return positional.slice(1).some((spec) => {
+    const dest = spec.includes(':') ? spec.split(':').pop() : spec;
+    return /(^|\/)main$/.test(dest.replace(/^refs\/heads\//, ''));
+  })
+    ? 'main'
+    : null;
+}
+
+export function classifyPushCommand(command) {
+  const raw = String(command ?? '');
+  if (!/\bpush\b/.test(raw)) return null;
+
+  // Command substitution can hide the real refspec. Do not try to be clever:
+  // anything push-shaped that we cannot read honestly goes to the human.
+  if (/\$\(|`/.test(raw)) return 'main';
+
+  const kinds = splitBashSegments(raw).map(classifyPushSegment);
+  if (kinds.includes('destructive')) return 'destructive';
+  if (kinds.includes('main')) return 'main';
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -566,6 +648,25 @@ export function guard(payload, opts = {}) {
     return { decision: DECISION.DEFER, reason: `${toolName ?? '(no tool)'} is not guarded.` };
   }
 
+  // The main-push human gate runs BEFORE any location logic. It must fire in
+  // the ordinary aligned case, and it must survive the absence of programme
+  // state — both of which the location path exits early on.
+  if (toolName === 'Bash') {
+    const push = classifyPushCommand(toolInput?.command);
+    if (push === 'destructive') {
+      return {
+        decision: DECISION.DENY,
+        reason:
+          'Force-push, history rewrite and ref deletion are denied outright. ' +
+          'Ordinary pushes to main are gated by Warwick\'s approval prompt, not by this route.',
+        push,
+      };
+    }
+    if (push === 'main') {
+      return { decision: DECISION.ASK, reason: PUSH_ASK_REASON, push };
+    }
+  }
+
   const { canonical, reason } = findCanonical({ cwd, ...opts });
   if (!canonical) {
     return { decision: DECISION.DEFER, reason: `Guard has no canonical location: ${reason}.` };
@@ -578,11 +679,12 @@ export function guard(payload, opts = {}) {
 }
 
 export function toHookOutput(result) {
-  if (!result || result.decision !== DECISION.DENY) return null;
+  if (!result) return null;
+  if (result.decision !== DECISION.DENY && result.decision !== DECISION.ASK) return null;
   return {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
+      permissionDecision: result.decision === DECISION.ASK ? 'ask' : 'deny',
       permissionDecisionReason: result.reason,
     },
   };
