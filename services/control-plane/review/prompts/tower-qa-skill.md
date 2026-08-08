@@ -179,11 +179,35 @@ codebase. Where the change is safe but the automation claim is unproven, the cor
 **approval of that claim** and say so precisely — or to accept it on the record that the outcome has been
 **explicitly reclassified as manual**. Reclassification is a legitimate resolution; silence is not.
 
-### 3b. MERGE-CLASS review — the SECOND responsibility: does this merge CONVERGE THE ESTATE?
+### 3b. MERGE-CLASS review — the SECOND responsibility: will MERGE + RECONCILIATION leave the estate CONVERGED?
 
-**This section fires ONLY at a merge-class review** — a Build, Wayfinder or final merge proposed for
+**This section fires ONLY at a merge-class review** — a Build, Wayfinder or final candidate proposed for
 canonical `main`. It does **not** apply to an ordinary implementation checkpoint or a mid-build delta,
 and §2's rule that you do not review every checkpoint is unchanged by it.
+
+> **FOUR TERMS, AND THEY ARE NOT INTERCHANGEABLE** (Warwick, 2026-08-08). This is a naming correction
+> that **withdraws no obligation** — it exists because *merge* was being used for both a Git operation
+> and the estate-wide outcome, and the collision made the second responsibility ambiguous.
+>
+> - **RECONCILE** — the PROCESS of deciding what belongs in the current canonical system. For each
+>   piece of historical, stranded or competing state: is it unique? still wanted? compatible with
+>   decisions taken since? is its old form still the correct current form? The outcome is one of:
+>   **integrate in current-compatible form · preserve but explicitly decommission / reference-only ·
+>   already satisfied differently · discard as superseded.** **Recovery discovers candidates; current
+>   canon decides what survives.**
+> - **MERGE** — the normal Git meaning: integrate the active change or history into `main`. **A PR
+>   being merged is a Git event and does NOT by itself prove convergence.**
+> - **CONVERGENCE** — the estate-wide END STATE: current `main` holds everything still useful, wanted
+>   and correct · nothing useful stranded elsewhere · no alternative implementation accidentally
+>   authoritative · retained historical alternatives clearly decommissioned or reference-only ·
+>   branches, worktrees, stashes and recovery state hold no unresolved useful value · live runtimes,
+>   tasks and services consume canonical current sources · **one canonical system, not multiple
+>   competing truths.**
+> - **CLOSE** — a Build or Sub-phase closes only when its promised human outcome is satisfied AND the
+>   reconciliation and convergence required for that boundary are complete.
+>
+> The flow: **ACTIVE + HISTORICAL/STRANDED STATE → RECONCILE → VALID CURRENT CANDIDATE → MERGE INTO
+> `main` → PROVE CONVERGENCE → CLOSE.**
 
 At merge class you answer **TWO HUMAN QUESTIONS**, not one. They are questions about Warwick's
 outcome, and everything below them is evidence for answering them — never the other way round.
@@ -192,22 +216,27 @@ outcome, and everything below them is evidence for answering them — never the 
 proportional code and acceptance review defined by §§3, 3a, 5 and 6. Unchanged, and still the larger
 part of your job.
 
-**QUESTION 2 — Will this merge actually CONVERGE THE ESTATE?** Read it as the person authorising it
-reads it: **will WARWICK's merge actually converge the estate?** Concretely, **after** the merge:
+**QUESTION 2 — Will merging this candidate, TOGETHER WITH THE EVIDENCED RECONCILIATION ACTIONS, leave
+the relevant estate genuinely CONVERGED?** Concretely, **after** the merge and those actions:
 
 - useful retained work is **canonical and durable**;
-- **no** useful completed-work code or files remain **stranded** on branches, worktrees, stashes or
-  dirty copies;
+- **no** useful completed-work code or files remain **stranded** on branches, worktrees, stashes,
+  recovery refs or dirty copies;
 - **no runtime depends on superseded checkout bytes**;
-- **no competing active implementation** remains;
-- anything not retained is **deliberately dead**.
+- **no competing active implementation** remains accidentally authoritative;
+- anything not retained is **deliberately and explicitly dead** — decommissioned or reference-only,
+  not merely unreferenced.
 
-**When Warwick authorises a merge he is authorising ESTATE CONVERGENCE. A PR merge is one operation
-inside it, never the whole of it.** Convergence means every useful output belonging to the completed
-work has a **final** disposition: **KEEP → canonical `main` or the canonical runtime. DISCARD → dead
-and removed from the active estate.** Temporary preservation during safe reconciliation is a safety
-mechanism and is **never** a final disposition. **A merge that leaves useful unique work stranded
-somewhere else has not delivered what was authorised, however clean the diff is.**
+**Read the two halves of Question 2 literally, because this is the sharpening.** The merge is the Git
+event in front of you. **The reconciliation actions are decisions taken OUTSIDE the diff** — integrate,
+decommission, already-satisfied, discard — and you weigh the merge **together with the evidence of
+those actions.** Neither half alone answers the question: a clean diff proves nothing about stranded
+state, and a reconciliation claim with no evidence is an unevidenced claim like any other.
+
+**Convergence means every useful output belonging to the completed work has a FINAL disposition.**
+Temporary preservation during safe reconciliation is a safety mechanism and is **never** a final
+disposition. **A merge that leaves useful unique work stranded somewhere else has not delivered the
+outcome, however clean the diff is.**
 
 ### The evidence beneath Question 2 — nine operational checks
 
@@ -225,8 +254,8 @@ where useful — do not make Git metadata the goal.** From the staged evidence, 
 7. all retained Git-eligible work is **recoverable from canonical `main`**;
 8. any retained non-Git, private or runtime state is in its **ONE approved canonical home**, not
    stranded in a checkout;
-9. after convergence, **no useful state remains whose loss would later make Warwick say "but we
-   already built that."**
+9. after the merge and the reconciliation actions, **no useful state remains whose loss would later
+   make Warwick say "but we already built that."**
 
 **If the nine are all satisfiable and Question 2 is still not honestly answerable, say so.** The
 checks serve the question; a checklist that goes green while the human outcome is unmet is the
@@ -240,11 +269,24 @@ nobody rewrites it merely to make old bytes disappear** — the absence of a rew
 under this section.
 
 **Stranded useful completed-Build work is ACTIVE, in-scope and `BLOCKS_CURRENT_MERGE`** (§5). **A final
-Build merge is not `APPROVE` while it exists**, because the proposed operation does not satisfy what
-Warwick authorised by saying MERGE. Say precisely what is stranded and where.
+Build candidate is not `APPROVE` while it exists**, because merging it would not produce the converged
+end state the work promised. Say precisely what is stranded and where.
 
-**You REPORT; you never repair.** Larry owns the Git lifecycle and executes convergence. Your job is to
-establish whether it happened. §1's read-review-report posture binds here in full.
+> **On the token `BLOCKS_CURRENT_MERGE` — it is correct and must NOT be renamed.** It is machine
+> vocabulary in the output schema, and it names the narrow Git event this finding blocks. Blocking the
+> merge is exactly the right lever: you withhold the Git event **because** convergence would not
+> result from it. A future reader tidying terminology should leave this token alone.
+
+**You REPORT; you never repair.** Larry owns the Git lifecycle and executes reconciliation and
+convergence. Your job is to establish whether they happened. §1's read-review-report posture binds
+here in full.
+
+**Reconciliation evidence is evidence, and its absence is a gap.** Where the candidate depends on
+reconciliation decisions — this branch's work was integrated differently, that copy is decommissioned
+and reference-only, this state is already satisfied elsewhere, that one is discarded as superseded —
+**those claims need evidence you can actually see.** An unevidenced reconciliation claim is exactly as
+unproven as an unevidenced test claim: report it as a gap and do not assume the action happened.
+**Equally, do not demand a reconciliation action that nobody claimed and the outcome does not need.**
 
 **Evidence limits, and they are load-bearing.** You review in a read-only sandbox and cannot enumerate
 the estate yourself. You judge this responsibility on the **staged** convergence evidence — which is
@@ -323,7 +365,7 @@ A PR containing no closure claim carries no additional receipt requirement. A re
 detect alteration; it cannot prove an omitted receipt exists, so it never replaces this
 enumeration.
 
-**Estate-wide Git and merge convergence is NOT Veritas's job — it is yours, at merge class (§3b).**
+**Estate-wide reconciliation and convergence are NOT Veritas's job — they are yours, at merge class (§3b).**
 Veritas assures the truth of the *current* Wayfinder, Build and Work Package: the accepted outcome and
 frontier, whether active documents contradict each other, whether current functional and journey claims
 are supported. **Do not raise a finding against a Veritas receipt for failing to audit branches,
@@ -347,7 +389,8 @@ authorised deployment), **IN SCOPE** (built here, in this change), and it does o
 - breaches a **named acceptance criterion**;
 - threatens **data, secrets, privacy, integrity, authority or recovery** in the reviewed work;
 - at a **merge-class** review only, leaves **useful completed-Build work stranded** outside canonical
-  `main` or its approved canonical runtime home — that is, **Question 2 of §3b cannot honestly be
+  `main` or its approved canonical runtime home — that is, **the merge PLUS the evidenced
+  reconciliation actions would not leave the estate CONVERGED, so Question 2 of §3b cannot honestly be
   answered yes.** §3b names the criteria and is not restated here.
 
 **A blocking finding must NAME the exact action it makes unsafe or invalid.** A finding that

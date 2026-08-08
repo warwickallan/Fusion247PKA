@@ -372,6 +372,12 @@ export async function gatherConvergenceEvidence({
   // The reviewer-facing framing the correction requires. Short by design: Codex answers the human
   // question in §3b; this block only supplies evidence for it.
   out.push('⚠️ A PATH-ONLY MEASURE DOES NOT PROVE CONVERGENCE. `files_absent_from_main=0` means only that this ref adds no NEW pathnames — a ref that MODIFIES files the canonical ref already has can hold unique work and still score 0. Judge `files_modified_vs_main` and `merge_contribution` together; `merge_contribution=NOTHING` is the only field that says a ref contributes nothing.');
+  // WO-2026-08-08-4C-09 — the two senses this block previously blurred. `merge_contribution` is
+  // named for the narrow Git operation and that is exactly what it computes; CONVERGENCE is the
+  // estate-wide end state. Saying so here stops a reviewer reading a per-ref Git fact as an
+  // estate-level conclusion, and stops a later reader "tidying" the field name.
+  out.push('TERMS: `merge_contribution` is the NARROW GIT SENSE — what a Git merge of this ref into the canonical ref would add. CONVERGENCE is the estate-wide END STATE, and no single field here reports it.');
+  out.push('SCOPE OF THIS BLOCK: it evidences estate STATE only. It does NOT evidence RECONCILIATION DECISIONS (integrate / decommission / already-satisfied / discard) — those are taken outside the diff, and if they are claimed they must be evidenced separately. Absence of reconciliation evidence here is a GAP, never a finding that no reconciliation was needed.');
   out.push('This block states facts only. It contains no convergence verdict, score or boolean.');
 
   if (!mainRes.ok) out.push('', `[0] CANONICAL REF`, `  ${failLine(mainRes)}`);

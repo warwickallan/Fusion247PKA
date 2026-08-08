@@ -105,6 +105,15 @@ which bytes were examined**; it is not the identity of the gate, not the definit
 receipts — which are themselves commits — appear to demand review of the ground they were just written
 on.
 
+**TERMS** (Warwick, 2026-08-08 — a naming correction that withdraws no obligation). **MERGE** is the
+Git event: integrating the change into `main`. **RECONCILE** is the process of deciding what belongs
+in the current canonical system — integrate in current-compatible form, preserve but explicitly
+decommission / reference-only, already satisfied differently, or discard as superseded.
+**CONVERGENCE** is the estate-wide end state. **CLOSE** requires the promised human outcome plus the
+reconciliation and convergence that boundary needs. The merge-class question is therefore **"will the
+merge, together with the evidenced reconciliation actions, leave the estate converged?"** — canonical
+in `tower-qa-skill.md` §3b and not restated here.
+
 **ONE full merge-class review of the final stable candidate.** If it finds a genuine merge blocker,
 that blocker is corrected and **ONE focused delta confirmation** of that blocker follows. Then stop.
 
@@ -118,6 +127,12 @@ that blocker is corrected and **ONE focused delta confirmation** of that blocker
   that could change the verdict: **executable behaviour · accepted functional scope · a load-bearing
   interface or dependency · runtime wiring · an active instruction that materially alters the
   executable journey.** Nothing else qualifies.
+- **A RECONCILIATION ACTION landing is not automatically a new round.** Integrating a stranded piece,
+  decommissioning a superseded copy or discarding dead state changes the estate, and the commits that
+  carry it move HEAD — but it reopens the gate **only if it changes the answer to the merge-class
+  question.** Apply the commissioning question below to it like anything else. Where the previous
+  review's blocker WAS the stranded state, the evidence that it has been reconciled is exactly the
+  **one focused delta confirmation** already allowed above — not a fresh full pass.
 - **No cycles for cosmetic documentation**, and no review of every implementation checkpoint.
 - **You are not an iterative development partner.** Reviewing is not how the work gets built.
 

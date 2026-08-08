@@ -68,7 +68,14 @@ const O5_LITERAL = 'The existence of an upcoming merge must NOT itself force `DE
 // checks. It exists because 4C's acceptance turns on the LIVE loader consuming the AMENDED bytes,
 // and a contract that merely contains new law on disk proves nothing about what reached stdin.
 // If §3b is ever reworded, this line is what proves the obligation still arrives.
-const CONVERGENCE_LITERAL = 'Will this merge actually CONVERGE THE ESTATE?';
+// MOVED DELIBERATELY 2026-08-08 (WO-2026-08-08-4C-09), which is the event this pin's own note
+// anticipates. It was `Will this merge actually CONVERGE THE ESTATE?`. Warwick's terminology
+// correction separated MERGE (the Git event) from CONVERGENCE (the estate end state), so the old
+// sentence was itself the overloaded usage being corrected — retaining it to keep a test green
+// would have preserved the defect in the delivered law. The new literal pins the SHARPENING, which
+// is the part that would be lost if §3b were ever quietly reverted: the reviewer must weigh the
+// merge TOGETHER WITH the reconciliation actions, not the merge alone.
+const CONVERGENCE_LITERAL = 'TOGETHER WITH THE EVIDENCED RECONCILIATION ACTIONS';
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-contract-reach-'));
 const tmpFile = (text, name = `${randomUUID()}.md`) => {
