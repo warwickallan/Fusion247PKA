@@ -224,9 +224,9 @@ and deleted.** Its rows are retained struck-through as evidence of the 2026-08-0
 |---|---|
 | Source authority | **Canonical `main`.** All BUILD-015 source, this map, the build record and all four+1 assurance receipts live on `main`. No BUILD-015 branch exists |
 | Gate 3 position | **THREE reviews, all HOLD.** Live receipt: `veritas-gate3-truth-94f135f.md` — `D-G3-21`–`24` never corrected, `D-G3-26` open Warwick decision. Enumerate `Builds/BUILD-015-…/Assurance/` rather than trusting this row |
-| CI | **`asdair-tests.yml` is RED at its most recent run** — 2026-08-08, head `eb03696` (the 4C merge): `unit` job PASSED, `integration` job FAILED at *"clean Postgres → schema → seed → data.js → planner.js"* with an `AssertionError`. **The workflow is path-filtered: later non-asdair commits produce NO run, and an unrun workflow looks exactly like a green one. Check the last run PER WORKFLOW.** Root cause UNESTABLISHED — a live candidate is fog item 3 (migrations 013/014 missing from the repo, so a clean Postgres cannot reproduce live schema) |
-| Live runtime | **RUNNING, and OLDER than current source.** Verified by execution 2026-08-08: `pipeline/runtime.js --watch` (PID at probe: 40920) has run from the primary checkout `C:\Fusion247PKA` **since 2026-08-03 21:31** — it predates every 2026-08-04 seven-workstream fix and is executing pre-fix bytes from memory. The ShopperBot server process started 2026-08-04 02:37, also pre-fix. Scheduled task `MyPKA-AsdAIr-Runtime` is **Ready** — `ACTIVATION-DEFERRED.md`'s "registered Disabled, not armed" is STALE. **Restarting these processes is a runtime action belonging to post-jump BUILD-015 work — 4E changes nothing live** |
-| Live database | **UNVERIFIABLE from this reconciliation** — `live_authority: none` throughout this map. Migrations directory still stops at `012_complete_grant_matrix.sql`; 013/014 remain applied-live-only (fog item 3, still true 2026-08-08) |
+| CI | ~~Root cause UNESTABLISHED~~ **RE-CUT at the bootstrap (2026-08-08 late): `asdair-tests.yml`'s `integration` job has NEVER passed in its recorded history (12/12 runs failed, 2026-08-05→08). Exact failure identified: `skill/test/integration.dbtest.js:266` — seeded `widget b` (household-scoped term match) plans `needs_decision` where the test requires `add`; the divergence is in the real `data.js` adapter ↔ planner contract, which unit fixtures never exercise. INHERITED BASELINE BREAKAGE — predates all 4E/bootstrap work. Do not weaken the assertion; the fix is routed work.** The path-filter warning stands: an unrun workflow looks exactly like a green one — check the last run PER WORKFLOW. Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §3 |
+| Live runtime | ~~RUNNING, and OLDER than current source~~ **RE-CUT — ALIGNED at the bootstrap (2026-08-08 ~21:50–21:55), on Warwick's §4 authority:** `runtime.js --watch` restarted via the canonical scheduled-task launcher (PID 13756, absolute canonical entrypoint) and cockpit-api restarted detached (PID 14376, canonical WorkingDirectory, port 8710 LISTENING). **Both now execute canonical source `959a64b` — the first live processes ever to carry the 2026-08-04 seven-workstream fixes.** No shop_event row appeared after the restarts (verified) — the alignment changed no shopping state. Known liability recorded once: **cockpit-api has no launcher/task; its start is manual.** Scheduled task `Ready`; `ACTIVATION-DEFERRED.md`'s "Disabled, not armed" remains STALE. Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §2 |
+| Live database | ~~UNVERIFIABLE from this reconciliation~~ **RE-CUT — ESTABLISHED read-only at the bootstrap (2026-08-08, `asdair_ro`, SELECTs only):** 26 live tables vs 23 repo-defined — **live-only: `command_request`, `previously_ordered`, `skill_steps` (the migration debt, now named); no packet table (015 never applied).** Rules: 40 by directive (exclude 3 · info 24 · map 10 · needs_decision 2 · rotate 1) — rule 32 is now a structured `rotate` WITH match_term; rule 10 (never-BOB) is still inert `info` while regular 69 (Arla BOB) is ACTIVE — fog 2 CONFIRMED LIVE. Regulars: 103/103 active, `source`={regular} only — fog 5 RESOLVED (no live Favourites source). **Real journey rows exist: 3 shops; shop 6 (2026-08-03) interpreted 35 lines against a 97-product catalogue, answered all 11 questions, replanned — and has sat at `PROCESSING` ever since: stalled at the exact packet-chain seam (breaks 3–5).** Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §4–§5 |
 | Suites | Not re-run during 4E (documentation-only phase). The last committed local claim is the 2026-08-04 green at 1,599–1,609; **the CI row above is newer and redder — believe it** |
 
 **Verified assets — real, tested, and reachable from something:** the intake receiver, shop state
@@ -243,9 +243,12 @@ caller — `handoff/buildHandoff.js` — **but `handoff/` itself has zero non-te
 The chain plan → packet → Sonnet handoff artefact exists and is tested, and **nothing in the
 production journey invokes it. A tested module with no caller is not delivered.**
 
-**The standing risk, stated as the risk it is: no row has ever been written to Postgres by this
-journey.** All three skipped tests are the destructive Postgres tests gated on
-`ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE`. The `RESUMABILITY` tests build a fresh deps container over the
+**The standing risk, re-stated with its scope (precision added at the 2026-08-08 bootstrap): no row
+has ever been written to Postgres by the TESTED journey** — all three skipped tests are the
+destructive Postgres tests gated on `ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE`, and that remains true.
+**The LIVE journey has real rows** (3 shops; shop 6's full trail through interpretation, questions
+and replan — see [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §5), written during the
+manually-rescued 2026-08-03 run. Both halves are true; the original sentence stated only the first. The `RESUMABILITY` tests build a fresh deps container over the
 **same in-memory JS object graph** — which proves no state hides in the container, **not** that
 anything survives process death.
 
@@ -307,22 +310,32 @@ source.**
 1. **The `sure`-variant conflict — three artefacts disagree.** `skill/planner.js:524` returns
    `fixed_variant_conflict`; `services/asdair/db/007_rules_rotate_directive.sql`'s header states the
    household holds a real conflict and that the migration does not resolve it; `ACTIVATION-DEFERRED.md`
-   calls it *"Real, unresolved."* **Establish which is true against the live rules table.**
-   `UNVERIFIABLE OFFLINE`. **The separate three-way reading Warwick already closed is retracted and
-   settled — this is not that, and it does not re-open it.**
+   calls it *"Real, unresolved."* ~~Establish which is true against the live rules table.
+   `UNVERIFIABLE OFFLINE`.~~ **PARTIALLY RESOLVED BY EXECUTION 2026-08-08 (read-only):** the live
+   rules table now holds Sure as a structured family — rule 13 `info`, rules 23/24 `map` (male→blue,
+   female→white), **rule 32 a structured `rotate` WITH `match_term`** (no longer inert info), rule
+   37 `info` (multibuy rounding). Whether the planner actually actions `rotate` end-to-end is
+   still for the routed investigation. **The separate three-way reading Warwick already closed is
+   retracted and settled — this is not that, and it does not re-open it.**
 2. **`Arla BOB Semi-Skimmed 2L` (regular 69) is ACTIVE while rule 10 says never buy BOB**, and rule
    10 is `info` with no `match_term`, so nothing enforces it. The old reasoning that `milk` resolved
    safely *because regular 69 carries no alias* was written when matching was exact-string. **Matching
    is now tolerant, so the reason that safety held may no longer hold.** More urgent, not less.
-   `UNVERIFIABLE OFFLINE`.
+   ~~`UNVERIFIABLE OFFLINE`.~~ **CONFIRMED LIVE 2026-08-08 (read-only): regular 69 `"Arla BOB
+   Semi-Skimmed Milk 2L That Tastes Like Whole"` is ACTIVE while rule 10 remains `info` with no
+   `match_term` — structurally unenforced. The regular's own name suggests the household
+   deliberately buys BOB; the rule says never. A genuine product question for the first WP — not
+   to be silently resolved either way.**
 3. **Migrations 013 and 014 were applied live and have no committed files.** `services/asdair/db/`
    stops at `012_complete_grant_matrix.sql` — verified by listing. **The live database is ahead of
    the repository, and a fresh clone or bootstrap restore does not reproduce live state.**
 4. **The producer's actual database role is unverified**, and it is the highest-risk unknown before
    any live migration application. `UNVERIFIABLE OFFLINE`.
-5. **Whether Favourites is genuinely a distinct source view.** `asdair.regulars` holds one distinct
-   `source` value; no `'favourite'` row has ever existed, so `source_view: "favourites"` is a forward
-   contract describing nothing live. `UNVERIFIABLE OFFLINE`. Product intent is Warwick's — §7 item 2.
+5. **Whether Favourites is genuinely a distinct source view.** ~~`UNVERIFIABLE OFFLINE`.~~
+   **RESOLVED BY EXECUTION 2026-08-08 (read-only): `asdair.regulars` = 103 rows, all active, and
+   `source` holds exactly `{regular}` — no `'favourite'` row exists. `source_view: "favourites"`
+   remains a forward contract describing nothing live.** Product intent is still Warwick's — §7
+   item 2 (human dependency 2) stands.
 6. **A `BUILD-002 live proof` test row is recorded as still sitting in a `next_week_draft` list.**
    `UNVERIFIABLE OFFLINE`.
 7. **A corrected record may not reach a fresh agent. UNEXPLAINED — three observations across three
