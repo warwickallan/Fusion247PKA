@@ -403,6 +403,18 @@ test('this work package owns ONE folder: it emits SQL for shop_line and pipeline
   const OWNED = [
     'asdair.shop_line', 'asdair.pipeline_command', 'asdair.shop_source_image',
     'asdair.shop_decision',
+    // asdair.remembered_choice - Silas's schema decision of 2026-08-09, written by
+    // pipeline/rememberedChoice.js. Warwick's rule: "when there is more than one
+    // valid choice, remember the choice I made last time." Append-only, and
+    // asdair_rw holds SELECT+INSERT with UPDATE/DELETE granted to NOBODY, so a
+    // preference cannot be rewritten by any code path that exists or is added
+    // later. It arrived for exactly this stage and has no other owner.
+    //
+    // ADDED BY LARRY, not by the implementing worker: this line sits outside that
+    // Work Order's file_surface, and the worker correctly refused BOTH to edit it
+    // AND to reshape its own SQL to dodge the regex - either would have made the
+    // suite green while hiding a new writer from this very check.
+    'asdair.remembered_choice',
   ];
   const writers = shippingFiles()
     // The backfill is the ONE deliberate exception - retiring the legacy
