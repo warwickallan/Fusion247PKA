@@ -1049,18 +1049,28 @@ test('MAIN-PUSH GATE (MUTATION): a tool NOT in the shell list is not silently ga
 
 import { classifyPowerShellCommand, safeOperationDecision } from './worktree-guard.mjs';
 
+
+// REPO_ROOT, added 2026-08-09. These CONTRACT tests originally hard-coded
+// 'C:/Fusion247PKA'. That passed on Warwick's machine and FAILED on Linux CI at
+// 518/520 — the path does not exist there, so  returned []
+// and the guard correctly DEFERRED under the rule that a component which cannot
+// establish where it is may not approve anything. The GUARD was right; the TEST was
+// environment-dependent, which is the 'green on your machine is not green' defect.
+// Anchored to the real repository root so it asserts the same property on both.
+const REPO_ROOT = normalisePath(join(__dirname, '..', '..'));
+
 const hookOf = (r) => {
   const o = toHookOutput(r);
   return o ? o.hookSpecificOutput.permissionDecision : null;
 };
 const asGuard = (tool, command, extra = {}) =>
-  guard({ tool_name: tool, tool_input: { command, ...extra }, cwd: 'C:/Fusion247PKA' },
-    { estateRoots: ['C:/Fusion247PKA'] });
+  guard({ tool_name: tool, tool_input: { command, ...extra }, cwd: REPO_ROOT },
+    { estateRoots: [REPO_ROOT] });
 
 test('CONTRACT: ordinary writes and shell mutations ALLOW, and the hook EMITS allow', () => {
   for (const tool of ['Write', 'Edit', 'MultiEdit', 'NotebookEdit']) {
-    const r = guard({ tool_name: tool, tool_input: { file_path: 'C:/Fusion247PKA/x.md' }, cwd: 'C:/Fusion247PKA' },
-      { estateRoots: ['C:/Fusion247PKA'] });
+    const r = guard({ tool_name: tool, tool_input: { file_path: REPO_ROOT + '/x.md' }, cwd: REPO_ROOT },
+      { estateRoots: [REPO_ROOT] });
     assert.equal(r.decision, DECISION.ALLOW, tool + ' must allow');
     assert.equal(hookOf(r), 'allow', tool + ' must EMIT allow — an unemitted decision is one the host never sees');
   }
