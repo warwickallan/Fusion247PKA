@@ -54,6 +54,50 @@ import { STEPS, decideNextStep, planOutcome, everIssued, pendingCommands } from 
 import { questionKeyFor, intentKeyFor, sourceIdFor, outboxKeyFor, normaliseTerm } from './keys.js';
 import * as store from './store.js';
 import * as shopLines from './shopLines.js';
+import * as shopDecisions from './shopDecisions.js';
+import { applyDecisionsToPlan } from './applyDecisions.js';
+
+/**
+ * THE ONE PLACE A PLAN IS BUILT (WP-B15-2).
+ *
+ * There is no plan table. `planBasket` is pure and is recomputed from durable
+ * inputs at EVERY site that needs a plan, which is exactly why applying the
+ * human's decisions at one of those sites and not the others would be a
+ * silently half-working fix: the shop would look decided while it was planned,
+ * and undecided when it was reconciled.
+ *
+ * So no step calls `deps.planBasket` directly any more. Every production
+ * recomputation on the shopping journey goes through here, which means
+ * "decisions are applied" is a property of the FUNCTION, not a discipline each
+ * call site has to remember. `runPipeline.test.js` asserts on this module's
+ * source that no other `deps.planBasket(` call site exists.
+ *
+ * @returns {{plan:object, applied:Array, unresolved:Array, unlinkable:Array,
+ *           decisions:Array}}
+ */
+async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
+  const plan = deps.planBasket({
+    listItems,
+    rules: inputs.rules,
+    products: inputs.products,
+    regulars: inputs.regulars,
+    budget: inputs.budget,
+    lastOrder: inputs.lastOrder,
+    // THE ANSWERS WARWICK HAS ALREADY GIVEN, as cross-week rule evidence. This
+    // is the FORWARD-LEARNING channel (asdair.rule_qa_log) and it is NOT how a
+    // current-shop decision travels - see applyDecisions.js. Lane B owns it.
+    priorAnswers: inputs.priorAnswers,
+    household: shop.household_id,
+  });
+
+  const decisions = await shopDecisions.listDecisions(deps, shop.id);
+  const regularsById = catalogue && catalogue.regularsById instanceof Map
+    ? catalogue.regularsById
+    : new Map(((catalogue && catalogue.regulars) || []).map((r) => [Number(r.id), r]));
+
+  const result = applyDecisionsToPlan({ plan, decisions, questionKeyFor, regularsById });
+  return { ...result, decisions };
+}
 
 /** The list_date a shop belongs to, taken from its ref. NO CLOCK: a retry that
  *  crossed midnight must not put this week's items on next week's list. */
@@ -371,22 +415,10 @@ async function stepPlan(deps, snapshot) {
   const listItems = await store.listListItems(deps, shop.list_id);
   const inputs = await deps.loadPlanningInputs(shop.household_id);
 
-  const plan = deps.planBasket({
-    listItems,
-    rules: inputs.rules,
-    products: inputs.products,
-    regulars: inputs.regulars,
-    budget: inputs.budget,
-    lastOrder: inputs.lastOrder,
-    // THE ANSWERS WARWICK HAS ALREADY GIVEN. asdair.rule_qa_log, read by
-    // data.js loadRuleQaLog() and handed over by loadPlanningInputs. The
-    // planner consults them BEFORE deciding a line needs a human, which is what
-    // stops a question that was settled in July being asked again in August.
-    // Optional and additive inside planBasket: absent, planning is byte-for-byte
-    // what it was, which is precisely why omitting it here was invisible.
-    priorAnswers: inputs.priorAnswers,
-    household: shop.household_id,
-  });
+  // THE PLAN, WITH WARWICK'S CURRENT-SHOP DECISIONS ALREADY APPLIED. Not the
+  // raw planner output: a line he has decided is no longer a line that needs
+  // him, and `unresolved` is the set that genuinely still does.
+  const { plan, applied, unresolved } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
 
   // The interpretation is the ONLY source of regulars ids on a candidate. See
   // planCandidates below for why that matters.
@@ -412,21 +444,87 @@ async function stepPlan(deps, snapshot) {
     if (term !== '' && !listItemIdByTerm.has(term)) listItemIdByTerm.set(term, item.id);
   }
 
-  const held = plan.items.filter((it) => it.status === 'needs_decision');
+  // ── ASK ABOUT EVERY LINE THAT STILL NEEDS A HUMAN ─────────────────────────
+  // `unresolved` - not `status === 'needs_decision'` - is the set to ask about.
+  // A line Warwick has decided is no longer held even though the PLANNER still
+  // classified it that way, because the planner does not know what he said.
+  //
+  // Two populations, and they need different questions:
+  //
+  //   * NO DECISION YET      -> the original round-1 question, unchanged. Its
+  //                             key is byte-for-byte the historic derivation,
+  //                             so ON CONFLICT still recognises a question
+  //                             asked in a previous pass and does not re-ask.
+  //   * CLARIFICATION NEEDED -> a genuinely NEW question row for round N+1.
+  //                             The round-1 row cannot be reused: recordAnswer
+  //                             is a compare-and-set on status='open', so
+  //                             round 2 could only be recorded by forcing the
+  //                             status back - and round 1's answer_text, which
+  //                             is Warwick's exact words, would be overwritten
+  //                             by it. One row per round is forced by the
+  //                             schema, not chosen.
+  //
+  // THIS IS ALSO WHAT PREVENTS THE LIVELOCK. Opening the next round here means
+  // countOpenQuestions is non-zero by the time planOutcome runs, so the gate
+  // takes its ordinary NEEDS_DECISION branch and the shop waits on a real
+  // question with a real card - instead of bouncing PROCESSING <-> NEEDS_DECISION
+  // forever against a question that can never re-open.
+  const lineByKey = new Map();
+  for (const it of plan.items) {
+    if (!it || !it.item_name) continue;
+    try { lineByKey.set(questionKeyFor(it.item_name), it); } catch { /* unreadable line - no key */ }
+  }
+
+  // ── A CLARIFICATION WAITS FOR THE READING TO BE CONFIRMED ────────────────
+  // The interpretation gate is the EARLIER gate: a list AsdAIr had to guess at
+  // is not acted on until a human agrees it says what we think it says. Asking
+  // Warwick which variant of line 3 he meant, before he has confirmed we read
+  // line 3 correctly at all, is asking the wrong question first - and because
+  // planOutcome checks open questions BEFORE the interpretation gate, an open
+  // clarification would also suppress the confirmation card entirely (the
+  // WP-B15-1 behaviour that recovered shop 6).
+  //
+  // The decision row is still written either way, so nothing is stranded: the
+  // clarification simply opens on the first pass after he confirms the reading.
+  const readingConfirmed = shop.needs_review !== true
+    || everIssued(snapshot, COMMANDS.CONFIRM_INTERPRETATION);
+
   const opened = [];
-  for (const line of held) {
-    const key = questionKeyFor(line.item_name);
+  for (const held of unresolved) {
+    const line = lineByKey.get(held.question_key) || { item_name: held.item_name, alternatives: [] };
+    const term = normaliseTerm(held.item_name);
+
+    // The clarification round, when one is owed. `question_round` on the
+    // decision's own question row is the round we are IN; the next is +1.
+    const wantsClarification = held.needs_clarification_round === true;
+    if (wantsClarification && !readingConfirmed) continue;
+
+    const nextRound = wantsClarification
+      ? Number(held.question_round || 1) + 1
+      : 1;
+
+    const key = nextRound === 1 ? held.question_key : questionKeyFor(held.item_name, nextRound);
+    const questionText = nextRound === 1
+      ? `Which product is "${held.item_name}"?`
+      : `About "${held.item_name}" - ${held.clarification_reason || 'I could not tell which you meant'}. Which did you mean?`;
+
     const res = await deps.shopStore.openQuestion({
       shop_id: shop.id,
       question_key: key,
       // Null when the plan line answers to no stored list item. The joins are
       // LEFT for exactly this: a question with no carrier still reaches the
       // human with a degraded card, and is never dropped.
-      list_item_id: listItemIdByTerm.get(normaliseTerm(line.item_name)) ?? null,
-      question_text: `Which product is "${line.item_name}"?`,
-      candidates: planCandidates(line, byReading.get(normaliseTerm(line.item_name)) || null),
+      list_item_id: listItemIdByTerm.get(term) ?? null,
+      question_text: questionText,
+      candidates: planCandidates(line, byReading.get(term) || null),
+      // Absent on round 1, so that INSERT stays byte-for-byte what it was.
+      ...(nextRound > 1
+        ? { question_round: nextRound, parent_question_id: held.question_id }
+        : {}),
     });
-    opened.push({ key, created: res.created, already_answered: res.already_answered });
+    opened.push({
+      key, created: res.created, already_answered: res.already_answered, round: nextRound,
+    });
   }
 
   const openNow = await store.countOpenQuestions(deps, shop.id);
@@ -434,7 +532,52 @@ async function stepPlan(deps, snapshot) {
     openQuestions: openNow,
     needsReview: shop.needs_review === true,
     interpretationConfirmed: everIssued(snapshot, COMMANDS.CONFIRM_INTERPRETATION),
+    // THE LINE GATE. Zero open questions no longer means "every line is
+    // resolved" - this is the count that makes that sentence earned.
+    unresolvedLines: unresolved.length,
   });
+
+  // ── THE LINE-RESOLUTION PARK MUST SPEAK (WP-B15-2, Veritas D-2) ──────────
+  // A park that tells nobody is the defect this build keeps re-creating. The
+  // gate above makes READY_TO_SHOP unreachable while a line is undecided -
+  // which is correct - and shipping it WITHOUT this card would have re-created
+  // shop 6's exact live shape: a shop stopped indefinitely, no event, no
+  // message, nothing telling Warwick it was waiting on him. That is the
+  // sibling of the very park WP-B15-1 was commissioned to fix, and root
+  // CLAUDE.md is unambiguous: "failure must never be silent."
+  //
+  // Found by Veritas, not by me and not by the external reviewer.
+  //
+  // Same self-healing shape as the confirmation card below, deliberately
+  // reused rather than reinvented: guarded by outboxEverQueued over the FULL
+  // outbox history so it is queued AT MOST ONCE per shop ever, and a shop
+  // ALREADY parked here before this code shipped gets its card on the very
+  // next pass, because every pass over a parked PROCESSING shop re-runs this
+  // step. No manual insert, no restart of durable state.
+  //
+  // Built from durable reads only, so it renders the same facts however many
+  // passes later it is sent. The item names come from the unresolved set the
+  // gate itself computed - the card cannot disagree with the reason the shop
+  // is parked, because they are the same data.
+  if (gate.step === STEPS.AWAIT_LINE_RESOLUTION
+    && !(await store.outboxEverQueued(deps, shop.id, 'lines_unresolved'))) {
+    await store.enqueueMessage(deps, {
+      householdId: shop.household_id,
+      shopId: shop.id,
+      kind: 'lines_unresolved',
+      key: outboxKeyFor(shop.shop_ref, 'lines_unresolved'),
+      payload: {
+        shopRef: shop.shop_ref,
+        // What is actually stuck, by name, so the card is actionable rather
+        // than an apology. Capped: a card is a message, not a report.
+        items: unresolved.slice(0, 10).map((u) => u.item_name),
+        unresolvedCount: unresolved.length,
+        // Why each one is stuck, which is the difference between "I never got
+        // an answer" and "I could not understand the answer you gave".
+        awaitingClarification: unresolved.filter((u) => u.needs_clarification_round === true).length,
+      },
+    });
+  }
 
   if (gate.to === null) {
     // Legally parked: the list needed review and nobody has confirmed it.
@@ -498,6 +641,7 @@ async function stepPlan(deps, snapshot) {
     return {
       stepped: false, step: gate.step, from: shop.status, to: null,
       reason: gate.reason, plan_summary: plan.summary, questions: opened,
+      decisions_applied: applied, lines_unresolved: unresolved,
     };
   }
 
@@ -506,6 +650,7 @@ async function stepPlan(deps, snapshot) {
     stepped: moved.changed, from: shop.status, to: gate.to,
     plan_summary: plan.summary, questions: opened,
     questions_open: openNow,
+    decisions_applied: applied, lines_unresolved: unresolved,
   };
 }
 
@@ -576,13 +721,29 @@ export function planCandidates(planLine, interpretedLine) {
  * inference promoteDecision's provenance guard exists to refuse - see the note
  * on realRecordLearning in deps.js, which this obeys rather than amends.
  *
- * It is NOT a no-op. promoteDecision writes the asdair.rule_qa_log row
- * unconditionally; only the asdair.rules promotion beside it is gated on the
- * flag. That log row is what data.js loadRuleQaLog() reads back as
- * `priorAnswers`, which stepPlan now feeds to the planner - so the loop closes
- * through the decision log, not through rule promotion. If the command surface
- * ever grows an explicit "and going forward" act, THAT is what flips this
- * literal, and nothing else may.
+ * ── CORRECTED 2026-08-09 (WP-B15-2). THIS COMMENT USED TO BE FALSE. ─────────
+ * It previously read: "It is NOT a no-op. ... That log row is what data.js
+ * loadRuleQaLog() reads back as `priorAnswers`, which stepPlan now feeds to the
+ * planner - so the loop closes through the decision log, not through rule
+ * promotion."
+ *
+ * THE LOOP DID NOT CLOSE. The claim was accurate about the write and the read
+ * and wrong about the end: `promoteDecision` does write the rule_qa_log row
+ * unconditionally, and `loadRuleQaLog` does read it back - and then
+ * `planner.js` discards it, because `eligiblePriorAnswers` admits only rows
+ * where `applies_going_forward === true`, which is the exact literal this step
+ * passes as `false`. Every row written here was filtered out by the consumer.
+ * The defect was documented as the fix, and the comment cost two separate
+ * investigations before anyone read both ends of the chain.
+ *
+ * What is true now: this write is the FORWARD-LEARNING channel and it remains
+ * inert until Lane B consumes it. It is NOT how an answer changes this week's
+ * shop. That job belongs to asdair.shop_decision and applyDecisions.js, which
+ * are a different table on a different path for a deliberately different
+ * concern (Warwick, 2026-08-09: current-shop meaning and future household
+ * learning are different concerns). If the command surface ever grows an
+ * explicit "and going forward" act, THAT is what flips this literal, and
+ * nothing else may.
  *
  * ── WHY A FAILURE HERE FAILS THE SHOP ──────────────────────────────────────
  * recordAnswerLearning throws by design and this step does not catch it: the
@@ -595,9 +756,35 @@ export function planCandidates(planLine, interpretedLine) {
 async function stepReplan(deps, snapshot) {
   const shop = snapshot.shop;
   const learned = [];
+  const decided = [];
 
   for (const q of await store.listQuestions(deps, shop.id)) {
     if (q.status !== 'answered' && q.status !== 'skipped') continue;
+
+    // ── WHAT THE ANSWER MEANT FOR THIS WEEK (WP-B15-2) ────────────────────
+    // Derived HERE, beside the learning write, for the same reason the
+    // learning write lives here: this is the one moment where "Warwick has
+    // answered" is durably true and nothing has consumed it yet. Deriving it
+    // in the tap handler instead would put a model call on the interactive
+    // path, where a slow or failing gateway would look to Warwick like a
+    // button that did nothing.
+    //
+    // Idempotent by the database: shop_decision_question_uniq means a re-run
+    // resolves to the SAME row. A second, differently-worded reading of the
+    // same answer cannot overwrite the first.
+    try {
+      const outcome = await decideAnswer(deps, shop, q);
+      if (outcome) decided.push(outcome);
+    } catch (err) {
+      // A failure to INTERPRET must not fail the shop and must not be
+      // swallowed. The line simply stays unresolved, the gate refuses
+      // READY_TO_SHOP, and the next pass tries again - which is a visible,
+      // recoverable state rather than a basket built on a guess.
+      decided.push({
+        question_key: q.question_key, decided: false,
+        reason: `interpretation failed: ${String(err && err.message ? err.message : err)}`,
+      });
+    }
 
     // The evidence of WHAT was asked about. Read from durable state - the
     // photographed wording from asdair.shop_line, else the list item's own
@@ -649,7 +836,227 @@ async function stepReplan(deps, snapshot) {
   const moved = await deps.shopStore.transition(
     shop.id, 'PROCESSING', 'every question is answered - re-planning with the answers in place',
   );
-  return { stepped: moved.changed, from: shop.status, to: 'PROCESSING', answer_learning: learned };
+  return {
+    stepped: moved.changed, from: shop.status, to: 'PROCESSING',
+    answer_learning: learned, decisions: decided,
+  };
+}
+
+/**
+ * ONE ANSWER -> ONE STRUCTURED CURRENT-SHOP DECISION.
+ *
+ * THE ORDER OF THE TWO BRANCHES IS THE POINT, not an optimisation:
+ *
+ *   1. AN EXACT CANDIDATE IS RESOLVED DETERMINISTICALLY, WITH NO MODEL CALL.
+ *      Warwick picked from a list we rendered and the candidate carries a real
+ *      asdair.regulars id. Nothing is left to interpret. Handing that to a
+ *      model would spend a call to re-derive a fact we already hold, and give
+ *      it an opportunity to be wrong about something certain.
+ *
+ *   2. FREE TEXT goes to the bounded interpreter, and ONLY free text.
+ *
+ * The interpreter is an injected seam (`deps.interpretAnswer`) so the suite
+ * stubs it at the boundary and spends nothing. A runtime with no interpreter
+ * wired does NOT guess: the answer stays uninterpreted, the line stays
+ * unresolved, and the gate refuses READY_TO_SHOP - which is the whole design.
+ *
+ * ── WHAT THE INTERPRETER MAY ASSERT ─────────────────────────────────────────
+ * It returns STRUCTURED MEANING, never prose authority, and it may only name a
+ * product present in the grounded evidence it was given. That is enforced in
+ * three places rather than trusted once: the prompt bounds it, `buildDecision`
+ * rejects a shape that decides nothing while claiming to, and
+ * `decided_regular_id` is a real FOREIGN KEY - so an invented product is
+ * refused by the database, not by the model's good intentions. Unknown means
+ * `clarification_required`; there is no least-bad match anywhere on this path.
+ */
+async function decideAnswer(deps, shop, question) {
+  // Already decided - the database owns that fact, not this process.
+  const existing = await shopDecisions.findDecisionForQuestion(deps, question.id);
+  if (existing) {
+    return { question_key: question.question_key, decided: false, reason: 'already decided' };
+  }
+
+  // ── 1. DETERMINISTIC. No model call on this path, and a test asserts it. ──
+  const exact = shopDecisions.resolveExactCandidate(question);
+  if (exact) {
+    const res = await shopDecisions.recordDecision(deps, {
+      shop_id: shop.id, question_id: question.id, ...exact.decided,
+    });
+    return {
+      question_key: question.question_key, decided: res.created,
+      kind: res.decision.decision_kind, interpreted_by: res.decision.interpreted_by,
+      model_called: false,
+    };
+  }
+
+  // ── 2. FREE TEXT. Bounded, grounded interpretation. ──────────────────────
+  //
+  // ── EVERY FAILURE FROM HERE ON OPENS A QUESTION (Codex F2) ───────────────
+  // A line whose question is already ANSWERED has exactly one route back to a
+  // human: a `clarification_required` decision, which opens a genuine round-2
+  // question. Anything that instead throws or returns without writing a
+  // decision leaves the line unresolved with NO open question - the shop parks
+  // at wait:line_resolution and the lines_unresolved card tells Warwick it is
+  // stuck while giving him nothing to answer. A notification is not an answer
+  // path.
+  //
+  // Five paths used to end that way, not one. Codex found the second; the
+  // CLASS is what matters:
+  //   1. no interpreter wired            -> returned early, no decision
+  //   2. structurally invalid return     -> threw            (Codex F2)
+  //   3. buildAnswerGrounding throwing    -> propagated
+  //   4. the interpreter itself throwing  -> propagated (e.g. no gateway)
+  //   5. recordDecision refusing a shape  -> propagated (Terra returns
+  //                                          existing_regular with no id)
+  //
+  // The inconsistency was the tell: an unknown KIND already became a
+  // clarification and gave Warwick a real question, while a malformed SHAPE
+  // gave him a dead end. Same underlying situation - Terra did not return
+  // something usable - and "I could not read the answer" is precisely the case
+  // where asking again is correct. So they all take the same route now.
+  //
+  // THIS GUESSES NOTHING. A clarification decides nothing about the line: it
+  // records that the answer could not be read and asks Warwick again.
+  let grounding = null;
+  let returned = null;
+  let failure = null;
+
+  try {
+    if (typeof deps.interpretAnswer !== 'function') {
+      failure = 'no interpreter is wired into this runtime, so your answer could not be read';
+    } else {
+      grounding = await buildAnswerGrounding(deps, shop, question);
+      returned = await deps.interpretAnswer(grounding);
+      if (!returned || typeof returned !== 'object' || Array.isArray(returned)
+        || typeof returned.decision_kind !== 'string') {
+        failure = 'the interpreter did not return a usable structured answer';
+        returned = null;
+      }
+    }
+  } catch (err) {
+    failure = `the interpreter could not be reached: ${String(err && err.message ? err.message : err)}`;
+  }
+
+  // PROVENANCE STAYS TRUE. A failure-derived clarification was decided by this
+  // code's own rule, NOT by a model - in three of the five paths no model was
+  // ever successfully invoked at all. Recording 'terra' for those would be the
+  // same false provenance WO-2026-08-09-B15-03 existed to remove.
+  const failureSpec = () => ({
+    shop_id: shop.id,
+    question_id: question.id,
+    decision_kind: 'clarification_required',
+    clarification_reason: failure,
+    interpreted_by: 'rule',
+    decision_evidence: {
+      model_return: returned,
+      grounding: grounding ? grounding.sanitized : null,
+      failure,
+    },
+    grounding_fingerprint: grounding ? grounding.fingerprint ?? null : null,
+    evidence_shop_line_id: grounding ? grounding.shop_line_id ?? null : null,
+  });
+
+  if (failure !== null) {
+    const res = await shopDecisions.recordDecision(deps, failureSpec());
+    return {
+      question_key: question.question_key, decided: res.created,
+      kind: res.decision.decision_kind, interpreted_by: 'rule',
+      model_called: returned !== null, reason: failure,
+    };
+  }
+
+  let res;
+  try {
+    res = await shopDecisions.recordDecision(deps, {
+      shop_id: shop.id,
+      question_id: question.id,
+      decision_kind: returned.decision_kind,
+      decided_regular_id: returned.decided_regular_id ?? null,
+      decided_quantity: returned.decided_quantity ?? null,
+      decided_item_name: returned.decided_item_name ?? null,
+      clarification_reason: returned.clarification_reason ?? null,
+      // STORED, ROUTED NOWHERE. Lane B consumes it; nothing here does.
+      forward_intent: returned.forward_intent ?? null,
+      interpreted_by: 'terra',
+      interpreted_model: returned.model ?? null,
+      // THE EVIDENCE OF WHAT IT WAS GIVEN. 017's shop_decision_terra_shows_its_work
+      // CHECK makes a terra decision with empty evidence unstorable, so this is
+      // not a convention that can quietly lapse.
+      decision_evidence: { model_return: returned, grounding: grounding.sanitized },
+      grounding_fingerprint: grounding.fingerprint ?? null,
+      evidence_shop_line_id: grounding.shop_line_id ?? null,
+    });
+  } catch (err) {
+    // PATH 5. The model returned a well-formed object describing an ILL-FORMED
+    // decision - `existing_regular` naming no product, `new_item` with no name.
+    // buildDecision and migration 017 both refuse it, correctly. Refusing it
+    // must not also strand the line, so it degrades to the same question.
+    failure = `the interpreter returned a decision the database refuses: ${String(err && err.message ? err.message : err)}`;
+    const fallback = await shopDecisions.recordDecision(deps, failureSpec());
+    return {
+      question_key: question.question_key, decided: fallback.created,
+      kind: fallback.decision.decision_kind, interpreted_by: 'rule',
+      model_called: true, reason: failure,
+    };
+  }
+
+  return {
+    question_key: question.question_key, decided: res.created,
+    kind: res.decision.decision_kind, interpreted_by: 'terra', model_called: true,
+  };
+}
+
+/**
+ * THE BOUNDED EVIDENCE PACKET one answer is interpreted against.
+ *
+ * The boundary is a closed list, and everything outside it is deliberately
+ * absent: the model gets the original wording, the exact question, Warwick's
+ * exact words, the candidates that were offered, the catalogue identities in
+ * play, and the household rules that apply. It does not get the shop, the
+ * database, the other lines, or anything it could use to decide something it
+ * was not asked about.
+ *
+ * `sanitized` is what is DURABLY RECORDED as evidence: shapes, counts and ids,
+ * never the household's content twice over. An audit record must make the claim
+ * checkable without becoming a second copy of the shopping list.
+ */
+async function buildAnswerGrounding(deps, shop, question) {
+  const catalogue = assertCatalogueLoaded(await deps.loadCatalogue(shop.household_id), 'answer interpretation');
+  const inputs = await deps.loadPlanningInputs(shop.household_id);
+  const interpreted = await shopLines.listLines(deps, shop.id);
+  const wording = question.photographed_wording || question.item_name || null;
+  const line = wording
+    ? interpreted.find((l) => normaliseTerm(l.raw_reading) === normaliseTerm(wording)) || null
+    : null;
+
+  const candidates = [
+    ...(Array.isArray(question.rendered_candidates) ? question.rendered_candidates : []),
+    ...(Array.isArray(question.candidates) ? question.candidates : []),
+  ].filter((c) => c && typeof c === 'object');
+
+  return {
+    // What the model is asked to interpret.
+    original_wording: wording,
+    question_text: question.question_text,
+    answer_text: question.answer_text,
+    answer_source: question.answer_source,
+    candidates,
+    regulars: regularsOf(catalogue),
+    rules: inputs.rules,
+    shop_line_id: line ? line.id : null,
+    fingerprint: null,
+    // What is durably recorded ABOUT the call: counts and ids only. Never a
+    // product name, never the list, never the prompt text.
+    sanitized: {
+      question_id: question.id,
+      candidates_offered: candidates.length,
+      candidate_regular_ids: candidates.map((c) => c.regular_id ?? null).filter((v) => v !== null),
+      regulars_supplied: (regularsOf(catalogue) || []).length,
+      rules_supplied: Array.isArray(inputs.rules) ? inputs.rules.length : 0,
+      answer_source: question.answer_source,
+      had_original_wording: wording !== null,
+    },
+  };
 }
 
 /** APPLY CORRECTIONS. A correction is a new durable intent against the same
@@ -724,6 +1131,16 @@ async function stepPauseBuild(deps, snapshot, to) {
  * the same durable inputs it reproduces the same plan - which is exactly what
  * makes recomputation honest rather than a guess.
  *
+ * ── AND THAT IS EXACTLY WHY DECISIONS MUST BE APPLIED HERE TOO (WP-B15-2) ───
+ * "Deterministic given the same durable inputs" is only true if the DECISIONS
+ * are among the inputs. Before this change, this site recomputed the plan
+ * WITHOUT them - and, separately, without `priorAnswers` - so the basket
+ * reconciled against a plan that had never heard of anything Warwick said.
+ * Warwick would have seen his answer change the shop, then watched
+ * reconciliation quietly disagree with it, which is worse than the answer
+ * never landing at all. `planWithDecisions` is now the only way a plan is
+ * built anywhere in this module.
+ *
  * recordConfirmation is idempotent on (shop_id, content_fingerprint): the same
  * confirmation submitted twice writes nothing the second time.
  */
@@ -732,15 +1149,7 @@ async function stepRecordConfirmation(deps, snapshot, command) {
   const catalogue = assertCatalogueLoaded(await deps.loadCatalogue(shop.household_id), 'reconciliation');
   const listItems = await store.listListItems(deps, shop.list_id);
   const inputs = await deps.loadPlanningInputs(shop.household_id);
-  const plan = deps.planBasket({
-    listItems,
-    rules: inputs.rules,
-    products: inputs.products,
-    regulars: inputs.regulars,
-    budget: inputs.budget,
-    lastOrder: inputs.lastOrder,
-    household: shop.household_id,
-  });
+  const { plan } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
 
   const built = deps.buildConfirmationPayload({
     shop_id: shop.id,

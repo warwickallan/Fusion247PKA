@@ -725,6 +725,62 @@ export function renderReconciliationSummary({
 }
 
 /**
+ * THE SHOP IS WAITING ON A LINE, NOT ON A QUESTION (WP-B15-2).
+ *
+ * The gate that makes READY_TO_SHOP unreachable while a line is undecided
+ * needs a voice, or it is just a shop that stopped. This is that voice.
+ *
+ * It names the items so the message is actionable rather than an apology, and
+ * it distinguishes the two reasons a line is stuck - never answered, versus
+ * answered in a way that could not be understood - because they need
+ * different things from Warwick.
+ */
+export function renderLinesUnresolved({
+  shopRef, items, unresolvedCount, awaitingClarification,
+} = {}) {
+  assertShopRef(shopRef);
+
+  const named = Array.isArray(items) ? items.filter((i) => typeof i === 'string' && i !== '') : [];
+  const total = Number.isFinite(Number(unresolvedCount)) ? Number(unresolvedCount) : named.length;
+  const clarifying = Number.isFinite(Number(awaitingClarification)) ? Number(awaitingClarification) : 0;
+
+  const lines = [
+    '⏸️ Waiting on you before this shop can go ahead',
+    `Ref: ${value(shopRef)}`,
+    '',
+    `${count(total)} line(s) still need a decision, so the basket is not ready.`,
+    '',
+  ];
+
+  if (named.length > 0) {
+    lines.push('Waiting on:');
+    for (const item of named) lines.push(`  • ${value(item)}`);
+    if (total > named.length) lines.push(`  …and ${count(total - named.length)} more`);
+    lines.push('');
+  }
+
+  if (clarifying > 0) {
+    lines.push(`${count(clarifying)} of these were answered, but the answer could not be`);
+    lines.push('read confidently — a follow-up question has been sent rather than');
+    lines.push('a guess being made.');
+    lines.push('');
+  }
+
+  lines.push('Nothing has been added to a basket and nothing has been ordered.');
+  lines.push('Answer the open question(s) above and this shop will carry on by itself.');
+
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      // ANSWER with NO arg is "open the question queue" - the same act the
+      // plan-ready card offers. It deliberately does not carry a question key:
+      // this card is about the shop being stuck, not about one line.
+      [button('Show me what is waiting', ACTIONS.ANSWER, shopRef)],
+    ]),
+  };
+}
+
+/**
  * The catalogue, by name. Lets a caller (and the test suite) enumerate every
  * renderer without importing them one at a time — the shape test in
  * renderMessages.test.js walks this map, so a NEW renderer added here is
@@ -736,6 +792,7 @@ export const MESSAGES = Object.freeze({
   plan_ready: renderPlanReady,
   question: renderQuestionCard,
   confirm_interpretation: renderConfirmInterpretation,
+  lines_unresolved: renderLinesUnresolved,
   progress: renderProgress,
   basket_ready: renderBasketReady,
   status: renderStatus,

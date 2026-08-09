@@ -535,7 +535,42 @@ function buildQuestion(intent) {
     card_message_id: cardMessage
   };
 
-  return { row: row, columns: QUESTION_INSERT_COLUMNS.slice() };
+  const columns = QUESTION_INSERT_COLUMNS.slice();
+
+  // ── CLARIFICATION ROUNDS (WP-B15-2, migration 017) ────────────────────────
+  // Round 1 is the overwhelmingly common case and its INSERT stays BYTE-FOR-
+  // BYTE what it was: the two columns are added only when a round above 1 is
+  // genuinely asked for. That is deliberate - the round-1 statement shape is
+  // what three live shops, the fake database and the existing suite all
+  // already agree on, and widening it unconditionally would change a working
+  // path to serve an uncommon one.
+  //
+  // 017's shop_question_round_parent_agree CHECK is `(parent is null) = (round
+  // = 1)`, so the two fields are validated together here rather than
+  // separately: a round above 1 with no parent, or a parent on round 1, is an
+  // incoherent chain and the database would refuse it anyway.
+  const roundGiven = intent.question_round !== undefined && intent.question_round !== null;
+  const parentGiven = intent.parent_question_id !== undefined && intent.parent_question_id !== null;
+  if (roundGiven || parentGiven) {
+    const round = Number(intent.question_round);
+    if (!Number.isInteger(round) || round < 1) {
+      fail('buildQuestion: question_round must be an integer >= 1, got ' + String(intent.question_round) + '.');
+    }
+    if (round === 1 && parentGiven) {
+      fail('buildQuestion: round 1 is the original question and must have no parent_question_id.');
+    }
+    if (round > 1 && !parentGiven) {
+      fail('buildQuestion: question_round ' + round + ' is a clarification and requires parent_question_id ' +
+        '- a round with no parent is an orphaned chain the database refuses.');
+    }
+    if (round > 1) {
+      row.question_round = round;
+      row.parent_question_id = optionalDbId(intent.parent_question_id, 'buildQuestion: parent_question_id');
+      columns.push('question_round', 'parent_question_id');
+    }
+  }
+
+  return { row: row, columns: columns };
 }
 
 // ---------------------------------------------------------------------

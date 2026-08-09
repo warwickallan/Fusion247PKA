@@ -387,8 +387,23 @@ test('this work package owns ONE folder: it emits SQL for shop_line and pipeline
   //                            on WO-2026-08-08-B15-01 - the shop-row INSERT
   //                            allowlist is frozen and owned elsewhere, so the
   //                            binding lives in a side table this stage owns)
+  //   asdair.shop_decision     migration 017 - the durable CURRENT-SHOP
+  //                            decision (WP-B15-2). Same argument as the three
+  //                            above, and Silas's schema decision of
+  //                            2026-08-09: it arrived for exactly this stage
+  //                            and has no other owner. It is deliberately NOT
+  //                            columns on shop_question, precisely because
+  //                            THAT table is owned elsewhere and asdair_rw
+  //                            already holds table-level UPDATE on it.
   // Everything else is written through the component that owns it.
-  const OWNED = ['asdair.shop_line', 'asdair.pipeline_command', 'asdair.shop_source_image'];
+  //
+  // ADDING A TABLE HERE IS HOW THIS LIST IS MAINTAINED, NOT HOW IT IS WEAKENED.
+  // The assertion is unchanged and every table NOT on this list still fails it;
+  // a relaxation would be widening the match or dropping the check.
+  const OWNED = [
+    'asdair.shop_line', 'asdair.pipeline_command', 'asdair.shop_source_image',
+    'asdair.shop_decision',
+  ];
   const writers = shippingFiles()
     // The backfill is the ONE deliberate exception - retiring the legacy
     // pending_action rows IS its job, and the test below governs it instead.

@@ -230,13 +230,47 @@ export const QUESTION_KEY_BYTES = 9;
  * Shape: `q` + 8 hex characters = 9 ASCII bytes, which satisfies the protocol's
  * charset ([A-Za-z0-9._-]) and leaves room for `.<candidateIndex>` inside the
  * 16-byte callback arg budget.
+ *
+ * ── CLARIFICATION ROUNDS (WP-B15-2) ────────────────────────────────────────
+ * A clarification is a DIFFERENT question, so it needs a DIFFERENT key. The
+ * round travels INSIDE THE HASH INPUT and never into the output, so every key
+ * stays exactly 9 ASCII bytes whatever the round number.
+ *
+ * A textual suffix (`<key>#clarify.1`) was rejected on three independent
+ * grounds, recorded here so it is not reintroduced:
+ *   1. `#` is not in callbackProtocol's FIELD_RE ([A-Za-z0-9._-]), and
+ *      buildCallbackData THROWS rather than truncating - the clarification card
+ *      could not be rendered at all.
+ *   2. 19 bytes against MAX_QUESTION_KEY_BYTES = 12.
+ *   3. Even a legal `.c2` sits at EXACTLY 12 bytes with zero headroom, so the
+ *      scheme survives rounds 2-9 and breaks at round 10. A scheme that fails
+ *      at a round number is a latent defect, not a design.
+ *
+ * The key is opaque by design - it does not advertise that it is a
+ * clarification. That job belongs to shop_question.parent_question_id and
+ * question_round, which are readable, joinable and constrained (migration 017).
+ *
+ * ROUND 1 IS BYTE-FOR-BYTE UNCHANGED, AND THAT IS LOAD-BEARING. Three live
+ * shops carry shop_question rows keyed by the original one-argument
+ * derivation. Shifting a round-1 key by a single byte orphans every open
+ * question and re-asks every settled one. The `r === 1` branch below therefore
+ * returns the ORIGINAL expression - it does NOT hash `term + '#1'` - and
+ * keys.test.js pins it against a literal digest held in the test.
  */
-export function questionKeyFor(itemName) {
+export function questionKeyFor(itemName, round = 1) {
   const term = normaliseTerm(itemName);
   if (term === '') {
     throw new Error('keys: questionKeyFor needs a non-empty item name - an unreadable line cannot be asked about by name');
   }
-  return `q${digest(term, 4)}`;
+  const r = Number(round);
+  if (!Number.isInteger(r) || r < 1) {
+    throw new Error(`keys: questionKeyFor round must be an integer >= 1, got ${String(round)}`);
+  }
+  // THE ORIGINAL EXPRESSION, REACHED BY THE ORIGINAL CALL PATH. Do not
+  // "simplify" this into the round-N form below by hashing `${term}#1`: that
+  // produces a different digest and silently orphans three live shops.
+  if (r === 1) return `q${digest(term, 4)}`;
+  return `q${digest(`${term}#${r}`, 4)}`;
 }
 
 /**

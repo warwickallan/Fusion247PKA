@@ -219,6 +219,9 @@ export function createFakeDatabase(seed = {}) {
     // binding. PRIMARY KEY on shop_id IS the first-write-wins idempotency, so
     // it is modelled as a real unique index below, not as a convenience map.
     shop_source_image: [],
+    // asdair.shop_decision (migration 017) - what an answer MEANT for this
+    // week. UNIQUE (question_id) is modelled as a real index below.
+    shop_decision: [],
     browser_build_request: [],
     pending_action: [],
     pipeline_command: [],
@@ -390,7 +393,15 @@ export function createFakeClient(store, options = {}) {
       if (db.shop_question.some((q) => String(q.shop_id) === String(row.shop_id) && q.question_key === row.question_key)) return none();
       const created = {
         id: id('shop_question'), status: 'open', answer_text: null, answer_source: null,
-        asked_at: nowIso(), answered_at: null, ...row,
+        asked_at: nowIso(), answered_at: null,
+        // Migration 017's COLUMN DEFAULTS. A round-1 INSERT deliberately omits
+        // both columns so its statement shape stays byte-identical to the one
+        // three live shops were written with - which means the fake has to
+        // supply the defaults Postgres would, or every round-1 row reads back
+        // with question_round undefined and a reader comparing it to 1 is
+        // quietly wrong about every existing question.
+        question_round: 1, parent_question_id: null,
+        ...row,
       };
       db.shop_question.push(created);
       return rows([created]);
@@ -760,6 +771,71 @@ export function createFakeClient(store, options = {}) {
       rows(db.shop_line.filter((l) => String(l.shop_id) === String(p[0]) && Number(l.line_no) === Number(p[1])))],
     [/FROM asdair\.shop_line WHERE shop_id = \$1 ORDER BY line_no ASC/i, (sql, p) =>
       rows(db.shop_line.filter((l) => String(l.shop_id) === String(p[0])).sort((a, b) => a.line_no - b.line_no))],
+
+    // ── asdair.shop_decision (migration 017 - the current-shop decision) ───
+    // UNIQUE (question_id) IS the idempotency: one decision per question, ever.
+    // Modelled as a real index rather than a convenience check, because "the
+    // second insert wrote nothing" is only meaningful if the first is still
+    // there.
+    //
+    // The CHECKs modelled are the ones a WRONG CALLER trips, not all fifteen:
+    // a fake that can store a shape Postgres would refuse proves nothing about
+    // the shape Postgres will accept.
+    [/^INSERT INTO asdair\.shop_decision \(/i, (sql, params) => {
+      const row = insertRow(sql, 'asdair.shop_decision', params);
+
+      if (!['existing_regular', 'quantity_change', 'variant_choice', 'new_item',
+        'skip_this_week', 'clarification_required'].includes(row.decision_kind)) {
+        throw new Error('fakePg: CHECK shop_decision_kind_known violated');
+      }
+      if (['existing_regular', 'quantity_change', 'variant_choice'].includes(row.decision_kind)
+        && (row.decided_regular_id === null || row.decided_regular_id === undefined)) {
+        throw new Error('fakePg: CHECK shop_decision_regular_required violated');
+      }
+      if ((row.decision_kind === 'clarification_required')
+        !== (row.clarification_reason !== null && row.clarification_reason !== undefined)) {
+        throw new Error('fakePg: CHECK shop_decision_clarification_shape violated');
+      }
+
+      // The composite FK to shop_question (id, shop_id): a decision cannot name
+      // a question that does not exist, nor one belonging to another shop.
+      const parent = db.shop_question.find((r) => String(r.id) === String(row.question_id)
+        && String(r.shop_id) === String(row.shop_id));
+      if (!parent) throw new Error('fakePg: FK shop_decision_question_fk violated');
+
+      // ON CONFLICT (question_id) DO NOTHING.
+      if (db.shop_decision.some((d) => String(d.question_id) === String(row.question_id))) return none();
+
+      const created = {
+        id: id('shop_decision'),
+        decided_regular_id: null, decided_quantity: null, decided_item_name: null,
+        clarification_reason: null, forward_intent: null, interpreted_model: null,
+        decision_evidence: {}, grounding_fingerprint: null, evidence_shop_line_id: null,
+        interpreted_at: nowIso(), created_at: nowIso(), ...row,
+      };
+      db.shop_decision.push(created);
+      return rows([created]);
+    }],
+    [/FROM asdair\.shop_decision WHERE question_id = \$1/i, (sql, p) =>
+      rows(db.shop_decision.filter((d) => String(d.question_id) === String(p[0])))],
+    // The shop-scoped read JOINs shop_question to carry question_key - the only
+    // durable link between a recomputed plan line and a stored decision.
+    [/FROM asdair\.shop_decision d\s+JOIN asdair\.shop_question q/i, (sql, p) => {
+      const out = db.shop_decision
+        .filter((d) => String(d.shop_id) === String(p[0]))
+        .sort((a, b) => Number(a.id) - Number(b.id))
+        .map((d) => {
+          const q = db.shop_question.find((r) => String(r.id) === String(d.question_id)) || {};
+          return {
+            ...d,
+            question_key: q.question_key ?? null,
+            question_round: q.question_round ?? 1,
+            parent_question_id: q.parent_question_id ?? null,
+            question_status: q.status ?? null,
+          };
+        });
+      return rows(out);
+    }],
 
     // ── asdair.households / shopping_lists / shopping_list_items ───────────
     // Modelled so the REAL services/control-plane/wp-d-proof/asdairCommands.mjs

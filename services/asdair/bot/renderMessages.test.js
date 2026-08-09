@@ -42,6 +42,13 @@ const SAMPLES = {
     priorShopRef: 'shop-2026-07-21', priorReceivedAt: '2026-07-21T09:12:00.000Z',
     samePhotoAsPrior: false,
   },
+  // WP-B15-2: the voice of the line-resolution park. Without this card the
+  // gate that makes READY_TO_SHOP unreachable stops a shop in SILENCE, which
+  // is shop 6's live shape re-created by the gate meant to prevent it.
+  lines_unresolved: {
+    shopRef: REF, items: ['Ariel Pods', 'fruit splits'],
+    unresolvedCount: 2, awaitingClarification: 1,
+  },
   progress: { shopRef: REF, stage: 'search items', regularsAdded: 30, searchItemsAdded: 5, held: 2, substitutions: 0, basketLines: 35 },
   // The basket handback is DERIVED FROM THE VERIFICATION. `verification` is not
   // optional garnish: absent or null renders the loud NOT-VERIFIED card, by
@@ -73,11 +80,14 @@ function everyButton(rendered) {
 
 test('the catalogue covers every message the directive specifies', () => {
   // 'confirm_interpretation' added by WP-B15-1 (the needs_review gate's
-  // production surface). The list grows; nothing was removed or renamed.
+  // production surface). 'lines_unresolved' added by WP-B15-2 (the
+  // line-resolution gate's production surface - Veritas D-2). Both exist for
+  // the same reason: a gate that parks a shop must be able to say so.
+  // The list grows; nothing was removed or renamed.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
     'basket_ready', 'confirm_interpretation', 'confirmation_received', 'failure',
-    'plan_ready', 'progress', 'question', 'receipt', 'reconciliation_summary',
-    'status',
+    'lines_unresolved', 'plan_ready', 'progress', 'question', 'receipt',
+    'reconciliation_summary', 'status',
   ]);
 });
 

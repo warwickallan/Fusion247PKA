@@ -1,0 +1,542 @@
+// =====================================================================
+// BUILD-015 AsdAIr WP-B15-2 - answerJourney.test.js
+//
+// THE PRODUCT OUTCOME, END TO END, THROUGH THE REAL ADVANCER.
+//
+// decisionSpine.test.js proves the PARTS: the vocabulary, the refusals, the
+// pure transformation, the gate. This file proves the JOURNEY - that a real
+// answer, entering by the real command surface, travelling through the real
+// runPipeline steps and the real shopStore writers, ends with a line in this
+// week's basket that is genuinely different.
+//
+// That distinction is the whole reason this file exists separately. A suite
+// can be entirely green over correct parts that are not wired to each other:
+// `buildAnswerLearning` and `recordAnswerLearning` were both complete, both
+// tested, and had ZERO production callers, so every answer Warwick ever gave
+// died with the shop that asked for it. Unit tests did not catch it because
+// each unit was fine. Only the journey shows the gap.
+//
+// The ONLY stub is the model itself, injected at `deps.interpretAnswer`. Zero
+// model spend, and the stub records that it was called so the deterministic
+// path can be proven NOT to call it.
+//
+// FULLY OFFLINE. No database, no network, no model, no credentials.
+// =====================================================================
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { makeHarness, HOUSEHOLD_ID } from './test/harness.js';
+import * as commands from './commands.js';
+import { runPipeline } from './runPipeline.js';
+import { STEPS } from './stages.js';
+import { questionKeyFor } from './keys.js';
+
+const REF = 'SHOP-2026-08-03';
+const ACTOR = 'telegram:555';
+const HANDLE = { shopRef: REF };
+
+async function receiveText(h, text = '3 gourmet cat food\nfruit splits') {
+  return commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate: '2026-08-03', sourceKind: 'text',
+    rawText: text, actor: ACTOR, telegramChatId: '555', telegramMessageId: '900',
+  }, h.deps);
+}
+
+async function drain(h, max = 12) {
+  const steps = [];
+  for (let i = 0; i < max; i += 1) {
+    const r = await runPipeline(HANDLE, h.deps);
+    steps.push(r);
+    if (!r.stepped) break;
+  }
+  return steps;
+}
+
+const shopStatus = (h) => h.db.shop[0].status;
+
+/**
+ * A recording stub for the bounded interpreter.
+ *
+ * It returns whatever the test tells it to and counts its calls, so "a button
+ * spends no model call" is proven by a NUMBER rather than by inspection.
+ */
+function makeInterpreter(returns) {
+  const calls = [];
+  const fn = async (grounding) => {
+    calls.push(grounding);
+    return typeof returns === 'function' ? returns(grounding) : returns;
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+/** Drive a fresh shop to its first open question and return the key. */
+async function toFirstQuestion(h) {
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await drain(h);
+  assert.equal(shopStatus(h), 'NEEDS_DECISION', 'the shop must be waiting on a human');
+  assert.equal(h.db.shop_question.length, 1);
+  return h.db.shop_question[0].question_key;
+}
+
+// =====================================================================
+// AC3 - THE FREE-TEXT JOURNEY, END TO END
+// =====================================================================
+
+test('AC3 JOURNEY: free text -> interpreter -> structured decision -> a CHANGED line', async () => {
+  const interpretAnswer = makeInterpreter({
+    decision_kind: 'existing_regular',
+    decided_regular_id: 11,
+    forward_intent: 'unclear',
+    model: 'gpt-5.6-terra',
+  });
+  const h = makeHarness({ depsOverride: { interpretAnswer } });
+  const key = await toFirstQuestion(h);
+
+  // Warwick replies in normal English. Not a candidate label - prose.
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key,
+    answerText: 'the big bag of the fruity ones', answerSource: 'typed',
+  }, h.deps);
+
+  const replan = await runPipeline(HANDLE, h.deps);
+  assert.equal(replan.step, STEPS.REPLAN);
+
+  // THE MODEL WAS ASKED, AND ASKED ONCE.
+  assert.equal(interpretAnswer.calls.length, 1, 'free text must reach the interpreter exactly once');
+
+  // A STRUCTURED DECISION IS DURABLE.
+  assert.equal(h.db.shop_decision.length, 1, 'the answer produced no durable structured decision');
+  const decision = h.db.shop_decision[0];
+  assert.equal(decision.decision_kind, 'existing_regular');
+  assert.equal(Number(decision.decided_regular_id), 11);
+  assert.equal(decision.interpreted_by, 'terra');
+  assert.equal(decision.interpreted_model, 'gpt-5.6-terra');
+  assert.equal(decision.forward_intent, 'unclear', 'the forward signal is STORED even though nothing routes it');
+
+  // WARWICK'S EXACT WORDS SURVIVE, SEPARATELY FROM THE INTERPRETATION.
+  assert.equal(h.db.shop_question[0].answer_text, 'the big bag of the fruity ones',
+    "the interpretation must never overwrite Warwick's own words");
+
+  // AND THE EVIDENCE OF WHAT THE MODEL WAS GIVEN IS RECORDED.
+  assert.ok(decision.decision_evidence && decision.decision_evidence.grounding,
+    'a terra decision with no grounding evidence must not exist');
+  assert.equal(typeof decision.decision_evidence.grounding.candidates_offered, 'number');
+
+  // ── THE POINT OF THE WHOLE WORK PACKAGE ─────────────────────────────────
+  // The next plan pass consumes that decision and the LINE CHANGES.
+  const plan = await runPipeline(HANDLE, h.deps);
+  assert.equal(plan.to, 'READY_TO_SHOP', 'a decided line must let the shop become ready');
+  assert.equal(plan.lines_unresolved.length, 0);
+  assert.equal(plan.decisions_applied.length, 1, 'the decision was recorded but never applied to the plan');
+  assert.equal(plan.decisions_applied[0].kind, 'existing_regular');
+  assert.equal(plan.plan_summary.planned_add, 2,
+    'the answered line must now be IN the basket, not held back');
+  assert.equal(plan.plan_summary.needs_decision, 0);
+});
+
+test('AC3 JOURNEY: the interpreter is given the bounded evidence and nothing else', async () => {
+  const interpretAnswer = makeInterpreter({ decision_kind: 'skip_this_week' });
+  const h = makeHarness({ depsOverride: { interpretAnswer } });
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'skip it', answerSource: 'typed',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  const given = interpretAnswer.calls[0];
+  // The closed list from the Work Order.
+  for (const field of ['original_wording', 'question_text', 'answer_text', 'candidates', 'regulars', 'rules']) {
+    assert.ok(field in given, `the interpreter was not given ${field}`);
+  }
+  assert.equal(given.answer_text, 'skip it', "the model must see Warwick's exact words");
+  // And NOT the things it has no business deciding about.
+  for (const forbidden of ['shop', 'deps', 'client', 'listItems', 'plan']) {
+    assert.equal(forbidden in given, false,
+      `the interpreter was handed ${forbidden} - it can decide things it was not asked about`);
+  }
+});
+
+test('AC3 JOURNEY: a skip decision genuinely removes the line from this week', async () => {
+  const h = makeHarness({
+    depsOverride: { interpretAnswer: makeInterpreter({ decision_kind: 'skip_this_week' }) },
+  });
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'not this week', answerSource: 'typed',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  const plan = await runPipeline(HANDLE, h.deps);
+
+  assert.equal(plan.to, 'READY_TO_SHOP');
+  assert.equal(plan.plan_summary.excluded_this_week, 1, 'the skipped line must leave the basket');
+  assert.equal(plan.plan_summary.planned_add, 1, 'and only that line');
+});
+
+test('AC2 JOURNEY: a button naming an exact candidate spends NO model call', async () => {
+  const interpretAnswer = makeInterpreter({ decision_kind: 'skip_this_week' });
+  const h = makeHarness({ depsOverride: { interpretAnswer } });
+  const key = await toFirstQuestion(h);
+
+  // A text list produces no catalogue-resolver alternatives, so this question
+  // legitimately carries no id-bearing candidate. The card contents are
+  // planCandidates' job and are tested there; what is under test HERE is what
+  // the answer path does with a tap, so the offered list is set directly.
+  const withId = { label: 'Rowntrees Fruit Pastille Lolly', regular_id: 11, source: 'asdair.regulars (resolveByCatalogue)' };
+  h.db.shop_question[0].candidates = [withId];
+
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key,
+    answerText: withId.label, answerSource: 'button',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  assert.equal(interpretAnswer.calls.length, 0,
+    'a tap naming an exact candidate must NOT spend a model call - the answer was already certain');
+  assert.equal(h.db.shop_decision.length, 1);
+  assert.equal(h.db.shop_decision[0].interpreted_by, 'human',
+    'no model was asked, so no model may be recorded as the interpreter');
+  assert.equal(Number(h.db.shop_decision[0].decided_regular_id), Number(withId.regular_id));
+});
+
+// =====================================================================
+// D-2 - THE PARK SPEAKS
+// =====================================================================
+
+/**
+ * SHOP 6'S EXACT HISTORICAL SHAPE: a question ANSWERED, with NO decision row.
+ *
+ * Since Codex F2, every interpretation failure records a clarification and
+ * opens a real round-2 question, so the park is no longer reachable by simply
+ * failing to interpret - which is the point of that fix. What remains, and is
+ * exactly what the three live shops carry, is a question answered BEFORE the
+ * decision mechanism existed: nothing to apply, and a round-1 question that
+ * ON CONFLICT will not re-open.
+ *
+ * That is the honest remaining trigger for the park, so it is what these tests
+ * drive.
+ */
+async function toShopSixShape(h) {
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'no idea', answerSource: 'typed',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);              // replan
+  h.db.shop_decision = [];                        // the pre-mechanism world
+  return key;
+}
+
+test('D-2 JOURNEY: a shop parked on an unresolved line QUEUES a card, once and only once', async () => {
+  // Without this the gate simply stops the shop forever with nothing telling
+  // Warwick - shop 6's live shape, re-created by this WP's own gate.
+  const h = makeHarness();
+  await toShopSixShape(h);
+  const plan = await runPipeline(HANDLE, h.deps);
+  assert.equal(plan.step, STEPS.AWAIT_LINE_RESOLUTION, 'this test must actually reach the park');
+
+  const carded = () => h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'lines_unresolved');
+  assert.equal(carded().length, 1, 'the park queued no card - the shop stopped and nobody was told');
+  assert.equal(carded()[0].args.unresolvedCount, 1);
+  assert.deepEqual(carded()[0].args.items, ['fruit splits'], 'the card must name what is stuck');
+
+  // AT MOST ONCE PER SHOP, EVER. Ten more passes must not queue ten more cards.
+  for (let i = 0; i < 10; i += 1) await runPipeline(HANDLE, h.deps);
+  assert.equal(carded().length, 1,
+    'the park re-queued its card - a stuck shop would spam Warwick on every pass');
+});
+
+test('D-2 JOURNEY: the card is SELF-HEALING for a shop already parked before it existed', async () => {
+  // The property that recovered shop 6 live on 2026-08-09: a shop already
+  // sitting in the park gets its card on the very next pass, with no manual
+  // insert and no restart of durable state.
+  const h = makeHarness();
+  await toShopSixShape(h);
+  await runPipeline(HANDLE, h.deps);
+
+  const carded = () => h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'lines_unresolved');
+  assert.equal(carded().length, 1);
+
+  // The pre-existing shop: parked, but never carded, because the code did not
+  // exist when it parked.
+  const before = h.db.pipeline_command.length;
+  h.db.pipeline_command = h.db.pipeline_command.filter(
+    (c) => !(c.kind === 'outbox' && c.command === 'lines_unresolved'),
+  );
+  assert.equal(h.db.pipeline_command.length, before - 1, 'the fixture must actually remove the card');
+
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(carded().length, 1,
+    'a shop already parked before this code shipped is never told it is stuck');
+});
+
+test('D-2 JOURNEY: a shop that is NOT parked on lines queues no such card', async () => {
+  // The gate must not narrate at shops that are fine.
+  const h = makeHarness({
+    depsOverride: {
+      interpretAnswer: makeInterpreter({ decision_kind: 'existing_regular', decided_regular_id: 11 }),
+    },
+  });
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the fruity ones', answerSource: 'typed',
+  }, h.deps);
+  await drain(h);
+
+  assert.equal(shopStatus(h), 'READY_TO_SHOP');
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'lines_unresolved').length, 0,
+    'a healthy shop must not be told it is stuck',
+  );
+});
+
+test('F2: a runtime with NO interpreter wired does not guess - and ASKS AGAIN', async () => {
+  // ── RE-CUT for Codex F2. The old form asserted the DEFECT. It read:
+  //
+  //   assert.equal(h.db.shop_decision.length, 0,
+  //     'no interpreter must mean no decision, never a guessed one');
+  //   assert.equal(plan.step, STEPS.AWAIT_LINE_RESOLUTION);
+  //
+  // "No decision" was the right instinct with the wrong outcome: it left the
+  // line unresolved with NO open question, so Warwick got a card telling him
+  // the shop was stuck and nothing he could answer. A notification is not an
+  // answer path.
+  //
+  // Not guessing is still asserted - and now so is the thing that makes not
+  // guessing survivable: he gets a real question back.
+  const h = makeHarness();
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'whatever he meant', answerSource: 'typed',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  const plan = await runPipeline(HANDLE, h.deps);
+
+  // NOTHING WAS GUESSED. The decision recorded decides nothing about the line.
+  assert.equal(h.db.shop_decision.length, 1);
+  assert.equal(h.db.shop_decision[0].decision_kind, 'clarification_required');
+  assert.equal(h.db.shop_decision[0].decided_regular_id, null, 'no product may be invented');
+  assert.equal(h.db.shop_decision[0].interpreted_by, 'rule',
+    'no model was reached, so no model may be recorded as the interpreter');
+
+  // AND HE HAS SOMEWHERE TO GO - a real round-2 question, not a dead end.
+  assert.notEqual(plan.to, 'READY_TO_SHOP');
+  assert.equal(plan.to, 'NEEDS_DECISION', 'the shop must wait on a HUMAN, not on nothing');
+  const round2 = h.db.shop_question.find((q) => Number(q.question_round) === 2);
+  assert.ok(round2, 'no question was opened - he has been told he is stuck with nothing to answer');
+  assert.equal(round2.status, 'open');
+});
+
+// =====================================================================
+// CODEX F2 - NO INTERPRETATION FAILURE MAY STRAND THE SHOP
+//
+// Codex: "the diff leaves a reachable failure mode where structurally invalid
+// Terra output produces neither a decision nor an open clarification question,
+// leaving Warwick no actionable answer path."
+//
+// FIVE paths ended that way, not one. Each is driven here through the real
+// advancer, and each must end with a REAL round-2 question - because a line
+// whose question is already answered has exactly one route back to a human.
+// =====================================================================
+
+const F2_STRANDING_CASES = [
+  ['a structurally invalid return (the one Codex found)', { interpretAnswer: async () => 'not an object' }],
+  ['a null return', { interpretAnswer: async () => null }],
+  ['an array return', { interpretAnswer: async () => [] }],
+  ['a return with no decision_kind', { interpretAnswer: async () => ({ decided_regular_id: 11 }) }],
+  ['the interpreter throwing (gateway down)', { interpretAnswer: async () => { throw new Error('gateway 503'); } }],
+  ['the interpreter missing entirely', {}],
+  ['a well-formed object describing an ILL-FORMED decision', {
+    // existing_regular naming no product. buildDecision and 017 both refuse it,
+    // correctly - and refusing it must not also strand the line.
+    interpretAnswer: async () => ({ decision_kind: 'existing_regular', decided_regular_id: null }),
+  }],
+];
+
+for (const [label, override] of F2_STRANDING_CASES) {
+  test(`F2: ${label} opens a REAL question, never a dead end`, async () => {
+    const h = makeHarness({ depsOverride: override });
+    const key = await toFirstQuestion(h);
+    await commands.answerQuestion({
+      shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the usual one', answerSource: 'typed',
+    }, h.deps);
+
+    const replan = await runPipeline(HANDLE, h.deps);
+    assert.equal(replan.step, STEPS.REPLAN, 'the shop must not FAIL - an unreadable answer is not a crash');
+
+    // A DECISION EXISTS, AND IT DECIDES NOTHING.
+    assert.equal(h.db.shop_decision.length, 1, 'no decision row was written - the line is stranded');
+    const d = h.db.shop_decision[0];
+    assert.equal(d.decision_kind, 'clarification_required');
+    assert.equal(d.decided_regular_id, null, 'nothing may be guessed from an answer that could not be read');
+    assert.equal(d.decided_quantity, null);
+    assert.equal(d.interpreted_by, 'rule',
+      'a failure-derived clarification was decided by this code, not by a model');
+    assert.ok(d.clarification_reason, 'the reason must be recorded, and it is what the card renders');
+
+    // AND WARWICK HAS AN ANSWER PATH.
+    const plan = await runPipeline(HANDLE, h.deps);
+    const round2 = h.db.shop_question.find((q) => Number(q.question_round) === 2);
+    assert.ok(round2, 'NO QUESTION WAS OPENED - Warwick has no actionable answer path (Codex F2)');
+    assert.equal(round2.status, 'open');
+    assert.equal(plan.to, 'NEEDS_DECISION', 'the shop must wait on a human it can actually reach');
+    assert.notEqual(plan.step, STEPS.AWAIT_LINE_RESOLUTION,
+      'parking with a card and no question is the dead end this test exists to forbid');
+
+    // Round 1's exact words survive, and the shop never became ready.
+    assert.equal(h.db.shop_question.find((q) => q.id === round2.parent_question_id).answer_text,
+      'the usual one', "Warwick's original words must survive the failure");
+    assert.notEqual(shopStatus(h), 'READY_TO_SHOP');
+  });
+}
+
+test('F2: and answering that clarification still resolves the shop', async () => {
+  // The path has to be walkable to the end, not merely open.
+  let call = 0;
+  const h = makeHarness({
+    depsOverride: {
+      interpretAnswer: async () => {
+        call += 1;
+        if (call === 1) return 'not an object';
+        return { decision_kind: 'existing_regular', decided_regular_id: 11 };
+      },
+    },
+  });
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the usual one', answerSource: 'typed',
+  }, h.deps);
+  await drain(h);
+
+  const round2 = h.db.shop_question.find((q) => Number(q.question_round) === 2);
+  assert.ok(round2, 'the clarification must exist before it can be answered');
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: round2.question_key,
+    answerText: 'the big one', answerSource: 'typed',
+  }, h.deps);
+  await drain(h);
+
+  assert.equal(shopStatus(h), 'READY_TO_SHOP',
+    'a shop that recovered from an unreadable answer must be able to finish');
+});
+
+test('ONE DECISION PER QUESTION, EVER: a re-run does not re-interpret or overwrite', async () => {
+  const interpretAnswer = makeInterpreter({
+    decision_kind: 'existing_regular', decided_regular_id: 11, model: 'gpt-5.6-terra',
+  });
+  const h = makeHarness({ depsOverride: { interpretAnswer } });
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the fruity ones', answerSource: 'typed',
+  }, h.deps);
+
+  await runPipeline(HANDLE, h.deps);
+  const firstId = h.db.shop_decision[0].id;
+
+  // Drive the whole thing again from durable state, as a restarted runner would.
+  await drain(h);
+  assert.equal(h.db.shop_decision.length, 1, 'a second decision row was written for the same question');
+  assert.equal(h.db.shop_decision[0].id, firstId, 'the stored decision was replaced');
+  assert.equal(interpretAnswer.calls.length, 1, 'the model was asked twice about the same answer');
+});
+
+// =====================================================================
+// AC7 - THE CLARIFICATION ROUND, END TO END
+// =====================================================================
+
+test('AC7 JOURNEY: clarification_required opens a REAL round-2 question with a parent', async () => {
+  const h = makeHarness({
+    depsOverride: {
+      interpretAnswer: makeInterpreter({
+        decision_kind: 'clarification_required',
+        clarification_reason: 'he said "the usual" and there are two of them',
+      }),
+    },
+  });
+  const key = await toFirstQuestion(h);
+  const parentId = h.db.shop_question[0].id;
+
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the usual', answerSource: 'typed',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  assert.equal(h.db.shop_decision[0].decision_kind, 'clarification_required');
+
+  // The next plan pass must ASK AGAIN rather than guess or stall.
+  const plan = await runPipeline(HANDLE, h.deps);
+
+  assert.equal(h.db.shop_question.length, 2, 'ambiguity must produce ANOTHER question, not a guess');
+  const round2 = h.db.shop_question.find((q) => Number(q.question_round) === 2);
+  assert.ok(round2, 'no round-2 question row was opened');
+  assert.equal(String(round2.parent_question_id), String(parentId),
+    'the clarification must name its parent so the chain is readable');
+  assert.equal(round2.status, 'open');
+  assert.equal(round2.question_key, questionKeyFor('fruit splits', 2),
+    'the round-2 key must use the round-aware derivation');
+  assert.notEqual(round2.question_key, key, 'a clarification must NOT reuse the parent key');
+
+  // Round 1's answer is untouched - his exact words survive the second round.
+  const round1 = h.db.shop_question.find((q) => q.id === parentId);
+  assert.equal(round1.answer_text, 'the usual', "round 2 must not overwrite round 1's words");
+  assert.equal(round1.status, 'answered', 'round 1 must NOT be forced back to open');
+
+  // And the shop is waiting on a human on a real question - not livelocking.
+  assert.equal(plan.to, 'NEEDS_DECISION',
+    'with a real open clarification the shop waits on the human, via the ordinary branch');
+  assert.notEqual(plan.to, 'READY_TO_SHOP');
+});
+
+test('AC7 JOURNEY: the clarification round is opened ONCE, not on every pass', async () => {
+  const h = makeHarness({
+    depsOverride: {
+      interpretAnswer: makeInterpreter({
+        decision_kind: 'clarification_required', clarification_reason: 'ambiguous',
+      }),
+    },
+  });
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the usual', answerSource: 'typed',
+  }, h.deps);
+  await drain(h);
+
+  const before = h.db.shop_question.length;
+  await drain(h);
+  await drain(h);
+  assert.equal(h.db.shop_question.length, before,
+    'repeated passes must not queue a new clarification each time - the key is stable and ON CONFLICT holds');
+});
+
+test('AC7 JOURNEY: answering the clarification round resolves the line and frees the shop', async () => {
+  // Round 1 is ambiguous; round 2 is answered by tapping an exact candidate.
+  let round = 0;
+  const interpretAnswer = makeInterpreter(() => {
+    round += 1;
+    return round === 1
+      ? { decision_kind: 'clarification_required', clarification_reason: 'two sizes' }
+      : { decision_kind: 'existing_regular', decided_regular_id: 11 };
+  });
+  const h = makeHarness({ depsOverride: { interpretAnswer } });
+  const key = await toFirstQuestion(h);
+
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the usual', answerSource: 'typed',
+  }, h.deps);
+  await drain(h);
+
+  const round2 = h.db.shop_question.find((q) => Number(q.question_round) === 2);
+  assert.ok(round2, 'the clarification round must exist before it can be answered');
+
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: round2.question_key,
+    answerText: 'the big one', answerSource: 'typed',
+  }, h.deps);
+  const steps = await drain(h);
+
+  assert.equal(h.db.shop_decision.length, 2, 'each round records its own decision');
+  assert.equal(shopStatus(h), 'READY_TO_SHOP',
+    'once the clarification is answered the shop must finally be ready');
+  assert.ok(steps.length > 0);
+});

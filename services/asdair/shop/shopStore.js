@@ -88,7 +88,12 @@ const SHOP_SELECT_LIST = SHOP_SELECT_COLUMNS.join(', ');
 
 const QUESTION_SELECT_LIST =
   'id, shop_id, list_item_id, question_key, question_text, candidates, status, ' +
-  'answer_text, answer_source, card_chat_id, card_message_id, asked_at, answered_at';
+  'answer_text, answer_source, card_chat_id, card_message_id, asked_at, answered_at, ' +
+  // WP-B15-2 / migration 017. A caller deciding whether to open the NEXT
+  // clarification round needs the round this question is ON, and it must come
+  // from the database rather than be counted in a process that may have
+  // restarted between rounds.
+  'question_round, parent_question_id';
 
 const BROWSER_SELECT_LIST =
   'id, shop_id, status, claimed_by, progress, last_error, requested_at, claimed_at, finished_at';
