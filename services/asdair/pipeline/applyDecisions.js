@@ -121,16 +121,38 @@ export function applyDecisionsToPlan({ plan, decisions, questionKeyFor, regulars
   const items = (Array.isArray(plan.items) ? plan.items : []).map((item) => {
     if (!item || typeof item !== 'object') return item;
 
+    // ── WALK THE ROUND CHAIN, NEWEST WINS ─────────────────────────────────
+    // A line's conversation may run several rounds, and EACH ROUND IS A
+    // DIFFERENT QUESTION WITH A DIFFERENT KEY. Looking up round 1 alone finds
+    // only the decision that ASKED for a clarification, never the one that
+    // answered it - so the line would stay unresolved forever while the
+    // pipeline opened round 3, then 4, then 5, about something Warwick had
+    // already settled.
+    //
+    // The effective decision is therefore the HIGHEST round on record: the
+    // latest thing he said about this line. Earlier rounds are history.
+    //
+    // Found by answerJourney.test.js driving a real second round, not by
+    // reasoning about the code - which is exactly why that test exists.
     let key = null;
-    try {
-      key = questionKeyFor(item.item_name);
-    } catch {
-      // An unreadable line cannot be asked about by name, so it can carry no
-      // decision. It is still unresolved if the planner wanted a human.
-      key = null;
+    let decision = null;
+    for (let round = 1; ; round += 1) {
+      let candidateKey;
+      try {
+        candidateKey = questionKeyFor(item.item_name, round);
+      } catch {
+        // An unreadable line cannot be asked about by name, so it can carry no
+        // decision. It is still unresolved if the planner wanted a human.
+        break;
+      }
+      if (round === 1) key = candidateKey;
+      const found = byKey.get(candidateKey) || null;
+      // A gap ends the chain: rounds are opened consecutively, so the absence
+      // of round N means there is no round N+1 either.
+      if (!found) break;
+      decision = found;
+      key = candidateKey;
     }
-
-    const decision = key === null ? null : (byKey.get(key) || null);
 
     // NOTHING DECIDED. The line is exactly what the planner made it - and if
     // the planner wanted a human, it still does. An ANSWERED question with no
