@@ -3422,3 +3422,95 @@ Specifically:
 **Wrong-worktree enforcement is a REAL DEFECT and must not be forgotten.** It is currently unreachable live because no active programme state exists. Warwick's ruling, verbatim: **"NO — do not restore/re-design multi-worktree enforcement now… solving active-programme-state / multi-worktree semantics is now explicitly PARKED to BUILD-020 4F. Do not let it become a side quest inside BUILD-015."**
 
 The DENY path is proven **by construction** in `tools/governor/worktree-guard.test.mjs` § CONTRACT, and is deliberately **not** claimed to be live.
+
+---
+
+## 📋 FIRST-CLASS 4F FINDING — **WAYFINDER METHOD REGRESSION, not a missing feature** (Warwick, 2026-08-09)
+
+> **Banked for 4F. Not solved here. Warwick's classification, and the correction is the point of it:
+> this is a REGRESSION / FAILURE TO APPLY THE EXISTING WAYFINDER METHOD — NOT a missing feature
+> requiring a new governance rule.**
+
+**Warwick correctly recalls that the proven Wayfinder operating method ALREADY requires this
+behaviour.** The evidence he cites, already present in the estate:
+
+- Larry owns worker/specialist allocation, technical sequencing and parallelisation.
+- If one path waits on Warwick, **all safe independent work continues**.
+- The Wayfinder maps outcomes, dependencies, interfaces and evidence.
+- Build order inside a phase is Larry's responsibility.
+- Larry's orchestration role is decomposition, sequencing, integration and truth — turn an outcome
+  into work packages with explicit dependencies, and decide retain-vs-delegate-vs-sequence.
+- The original Wayfinder method explicitly supports dependent decisions and parallel planning.
+
+### What actually failed in BUILD-015
+
+The deliberately narrow **4E entry route** — `bootstrap → Pax → one earliest-broken-link WP → Nolan →
+Warwick → implementation` — **was appropriate for entering BUILD-015 safely.** The failure is that it
+**became the planning model for the continuing build.**
+
+Larry followed the live Product-Star critical path **serially**, without maintaining the surrounding
+implementation and dependency picture. **Warwick could no longer see:** the major product phases ·
+dependencies between them · which work could proceed independently · which research should already be
+running · which modules were ready to slot in · which specialists should be working concurrently.
+
+**Cost: avoidable elapsed time and token inefficiency while large amounts of parallel worker capacity
+sat idle.**
+
+### The graduation question 4F must now test — EXTENDED
+
+It is no longer merely *"Can a fresh Larry recover the next action?"* It must also be:
+
+> **«Given a new Warwick destination, can a fresh Larry use the Wayfinder method to construct and
+> maintain a coherent implementation route?»**
+
+Testing all eleven:
+
+1. identifies the major outcome phases;
+2. identifies real dependencies between them;
+3. identifies the critical Product-Star path;
+4. decomposes phases into bounded work packages;
+5. delegates suitable work;
+6. runs independent research/implementation/assurance **in parallel**;
+7. keeps dependent PRODUCT EXECUTION **serial where truth requires it**;
+8. continues safe independent work while another path waits;
+9. **selects appropriate worker/model cost** rather than defaulting expensive reasoning everywhere;
+10. keeps Warwick able to **see the whole build, current frontier and parallel activity without
+    reconstructing it himself**;
+11. adapts the map at evidence/phase boundaries rather than **collapsing into one-ticket-at-a-time
+    tunnel vision**.
+
+### The principle
+
+> **PARALLEL PREPARATION. DEPENDENCY-AWARE IMPLEMENTATION. SERIAL PRODUCT TRUTH WHERE REQUIRED.**
+
+Optimising together for: **Warwick's Product Star · build quality · reliability · elapsed delivery
+time · token/model burn · Warwick interruption cost.**
+
+### ⛔ What 4F must NOT do
+
+**Do not create another Wayfinder rule or framework to solve this.** The regrowth cap applies at full
+force: the method already exists and already says this. **First establish WHY an operating method
+already present in the proven Wayfinder failed to affect BUILD-015 behaviour.**
+
+Candidate causes for 4F to weigh on evidence — **the cause is unestablished and must not be assumed:**
+
+- the BUILD-015 **map shape**;
+- **loss during the BUILD-020 → BUILD-015 transfer**;
+- **Larry salience / consultation** — the method was present but never consulted at the moment of
+  sequencing;
+- **over-weighting "earliest broken link"** into serial execution;
+- or another evidenced cause.
+
+**Then prove the EXISTING method works** in the 4F fresh-Larry graduation exercise.
+
+### Larry's own evidence, recorded as Larry's and not as Warwick's ruling
+
+Corroborating instances from this session, offered as natural evidence rather than as a diagnosis:
+
+- Five workers were dispatched in parallel **only after** Warwick issued an explicit parallelisation
+  ruling — the capacity was available for hours beforehand and was not used.
+- The four-lane execution view was written **only after** he named the visibility failure. The lanes
+  and their dependencies were derivable from evidence already banked days earlier.
+- The Lane C1 and Lane A file-surface collision (`services/asdair/shop/**` unassigned in both orders)
+  is a **dependency-mapping** failure of exactly the kind item 2 above names — and it was caught by a
+  worker's refusal, not by the map.
