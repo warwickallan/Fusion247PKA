@@ -51,6 +51,26 @@ const {
 
 const HANDOFF_VERSION = 1;
 const SORT_CONTRACT = 'brand_az_then_product_az';
+
+// THE METHOD PAYLOAD IS NOT OPTIONAL, AND THESE TWO NUMBERS ARE THE PIN.
+//
+// Warwick, 2026-08-09: "THE PROVEN BROWSER OPERATING CONTRACT EXISTS, BUT THE
+// PRODUCTION ROUTE DOES NOT ENFORCE IT." Until this check existed, carrying the
+// method was a property of instructions.js having been imported correctly - i.e.
+// of nothing at all. An import resolving to an empty array, a mapping that
+// quietly produced [], or a future edit trimming the list back to the three
+// behaviours v1 shipped would each have emitted a perfectly well-formed handoff
+// carrying NO operating contract, and the shop would then have run off whatever
+// the worker happened to remember. That is the failure this refuses.
+//
+// The counts are written HERE, in the consumer, and checked against the arrays
+// that arrive from instructions.js. A pin that imported its own expectation
+// would prove only that the module agrees with itself. method.test.js writes the
+// same two numbers a THIRD time against the behaviour list in full, so the
+// contract has to be broken in three places at once to go quiet.
+const METHOD_STEP_COUNT = 18;
+const PROHIBITED_ACTION_COUNT = 5;
+
 const SHOP_REF_RE = /^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 const ASDA_REF_RE = /^[0-9]{3,12}$/;
 const SOURCE_VIEWS = ['regulars', 'favourites', 'search'];
@@ -424,6 +444,94 @@ function copyLine(line) {
   };
 }
 
+/**
+ * THE PRODUCER REFUSES A HANDOFF THAT DOES NOT CARRY THE OPERATING CONTRACT.
+ *
+ * Checked on the ARTEFACT, not on the imported constants, because the artefact
+ * is what travels. Every way the payload can go missing - a broken import, a
+ * mapping that returned [], a trimmed behaviour list, an entry with no id or no
+ * text - has to land here rather than on a worker's screen at 07:00 on a
+ * Sunday. A flag would not do: an advisory field nobody reads is exactly the
+ * condition Lane C exists to end, so this THROWS.
+ *
+ * The prohibitions get the same treatment for a harder reason. They are the
+ * five things that must never happen to Warwick's real account, and a handoff
+ * that silently omitted them would read as though nothing were forbidden.
+ */
+function assertMethodPayload(artefact) {
+  const fail = (code, message, detail) => { throw new PacketContractError(code, message, detail); };
+
+  if (!Number.isInteger(artefact.instructions_version) || artefact.instructions_version < 1) {
+    fail('INSTRUCTIONS_VERSION_MISSING',
+      'the handoff carries no usable instructions_version. The durable browser build request records this '
+      + 'number as the statement of WHICH operating contract governs the run; without it the artefact cannot '
+      + 'say what method it was built against.',
+      { instructions_version: artefact.instructions_version });
+  }
+
+  if (!Array.isArray(artefact.method) || artefact.method.length === 0) {
+    fail('METHOD_PAYLOAD_MISSING',
+      'the handoff carries NO browser method. The production route may not open a browser build request from '
+      + 'an artefact that does not carry the operating contract - that is the whole defect Lane C closes.',
+      { method: Array.isArray(artefact.method) ? artefact.method.length : typeof artefact.method });
+  }
+  if (artefact.method.length !== METHOD_STEP_COUNT) {
+    fail('METHOD_PAYLOAD_INCOMPLETE',
+      `the handoff carries ${artefact.method.length} method steps; the settled contract has ${METHOD_STEP_COUNT}. `
+      + 'A partial method is how v1 shipped three behaviours and nobody noticed. If the contract genuinely '
+      + 'changed, METHOD_STEP_COUNT here and the behaviour list in method.test.js both move, deliberately.',
+      { expected: METHOD_STEP_COUNT, actual: artefact.method.length });
+  }
+
+  if (!Array.isArray(artefact.prohibited_actions) || artefact.prohibited_actions.length !== PROHIBITED_ACTION_COUNT) {
+    fail('PROHIBITED_ACTIONS_INCOMPLETE',
+      `the handoff carries ${Array.isArray(artefact.prohibited_actions) ? artefact.prohibited_actions.length : 0} `
+      + `prohibitions; there are ${PROHIBITED_ACTION_COUNT}. These are the five things that must never happen to a `
+      + 'real account, so an artefact missing any of them is refused rather than shipped reading as permissive.',
+      { expected: PROHIBITED_ACTION_COUNT, actual: Array.isArray(artefact.prohibited_actions) ? artefact.prohibited_actions.length : null });
+  }
+
+  for (const [label, list] of [['method', artefact.method], ['prohibited_actions', artefact.prohibited_actions]]) {
+    list.forEach((entry, i) => {
+      if (!entry || typeof entry !== 'object' || !isNonEmptyString(entry.id) || !isNonEmptyString(entry.text)) {
+        fail('METHOD_ENTRY_EMPTY',
+          `${label}[${i}] has no usable id/text pair. An entry present but empty is worse than an absent one: it `
+          + 'keeps the count right while saying nothing.',
+          { list: label, index: i });
+      }
+    });
+  }
+}
+
+/**
+ * SEARCH IS A BOUNDED FALLBACK, NEVER THE DEFAULT.
+ *
+ * Ruling 2 made free search legal for a known household item that has no ASDA
+ * reference on file. It did NOT make search an ordinary way to shop a known
+ * item: the line only travels that way carrying the retrieval contract - verify
+ * what you found against the identity we already hold, and STOP if it is
+ * ambiguous. Those duties are what make it bounded.
+ *
+ * `retrievalFor()` derives them, so on an honest build this never fires. It is
+ * an invariant on the producer's own output, and it is what turns "search
+ * became the default" from a silent behaviour change into a refusal: strip the
+ * derivation and every known line routed to search leaves here unbounded, which
+ * is per-item free-searching with the safeguards removed.
+ */
+function assertSearchIsBounded(lines) {
+  for (const line of lines) {
+    if (line.origin === 'known' && line.source_view === 'search' && line.retrieval === null) {
+      throw new PacketContractError(
+        'UNBOUNDED_SEARCH_FALLBACK',
+        `lines[seq ${line.seq}]: a known item is routed to free search with no retrieval contract attached. `
+        + 'Search is permitted for a known item only as a BOUNDED fallback - verify against the identity we hold, '
+        + 'stop if ambiguous. Without those duties this is per-item free-searching, which is the slow, wrong shop.',
+        { seq: line.seq, source_view: line.source_view, origin: line.origin },
+      );
+    }
+  }
+}
+
 function copyHeld(h) {
   return {
     shop_line_no: h.shop_line_no == null ? null : h.shop_line_no,
@@ -452,12 +560,13 @@ function buildHandoff(packet, { operatingRules = [] } = {}) {
   const guidance = operatingRules.map(assertRuleRow);
 
   const lines = packet.lines.map(copyLine);
+  assertSearchIsBounded(lines);
   const held = Array.isArray(packet.held) ? packet.held.map(copyHeld) : [];
   const known = lines.filter((l) => l.origin === 'known').length;
   const newApproved = lines.length - known;
   const retrievalRequired = lines.filter((l) => l.retrieval !== null).length;
 
-  return {
+  const artefact = {
     handoff_version: HANDOFF_VERSION,
     instructions_version: INSTRUCTIONS_VERSION,
     packet_version: packet.packet_version,
@@ -519,6 +628,11 @@ function buildHandoff(packet, { operatingRules = [] } = {}) {
     lines,
     held,
   };
+
+  // LAST, ON THE ARTEFACT ITSELF. Everything above could be correct and this
+  // still fail - that is the point. What travels is what gets checked.
+  assertMethodPayload(artefact);
+  return artefact;
 }
 
 module.exports = {
@@ -526,6 +640,8 @@ module.exports = {
   PacketContractError,
   HANDOFF_VERSION,
   SORT_CONTRACT,
+  METHOD_STEP_COUNT,
+  PROHIBITED_ACTION_COUNT,
 
   // Exported at the top level, NOT hidden behind _internal, so the cross-module
   // pin against packet/buildExecutionPacket.js's exported `normalizeSortKey`
@@ -534,5 +650,11 @@ module.exports = {
   normalizeSortKey,
   identityKey,
 
-  _internal: { compareLines, brandKey, nameKey, identityKey, assertPacket },
+  // `assertMethodPayload`, `assertSearchIsBounded` and `retrievalFor` are here
+  // so mutation-proof.js can break each guard on purpose and show the property
+  // change. A guard nobody has ever removed is a guard nobody has proven.
+  _internal: {
+    compareLines, brandKey, nameKey, identityKey, assertPacket,
+    assertMethodPayload, assertSearchIsBounded, retrievalFor,
+  },
 };

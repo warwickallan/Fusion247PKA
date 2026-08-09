@@ -1,16 +1,14 @@
 // Read the live trolley state. READ-ONLY.
-const { targets, connect, newTab } = require('./cdp.js');
+const { openShoppingTab } = require('./cdp.js');
+// ONE TAB, read-only. Reading the trolley used to open its own tab on top of
+// whatever the adds had already opened; it now navigates the session's single
+// tab like everything else. cdp.js no longer exports a way to do otherwise.
 async function openAndEval(url, expression, waitMs = 10000) {
-  const t = await newTab(url);
-  await new Promise(r => setTimeout(r, waitMs));
-  const list = await targets();
-  const page = list.find(x => x.id === t.id);
-  if (!page) throw new Error('page not found');
-  const c = await connect(page.webSocketDebuggerUrl);
-  await c.send('Runtime.enable');
+  const c = await openShoppingTab(url, { waitMs });
   const ev = await c.send('Runtime.evaluate', { returnByValue: true, expression });
+  const targetId = c.targetId;
   c.close();
-  return { value: ev.result?.result?.value, targetId: t.id };
+  return { value: ev.result?.result?.value, targetId };
 }
 const TROLLEY_SNAPSHOT = `JSON.stringify((()=>{
   const txt = document.body.innerText;

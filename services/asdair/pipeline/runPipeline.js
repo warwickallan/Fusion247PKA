@@ -57,6 +57,28 @@ import * as shopLines from './shopLines.js';
 import * as shopDecisions from './shopDecisions.js';
 import { applyDecisionsToPlan } from './applyDecisions.js';
 
+// ── THE BROWSER HANDOFF, ON THE LIVE ROUTE ─────────────────────────────────
+//
+// Warwick, 2026-08-09: "THE PROVEN BROWSER OPERATING CONTRACT EXISTS, BUT THE
+// PRODUCTION ROUTE DOES NOT ENFORCE IT."
+//
+// Before these three imports, `buildExecutionPacket`, `buildHandoff` and the
+// durable `openHandoff` lifecycle had ZERO production callers. All complete.
+// All tested. Reachable only from their own unit tests - which is this build's
+// recurring defect, the same shape Veritas D-1 found on `interpretAnswer` and
+// the same shape `shopLines.markCorrected` still has.
+//
+// Imported directly rather than injected through `deps`, exactly like `store`
+// and `applyDecisionsToPlan` above: they are pure, or pure over an injected
+// query. A `deps.X` that nothing binds is undefined at runtime while every
+// stubbed test passes; a static import cannot fail that way.
+import { buildExecutionPacket } from '../packet/buildExecutionPacket.js';
+import { createRequire } from 'node:module';
+
+const requireCjs = createRequire(import.meta.url);
+const { buildHandoff } = requireCjs('../handoff/buildHandoff.js');
+const { openHandoff } = requireCjs('../handoff/claim.js');
+
 /**
  * THE ONE PLACE A PLAN IS BUILT (WP-B15-2).
  *
@@ -1090,18 +1112,169 @@ async function stepApplyCorrections(deps, snapshot) {
   return { stepped: applied.length > 0, from: shop.status, to: null, corrections: applied };
 }
 
-/** QUEUE THE BROWSER BUILD. Repeated taps RESUME the live request rather than
- *  queueing a second one - migration 006's partial unique index decides. */
+/**
+ * THE PLAN, AS EXECUTION PACKET LINES.
+ *
+ * Nothing invented, ever. A planned line becomes a shoppable line only when the
+ * household catalogue can supply its IDENTITY - the regulars row the planner
+ * matched it to, with its id, brand and (where we have one) ASDA reference.
+ * Everything else becomes a HELD entry carrying the reason, which is the
+ * packet's own mechanism for "a human must look at this" and is why this
+ * adapter never has to guess.
+ *
+ * WHY THE LOOKUP IS BY NAME. `planBasket` returns `matched_product` as a NAME,
+ * not an id - see its publicItems projection. The identity therefore has to be
+ * recovered from the same regulars rows the planner was given, which is what
+ * `inputs.regulars` is. A line whose name no longer resolves is HELD, not
+ * shopped: an unresolvable identity at this point is a real defect, and the
+ * right thing to do with a real defect is show it to Warwick.
+ *
+ * BRAND IS LOAD-BEARING, NOT DECORATION (Warwick, 2026-08-09): the packet sorts
+ * brand A-Z so the plan order and the ASDA Regulars page order under Sort A-Z
+ * are the SAME sequence. That is what makes a single top-to-bottom pass
+ * possible instead of a search per line.
+ */
+function packetLinesFromPlan(planItems, regulars) {
+  const byName = new Map();
+  for (const r of Array.isArray(regulars) ? regulars : []) {
+    const key = normaliseTerm(r && r.name);
+    if (key !== '' && !byName.has(key)) byName.set(key, r);
+  }
+
+  return (Array.isArray(planItems) ? planItems : []).map((item, i) => {
+    const shopLineNo = i + 1;
+    const original = String(item.item_name || '').trim() || `line ${shopLineNo}`;
+    const hold = (reason, detail) => ({
+      shop_line_no: shopLineNo, original_list_line: original, hold: { reason, detail: detail || null },
+    });
+
+    if (item.status !== 'add') {
+      return hold('not_planned_for_this_shop', `the planner left this line as "${item.status}"`);
+    }
+
+    const regular = byName.get(normaliseTerm(item.matched_product));
+    if (!regular) {
+      return hold('identity_not_in_catalogue',
+        `the plan names "${item.matched_product}" but no regulars row carries that name, so this line has no `
+        + 'durable identity to shop against. Held rather than free-searched on a guess.');
+    }
+
+    const qty = Number.isInteger(item.planned_qty) ? item.planned_qty : null;
+    if (qty === null || qty < 1 || qty > 99) {
+      return hold('quantity_not_established', 'a quantity is never invented - see the packet contract');
+    }
+
+    const ref = regular.asda_product_id == null ? null : String(regular.asda_product_id);
+    return {
+      shop_line_no: shopLineNo,
+      original_list_line: original,
+      origin: 'known',
+      canonical_product_id: Number(regular.id),
+      canonical_product_name: String(regular.name),
+      brand: regular.brand == null ? null : String(regular.brand),
+      // Ruling 2: identity and RETRIEVAL are separate concerns. With a usable
+      // reference the line is added from Regulars/Favourites; without one it is
+      // retrieved by search - and buildHandoff attaches the bounded retrieval
+      // contract to exactly those lines, which is what keeps search a fallback
+      // rather than the default.
+      source_view: ref ? 'regulars' : 'search',
+      asda_product_ref: ref,
+      required_quantity: qty,
+      substitutes_allowed: regular.substitutes_allowed === true,
+    };
+  });
+}
+
+/**
+ * QUEUE THE BROWSER BUILD - AND IT CANNOT BE QUEUED WITHOUT THE METHOD.
+ *
+ * ── WHAT THIS STEP USED TO BE, AND WHY IT WAS THE DEFECT ────────────────────
+ * Two lines: `shopStore.requestBrowserBuild(shop.id)` inserted a row carrying
+ * (shop_id, status) and nothing else, then the shop moved to
+ * WAITING_FOR_BROWSER. No packet was built, no handoff was built, and the
+ * operating contract in handoff/instructions.js reached nobody. The worker got
+ * a bare "go and shop" and rediscovered ASDA from memory - which is exactly
+ * what Warwick ruled must become impossible.
+ *
+ * The producers were not missing. `buildExecutionPacket`, `buildHandoff` and
+ * `verifyBasket` were complete, tested, and had ZERO production callers. This
+ * is the call site that gives the first two one.
+ *
+ * ── WHY openHandoff AND NOT requestBrowserBuild (Larry's ruling, 2026-08-09) ─
+ * Because the shopStore route physically cannot carry a payload:
+ * `requestBrowserBuild` inserts only (shop_id, status), and
+ * `updateBrowserProgress` refuses any row that is not already claimed/running,
+ * so a just-queued request can never be back-filled with what it must carry.
+ * `handoff/claim.js openHandoff` inserts the request WITH its handoff block in
+ * one statement, under the same partial unique index, so repeated taps still
+ * resume exactly one live request per shop.
+ *
+ * It is also ARM-AGNOSTIC, which matters: RUNTIME-DECISION.md names Sonnet in
+ * Claude for Chrome as the live writer while the Wayfinder keeps CDP as "the
+ * arm, not yet the accepted method". A durable request carrying the contract
+ * serves either, and this step does not have to choose between them.
+ */
 async function stepQueueBrowserBuild(deps, snapshot, command) {
   const shop = snapshot.shop;
-  const req = await deps.shopStore.requestBrowserBuild(shop.id);
+
+  // The plan is recomputed here through the ONE function that applies Warwick's
+  // decisions - never `deps.planBasket` directly. See planWithDecisions.
+  const catalogue = assertCatalogueLoaded(await deps.loadCatalogue(shop.household_id), 'browser handoff');
+  const listItems = await store.listListItems(deps, shop.list_id);
+  const inputs = await deps.loadPlanningInputs(shop.household_id);
+  const { plan } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
+
+  // NO CLOCK, for the same reason listDateOf() takes the date from the shop_ref
+  // rather than from today: a retry must produce the same packet as the run it
+  // is retrying. `updated_at` is the durable record of when this shop last
+  // moved, which is exactly when its packet was prepared.
+  const packet = buildExecutionPacket({
+    shop_ref: shop.shop_ref,
+    generated_at: shop.updated_at || shop.created_at,
+    household_id: shop.household_id == null ? undefined : Number(shop.household_id),
+    lines: packetLinesFromPlan(plan.items, inputs.regulars),
+  });
+
+  // THE REFUSAL THAT MAKES THE CONTRACT REAL. buildHandoff throws
+  // PacketContractError unless the artefact carries all 18 method steps, all 5
+  // prohibitions and a usable instructions_version. There is therefore no
+  // ordering of this function in which a browser build request exists and the
+  // method did not: the throw happens BEFORE openHandoff is reached.
+  //
+  // operatingRules stays empty deliberately. The household's shelf-guidance
+  // rules are a separate lane, and passing rows this step has no contract for
+  // would be inventing guidance.
+  const handoff = buildHandoff(packet, { operatingRules: [] });
+
+  const opened = await openHandoff(deps.writeQuery, {
+    shopId: shop.id,
+    handoff,
+    openedBy: 'asdair:pipeline',
+  });
+
   const moved = await deps.shopStore.transition(
     shop.id, 'WAITING_FOR_BROWSER',
     'browser build requested - a SUPERVISED runner will claim it; nothing autonomous ever does',
   );
+
   return {
-    stepped: moved.changed, from: shop.status, to: 'WAITING_FOR_BROWSER',
-    browser_request_id: req.request.id, request_created: req.created, command,
+    stepped: moved.changed,
+    from: shop.status,
+    to: 'WAITING_FOR_BROWSER',
+    browser_request_id: opened.request.id,
+    request_created: opened.created,
+    request_resumed: opened.resumed === true,
+    request_superseded: opened.superseded === true,
+    // Reported so a run's log SAYS which contract governed it, rather than
+    // leaving it to be inferred from whatever instructions.js happens to say
+    // on the day someone reads the log.
+    packet_fingerprint: handoff.packet_fingerprint,
+    instructions_version: handoff.instructions_version,
+    method_steps: handoff.method.length,
+    prohibited_actions: handoff.prohibited_actions.length,
+    packet_lines: handoff.lines.length,
+    held_lines: handoff.held.length,
+    command,
   };
 }
 
