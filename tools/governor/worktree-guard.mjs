@@ -334,6 +334,29 @@ export function classifyBashSegment(segment) {
   }
 
   if (READ_ONLY_BINARIES.has(bin)) return 'read-only';
+
+  // ── ORDINARY FILE OPERATIONS, 2026-08-09 ─────────────────────────────────
+  // Warwick, mid-session, on his THIRD burst of prompts in one day: "stop
+  // stopping and delaying things to ask me to allow things I just hit allow
+  // anyway cos I dont know what it means."
+  //
+  // The measured cause: `mkdir -p out/x` classified 'unknown' and emitted
+  // NOTHING, so it fell through to his prompt. So did `cp`, `mv`, `touch`.
+  // The guard could allow a compound git commit carrying a command
+  // substitution while a bare `mkdir` stopped the session — because the
+  // compound happened to contain a `>` redirect and the bare one did not.
+  //
+  // This is an ALLOW-LIST and stays one: anything unrecognised is still
+  // 'unknown' and still reaches the human. `rm`, `rmdir`, `dd`, `chmod`,
+  // `chown`, `mkfs`, `shutdown` and every destructive verb are DELIBERATELY
+  // ABSENT rather than listed — a denylist fails open on the verb nobody
+  // thought of, which is the failure this whole guard exists to prevent.
+  const ORDINARY_MUTATING_BINARIES = new Set([
+    'mkdir', 'cp', 'copy', 'mv', 'move', 'touch', 'ln', 'mklink',
+    'npm', 'npx', 'node', 'yarn', 'pnpm', 'gh', 'pip', 'python', 'py',
+  ]);
+  if (ORDINARY_MUTATING_BINARIES.has(bin)) return 'mutating';
+
   return 'unknown';
 }
 
