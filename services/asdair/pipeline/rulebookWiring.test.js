@@ -5,9 +5,12 @@
 //
 // DOES A HOUSEHOLD JUDGEMENT RULE ACTUALLY CHANGE A REAL SHOP?
 //
-// `skill/rulebook.js` has 29 of its own tests and they all pass. Every one of
-// them calls `applyRulebook` directly. That proves the module works; it proves
-// NOTHING about whether a shop ever reaches it - and for weeks, no shop did.
+// `skill/rulebook.js` has its own suite (34 tests as of 2026-08-09; the figure
+// here is narrative, and nothing asserts it - it was written as "29" and went
+// stale twice in one day, so read the suite rather than this line). Every one of
+// those tests calls `applyRulebook` directly. That proves the module works; it
+// proves NOTHING about whether a shop ever reaches it - and for weeks, no shop
+// did.
 // Veritas measured exactly that at Gate 1: five exports, imported by two test
 // files and nothing else.
 //
@@ -49,6 +52,13 @@ const HANDLE = { shopRef: REF };
 // never changed a quantity, a product or a status. That is the whole point.
 //
 // Synthetic. Modelled on live rule 37's SHAPE, not copied from household data.
+//
+// AND IT IS STILL THE RIGHT CLASS AFTER 2026-08-09. Warwick archived the
+// PRICE/VALUE judgement and explicitly RETAINED the determinable quantity rule
+// that live rule 37 expresses ("round qty UP to an even number"), so a
+// quantity-rounding fixture is modelled on a rule that is still live. The
+// wording is aligned with the retained rule's own arithmetic; a fixture that
+// read like the archived class would be describing a rule that no longer exists.
 const PAIR_RULE = Object.freeze({
   id: 3701,
   household_id: HOUSEHOLD_ID,
@@ -56,15 +66,22 @@ const PAIR_RULE = Object.freeze({
   directive: 'info',
   match_term: 'gourmet cat food',
   match_category: null,
-  rule_text: 'Gourmet cat food: round the quantity up to complete a pair.',
+  rule_text: 'Gourmet cat food: round the quantity UP to an even number so every pair is complete.',
 });
 
-/** A rule of the same inert shape that speaks about NOTHING in this basket. */
+/**
+ * A rule of the same inert shape that speaks about NOTHING in this basket.
+ *
+ * Re-worded 2026-08-09: it used to read "pick the best value by price per wash",
+ * which is precisely the judgement Warwick archived. Its job here is to be
+ * IRRELEVANT to the basket, not to be a bargain rule, so it is now an ordinary
+ * non-price household preference.
+ */
 const UNRELATED_RULE = Object.freeze({
   ...PAIR_RULE,
   id: 3702,
   match_term: 'washing powder',
-  rule_text: 'Washing powder: pick the best value by price per wash.',
+  rule_text: 'Washing powder: we always want the non-bio one.',
 });
 
 function planningInputs(rules) {
@@ -152,7 +169,7 @@ test('AC2 CONTROL: with no judgement, the basket is exactly what the determinist
 
 test('AC2: a rule the deterministic planner DISCARDS changes a real planned line, all the way to the durable handoff', async () => {
   // Rule 3701 is inert: the planner drops it and always has. The reasoning
-  // consumer reads its words and rounds 3 up to 4 to complete a pair.
+  // consumer reads its words and rounds 3 up to the next even number, 4.
   //
   // NOTHING in this test calls applyRulebook. The judgement is injected at
   // deps.consult - the same seam deps.js binds realConsultRulebook to - and the
@@ -172,7 +189,7 @@ test('AC2: a rule the deterministic planner DISCARDS changes a real planned line
           rule_id: rule.id,
           kind: 'set_quantity',
           quantity: 4,
-          why: 'rounded up to complete a pair',
+          why: 'rounded up to the next even number so every pair is complete',
         }],
       };
     },
@@ -222,7 +239,7 @@ test('AC2 ATTRIBUTION: the changed line carries `rulebook rule <id>` where a pro
           rule_id: grounding.rules[0].id,
           kind: 'set_quantity',
           quantity: 4,
-          why: 'rounded up to complete a pair',
+          why: 'rounded up to the next even number so every pair is complete',
         }],
       }),
       buildConfirmationPayload(spec) {

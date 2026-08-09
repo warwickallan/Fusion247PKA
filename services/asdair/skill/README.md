@@ -153,10 +153,21 @@ So:
 **Do not read `summary.advisories` as "the multibuy rule works".** It does not.
 It means the rule finally reaches a human instead of being thrown away.
 
-> **This table is the WO-Y record and is left as written.** Rules 36 and 37 were
-> **archived by Warwick on 2026-08-09** -- see *"The best-value judgement is
-> ARCHIVED"* below. The verdicts above describe why they could never be
-> executed here; they are no longer wanted here either.
+> **This table is the WO-Y record and is left as written.** Two of its rows have
+> since been overtaken, and both corrections are stated here rather than edited
+> silently into the table above:
+>
+> - **Rules 31 and 36 are ARCHIVED** (Warwick, 2026-08-09) -- see *"The
+>   best-value judgement is ARCHIVED"* below. The verdict above describes why 36
+>   could never be executed here; it is no longer wanted here either.
+> - **Rule 37 is RETAINED, and its row above is WRONG.** *"Conditional on an
+>   offer this planner cannot see"* is the reading Warwick overruled later the
+>   same day: *"Do not discard a deterministic quantity/variant rule merely
+>   because its prose mentions a multibuy context."* Rule 37's outcome is
+>   arithmetic on a quantity -- **`Mum 3 male -> add 1 female = 4`** -- and needs
+>   no price, no offer state and no browser. It is executed through the rulebook
+>   path below, and `rulebook.test.js` drives it from a catalogue carrying no
+>   price field at all.
 
 ### `rulebook.js` -- the prose rulebook, and the rules that finally ACT (B15-3, lane R1)
 
@@ -225,10 +236,23 @@ answer, or the change does not happen.
   rather than stale, and this module cannot recompute it (it never sees unit
   prices). It is set to `null` with `budget_flag: 'unknown'` and
   `summary.rulebook.estimate_invalidated: true`.
-- **Nothing is wired.** No pipeline caller invokes `applyRulebook` yet, so **no
-  real shop has ever exercised it**. Tests use a stand-in consumer; that proves
-  the path carries, applies and refuses -- it proves nothing about how well a
-  model judges.
+- **Adding a basket LINE.** The three verbs are `set_product`, `set_quantity`
+  and `ask`; none of them can put a new item in a basket, and `set_product` may
+  only re-resolve a line the planner already held, from candidates that line
+  itself offered. So the second clause of live rule 37 -- *"add a FEMALE variant
+  to complete the last pair"* -- is **carried and said, never applied**: the
+  advisory echo puts it on the line, the grounding packet sends it verbatim to
+  the consumer, and the applied quantity change names it in the note a person
+  reads. A fourth verb is a design decision, not a way of teaching this system a
+  new kind of rule, and it is not taken here.
+- **It is WIRED, but no real shop has run.** *(Corrected 2026-08-09: this bullet
+  used to read "Nothing is wired. No pipeline caller invokes `applyRulebook`
+  yet." B15-3 lane R2 made that false.)* `pipeline/runPipeline.js` calls
+  `applyRulebook` on the production path, and `pipeline/rulebookWiring.test.js`
+  drives the whole journey from the pipeline entry to prove it. What is still
+  true is the part that matters: **every test injects a stand-in consumer, so no
+  real shop has ever exercised it.** That proves the path carries, applies and
+  refuses; it proves nothing about how well a model judges household prose.
 
 ### The best-value judgement is ARCHIVED (Warwick, 2026-08-09)
 
@@ -256,9 +280,29 @@ What that means concretely, and all of it is enforced by `rulebook.test.js`:
   removed; re-introducing one is a code change that the control below fails.
 - **The rules themselves are archived as DATA**, in `asdair.rules`, by Warwick.
   This module hard-codes no rule id, so archiving a rule is never a code change
-  here. The rows affected are the best-value-per-wash rule, the multibuy
-  "buy up to the offer quantity" rule (36), and the `any 2 for GBP X` pair
-  rounding rule (37).
+  here. **The rows affected are 31 and 36, and nothing else** -- the
+  best-value-by-price-per-wash rule (31) and the ">=50% off the extra item, buy
+  up to the offer quantity" rule (36). Established by live query on 2026-08-09
+  and staged at
+  `Deliverables/2026-08-09-live-rule-corpus-and-value-rule-identification.md`.
+- **RULE 37 IS NOT ARCHIVED, and the line between the two classes is Warwick's
+  own** *(corrected 2026-08-09 -- this bullet previously listed 37 among the
+  archived rows, which was wrong)*:
+
+  > *"You have conflated two different classes of behaviour: **PRICE/VALUE
+  > JUDGEMENT -- archive this** ... anything that requires current price/offer
+  > arithmetic to choose the economically 'best' option. **DETERMINABLE
+  > HOUSEHOLD SHOPPING POLICY -- retain this. Rule 37 is in this class.** ... Do
+  > not discard a deterministic quantity/variant rule merely because its prose
+  > mentions a multibuy context."*
+
+  **The test is whether the OUTCOME requires price arithmetic, not whether the
+  PROSE mentions an offer.** Rules 12 and 25 (Nescafe Azera) stay for the same
+  reason from the other direction: their directive is `needs_decision`, so they
+  **ask a person** rather than optimise. Rule 37's outcome is arithmetic on a
+  quantity and is executed through this module; `rulebook.test.js` drives it
+  from a catalogue with no price field at all, and asserts the absence of the
+  price field before it asserts the behaviour.
 - **Out of scope of the removal:** `planBasket`'s budget estimate
   (`estimated_total` / `budget_flag`, standing rule 7) and `rankAlternatives`'
   price-proximity *similarity* score are planner behaviour, not a bargain

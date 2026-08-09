@@ -33,6 +33,42 @@
 // packet or the prompt; its source half scans this module for a vocabulary
 // pinned in README.md, not here, so widening the code cannot widen its check.
 //
+// -- AND WHAT WARWICK THEN CORRECTED, LATER THE SAME DAY ---------------------
+//
+// R3 (above) swept RULE 37 into the archive along with 31 and 36. Warwick
+// overruled that, in as many words:
+//
+//   "DO NOT ARCHIVE RULE 37. I am explicitly retaining the Sure rule. You have
+//    conflated two different classes of behaviour: PRICE/VALUE JUDGEMENT -
+//    archive this ... DETERMINABLE HOUSEHOLD SHOPPING POLICY - retain this.
+//    Rule 37 is in this class. ... Do not discard a deterministic
+//    quantity/variant rule merely because its prose mentions a multibuy
+//    context."
+//
+// THE TEST IS WHETHER THE OUTCOME NEEDS PRICE ARITHMETIC, NOT WHETHER THE PROSE
+// MENTIONS AN OFFER. Rule 37 states its own outcome arithmetically and
+// price-free - "Mum 3 male -> add 1 female = 4". Rounding an odd quantity up to
+// the next even number needs no price, no offer state and no browser, which is
+// exactly what the rule-37 cases below drive from a catalogue with NO price
+// field at all.
+//
+// So the suite GROWS rather than swapping again: rule 37's regression coverage
+// comes back, and every non-price case R3 added in its place stays. The
+// ARCHIVED control is untouched and still fires - a correct rule-37
+// implementation does not strain it, because rule 37 needs no money.
+//
+// ONE HALF OF RULE 37 IS NOT DELIVERABLE HERE, AND IT IS SAID RATHER THAN
+// QUIETLY DROPPED. The rule's second clause - "add a FEMALE variant to complete
+// the last pair" - is an ADD-A-PRODUCT-TO-THE-BASKET outcome. The safety
+// envelope has three verbs (set_product, set_quantity, ask) and none of them
+// can put a new line in a basket; `set_product` may only re-resolve a line the
+// planner already held, and only from candidates that line itself offered - and
+// a `map`-resolved Sure line offers none. Adding a fourth verb is a design
+// decision this module's own header refuses to take on its own. What IS proven
+// below is that the clause is never lost: the planner's advisory echo puts rule
+// 37's full words on the line, and the grounding packet carries them verbatim
+// to the consumer. See the return for WO-2026-08-09-08.
+//
 // -- WHAT THE FAKE CONSUMER PROVES, AND WHAT IT CANNOT ----------------------
 //
 // `terraFake` below is a STAND-IN for Terra. It is not a model and it does not
@@ -55,6 +91,14 @@
 //     rule 32  info    match_term "sure male"
 //     rule 38  info    match_term NULL   <- global, no target
 //     rule 12  needs_decision  match_term "Nescafe Azera"
+//
+//   LIVE-VERIFIED (queried 2026-08-09, staged at
+//   Deliverables/2026-08-09-live-rule-corpus-and-value-rule-identification.md):
+//     rule 37  info    match_term "sure male"  <- rule_text below is the LIVE
+//       wording, transliterated to ASCII ("GBP X" for the currency symbol) to
+//       hold this file's pure-ASCII rule. Nothing else about it is paraphrased,
+//       and the transliteration cannot matter to the outcome: the outcome is
+//       arithmetic on a quantity, which is the whole reason the rule was kept.
 //
 //   CONSTRUCTED (realistic shape, values NOT from the live database): rules 41,
 //     42 and 43, every product row and its price, and the pack sizes. THE LIVE
@@ -106,6 +150,19 @@ const RULES = Object.freeze([
     match_term: 'sure male', match_category: null, matched_product: null,
     rule_text: 'Sure male: rotate the scent each week.'
   },
+  // RULE 37 - RETAINED BY WARWICK, 2026-08-09, and this is the LIVE row.
+  //
+  // Its prose opens on a multibuy context and its OUTCOME is pure arithmetic on
+  // a quantity: 3 is odd, so the next even number is 4. No price, no offer
+  // state, no browser. It is here to prove that distinction holds under
+  // execution and not merely in a comment.
+  {
+    id: 37, directive: 'info', scope: 'product', active: true, household_id: HOUSEHOLD,
+    match_term: 'sure male', match_category: null, matched_product: null,
+    rule_text: 'Sure "any 2 for GBP X": round qty UP to an even number to capture every pair; '
+      + 'add a FEMALE variant to complete the last pair (Mum 3 male -> add 1 female = 4). '
+      + 'Combines with the rotate-variant rule (Warwick 2026-07-21).'
+  },
   {
     id: 38, directive: 'info', scope: 'household', active: true, household_id: HOUSEHOLD,
     match_term: null, match_category: null, matched_product: null,
@@ -144,10 +201,17 @@ const UNPRICED_PODS = Object.freeze(PRICED_PODS.map(function (p) {
   return Object.freeze(copy);
 }));
 
+// NO `price` KEY, AND THAT IS THE POINT - the live `products` table has no price
+// column at all, and rule 37's outcome must be reachable from exactly this. The
+// rule-37 cases below assert the absence structurally before they assert the
+// behaviour, so a catalogue that quietly grew a price could never make them
+// pass on money.
 const SURE_PRODUCT = Object.freeze({
   id: 201, list_term: 'sure male', matched_product: 'Sure Men Anti-Perspirant (blue variant)',
   category: 'toiletries', household_id: null
 });
+
+const UNPRICED_SURE = Object.freeze([SURE_PRODUCT]);
 
 // Two scents under one list term - so the planner holds the line as ambiguous
 // and rule 41 has something to rotate BETWEEN.
@@ -217,6 +281,28 @@ const HANDLERS = {
     return { kind: 'set_quantity', quantity: want, why: 'the household gets through ' + want + ' a week' };
   },
 
+  // Rule 37 - EVEN-NUMBER ROUNDING. The household's own words say what "round
+  // up" means here, and the answer is arithmetic on the line's own planned
+  // count. THERE IS NOTHING FOR A PRICE TO DO IN THIS FUNCTION, and there is no
+  // price in the packet for it to read even if there were: `line` carries
+  // item_name, statuses, counts, note, and candidate NAMES.
+  '37': function (line, rule) {
+    if (!line.may_set_quantity) return null;
+    if (!/round\s+qty\s+UP\s+to\s+an\s+even\s+number/i.test(rule.text)) return null;
+    const q = Number(line.planned_qty);
+    if (!Number.isInteger(q) || q < 1) return null;
+    if (q % 2 === 0) return null;   // already an even number - every pair is captured
+    return {
+      kind: 'set_quantity',
+      quantity: q + 1,
+      // The second clause of the rule cannot be APPLIED by this module (there is
+      // no verb that adds a basket line), so it is SAID. Silence is the one
+      // option this module never takes.
+      why: 'rounded ' + q + ' up to ' + (q + 1)
+        + ' so every pair is captured; the household rule says the completing unit is a FEMALE variant'
+    };
+  },
+
   // Rule 43 - a BASKET-WIDE size preference. It belongs to whatever line turns
   // out to offer the size it names, which is exactly why it has no target.
   '43': function (line, rule) {
@@ -268,8 +354,8 @@ function itemNamed(result, name) {
 
 test('AC1: the rules actionableRules() drops are enumerated, and it is the judgement layer', () => {
   const inert = rulebook.inertRules(RULES, HOUSEHOLD).map(function (r) { return r.id; }).sort(function (a, b) { return a - b; });
-  assert.deepEqual(inert, [32, 38, 41, 42, 43],
-    'the inert set is not the five judgement/advisory rules - check it against actionableRules()');
+  assert.deepEqual(inert, [32, 37, 38, 41, 42, 43],
+    'the inert set is not the six judgement/advisory rules - check it against actionableRules()');
 
   // and the deterministic ones are NOT swept up with them
   [12, 23, 40].forEach(function (id) {
@@ -330,8 +416,9 @@ test('AC2: a rule about another item is not sent, and the omission is COUNTED no
 
   assert.deepEqual(sent, [38, 42, 43], 'the wrong rule set was sent for a milk-only basket');
   assert.ok(sent.indexOf(41) === -1, 'a shower-gel rule was sent for a basket with no shower gel');
-  assert.equal(grounding.omitted_rule_count, 2,
-    'the rules that spoke about nothing here (32, 41) are not counted - an omission must be visible');
+  assert.ok(sent.indexOf(37) === -1, 'a Sure rule was sent for a basket with no Sure line');
+  assert.equal(grounding.omitted_rule_count, 3,
+    'the rules that spoke about nothing here (32, 37, 41) are not counted - an omission must be visible');
 });
 
 test('AC2: relevance is OVER-INCLUSIVE - an advisory-grade similarity still carries the rule', () => {
@@ -412,6 +499,115 @@ test('AC3 rule 43: a BASKET-WIDE rule changes a line no targeted rule names', as
     'the basket-wide size rule did not reach a line no targeted rule speaks about');
   assert.equal(line.status, 'add');
   assert.ok(/rule 43/.test(line.note), 'the change does not say which rule caused it');
+});
+
+// =====================================================================
+// AC3 rule 37 - RESTORED (Warwick, 2026-08-09). A DETERMINABLE HOUSEHOLD
+//               POLICY, not a bargain judgement. Its regression coverage comes
+//               back; nothing R3 put in its place is removed to make room.
+// =====================================================================
+
+test('AC3 rule 37: an ODD Sure quantity is rounded UP to the next even number, from a catalogue with NO price', async () => {
+  // ESTABLISH THE GROUND FIRST. A control that did not examine what it claims to
+  // is worse than no control, so the absence of money is asserted before any
+  // behaviour is, and it is asserted about the actual fixture this test plans.
+  UNPRICED_SURE.forEach(function (row) {
+    assert.ok(!Object.prototype.hasOwnProperty.call(row, 'price'),
+      'the Sure catalogue grew a price field - this case would no longer prove rule 37 is price-free');
+  });
+
+  const listItems = [{ item_name: 'sure male', requested_qty: 3 }];
+  const before = plan(listItems, UNPRICED_SURE);
+
+  // THE DETERMINISTIC ANSWER, AND IT IS THE ONE THE HOUSEHOLD RULE EXISTS TO FIX.
+  assert.equal(before.items[0].status, 'add');
+  assert.equal(before.items[0].planned_qty, 3, 'the deterministic plan should buy exactly what was asked for');
+  assert.equal(before.summary.estimated_total, null,
+    'the unpriced fixture produced a basket estimate - there is money in this path after all');
+
+  const grounding = rulebook.buildRulebookGrounding(before, RULES, HOUSEHOLD);
+  assert.ok(grounding.rules.some(function (r) { return r.id === 37; }),
+    'rule 37 did not reach the consumer at all');
+  // The consumer is handed no money to work from. Same recursive walk the
+  // ARCHIVED control uses, applied to the packet this case actually sends.
+  (function walk(node, at) {
+    if (node === null || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach(function (v, i) { walk(v, at + '[' + i + ']'); }); return; }
+    Object.keys(node).forEach(function (k) {
+      assert.ok(!/price|cost|amount|gbp/i.test(k),
+        'the rule-37 packet carries a money field "' + k + '" at ' + at);
+      walk(node[k], at + '.' + k);
+    });
+  })(grounding, 'grounding');
+
+  const out = await rulebook.applyRulebook({ plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake() });
+  const line = out.plan.items[0];
+
+  assert.equal(line.planned_qty, 4, 'rule 37 did not round the odd quantity up to the next even number');
+  assert.equal(line.matched_product, 'Sure Men Anti-Perspirant (blue variant)',
+    'the deterministic map rule 23 must still decide WHICH product');
+  assert.ok(line.flags.indexOf('quantity set by household rule') !== -1);
+  assert.ok(line.flags.indexOf('rulebook rule 37') !== -1, 'the change does not carry rule 37 as its cause');
+  assert.ok(/rule 37/.test(line.note), 'the change does not say which rule caused it');
+
+  const applied = out.audit.applied.filter(function (a) { return String(a.rule_id) === '37'; });
+  assert.deepEqual(applied.map(function (a) { return [a.from, a.to]; }), [[3, 4]],
+    'the audit does not record 3 -> 4 attributed to rule 37');
+});
+
+test('AC3 rule 37: the boundary is SWEPT, not spot-checked - odds move, evens are left alone', async () => {
+  // The rule is about parity, so parity is where it can be wrong. Both sides of
+  // the boundary are exercised rather than the single example the rule's prose
+  // happens to quote.
+  const cases = [[1, 2], [2, 2], [3, 4], [4, 4], [5, 6]];
+  for (const [asked, expected] of cases) {
+    const before = plan([{ item_name: 'sure male', requested_qty: asked }], UNPRICED_SURE);
+    assert.equal(before.items[0].planned_qty, asked, 'fixture drifted at requested_qty ' + asked);
+    const out = await rulebook.applyRulebook({ plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake() });
+    assert.equal(out.plan.items[0].planned_qty, expected,
+      'rule 37 turned ' + asked + ' into ' + out.plan.items[0].planned_qty + ', not ' + expected);
+    if (asked === expected) {
+      assert.equal(out.audit.applied.filter(function (a) { return String(a.rule_id) === '37'; }).length, 0,
+        'an already-even quantity was "changed" to itself at requested_qty ' + asked);
+    }
+  }
+});
+
+test('AC3 rule 37: the FEMALE-variant clause is NEVER LOST - it reaches the consumer and the line, verbatim', async () => {
+  // THE HONEST HALF OF THIS RULE. `add a FEMALE variant to complete the last
+  // pair` is an add-a-line outcome and no verb in the safety envelope can
+  // perform it (see this file's header). What must never happen is the clause
+  // falling silently on the floor - that is the exact defect this whole module
+  // exists to end. So it is proven to survive in the two places a person and a
+  // model can each see it.
+  const FEMALE_CLAUSE = 'add a FEMALE variant to complete the last pair (Mum 3 male -> add 1 female = 4)';
+  const rule37 = RULES.find(function (r) { return r.id === 37; });
+  assert.ok(rule37.rule_text.indexOf(FEMALE_CLAUSE) !== -1,
+    'the fixture no longer carries the clause this test is about - re-point it');
+
+  const before = plan([{ item_name: 'sure male', requested_qty: 3 }], UNPRICED_SURE);
+
+  // (a) THE PERSON. The deterministic planner's advisory echo already attaches
+  //     the household's own words to the line, before the rulebook runs at all.
+  assert.ok(String(before.items[0].note || '').indexOf(FEMALE_CLAUSE) !== -1,
+    "the planner's advisory echo dropped rule 37's female-variant clause from the line");
+
+  // (b) THE CONSUMER. The grounding packet and the rendered prompt carry the
+  //     rule's text verbatim, so a model reading it is told about the variant
+  //     even though this module cannot act on it.
+  const grounding = rulebook.buildRulebookGrounding(before, RULES, HOUSEHOLD);
+  const sent37 = grounding.rules.find(function (r) { return String(r.id) === '37'; });
+  assert.equal(sent37.text, rule37.rule_text,
+    "rule 37 reached the consumer without the household's own words");
+  assert.ok(rulebook.buildRulebookPrompt(grounding).indexOf(FEMALE_CLAUSE) !== -1,
+    'the rendered prompt dropped the female-variant clause');
+
+  // (c) AND AFTER THE JUDGEMENT. The applied change says, on the line, that the
+  //     completing unit is a female variant - so the handoff a person reads is
+  //     not silently "4 male".
+  const out = await rulebook.applyRulebook({ plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake() });
+  assert.match(String(out.plan.items[0].note), /FEMALE variant/,
+    'the rounded line says nothing about the variant the household asked for');
 });
 
 test('AC3: the same reply arriving as raw model TEXT behaves identically', async () => {
