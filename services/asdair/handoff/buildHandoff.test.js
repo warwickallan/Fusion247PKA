@@ -146,20 +146,85 @@ test('SORT: the comparison is codepoint-based, not locale-dependent', () => {
 // THE RULES THAT PROTECT THE METHOD
 // ---------------------------------------------------------------------
 
-test('A KNOWN ITEM CAN NEVER BE SENT TO FREE SEARCH', () => {
+test('A KNOWN ITEM THAT HAS A VALID REFERENCE MAY NOT BE SENT TO FREE SEARCH', () => {
+  // The surviving half of the old rule. Narrowed by Ruling 2 to the case it was
+  // actually protecting: throwing away identity we already hold.
   const p = basePacket();
   p.lines[0].source_view = 'search';
   assert.equal(codeOf(() => buildHandoff(p)), 'KNOWN_ITEM_SENT_TO_SEARCH');
 });
 
-test('A known item without an ASDA reference is refused - it would have to be searched for', () => {
+// SUPERSEDED 2026-08-09 - Warwick's Product Ruling 2. This block used to assert
+// KNOWN_WITHOUT_ASDA_REF, a refusal that failed the WHOLE weekly shop over one
+// known household product with no ASDA reference on file. The requirement
+// changed; these tests follow the requirement and are no weaker than the ones
+// they replace.
+
+test('RULING 2: a known line with no ASDA reference does NOT stop the shop', () => {
   const p = basePacket();
   p.lines[0].asda_product_ref = null;
-  assert.equal(codeOf(() => buildHandoff(p)), 'KNOWN_WITHOUT_ASDA_REF');
+  const h = buildHandoff(p);            // must not throw - that is the point
+  assert.equal(h.counts.retrieval_required, 1, 'the line must be counted as needing retrieval');
+  assert.equal(h.lines.length, 4, 'every other line must be unaffected');
+});
 
+test('RULING 2: such a line is NOT reclassified as new, and no search wording is invented', () => {
+  const p = basePacket();
+  p.lines[0].asda_product_ref = null;
+  const line = buildHandoff(p).lines[0];
+
+  assert.equal(line.origin, 'known', 'search is a RETRIEVAL method - it must not redefine the item as new');
+  assert.equal(line.approved_search_term, null, 'approved wording is Warwick\'s and exists only for a new_approved line');
+  assert.equal(line.canonical_product_id, 11, 'identity must survive intact');
+});
+
+test('RULING 2: the line carries retrieval, verify-before-add and stop-if-ambiguous', () => {
+  const p = basePacket();
+  p.lines[0].asda_product_ref = null;
+  const line = buildHandoff(p).lines[0];
+
+  assert.ok(line.retrieval, 'a known line with no reference must carry a retrieval instruction');
+  assert.equal(line.retrieval.required, true);
+  assert.equal(line.retrieval.reason, 'no_asda_reference_on_file');
+
+  // The identity the worker checks the found product AGAINST - copied from the
+  // line, never invented.
+  assert.deepEqual(line.retrieval.verify_against, {
+    canonical_product_id: 11,
+    canonical_product_name: 'Oat Crunch',
+    brand: 'Acme',
+  });
+
+  // Ruling 2's four clauses, pinned by id against a literal held HERE.
+  assert.deepEqual(
+    line.retrieval.contract.map((c) => c.id),
+    ['retrieval_permitted', 'identity_unchanged', 'verify_before_add', 'ambiguity_stops_line'],
+    'a clause of Warwick\'s ruling has been dropped from what the worker receives',
+  );
+});
+
+test('RULING 2: an ordinary line is completely unchanged - no retrieval noise', () => {
+  const h = buildHandoff(basePacket());
+  assert.equal(h.counts.retrieval_required, 0);
+  for (const l of h.lines) assert.equal(l.retrieval, null, 'no line in the base packet needs retrieval');
+});
+
+test('A known item with a MALFORMED ASDA reference is still refused - absent and broken differ', () => {
+  // "when available AND VALID" is the ruling's own wording. A malformed
+  // reference is an upstream defect and must not be silently downgraded to
+  // "search for it instead", which would hide the bug.
   const q = basePacket();
   q.lines[0].asda_product_ref = 'not-a-ref';
-  assert.equal(codeOf(() => buildHandoff(q)), 'KNOWN_WITHOUT_ASDA_REF');
+  assert.equal(codeOf(() => buildHandoff(q)), 'KNOWN_WITH_MALFORMED_ASDA_REF');
+});
+
+test('A known item with NO reference may legitimately arrive with source_view search', () => {
+  const p = basePacket();
+  p.lines[0].asda_product_ref = null;
+  p.lines[0].source_view = 'search';
+  const h = buildHandoff(p);
+  assert.equal(h.lines[0].source_view, 'search');
+  assert.equal(h.lines[0].origin, 'known');
 });
 
 test('A new item without Warwick approved wording is refused - wording is NEVER invented', () => {
@@ -299,17 +364,23 @@ test('THE ARTEFACT CARRIES ALL FIVE PROHIBITIONS - pinned to a literal held in t
 
 test('The artefact carries the Brand A-Z ordering step BEFORE the traversal step', () => {
   const h = buildHandoff(basePacket());
-  const orderStep = h.method.findIndex((s) => /Brand A-Z/.test(s));
-  const traverseStep = h.method.findIndex((s) => /in the order given/.test(s));
+  const orderStep = h.method.findIndex((s) => /Brand A-Z/.test(s.text));
+  const traverseStep = h.method.findIndex((s) => /in the order given/.test(s.text));
   assert.ok(orderStep >= 0, 'the Brand A-Z instruction is missing');
   assert.ok(traverseStep > orderStep, 'ordering must be set BEFORE traversal begins');
-  assert.ok(h.method.some((s) => /NEVER free-search a known item/.test(s)));
+
+  // SUPERSEDED 2026-08-09: this used to assert the presence of "NEVER
+  // free-search a known item". Warwick's Ruling 2 retired that instruction, so
+  // its presence is now the defect. The full behaviour set is pinned in
+  // method.test.js.
+  assert.ok(!h.method.some((s) => /NEVER free-search a known item/.test(s.text)),
+    'the retired instruction must not survive in the artefact');
 });
 
 test('The artefact carries expectations, counts and the held lines', () => {
   const h = buildHandoff(basePacket());
   assert.deepEqual(h.expected, { distinct_products: 4, total_units: 7 });
-  assert.deepEqual(h.counts, { lines: 4, known: 3, new_approved: 1, held: 1 });
+  assert.deepEqual(h.counts, { lines: 4, known: 3, new_approved: 1, held: 1, retrieval_required: 0 });
   assert.equal(h.held.length, 1, 'held lines must be carried so nothing is silently dropped');
   assert.equal(h.lines[2].approved_search_term, 'Zenith Cocoa Drops 200g');
   assert.equal(h.lines[0].approved_search_term, null, 'a known line must carry NO search wording');

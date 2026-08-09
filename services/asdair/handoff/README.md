@@ -51,11 +51,43 @@ It **asserts** rather than trusts:
 |---|---|
 | Lines really are in normalized-brand A–Z, NULL brand last, then product A–Z | `SORT_CONTRACT_VIOLATED` |
 | `sort_contract`, when declared, is one this consumer can verify | `UNKNOWN_SORT_CONTRACT` |
-| A **known** item is never routed to free search | `KNOWN_ITEM_SENT_TO_SEARCH` |
-| A known item carries an ASDA reference (so it need not be searched for) | `KNOWN_WITHOUT_ASDA_REF` |
+| A known item that **has** a valid ASDA reference is not routed to free search | `KNOWN_ITEM_SENT_TO_SEARCH` |
+| A known item carries its catalogue **identity** | `KNOWN_WITHOUT_ID` |
+| An ASDA reference, where present, is 3–12 digits | `KNOWN_WITH_MALFORMED_ASDA_REF` |
 | A new item carries Warwick's approved wording, never invented | `NEW_WITHOUT_APPROVED_TERM` |
 | The declared reconciliation counts agree with the packet's own lines | `EXPECTED_DISTINCT_MISMATCH`, `EXPECTED_UNITS_MISMATCH` |
 | `seq` runs 1..N with no gaps or repeats | `BAD_SEQ_SEQUENCE` |
+
+### Known identity vs ASDA retrieval — Warwick's Product Ruling 2 (2026-08-09)
+
+> Known household identity and ASDA retrieval method are **separate concerns**. Use the durable ASDA
+> reference when available and valid; otherwise the supervised route **may** use bounded ASDA
+> search/navigation from the canonical identity, brand and variant. The result **must be verified**
+> against the known household identity before addition. **Search is RETRIEVAL — it does not redefine
+> the item as "new".** No silent substitution. If several plausible products remain, **stop that line
+> and ask Warwick** rather than choosing the least-bad result.
+
+**What this retired.** `KNOWN_WITHOUT_ASDA_REF` used to fail the **entire weekly shop** whenever one
+known household product had no 3–12 digit reference on file — against a catalogue where a large
+minority have none. It is gone.
+
+**What replaced it.** A known line with no usable reference is accepted and carries a `retrieval`
+object: the identity to verify the found product against, and Ruling 2's four clauses
+(`retrieval_permitted`, `identity_unchanged`, `verify_before_add`, `ambiguity_stops_line`).
+`counts.retrieval_required` says how many lines are in that state. The line stays `origin: "known"`
+and is never given search wording — approved wording is Warwick's and exists only for a
+`new_approved` line.
+
+**What did not change.** Identity is still mandatory (`KNOWN_WITHOUT_ID`). A **malformed** reference
+is still refused (`KNOWN_WITH_MALFORMED_ASDA_REF`) — "available *and valid*" — because a broken
+reference is an upstream defect, not a missing one, and silently downgrading it to "search instead"
+would hide the bug.
+
+**Known gap, recorded not papered over:** `LINE_REPORT_STATUSES` has no member for *"found several
+plausible products, stopping to ask"*. The duty is carried in `COMPLETION_CONTRACT` wording instead,
+because the status label map lives in `services/asdair/cockpit-api/readPacket.js`, outside the file
+surface of the change that introduced this. Filing such a line as `not_found` is explicitly wrong:
+*"I could not find it"* and *"I found too many"* are different facts.
 
 **`expected_distinct_products` counts IDENTITIES, not lines**, using the same precedence as
 `packet/buildExecutionPacket.js` (`canonical_product_id` → `asda_product_ref` → normalized

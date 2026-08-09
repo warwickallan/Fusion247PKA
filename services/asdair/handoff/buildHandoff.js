@@ -44,8 +44,9 @@
 
 const { fingerprintPacket } = require('./fingerprint');
 const {
-  INSTRUCTIONS_VERSION, BROWSER_METHOD, PROHIBITED_ACTIONS,
-  COMPLETION_CONTRACT, RECONCILIATION_CONTRACT, LINE_REPORT_STATUSES, assertRuleRow,
+  INSTRUCTIONS_VERSION, BROWSER_METHOD, ENVIRONMENT_CONSTRAINTS, PROHIBITED_ACTIONS,
+  RETRIEVAL_CONTRACT, COMPLETION_CONTRACT, RECONCILIATION_CONTRACT, LINE_REPORT_STATUSES,
+  assertRuleRow,
 } = require('./instructions');
 
 const HANDOFF_VERSION = 1;
@@ -70,6 +71,16 @@ class PacketContractError extends Error {
 
 const isInt = (v) => Number.isInteger(v);
 const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
+
+/**
+ * Does this line carry an ASDA reference we can actually shop with?
+ *
+ * "Available AND valid" is Warwick's wording in Ruling 2, and it is one
+ * predicate rather than two scattered checks precisely so that the producer,
+ * the refusal and the per-line retrieval decision can never disagree about
+ * what "has a reference" means.
+ */
+const hasUsableRef = (line) => isNonEmptyString(line.asda_product_ref) && ASDA_REF_RE.test(line.asda_product_ref);
 
 /**
  * THE NORMALISATION. Mirrored EXACTLY from `normalizeSortKey` in
@@ -191,27 +202,54 @@ function assertLine(line, idx) {
     throw new PacketContractError('BAD_QUANTITY', `${at}.required_quantity must be an integer 1..99 - a quantity is never invented`, { required_quantity: line.required_quantity });
   }
 
-  // THE RULE THAT PROTECTS THE WHOLE METHOD: a known item must never be
-  // free-searched, so `search` is only ever legal on an approved new item.
-  if (line.source_view === 'search' && line.origin !== 'new_approved') {
-    throw new PacketContractError(
-      'KNOWN_ITEM_SENT_TO_SEARCH',
-      `${at}: source_view 'search' is permitted ONLY when origin is new_approved. A known item must NEVER be free-searched.`,
-      { seq: line.seq, origin: line.origin },
-    );
-  }
-
   if (line.origin === 'known') {
+    // IDENTITY is what makes an item "known", and it is still mandatory.
+    // Warwick's Ruling 2 separated identity from RETRIEVAL; it did not make
+    // identity optional. A line with no catalogue identity is not a known
+    // household product at all, and nothing downstream could verify it.
     if (line.canonical_product_id == null) {
       throw new PacketContractError('KNOWN_WITHOUT_ID', `${at}: origin 'known' requires canonical_product_id`, { seq: line.seq });
     }
-    if (!isNonEmptyString(line.asda_product_ref) || !ASDA_REF_RE.test(line.asda_product_ref)) {
+
+    // A PRESENT reference must be a VALID one. Ruling 2 says to use the
+    // durable reference "when available AND VALID", so a malformed ref is not
+    // quietly downgraded to "search for it instead" - that would swallow an
+    // upstream data defect and make it invisible. This is deliberately NOT the
+    // same case as an ABSENT reference below: absent is the ordinary condition
+    // of a large minority of the catalogue, malformed is a producer bug.
+    if (line.asda_product_ref != null && !(isNonEmptyString(line.asda_product_ref) && ASDA_REF_RE.test(line.asda_product_ref))) {
       throw new PacketContractError(
-        'KNOWN_WITHOUT_ASDA_REF',
-        `${at}: origin 'known' requires asda_product_ref, so the item is found rather than searched for`,
-        { seq: line.seq, asda_product_ref: line.asda_product_ref == null ? null : '(present but malformed)' },
+        'KNOWN_WITH_MALFORMED_ASDA_REF',
+        `${at}: origin 'known' carries an asda_product_ref that is not 3-12 digits. A malformed reference is an upstream defect, not a missing one - it is refused rather than silently treated as absent.`,
+        { seq: line.seq, asda_product_ref: '(present but malformed)' },
       );
     }
+  }
+
+  // WHERE `search` IS AND IS NOT LEGAL - Warwick's Product Ruling 2, 2026-08-09.
+  //
+  // SUPERSEDED: `KNOWN_ITEM_SENT_TO_SEARCH` used to refuse ANY known line whose
+  // source_view was 'search', and `KNOWN_WITHOUT_ASDA_REF` refused any known
+  // line with no reference at all. Together they failed the ENTIRE weekly shop
+  // over one known household product that happened to have no ASDA reference on
+  // file - against a catalogue where a large minority have none.
+  //
+  // The ruling: "Known household identity and ASDA retrieval method are
+  // SEPARATE concerns... search is a RETRIEVAL method - it does NOT redefine
+  // the household item as new."
+  //
+  // So the rule that survives is narrower and it is about PREFERRING the
+  // durable reference: if we HAVE a usable reference, use it - sending such a
+  // line to a free search would throw away the identity we already hold. If we
+  // do NOT have one, retrieval by search is permitted, and the line travels
+  // with the verify-before-add and stop-if-ambiguous duties attached
+  // (see RETRIEVAL_CONTRACT and `retrieval` on each line).
+  if (line.origin === 'known' && line.source_view === 'search' && hasUsableRef(line)) {
+    throw new PacketContractError(
+      'KNOWN_ITEM_SENT_TO_SEARCH',
+      `${at}: this known item already has a valid asda_product_ref, so it must be added from Regulars or Favourites rather than free-searched. Search is permitted for a known item ONLY when no usable reference exists.`,
+      { seq: line.seq, origin: line.origin, asda_product_ref: line.asda_product_ref },
+    );
   }
 
   if (line.origin === 'new_approved' && !isNonEmptyString(line.approved_search_term)) {
@@ -333,6 +371,33 @@ function assertPacket(packet) {
   return { distinct, units, sortContractDeclared: declared != null, duplicateIdentities };
 }
 
+/**
+ * THE RETRIEVAL INSTRUCTION FOR ONE LINE - Warwick's Product Ruling 2.
+ *
+ * Returns null for every line that does not need it, so the ordinary line - a
+ * known product with a reference, or an approved new one - is completely
+ * unchanged and carries no extra noise onto the phone.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO: it does not author a search term. The
+ * only search wording this product recognises is Warwick's `approved_search_term`
+ * on a new_approved line, which is his approval and is NEVER invented. A known
+ * item is retrieved from the identity we already hold - its catalogue name and
+ * brand - and the worker is told to verify what it finds against exactly that.
+ */
+function retrievalFor(line) {
+  if (line.origin !== 'known' || hasUsableRef(line)) return null;
+  return {
+    required: true,
+    reason: 'no_asda_reference_on_file',
+    verify_against: {
+      canonical_product_id: line.canonical_product_id == null ? null : line.canonical_product_id,
+      canonical_product_name: line.canonical_product_name,
+      brand: line.brand == null ? null : line.brand,
+    },
+    contract: RETRIEVAL_CONTRACT.map((c) => ({ id: c.id, text: c.text })),
+  };
+}
+
 function copyLine(line) {
   return {
     seq: line.seq,
@@ -351,6 +416,11 @@ function copyLine(line) {
     substitutes_allowed: line.substitutes_allowed === true,
     applied_rules: Array.isArray(line.applied_rules) ? line.applied_rules.slice() : [],
     quantity_rationale: line.quantity_rationale == null ? null : line.quantity_rationale,
+
+    // null on every ordinary line. Non-null ONLY where a known household
+    // product has no usable ASDA reference and must therefore be retrieved
+    // and verified rather than looked up. See retrievalFor().
+    retrieval: retrievalFor(line),
   };
 }
 
@@ -385,6 +455,7 @@ function buildHandoff(packet, { operatingRules = [] } = {}) {
   const held = Array.isArray(packet.held) ? packet.held.map(copyHeld) : [];
   const known = lines.filter((l) => l.origin === 'known').length;
   const newApproved = lines.length - known;
+  const retrievalRequired = lines.filter((l) => l.retrieval !== null).length;
 
   return {
     handoff_version: HANDOFF_VERSION,
@@ -404,14 +475,36 @@ function buildHandoff(packet, { operatingRules = [] } = {}) {
     sort_contract_verified: true, // assertPacket() threw if it were not
 
     expected: { distinct_products: distinct, total_units: units },
-    counts: { lines: lines.length, known, new_approved: newApproved, held: held.length },
+    counts: {
+      lines: lines.length,
+      known,
+      new_approved: newApproved,
+      held: held.length,
+
+      // How many KNOWN lines must be retrieved rather than looked up. Surfaced
+      // as a count so the shape of the shop is visible before it starts: these
+      // are the lines most likely to stop and ask.
+      retrieval_required: retrievalRequired,
+    },
 
     // Never hidden: when two lines are one product in the trolley, the line
     // count and the distinct count legitimately differ, and both Sonnet and the
     // reconciler are told why rather than left to infer it.
     duplicate_identities: duplicateIdentities,
 
-    method: BROWSER_METHOD.slice(),
+    // The FULL proven method, each behaviour with its stable id. v1 carried
+    // three of these; the rest were recovered from real successful runs by the
+    // 2026-08-09 method audit and are pinned by test against ids held in the
+    // test file.
+    method: BROWSER_METHOD.map((b) => ({ id: b.id, text: b.text })),
+
+    // Facts about ASDA rather than actions, kept separate on purpose so an
+    // absence is never dressed up as a proven move.
+    environment_constraints: ENVIRONMENT_CONSTRAINTS.map((c) => ({ id: c.id, text: c.text })),
+
+    // Present whether or not any line needs it, so the worker can read the
+    // rule that governs retrieval before meeting a line that depends on it.
+    retrieval_contract: RETRIEVAL_CONTRACT.map((c) => ({ id: c.id, text: c.text })),
 
     // Household operating guidance, carried WITH its rule id so its provenance
     // is visible and a stale copy is impossible - the text lives in
