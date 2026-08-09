@@ -1093,7 +1093,45 @@ Then verify which 4E preparation assumptions survived: the seven-break classific
 CI-red row in §2, and the live-runtime row in §2 were all established 2026-08-08 and **each names
 its evidence so it can be re-established or falsified in minutes.**
 
-### ⭐ ACTIVE SESSION WORK PACKAGE — WP-B15-1, items 1+2 (approved 2026-08-08)
+### ⭐ ACTIVE SESSION WORK PACKAGE — WP-B15-3, corrections 1–5 (authorised by Warwick 2026-08-09)
+
+> **This supersedes WP-B15-1 as the ACTIVE package.** WP-B15-1 was DISCHARGED on 2026-08-08 with a
+> Veritas Gate 1 PASS; its record is retained below and is no longer the frontier. **Re-cut here
+> because the section had continued to name completed work, which would orient a fresh Larry onto a
+> finished package.**
+
+**Authority.** Warwick, 2026-08-09, with execution approval and *"no further design handback"*, and
+reconfirmed at this session's orientation: *"Nothing has changed. continue as fast as you came.
+delegate and parralel where at all possible."* **This is implementation detail satisfying the
+EXISTING North Star — not a new build, direction or success criterion.**
+
+**The numbered functional requirements are the five corrections** recorded under SUB-PHASE B15-3.
+Restated here in numbered form so a gate can grade them separately:
+
+| # | Functional requirement | Delivered on `b15-3/integration` @ `318e0e3` | Known residual against it |
+|---|---|---|---|
+| **1** | **Free text is a first-class production input** — a typed natural-language reply reaches the SAME durable question → answer → `shop_decision` → recomputation spine. No button-only dependency, no silently discarded text, no Larry relay. | Lane A, `a61fc44`. `answer_source='typed'`; unrecognised source **throws and writes nothing** | **The real production event has never run.** No live Telegram message has traversed it; **Terra's prompt has never met the model** |
+| **2** | **Coherent question surface** — unresolved questions presented together; one typed reply may answer several where the mapping can be grounded safely | Lane A. Terra called **once** with all open keys; two questions answered; two separate ledger commands | With exactly ONE open question, any answer-shaped message is claimed — so a genuine new list typed while a stale question is open would be read as an answer. **No list-shape heuristic was invented** |
+| **3** | **Terra applies the prose rulebook** — relevant household rules go to the reasoning consumer AS PROSE and Terra applies the judgement. ⛔ No ever-growing deterministic mini-language | Lane R1, `466cba9`. Rules 31/36/37 — inert for weeks — each change a line, attributably. **No directive type, grammar, registry or DSL added**, asserted against a CHECK-constraint literal held outside the module | **🔴 Rules 31 and 36 are gated on PRICE AT PLAN TIME, which the schema does not carry.** On today's corpus they will mostly produce a REASONED QUESTION rather than a pick. Better than silence; **NOT yet "never asked which Ariel again."** Closing it is the browser lane's territory |
+| **4** | **Uncertainty is spoken, never guessed and never silently parked** — applies to an unmappable reply fragment and to an unclear or conflicting prose rule alike | Lanes A and R1. Six executed uncertainty paths incl. unreachable consumer → flag on every affected line; **unparseable reply → error recorded, never read as approval** | — |
+| **5** | **Traced to the real production caller** — not "a model wired to a prompt" | Lane C, `8e625b4`: `buildHandoff`, the execution packet and `verifyBasket` now have production callers, proven reachable from the runtime entry, with `requestBrowserBuild` asserted OFF the path | **AC6(f) OPEN:** `openHandoff` writes `progress.handoff` while `runner.js reconstruct()` reads `progress.plan`, so **a CDP arm can still ignore the payload.** `browser-runner/progress.cjs` was outside every granted surface. Named, not hidden |
+
+**Where the work lives:** branch **`b15-3/integration`**, worktree `C:/Fusion247PKA-b153-int`, head
+**`318e0e3`** — carrying Lane A (`a61fc44`), Lane C (`8e625b4`), Lane R1 (`466cba9`), the INT1
+harness repair (`dde0d51`) and the CRLF control fix (`318e0e3`). **Unpushed. Not merged to `main`.**
+
+**Measured suite state at that head** — counts, not exit codes: pipeline **327/327** · handoff
+114/114 · packet 109/109 · browser-runner 75/75 · bot 165/165 · intake 34/34 · reconcile 106/106 ·
+skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB_URL` unset).
+
+**⛔ THE BAR THIS PACKAGE HAS NOT MET.** Every requirement above is proven **OFFLINE ONLY** — no
+live Telegram message, no live ASDA session, no real shop, no database. Under § "Nothing may live
+only in Larry's head", **all five outcomes REMAIN ON THE FRONTIER**: code existence, green suites,
+mutation proofs and a callable interface evidence **capability**, never completed automation.
+**Larry has not declared and may not declare this complete.** Every one of the four workers recorded
+this limit itself rather than letting a green suite imply otherwise.
+
+### 📕 SUPERSEDED — WP-B15-1, items 1+2 (approved 2026-08-08, DISCHARGED). Retained as record.
 
 **The prepared sequence below was EXECUTED AND DISCHARGED on 2026-08-08, in order:** step 1 the
 bootstrap ([[Deliverables/2026-08-08-b15-bootstrap-evidence]]); step 2 Pax's bounded investigation
