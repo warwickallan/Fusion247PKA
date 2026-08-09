@@ -190,3 +190,33 @@ onward progress, or Warwick's §12 handback — which should proceed, carrying t
 A material change to the promised outcome: Warwick's ruling on §11 row 7, **or** a second live acceptance
 event on a fingerprinted photo shop that can exercise rows 10 and 11, **or** a restart executed across a
 pending confirmation (row 12). **Not** a receipt commit, a map correction of D1, or any documentation move.
+
+---
+
+## ADDENDUM — Larry, 2026-08-09, AFTER the Gate 2 ceiling. NOT a reopened review.
+
+**Veritas closed its receipt naming two queries it could not run, having no database reach. Larry ran
+them via the Supabase connector immediately afterwards. This addendum records the answers so the
+named gap does not persist. It changes NO verdict, and Veritas was NOT re-dispatched** — a receipt is
+an output of a review, and correcting a gap it named does not create a new object requiring review
+(root `CLAUDE.md` § "Veritas dispatch").
+
+**Query 1 — `pipeline_command` id 22 `actor`.**
+Result: **`telegram:8601328832`**. Full args: `{"note":null,"actor":"telegram:8601328832",
+"command":"confirmInterpretation","shop_ref":"SHOP-2026-08-03","ledger_key":
+"command:1:confirmInterpretation:SHOP-2026-08-03","household_id":"1"}`.
+**Effect:** the confirm command was raised by a real Telegram principal, not a system or Larry actor.
+This corroborates §11 *"real human tap"* and *"no Larry/manual DB command in the journey"* **at
+database level**, where the receipt could previously rely only on Larry's testimony and the log.
+
+**Query 2 — sweep for any `shop` or `shop_event` row touched between 23:38:00Z and 23:42:30Z outside
+shop 6**, which the receipt wanted in order to close §11 row 14 at database level rather than log
+level.
+Result: **exactly two rows, both shop 6** — `shop` id 6 → `READY_TO_SHOP` at 23:41:55.627328+00, and
+`shop_event` shop 6 → `transition READY_TO_SHOP` at the same instant. **No other shop and no other
+event row changed in the window.**
+**Effect:** §11 row 14 *"no unrelated shop state corrupted"* is now evidenced at database level.
+
+**Provenance and its limit, stated plainly:** these two results are **Larry's readings via the
+Supabase connector**, exactly as the receipt labels every other database row in it. They are not
+Veritas's own observation, and this addendum does not convert them into one.
