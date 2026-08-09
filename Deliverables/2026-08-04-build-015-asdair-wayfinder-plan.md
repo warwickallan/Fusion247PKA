@@ -1277,6 +1277,60 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 >
 > - ~~**Rule 37** (Sure pair rounding) is multibuy-conditional … **Larry's reading: it is archived
 >   with 31 and 36.**~~ **STRUCK — wrong, and overruled above.**
+>
+> - > #### ✅ `WO-B15-R4` — RULE 37 IS HALF RESTORED (`4bd71cf`, **PARTIAL**)
+>   >
+>   > **The finding that vindicates Warwick's correction: rule 37 needed NO CODE CHANGE.**
+>   > `skill/rulebook.js` is **byte-identical** (sha256 matches R3's own recorded hash). R3 removed
+>   > money from the packet and the prompt; it removed **no rule**, because the module hard-codes no
+>   > rule id. **What R3 actually destroyed was rule 37's executable COVERAGE and the documents'
+>   > account of it.** Both restored. `skill` **283 → 286** (+3), the other seven suites unchanged,
+>   > same 7 environment failures by name.
+>   >
+>   > **DELIVERED — the rounding.** An odd Sure quantity rounds UP to the next even number before the
+>   > browser handoff, proven from a catalogue with **no price field at all**; boundary swept
+>   > 1→2, 2→2, 3→4, 4→4, 5→6.
+>   >
+>   > **Larry's guard on his own correction NEVER FIRED, and that is the evidence.** R3's archival
+>   > control was **not touched** and was never put under pressure — restoring rule 37 strained it
+>   > not at all, which is what "uses no price" looks like from the outside. Re-mutation-tested: M1/M2/M3
+>   > identical to R3, plus a **new M4** — make rule 37 *depend* on a price and **both halves of the
+>   > control go RED**. A price-using rule 37 cannot pass this suite.
+>   >
+>   > **⛔ NOT DELIVERED — *"add a FEMALE variant to complete the last pair"*.** The rulebook
+>   > **physically cannot add a line to a basket**: its three verbs (`set_product`, `set_quantity`,
+>   > `ask`) only re-resolve or re-quantify a line already present, and `set_product` draws only from
+>   > candidates that line offered — a Sure line resolved by `map` rule 23 is status `add` with an
+>   > **empty** alternatives array. The worker **correctly refused** to add a fourth verb: both
+>   > `rulebook.js`'s header and `skill/README.md` record that as a design decision, and SOP-022
+>   > step 8 puts those above a Work Order. **Today the system SAYS the female one is needed** — rule
+>   > text verbatim in the prompt, named in the human-readable note — **and plans 4 male, not 3 male +
+>   > 1 female.**
+>   >
+>   > > **⚖️ A CONFLICT BETWEEN TWO OF WARWICK'S OWN RULES — settled by precedence, not escalated.**
+>   > >
+>   > > **Rule 5** (global): *"Nothing is added to the basket unless it is explicitly on the list."*
+>   > > **Rule 37**: add a female Sure that is **not** on the list. Both are Warwick's.
+>   > > **Settled:** rule 37 is the **more specific and later** authority (2026-07-21), and he
+>   > > **re-authorised the variant behaviour explicitly on 2026-08-09**. The companion line is
+>   > > therefore an **authorised exception** to rule 5, not a breach. Recorded because a fresh Larry
+>   > > will otherwise re-discover it as a contradiction. **Raised to Warwick (FusionDevBot 464) as a
+>   > > statement, not a question.**
+>   >
+>   > **LARRY'S DECISION, overruling the worker's recommendation.** It recommended leaving the clause
+>   > *said but not done* until a real shop has run. **Overruled:** Warwick named the variant
+>   > behaviour explicitly twice, and being *told* about a missing deodorant is not the same as having
+>   > it. **But the general capability is NOT what gets built.** The female product is already
+>   > **determined** by rule 24 (`map 'Sure female'` → the white variant), so the companion line is
+>   > **deterministic, not a model judgement**. ⛔ **No general power for a model to put products in
+>   > the trolley** — that is precisely what the worker was right to refuse.
+>   >
+>   > **F1–F5 recorded, parked:** the rulebook cannot add a basket line at all, so **any** household
+>   > rule of the form *"…and also get one of X"* is carried but never executed (**not introduced
+>   > here**); `rankAlternatives` price-proximity ordering (unchanged, parked); `ruleConsumption.test.js`
+>   > carries a **paraphrase** of rule 37 missing the `3 male -> add 1 female = 4` example and gives
+>   > rule 32 `info` where the live corpus says `rotate`; R3's return still says rule 31's existence
+>   > was "not established"; **the archival SQL for 31 and 36 is still unexecuted.**
 > - **R1's AC3 is now testing archived behaviour.** Its three named cases were rules 31, 36 and 37,
 >   chosen at the time *because* they were the judgement layer. **Those tests must be re-cut, not
 >   deleted** — the rulebook's remaining job is real.
