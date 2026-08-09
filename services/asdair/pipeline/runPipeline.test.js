@@ -253,8 +253,9 @@ test('IDEMPOTENCY: re-planning opens NO second question and never re-asks an ans
   assert.equal(replan.to, 'PROCESSING');
 
   const plan = await runPipeline(HANDLE, h.deps);
-  assert.equal(h.db.shop_question.length, 1, 'a second question row was written for the same line');
-  assert.equal(h.db.shop_question[0].status, 'answered', 'the settled question was re-opened');
+  const round1 = h.db.shop_question.filter((q) => Number(q.question_round) === 1);
+  assert.equal(round1.length, 1, 'a second ROUND-1 question row was written for the same line');
+  assert.equal(round1[0].status, 'answered', 'the settled question was re-opened');
 
   // ── CORRECTED 2026-08-09 (WP-B15-2). THE OLD ASSERTION HERE WAS THE DEFECT.
   // It read:
@@ -270,19 +271,34 @@ test('IDEMPOTENCY: re-planning opens NO second question and never re-asks an ans
   // Everything this test was BUILT to prove is untouched and still asserted
   // above: no second question row, and the settled question is not re-opened.
   // What changed is the outcome that follows from them.
-  assert.equal(plan.to, null, 'an answer nothing could interpret must NOT make the shop ready');
-  assert.equal(plan.step, STEPS.AWAIT_LINE_RESOLUTION, 'the shop waits on the LINE, not on the question');
-  assert.equal(shopStatus(h), 'PROCESSING', 'the shop parks - it must not livelock back to NEEDS_DECISION');
+  assert.notEqual(plan.to, 'READY_TO_SHOP', 'an answer nothing could interpret must NOT make the shop ready');
   assert.equal(plan.lines_unresolved.length, 1, 'the undecided line must be reported, not silently passed');
 
-  // AND IT IS NOT A LIVELOCK. A further pass parks in the SAME place and
-  // writes no transition - the property that distinguishes a stable wait from
-  // the PROCESSING <-> NEEDS_DECISION bounce a naive gate would have produced.
-  const again = await runPipeline(HANDLE, h.deps);
-  assert.equal(again.stepped, false, 'a parked shop must not keep transitioning');
-  assert.equal(again.step, STEPS.AWAIT_LINE_RESOLUTION);
-  assert.equal(shopStatus(h), 'PROCESSING', 'still parked - never bounced to NEEDS_DECISION');
-  assert.equal(h.db.shop_question.length, 1, 'parking must not manufacture more questions');
+  // ── AMENDED AGAIN 2026-08-09 for Codex F2. ────────────────────────────────
+  // This block used to assert the shop PARKED at wait:line_resolution and
+  // stayed there:
+  //   assert.equal(plan.to, null, ...);
+  //   assert.equal(plan.step, STEPS.AWAIT_LINE_RESOLUTION, ...);
+  //   assert.equal(again.step, STEPS.AWAIT_LINE_RESOLUTION);
+  //
+  // Correct against the gate, and it was still a dead end: Warwick got a card
+  // saying the shop was stuck and no question he could answer. F2 routes an
+  // unreadable answer to a real round-2 question instead, so the shop now
+  // waits on a HUMAN rather than on nothing.
+  //
+  // The property this test exists for is unchanged and asserted above - the
+  // settled ROUND-1 question is never re-opened or duplicated.
+  assert.equal(plan.to, 'NEEDS_DECISION', 'the shop must wait on a human it can actually reach');
+  const round2 = h.db.shop_question.filter((q) => Number(q.question_round) === 2);
+  assert.equal(round2.length, 1, 'exactly one clarification round must be opened');
+  assert.equal(round2[0].status, 'open');
+
+  // AND IT IS NOT A LIVELOCK. Further passes neither re-ask nor pile up rounds.
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(h.db.shop_question.length, 2, 'repeated passes must not queue another round each time');
+  assert.equal(h.db.shop_question.filter((q) => q.status === 'answered').length, 1,
+    'the settled question must stay settled');
 });
 
 test('IDEMPOTENCY: repeated basket requests RESUME one browser request - they never queue a second', async () => {

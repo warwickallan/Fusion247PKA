@@ -393,7 +393,15 @@ export function createFakeClient(store, options = {}) {
       if (db.shop_question.some((q) => String(q.shop_id) === String(row.shop_id) && q.question_key === row.question_key)) return none();
       const created = {
         id: id('shop_question'), status: 'open', answer_text: null, answer_source: null,
-        asked_at: nowIso(), answered_at: null, ...row,
+        asked_at: nowIso(), answered_at: null,
+        // Migration 017's COLUMN DEFAULTS. A round-1 INSERT deliberately omits
+        // both columns so its statement shape stays byte-identical to the one
+        // three live shops were written with - which means the fake has to
+        // supply the defaults Postgres would, or every round-1 row reads back
+        // with question_round undefined and a reader comparing it to 1 is
+        // quietly wrong about every existing question.
+        question_round: 1, parent_question_id: null,
+        ...row,
       };
       db.shop_question.push(created);
       return rows([created]);

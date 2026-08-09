@@ -475,6 +475,20 @@ async function stepPlan(deps, snapshot) {
     try { lineByKey.set(questionKeyFor(it.item_name), it); } catch { /* unreadable line - no key */ }
   }
 
+  // ── A CLARIFICATION WAITS FOR THE READING TO BE CONFIRMED ────────────────
+  // The interpretation gate is the EARLIER gate: a list AsdAIr had to guess at
+  // is not acted on until a human agrees it says what we think it says. Asking
+  // Warwick which variant of line 3 he meant, before he has confirmed we read
+  // line 3 correctly at all, is asking the wrong question first - and because
+  // planOutcome checks open questions BEFORE the interpretation gate, an open
+  // clarification would also suppress the confirmation card entirely (the
+  // WP-B15-1 behaviour that recovered shop 6).
+  //
+  // The decision row is still written either way, so nothing is stranded: the
+  // clarification simply opens on the first pass after he confirms the reading.
+  const readingConfirmed = shop.needs_review !== true
+    || everIssued(snapshot, COMMANDS.CONFIRM_INTERPRETATION);
+
   const opened = [];
   for (const held of unresolved) {
     const line = lineByKey.get(held.question_key) || { item_name: held.item_name, alternatives: [] };
@@ -482,7 +496,10 @@ async function stepPlan(deps, snapshot) {
 
     // The clarification round, when one is owed. `question_round` on the
     // decision's own question row is the round we are IN; the next is +1.
-    const nextRound = held.needs_clarification_round === true
+    const wantsClarification = held.needs_clarification_round === true;
+    if (wantsClarification && !readingConfirmed) continue;
+
+    const nextRound = wantsClarification
       ? Number(held.question_round || 1) + 1
       : 1;
 
@@ -873,38 +890,115 @@ async function decideAnswer(deps, shop, question) {
   }
 
   // ── 2. FREE TEXT. Bounded, grounded interpretation. ──────────────────────
-  if (typeof deps.interpretAnswer !== 'function') {
+  //
+  // ── EVERY FAILURE FROM HERE ON OPENS A QUESTION (Codex F2) ───────────────
+  // A line whose question is already ANSWERED has exactly one route back to a
+  // human: a `clarification_required` decision, which opens a genuine round-2
+  // question. Anything that instead throws or returns without writing a
+  // decision leaves the line unresolved with NO open question - the shop parks
+  // at wait:line_resolution and the lines_unresolved card tells Warwick it is
+  // stuck while giving him nothing to answer. A notification is not an answer
+  // path.
+  //
+  // Five paths used to end that way, not one. Codex found the second; the
+  // CLASS is what matters:
+  //   1. no interpreter wired            -> returned early, no decision
+  //   2. structurally invalid return     -> threw            (Codex F2)
+  //   3. buildAnswerGrounding throwing    -> propagated
+  //   4. the interpreter itself throwing  -> propagated (e.g. no gateway)
+  //   5. recordDecision refusing a shape  -> propagated (Terra returns
+  //                                          existing_regular with no id)
+  //
+  // The inconsistency was the tell: an unknown KIND already became a
+  // clarification and gave Warwick a real question, while a malformed SHAPE
+  // gave him a dead end. Same underlying situation - Terra did not return
+  // something usable - and "I could not read the answer" is precisely the case
+  // where asking again is correct. So they all take the same route now.
+  //
+  // THIS GUESSES NOTHING. A clarification decides nothing about the line: it
+  // records that the answer could not be read and asks Warwick again.
+  let grounding = null;
+  let returned = null;
+  let failure = null;
+
+  try {
+    if (typeof deps.interpretAnswer !== 'function') {
+      failure = 'no interpreter is wired into this runtime, so your answer could not be read';
+    } else {
+      grounding = await buildAnswerGrounding(deps, shop, question);
+      returned = await deps.interpretAnswer(grounding);
+      if (!returned || typeof returned !== 'object' || Array.isArray(returned)
+        || typeof returned.decision_kind !== 'string') {
+        failure = 'the interpreter did not return a usable structured answer';
+        returned = null;
+      }
+    }
+  } catch (err) {
+    failure = `the interpreter could not be reached: ${String(err && err.message ? err.message : err)}`;
+  }
+
+  // PROVENANCE STAYS TRUE. A failure-derived clarification was decided by this
+  // code's own rule, NOT by a model - in three of the five paths no model was
+  // ever successfully invoked at all. Recording 'terra' for those would be the
+  // same false provenance WO-2026-08-09-B15-03 existed to remove.
+  const failureSpec = () => ({
+    shop_id: shop.id,
+    question_id: question.id,
+    decision_kind: 'clarification_required',
+    clarification_reason: failure,
+    interpreted_by: 'rule',
+    decision_evidence: {
+      model_return: returned,
+      grounding: grounding ? grounding.sanitized : null,
+      failure,
+    },
+    grounding_fingerprint: grounding ? grounding.fingerprint ?? null : null,
+    evidence_shop_line_id: grounding ? grounding.shop_line_id ?? null : null,
+  });
+
+  if (failure !== null) {
+    const res = await shopDecisions.recordDecision(deps, failureSpec());
     return {
-      question_key: question.question_key, decided: false,
-      reason: 'no interpreter is wired into this runtime - the answer stays uninterpreted rather than guessed',
+      question_key: question.question_key, decided: res.created,
+      kind: res.decision.decision_kind, interpreted_by: 'rule',
+      model_called: returned !== null, reason: failure,
     };
   }
 
-  const grounding = await buildAnswerGrounding(deps, shop, question);
-  const returned = await deps.interpretAnswer(grounding);
-  if (!returned || typeof returned !== 'object') {
-    throw new Error('interpretAnswer returned no structured meaning');
+  let res;
+  try {
+    res = await shopDecisions.recordDecision(deps, {
+      shop_id: shop.id,
+      question_id: question.id,
+      decision_kind: returned.decision_kind,
+      decided_regular_id: returned.decided_regular_id ?? null,
+      decided_quantity: returned.decided_quantity ?? null,
+      decided_item_name: returned.decided_item_name ?? null,
+      clarification_reason: returned.clarification_reason ?? null,
+      // STORED, ROUTED NOWHERE. Lane B consumes it; nothing here does.
+      forward_intent: returned.forward_intent ?? null,
+      interpreted_by: 'terra',
+      interpreted_model: returned.model ?? null,
+      // THE EVIDENCE OF WHAT IT WAS GIVEN. 017's shop_decision_terra_shows_its_work
+      // CHECK makes a terra decision with empty evidence unstorable, so this is
+      // not a convention that can quietly lapse.
+      decision_evidence: { model_return: returned, grounding: grounding.sanitized },
+      grounding_fingerprint: grounding.fingerprint ?? null,
+      evidence_shop_line_id: grounding.shop_line_id ?? null,
+    });
+  } catch (err) {
+    // PATH 5. The model returned a well-formed object describing an ILL-FORMED
+    // decision - `existing_regular` naming no product, `new_item` with no name.
+    // buildDecision and migration 017 both refuse it, correctly. Refusing it
+    // must not also strand the line, so it degrades to the same question.
+    failure = `the interpreter returned a decision the database refuses: ${String(err && err.message ? err.message : err)}`;
+    const fallback = await shopDecisions.recordDecision(deps, failureSpec());
+    return {
+      question_key: question.question_key, decided: fallback.created,
+      kind: fallback.decision.decision_kind, interpreted_by: 'rule',
+      model_called: true, reason: failure,
+    };
   }
-
-  const res = await shopDecisions.recordDecision(deps, {
-    shop_id: shop.id,
-    question_id: question.id,
-    decision_kind: returned.decision_kind,
-    decided_regular_id: returned.decided_regular_id ?? null,
-    decided_quantity: returned.decided_quantity ?? null,
-    decided_item_name: returned.decided_item_name ?? null,
-    clarification_reason: returned.clarification_reason ?? null,
-    // STORED, ROUTED NOWHERE. Lane B consumes it; nothing here does.
-    forward_intent: returned.forward_intent ?? null,
-    interpreted_by: 'terra',
-    interpreted_model: returned.model ?? null,
-    // THE EVIDENCE OF WHAT IT WAS GIVEN. 017's shop_decision_terra_shows_its_work
-    // CHECK makes a terra decision with empty evidence unstorable, so this is
-    // not a convention that can quietly lapse.
-    decision_evidence: { model_return: returned, grounding: grounding.sanitized },
-    grounding_fingerprint: grounding.fingerprint ?? null,
-    evidence_shop_line_id: grounding.shop_line_id ?? null,
-  });
 
   return {
     question_key: question.question_key, decided: res.created,
