@@ -312,6 +312,25 @@ begin
   execute 'grant select on asdair.shop_decision to asdair_ro';
 end $$;
 
+-- ── THE INSERT-ONLY CLAIM RESTS ON ONE MORE THING THAN THESE GRANTS ────────
+-- (Established against real PostgreSQL by Silas, 2026-08-09.)
+--
+-- FOREIGN KEY REFERENTIAL ACTIONS RUN WITH OWNER AUTHORITY AND BYPASS GRANTS.
+-- So the two FKs above can change a decision row without any role holding
+-- UPDATE or DELETE on this table:
+--
+--   * deleting an asdair.shop_line NULLs evidence_shop_line_id
+--     (on delete set null);
+--   * deleting an asdair.shop_question CASCADES the decision away
+--     (shop_decision_question_fk, on delete cascade).
+--
+-- Both are the CORRECT semantics - a decision about a deleted question is not
+-- a decision - and neither is a defect. But it means immutability here also
+-- depends on asdair_rw lacking DELETE on those UPSTREAM tables, which was
+-- verified to be true. The claim holds; it holds for one more reason than the
+-- grant matrix above states on its own. Recorded so that a future grant change
+-- upstream is understood to reach this table too.
+--
 -- KNOWN LIMIT, DOCUMENTED RATHER THAN DISCHARGED. Because asdair_rw holds
 -- table-level UPDATE on asdair.shop_question, the new question_round and
 -- parent_question_id columns ARE mutable by the runtime. Fixing that would

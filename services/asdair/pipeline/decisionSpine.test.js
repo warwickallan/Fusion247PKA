@@ -407,6 +407,106 @@ test('a decision_kind the migration would refuse is LOUD here, never absorbed', 
   }), /unknown decision_kind/);
 });
 
+// =====================================================================
+// BIGINT IDS ARRIVE AS STRINGS FROM THE REAL DRIVER
+//
+// node-postgres returns `bigint` as a JavaScript STRING; fakePg returns a
+// NUMBER. It is not a uniform difference - `decided_quantity` is `integer` and
+// comes back as a number from both - so a LIVE decision row is a mixed bag of
+// string ids beside numeric quantities, and that mixture is INVISIBLE in the
+// fake. Established by Silas against real PostgreSQL 17.4.
+//
+// The production code is written to be INDIFFERENT: every id is either passed
+// straight through as a SQL parameter, or normalised with Number() on BOTH
+// sides of a comparison. These tests pin that indifference so it cannot
+// regress silently - they feed the pure functions exactly what the real driver
+// would hand them and require identical behaviour.
+//
+// The fake is deliberately NOT changed to return strings. Making the harness
+// mimic the driver hides the question; making the code not care answers it.
+// =====================================================================
+
+test('BIGINT: a decision whose ids are STRINGS behaves identically to numeric ids', () => {
+  const asNumbers = applyDecisionsToPlan({
+    plan: planWith(heldLine('Ariel Pods')),
+    decisions: [decisionFor('Ariel Pods',
+      { decision_kind: 'existing_regular', decided_regular_id: 11, question_id: 77 })],
+    questionKeyFor, regularsById: REGULARS,
+  });
+  const asStrings = applyDecisionsToPlan({
+    plan: planWith(heldLine('Ariel Pods')),
+    // Exactly what `pg` hands back: bigints as strings, integers as numbers.
+    decisions: [decisionFor('Ariel Pods',
+      { decision_kind: 'existing_regular', decided_regular_id: '11', question_id: '77' })],
+    questionKeyFor, regularsById: REGULARS,
+  });
+
+  assert.equal(asStrings.plan.items[0].status, 'add');
+  assert.equal(asStrings.plan.items[0].matched_product, asNumbers.plan.items[0].matched_product,
+    'a string bigint id failed to resolve its canonical name - the live row would silently lose it');
+  assert.equal(asStrings.plan.items[0].matched_product, 'Ariel All-in-1 Pods 38');
+  assert.equal(asStrings.unresolved.length, 0);
+  assert.equal(asStrings.plan.summary.planned_add, asNumbers.plan.summary.planned_add);
+});
+
+test('BIGINT: the round chain does not compare ids at all - it keys on question_key', () => {
+  // The named hazard: matching parent_question_id against question.id with ===
+  // would work perfectly in the suite and silently fail to find the parent
+  // live. It cannot happen here, because the chain is walked by DERIVED KEY -
+  // question_key is `text` in every driver - and parent_question_id is only
+  // ever WRITTEN, never matched.
+  const src = fs.readFileSync(path.join(HERE, 'applyDecisions.js'), 'utf8');
+  assert.doesNotMatch(src, /parent_question_id\s*={2,3}/,
+    'the round chain compares parent_question_id - a string/number mismatch would break it live');
+
+  // And behaviourally: a round-2 decision carrying STRING ids is still found.
+  const { plan, unresolved } = applyDecisionsToPlan({
+    plan: planWith(heldLine('Ariel Pods')),
+    decisions: [
+      { question_key: questionKeyFor('Ariel Pods', 1), question_id: '77', question_round: 1,
+        decision_kind: 'clarification_required', clarification_reason: 'two sizes' },
+      { question_key: questionKeyFor('Ariel Pods', 2), question_id: '78', question_round: 2,
+        decision_kind: 'existing_regular', decided_regular_id: '11' },
+    ],
+    questionKeyFor, regularsById: REGULARS,
+  });
+  assert.equal(plan.items[0].status, 'add', 'the round-2 decision was not found with string ids');
+  assert.equal(plan.items[0].matched_product, 'Ariel All-in-1 Pods 38');
+  assert.equal(unresolved.length, 0);
+});
+
+test('BIGINT: buildDecision accepts string ids and normalises them', () => {
+  const row = buildDecision({
+    shop_id: '3', question_id: '77', decision_kind: 'existing_regular',
+    decided_regular_id: '11', interpreted_by: 'human',
+  });
+  assert.equal(row.shop_id, 3);
+  assert.equal(row.question_id, 77);
+  assert.equal(row.decided_regular_id, 11);
+});
+
+test('BIGINT: an exact candidate whose regular_id is a string still resolves with no model call', () => {
+  const out = resolveExactCandidate({
+    status: 'answered',
+    answer_text: 'Ariel All-in-1 Pods 38',
+    candidates: [{ label: 'Ariel All-in-1 Pods 38', regular_id: '11' }],
+  });
+  assert.ok(out, 'a string regular_id must not defeat the deterministic path');
+  assert.equal(out.decided.decided_regular_id, 11);
+});
+
+test('BIGINT: the catalogue Map keys and the lookup calls both normalise with Number()', () => {
+  // loadCatalogue.js:122 builds regularsById with Number(r.id) keys; nameFor
+  // reads it with map.get(Number(id)). Both sides normalise, which is the
+  // reason a string id resolves at all. If either side stops, this pins it.
+  const src = fs.readFileSync(path.join(HERE, 'applyDecisions.js'), 'utf8');
+  assert.match(src, /map\.get\(Number\(id\)\)/,
+    'nameFor no longer normalises the id it looks up - a string bigint would miss the Map');
+  const runSrc = fs.readFileSync(path.join(HERE, 'runPipeline.js'), 'utf8');
+  assert.match(runSrc, /\[Number\(r\.id\), r\]/,
+    'the fallback catalogue Map no longer keys on Number(r.id)');
+});
+
 test('a decided regular missing from the supplied catalogue resolves to null, never to a guess', () => {
   const { plan } = applyDecisionsToPlan({
     plan: planWith(heldLine('Ariel Pods')),
