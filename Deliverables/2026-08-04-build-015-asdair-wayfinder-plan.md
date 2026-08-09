@@ -1112,7 +1112,7 @@ Restated here in numbered form so a gate can grade them separately:
 |---|---|---|---|
 | **1** | **Free text is a first-class production input** — a typed natural-language reply reaches the SAME durable question → answer → `shop_decision` → recomputation spine. No button-only dependency, no silently discarded text, no Larry relay. | Lane A, `a61fc44`. `answer_source='typed'`; unrecognised source **throws and writes nothing** | **The real production event has never run.** No live Telegram message has traversed it; **Terra's prompt has never met the model** |
 | **2** | **Coherent question surface** — unresolved questions presented together; one typed reply may answer several where the mapping can be grounded safely | Lane A. Terra called **once** with all open keys; two questions answered; two separate ledger commands | With exactly ONE open question, any answer-shaped message is claimed — so a genuine new list typed while a stale question is open would be read as an answer. **No list-shape heuristic was invented** |
-| **3** | **Terra applies the prose rulebook** — relevant household rules go to the reasoning consumer AS PROSE and Terra applies the judgement. ⛔ No ever-growing deterministic mini-language | ⛔ **NOT DELIVERED. `skill/rulebook.js` HAS ZERO PRODUCTION CALLERS** (Veritas D1, `318e0e3`). All five exports are reached only from `rulebook.test.js` and `ruleConsumption.test.js`. The module is written, tested — **and connected to nothing.** What IS true: the code exists, is well-tested, adds no directive type/grammar/registry/DSL, and the AC6 prohibition is pinned to a CHECK-constraint literal held outside it | **BLOCKING.** Corrective dispatch owed for the wiring, then ONE focused confirmation. **The price-at-plan-time limit below is real but SUBORDINATE** — it describes a module that does not run |
+| **3** | **Terra applies the prose rulebook** — relevant household rules go to the reasoning consumer AS PROSE and Terra applies the judgement. ⛔ No ever-growing deterministic mini-language | **CODE PATH NOW CLOSED.** Lane R1 built it (`466cba9`); **`WO-B15-R2` (`022c874`) WIRED it** — `planWithDecisions` (`runPipeline.js:132`) calls `applyRulebook` at `:164`, `deps.consult` bound in the real `createDeps()`, `decisionSpine.test.js`'s one-call-site constraint satisfied by wiring AROUND it. Pipeline **327 → 344**, all green, **independently re-measured by Larry**. Mutation both directions with sha256-verified restore. `skill/**` untouched — no finding against R1's interface *(supersedes the "ZERO PRODUCTION CALLERS" state Veritas found at `318e0e3`; D1 is answered, awaiting ONE focused confirmation)* | **🔴 NEW, HIGH — recomputation is no longer DETERMINISTIC.** See the block below. **Plus:** attribution never reaches the browser handoff; and the price-at-plan-time limit, real but subordinate |
 | **4** | **Uncertainty is spoken, never guessed and never silently parked** — applies to an unmappable reply fragment and to an unclear or conflicting prose rule alike | Lanes A and R1. Six executed uncertainty paths incl. unreachable consumer → flag on every affected line; **unparseable reply → error recorded, never read as approval** | — |
 | **5** | **Traced to the real production caller** — not "a model wired to a prompt" | Lane C, `8e625b4`: `buildHandoff`, the execution packet and `verifyBasket` now have production callers, proven reachable from the runtime entry, with `requestBrowserBuild` asserted OFF the path | **AC6(f) OPEN:** `openHandoff` writes `progress.handoff` while `runner.js reconstruct()` reads `progress.plan`, so **a CDP arm can still ignore the payload.** `browser-runner/progress.cjs` was outside every granted surface. Named, not hidden |
 
@@ -1201,6 +1201,55 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 >    **It is owed, not dropped.**
 > 4. The price limit is to be resolved **through the existing browser/planning-price seam** — ⛔ **no
 >    new architecture and no new Wayfinder.**
+
+> ### 🔴 OPEN PRODUCT DECISION — plan recomputation is no longer deterministic (`WO-B15-R2`, `022c874`)
+>
+> **Awaiting Warwick.** Notified 2026-08-09 (FusionDevBot 462). **NOT blocking** — safe work
+> continues either way.
+>
+> **The fact, verified by Larry's own execution and not taken on the worker's word:**
+> `planWithDecisions` (`runPipeline.js:132`) now calls `applyRulebook` (`:164`), and
+> `stepRecordConfirmation` routes through it (`:1463`) — while the comment at **`:1441` still
+> asserts** *"planBasket is pure and deterministic, so given the same durable inputs it reproduces
+> the same plan — which is exactly what makes recomputation honest rather than a guess."* **That
+> claim is now FALSE.** The rulebook makes a fresh model call at **every** recomputation — measured
+> at **3 consults** on a full journey, **0** on a parked shop.
+>
+> **Consequence in product terms:** the basket handed to the browser and the plan later checked
+> against it **can legitimately disagree**, because the model was asked twice and may judge
+> differently. **That is the exact class of failure the decision spine was built to remove**, and it
+> can mean the trolley does not match what Warwick approved. It clears the HOBBY BRAIN bar — money
+> and the system's core function — which is why it was escalated rather than parked.
+>
+> **It is a consequence of R1's interface, not a defect in `rulebook.js`**, and it could not be
+> resolved inside R2's surface.
+>
+> | Option | What changes |
+> |---|---|
+> | **(a) PERSIST the judgement with the shop** — **Larry's recommendation** | Consult once, store the result, recomputation reuses it. **Restores determinism** and matches how `shop_decision` already works — a decision, once made, is durable. Cost: a judgement made on Monday's prices stands if the offer changes midweek. Needs a small persistence decision (Silas) |
+> | **(b) Re-judge every time** — current behaviour | Always latest evidence; handoff and verification can disagree; 3 model calls per journey |
+> | **(c) Consult only at planning, never on recomputation** | Cheapest; recomputation reuses stored plan lines |
+>
+> **⛔ The false comment at `runPipeline.js:1441` is NOT yet corrected** — the correction belongs with
+> whichever option is chosen, and writing a truthful comment now would presuppose the answer.
+> **Recorded so it is not mistaken for an oversight.**
+>
+> **Also from R2, recorded once, non-blocking:** (MEDIUM) rule attribution never reaches the browser
+> handoff — `packetLinesFromPlan` reads only `status` and `planned_qty`, so neither the durable row
+> nor a supervised runner can say **why** a quantity is 4. (MEDIUM) `decisionSpine.test.js:78` is
+> CRLF-broken — `fn.indexOf('\n}\n')` returns `-1`, verified by execution, so its **second**
+> assertion currently means "somewhere in `runPipeline.js`" rather than "inside `planWithDecisions`";
+> **the first assertion — exactly one call site — is unaffected and fully binding.** The identical
+> defect sits at `productionWiring.test.js:425`.
+>
+> ### 📌 GUARD REGISTRATION — a prerequisite neither Warwick nor Larry had stated
+>
+> Warwick's condition (*"first let the integrated head finish green and bank the result"*) **is now
+> met** — 344/344 pipeline, independently re-measured. **But the guard lives on
+> `build-020/wo-readiness-validator` and is NOT on `main`**, so registering it in
+> `.claude/settings.json` would point the host at a file the live checkout does not have. **That
+> branch must converge to `main` first.** Sequencing unchanged, one more step than either of us said.
+> `WO-4F-08b` still running.
 
 **⛔ THE BAR THIS PACKAGE HAS NOT MET.** Every requirement above is proven **OFFLINE ONLY** — no
 live Telegram message, no live ASDA session, no real shop, no database. Under § "Nothing may live
