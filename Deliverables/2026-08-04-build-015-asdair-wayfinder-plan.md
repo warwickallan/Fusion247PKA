@@ -1269,6 +1269,40 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 >   out-of-stock meaning, exclusions, aliases) to the reasoning consumer. **The prohibition on
 >   growing a deterministic mini-language is unchanged and unaffected.**
 >
+> **SILAS'S SCHEMA DECISION IS IN** (`f0ebf31`,
+> [[Deliverables/2026-08-09-silas-schema-decision-remembered-last-choice]]): a new table
+> **`asdair.remembered_choice`, migration 018** — append-only, newest-wins, `SELECT`+`INSERT` to
+> `asdair_rw`, **UPDATE/DELETE to nobody**. Both existing seams were rejected on **correctness, not
+> taste**: `rule_qa_log` has no column able to hold a grounded product identity and the planner
+> recovers meaning from it by **prose matching** (`planner.js:1151`); `asdair.rules` has
+> `matched_product` as bare `text` with **no FK**, and `asdair_rw` holds **no UPDATE** on it
+> (`012:106-110`), so `active`/`superseded_by` are **inoperable from the runtime**. Warwick's
+> authorised-vs-accidental distinction is settled **structurally** — a composite FK to
+> `shop_decision (id, decision_kind)`, so the kind is **proved, not asserted**, with no boolean
+> successor to `applies_going_forward`. Honesty is by **absent columns**: no product name is stored,
+> so a dead preference renders as **nothing** rather than a stale-but-authoritative-looking string.
+>
+> > #### ⚠️ FLAG 1 — **`WO-B15-R3` IS NECESSARY BUT NOT SUFFICIENT.** Load-bearing; do not lose it.
+> >
+> > **Archiving the best-value rule needs an OWNER-LEVEL migration** — `asdair_rw` has **no UPDATE**
+> > on `asdair.rules`, so the runtime cannot archive a rule at all. **Until that privileged step
+> > runs, `planner.js:1151` keeps surfacing the archived rule as an advisory note on the Ariel
+> > line.** R3 removes the executable judgement from the code; **the DATA change is a separate
+> > privileged step and is Larry's to run under Warwick's authority**, on the precedent of 017's
+> > application (pre-notification + his §3 authority). ⛔ **Do not report "best value is archived"
+> > on the strength of R3 alone.**
+> >
+> > #### ⚠️ FLAG 2 — **018 hard-depends on 017 being applied** (composite FK). 017 IS applied, which
+> > satisfies it; the migration header must state the dependency. 017 was deliberately independent
+> > of 016 — 018 cannot be.
+>
+> **Recorded, not acted on:** two `normaliseTerm` implementations agree only by a sample-based test
+> (`stages.test.js:267`) — pre-existing, mitigated in 018 by a `term_normaliser` column plus a
+> fixed-point CHECK. `012`'s grant matrix is now missing two tables (`shop_decision` and this one).
+> **Price history is compatible** — same `regulars.id` key, reuse `price_basis` from `006` — and a
+> `price` column on `remembered_choice` is an **explicit NON-GOAL** so nobody adds one later *"while
+> we're in there"*.
+>
 > **The seam this lands on, established by execution and NOT to be rebuilt:** `asdair.rule_qa_log`
 > already carries `applies_going_forward` (`db/001:178`), which `planner.js` filters on — *"every
 > answer Warwick ever gave was written, read back, and discarded"* (`db/017` header). `db/017` also
