@@ -80,6 +80,98 @@ of them first and must learn from that one which document it is allowed to act o
 
 ---
 
+## 🚦 THE BUILD-015 EXECUTION VIEW — FOUR LANES. **Read this first. Everything below is detail.**
+
+> **Warwick's operating rule, 2026-08-09: PARALLEL PREPARATION. SERIAL PRODUCT TRUTH.**
+> The **live journey stays waterfall** — a downstream stage must never run on semantically invalid
+> upstream state. **Research, proof, design-readiness, bounded offline implementation and assurance
+> preparation do NOT wait for each other.**
+
+**THE CRITICAL PATH:**
+
+```
+A  valid current-shop decision  →  C  valid packet / browser / trolley
+                                →  D  checkout reconciliation
+                                →  B  durable knowledge feeds the NEXT shop
+```
+
+**B is developed in parallel even though its full product proof naturally closes at the end/start of
+the weekly cycle.**
+
+**Status vocabulary:** `PROVEN LIVE` · `WIRED NOT PROVEN` · `BUILT NOT WIRED` · `BROKEN` ·
+`READY TO IMPLEMENT` · `ACTIVE` · `BLOCKED BY UPSTREAM`.
+
+---
+
+### LANE A — INPUT → INTERPRETATION → QUESTIONS → CURRENT DECISION ⭐ **THE CRITICAL SPINE**
+
+| | |
+|---|---|
+| **PRODUCT OUTCOME** | **Warwick can answer AsdAIr naturally, without Larry, and that answer changes THIS WEEK'S shop.** |
+| **PROVEN LIVE** | Photo intake · exact-source fingerprint binding · catalogue-grounded interpretation · the **interpretation-confirmation card, delivered and tapped for real** (2026-08-09, shop 6 recovered `PROCESSING → READY_TO_SHOP` after a real Telegram tap, no Larry in the path) |
+| **BROKEN** | **Question cards are never delivered** — all 11 of shop 6's questions have `card_chat_id`/`card_message_id` NULL, no render fingerprint · **an answer cannot reach the plan** — `runPipeline.js:638` writes `applies_going_forward:false`, `planner.js:1091` admits only `===true`, and `shopLines.markCorrected` has **zero production callers** · **`READY_TO_SHOP` never looks at a line** (`stages.js:306-318` counts open questions only) |
+| **ACTIVE** | **WP-B15-2** — Keel, isolated worktree, read-back gate. Owns `pipeline/**`, `bot/**`, `db/**` |
+| **READY NEXT** | Cockpit parity — assess whether a bounded free-text/candidate control binds cleanly to the shared command surface. **Must NOT hold Telegram autonomy hostage** |
+| **LIVE ACCEPTANCE** | A real delivered card · ≥1 deterministic button resolution · **≥1 genuine natural-language Warwick reply** · any required Terra interpretation · durable structured decision · observable line/plan change · `READY_TO_SHOP` only after lines are actually resolved. **NO Larry answering.** Shop 6 is in an invalid semantic state — **its rows must NOT be hand-patched to manufacture acceptance** |
+| **DEPENDS ON** | Nothing. This is the spine. |
+
+**Establishment:** [[Deliverables/2026-08-09-pax-answer-to-plan-seam]], banked `397d388`. Conclusion **C** — neither buttons nor free text reliably change the current-week plan; both die at the same barriers, so **the seam is not in the channel**.
+
+**Binding design ruling (Warwick):** current-shop meaning and future household learning are **different concerns**. **Do NOT route this week's decision through `rule_qa_log`.** Persist it in the current shop's durable state. **Terra is called only where semantic interpretation is genuinely required** — a button naming an exact candidate must not spend a model call — and may only assert a product identity present in its supplied evidence. **No least-bad match. Unknown means `clarification_required`.**
+
+---
+
+### LANE B — SUPABASE DURABLE HOUSEHOLD KNOWLEDGE / BETWEEN-SHOPS MEMORY
+
+| | |
+|---|---|
+| **PRODUCT OUTCOME** | **What the household learns this week is there for Terra BEFORE next week's photograph.** |
+| **PROVEN LIVE** | Static knowledge genuinely reaches Terra / recognition / planner — recognition is authentically grounded |
+| **BROKEN** | **Everything learned by OPERATING is lost or inert.** Shop 6's 11 answers produced zero durable rows · `rule_qa_log` newest row is **2026-07-20** · the 106-key purchase-frequency view is read by nothing · `substitutes_allowed` flattened to `false` for all 103 regulars against a historical 9-of-36 · later regular enrichment has been **Larry-mediated, not production-learned** |
+| **ACTIVE** | Pax establishment of **B1** human decision learning · **B2** confirmed-basket catalogue learning · **B3** order/outcome learning — kept **separate**, not collapsed |
+| **READY NEXT** | Awaiting the establishment |
+| **LIVE ACCEPTANCE** | An answer given this week demonstrably prevents the same question next week, **against the real planner** · a genuinely new accepted product reaches Regulars/Favourites and Supabase **without Larry** |
+| **DEPENDS ON** | Full product proof closes at the weekly cycle boundary. **Design and implementation readiness do not wait.** |
+
+> **⚠️ ASDA Regulars/Favourites are PLATFORM EVIDENCE, not household intent. BOB is the example that proves it** — it kept reappearing because Regulars is generated from order history, while the household had explicitly ruled against it.
+
+---
+
+### LANE C — BROWSER OPERATION / ASDA SHOPPING
+
+| | |
+|---|---|
+| **PRODUCT OUTCOME** | **A valid confirmed plan becomes a correctly built ASDA trolley, reconciled, never checked out.** |
+| **PROVEN LIVE** | A real ASDA trolley HAS been built successfully by the historical browser method (three runs recovered from evidence) |
+| **BROKEN** | **Stale claims strand shops** — `browser_build_request` ids 1, 2 and 5 held by dead claimants since 28 Jul / 3 Aug, **no lease expiry, no reaper** · **packet/handoff has no production caller** — `handoff/` has zero non-test importers; `buildHandoff` appears in `runtime.js` only in a comment · **no Larry-less claimer by design** (`stages.js:85`: *waitsFor: the supervised browser runner (Larry, at the keyboard)*) |
+| **ACTIVE** | **C1** Keel — lease/recovery, isolated worktree, bounded to `handoff/**` + `browser-runner/**` · **C2/C3/C4** Pax — packet seam, proven operating method, ASDA auth/session durability |
+| **READY NEXT** | Wiring the packet seam — **only once Lane A's corrected plan contract exists** |
+| **LIVE ACCEPTANCE** | A real trolley built from a **semantically valid** plan, reconciled against it, `BASKET_READY` raised. **Never checkout, never pay** |
+| **DEPENDS ON** | **Lane A for a valid plan contract.** Do NOT design against the current invalid transient plan shape. Do NOT execute a real trolley from shop 6 until Lane A is fixed |
+
+---
+
+### LANE D — POST-SHOP WRAP-UP / RECONCILIATION
+
+| | |
+|---|---|
+| **PRODUCT OUTCOME** | **The real order is reconciled against the confirmed plan, discrepancies are visible, and the outcome is durable.** |
+| **PROVEN LIVE** | Nothing yet established |
+| **BROKEN** | Unestablished — this lane has never been exercised. The estate's recurring defect pattern (**a module that exists, is tested, is described in a comment as wired, and has no production caller**) is the primary hunt here |
+| **ACTIVE** | Pax read-only establishment of the confirmation parser, reconciliation, order persistence, outcome writer, `last_order`, favourites/regulars promises, runtime callers and surfaces |
+| **READY NEXT** | The prepared live acceptance sequence, written **before** we reach checkout |
+| **LIVE ACCEPTANCE** | Warwick checks out personally → the confirmation reaches AsdAIr → the real order is parsed and reconciled → discrepancies visible → durable outcome → learning hooks fire. **Larry performs no checkout, payment or slot action** |
+| **DEPENDS ON** | Lane C for `BASKET_READY`. **Establishment does not wait** — Warwick: *"so we do not reach checkout and then discover the last quarter of the product was only unit-tested."* |
+
+---
+
+**PARKED, NOT LOST** — carried, not chased: the tap-acknowledgement defect (`runtime.js:285-298`, historic, never worked) · the search-fallback browser-method contradiction · `RUNTIME-DECISION.md`'s corrected evidential premise · Veritas Gate 2's five open HOLDs · multi-worktree/active-programme-state semantics (parked to **BUILD-020 4F**).
+
+**FILE-SURFACE OWNERSHIP while implementers run in parallel — Larry's, resolved before dispatch:**
+Lane A owns `pipeline/**`, `bot/**`, `db/**`. Lane C1 owns `handoff/**`, `browser-runner/**`. **Neither crosses.** A worker needing the other's surface stops and says so rather than editing across it.
+
+---
+
 ## WHAT THIS MAP IS, AND WHEN IT WAS WRITTEN — read before trusting its shape
 
 **Written 2026-08-04, at roughly ninety percent of the build.** BUILD-015 was promoted on
