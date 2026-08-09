@@ -153,6 +153,84 @@ So:
 **Do not read `summary.advisories` as "the multibuy rule works".** It does not.
 It means the rule finally reaches a human instead of being thrown away.
 
+### `rulebook.js` -- the prose rulebook, and the rules that finally ACT (B15-3, lane R1)
+
+The section above ends at *"the rule finally reaches a human instead of being
+thrown away."* That was as far as a deterministic planner could go, and it was
+not far enough:
+
+> **Warwick:** *"there is no way to teach the system new rules and get it to
+> learn if I keep having to tell it which aerial every bloody week!"*
+
+`rulebook.js` closes the rest. It takes the rules `actionableRules()` drops --
+**23 of 39 active rules, and precisely the judgement layer** -- assembles them as
+the household's **own prose**, hands them to a **reasoning consumer**, and
+applies the answer to the plan.
+
+**It adds no directive type, no rule grammar, no matcher DSL and no registry.**
+A household rule needs no code here, ever. The prose is the interface; the model
+is the interpreter. Growing a `directive` per kind of judgement is an
+ever-lengthening mini-language that is always one household sentence behind, and
+that shape of regrowth is exactly what this lane must not produce.
+
+```js
+const { applyRulebook } = require('./rulebook.js');
+
+const plan = planBasket({ listItems, rules, products, regulars, budget, household });
+const { plan: judged, audit } = await applyRulebook({
+  plan,                 // the planBasket result
+  rules,                // the SAME rules array planBasket was given
+  household,
+  consult,              // async (grounding) => reply | raw model text
+});
+```
+
+`applyRulebook` is **pure apart from the injected `consult`**: no I/O, no env
+var, no model client, no credential -- the same shape as the rest of this
+directory. `buildRulebookPrompt(grounding)` and `parseRulebookReply(raw)` are
+exported so the production binding is thin.
+
+**The safety envelope is the load-bearing part.** A judgement may:
+
+| May | May not |
+|---|---|
+| name a product for a line the planner could **not identify** (`ambiguous match`, `ambiguous regulars match`, `no explicit product mapping`), **and only from the candidates that line actually offered** | overrule a `map`, an `exclude`, an out-of-stock, a quantity conflict, a foreign-household product id, a line a `needs_decision` rule deliberately holds, or **any hold cause this module does not recognise** -- unrecognised means untouched |
+| change the quantity of a line already being bought, a whole number, `1..24` | set a quantity of zero, or add anything to the basket that was excluded |
+| **ask** | fall back on the deterministic answer when it is unsure |
+
+**Uncertainty is spoken.** An unclear rule, two rules pointing different ways, a
+reply naming a product nobody offered, a quantity outside the bound, a verb
+outside the vocabulary, an attribution to a rule that was never sent -- none of
+them degrade to a silent deterministic answer. Each becomes a question carrying
+the household's own words, or a visible `rulebook answer rejected` flag plus an
+audit entry. An unreachable consumer flags **every** affected line
+`rulebook not consulted` and records the error in `summary.rulebook`.
+
+**Attribution is mandatory.** Every applied change carries flag
+`rulebook rule <id>`, names the rule in the line's note, and appears in
+`summary.rulebook.applied` with `from`/`to`. *"Why did it do that"* has an
+answer, or the change does not happen.
+
+**What this does NOT yet do, stated plainly:**
+
+- **Prices.** Rules 31 and 36 are conditional on price and offer data. Neither
+  `products` nor `regulars` carries a price column, so on the live corpus today
+  those rules will mostly produce a **reasoned question** rather than a pick --
+  which is still a large improvement on silence, and is proved by a test rather
+  than assumed. A priced candidate list makes them decide; nothing here fakes a
+  price.
+- **Category-targeted rules** are carried at basket scope with their category
+  stated in the prose, because `planBasket`'s public item shape carries no
+  category. Declared over-inclusion, not a silent omission.
+- **The estimate.** A changed quantity makes `summary.estimated_total` wrong
+  rather than stale, and this module cannot recompute it (it never sees unit
+  prices). It is set to `null` with `budget_flag: 'unknown'` and
+  `summary.rulebook.estimate_invalidated: true`.
+- **Nothing is wired.** No pipeline caller invokes `applyRulebook` yet, so **no
+  real shop has ever exercised it**. Tests use a stand-in consumer; that proves
+  the path carries, applies and refuses -- it proves nothing about how well a
+  model judges.
+
 ### Prior answers: `asdair.rule_qa_log` is a planning input (WO-Y)
 
 `CANONICAL-WEEKLY-SHOP-PROCESS.md` section D requires that *"previous decisions must be

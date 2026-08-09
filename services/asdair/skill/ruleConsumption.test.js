@@ -800,3 +800,51 @@ test('with no rules, no prior answers and no last order, planning is unchanged',
   assert.equal(result.summary.advisories.length, 0);
   assert.equal(lineFor(result, 'choc yazoo').status, 'add');
 });
+
+// ---------------------------------------------------------------------
+// 7. THE DEAD 59% (B15-3 lane R1).
+//
+// Section 5 above proves an `info` rule's WORDS reach a human. It has never
+// proved that the rule DOES anything - because until now it did not. rules 32,
+// 36, 37 and 38 have been active for weeks, are echoed onto a note, and have
+// never changed a product, a quantity or a status.
+//
+// These two tests hold the boundary between the two paths: what the
+// deterministic planner refuses to act on is exactly what the prose rulebook
+// picks up, and neither set leaks into the other.
+// ---------------------------------------------------------------------
+
+const rulebook = require('./rulebook.js');
+
+test('the rules the deterministic planner drops are exactly the ones the rulebook picks up', function () {
+  const rules = liveRules();
+  const { actionableRules } = require('./planner.js')._internal;
+  const actionable = actionableRules(rules).map(function (r) { return r.id; }).sort();
+  const inert = rulebook.inertRules(rules, HOUSEHOLD).map(function (r) { return r.id; }).sort();
+
+  assert.deepEqual(actionable, [12, 25], 'the deterministic set changed - re-read actionableRules()');
+  assert.deepEqual(inert, [32, 36, 37, 38], 'the inert set changed - the two paths must partition the corpus');
+
+  // No rule is in both, and none is in neither.
+  inert.forEach(function (id) {
+    assert.ok(actionable.indexOf(id) === -1, 'rule ' + id + ' is claimed by both paths');
+  });
+  assert.equal(actionable.length + inert.length, rules.length,
+    'a rule belongs to neither path - it is on the floor, which is the defect this closes');
+});
+
+test('a judgement rule that has never fired reaches the reasoning consumer as its own words', function () {
+  const rules = liveRules();
+  const result = plan([{ item_name: 'Sure male', requested_qty: 3 }], { rules: rules });
+  const grounding = rulebook.buildRulebookGrounding(result, rules, HOUSEHOLD);
+
+  assert.ok(grounding, 'the Sure rules still reach nothing');
+  const ids = grounding.rules.map(function (r) { return r.id; }).sort();
+  assert.deepEqual(ids, [32, 36, 37, 38]);
+
+  const prompt = rulebook.buildRulebookPrompt(grounding);
+  assert.ok(prompt.indexOf(ruleById(rules, 37).rule_text) !== -1,
+    "rule 37's own words are not in the prose sent to the consumer");
+  assert.ok(prompt.indexOf(ruleById(rules, 36).rule_text) !== -1,
+    "rule 36's own words are not in the prose sent to the consumer");
+});

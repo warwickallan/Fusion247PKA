@@ -949,6 +949,19 @@ function ruleReasonText(rule) {
   return '';
 }
 
+// WHERE THE ROWS THIS FUNCTION DROPS NOW GO (B15-3 lane R1).
+//
+// Everything filtered out here - every `info` row and every target-less row -
+// used to end its life at this line. On the live corpus that is 23 of 39 active
+// rules, and it is the JUDGEMENT layer: "pick the best value", "buy up to the
+// offer", "round it up". The filter itself is CORRECT and is unchanged: none of
+// those can be executed by a matcher, and forcing them into a directive type
+// each would grow an ever-lengthening mini-language for household judgement.
+//
+// They are now picked up as PROSE by rulebook.js (rulebook.inertRules is the
+// negative of this function plus rotationInstructionsFromRules) and applied by
+// a reasoning consumer, outside this pure planner. Nothing here parses prose,
+// which is the property that keeps this file deterministic and auditable.
 function actionableRules(rules) {
   return (Array.isArray(rules) ? rules : []).filter(function (r) {
     // An actionable directive with NO target is ignored (Finding 6): hasTarget()
