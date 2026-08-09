@@ -79,6 +79,19 @@ const requireCjs = createRequire(import.meta.url);
 const { buildHandoff } = requireCjs('../handoff/buildHandoff.js');
 const { openHandoff } = requireCjs('../handoff/claim.js');
 
+// ── THE HOUSEHOLD'S PROSE RULEBOOK, ON THE LIVE ROUTE (WP-B15-3) ───────────
+//
+// Same defect, third time: `skill/rulebook.js` was complete, tested to 29/29
+// with mutation proofs in both directions, and reachable ONLY from its own two
+// test files. Veritas found it at Gate 1. This import and the one call site
+// below are what make it production code.
+//
+// Imported directly rather than injected, exactly like `applyDecisionsToPlan`
+// above: the module is pure apart from the `consult` callable it is GIVEN, and
+// that callable IS injected (deps.consult). Injecting the pure half as well
+// would buy nothing and cost the D-1 failure mode.
+const { applyRulebook } = requireCjs('../skill/rulebook.js');
+
 /**
  * THE ONE PLACE A PLAN IS BUILT (WP-B15-2).
  *
@@ -94,11 +107,30 @@ const { openHandoff } = requireCjs('../handoff/claim.js');
  * call site has to remember. `runPipeline.test.js` asserts on this module's
  * source that no other `deps.planBasket(` call site exists.
  *
+ * ── AND IT IS ALSO THE ONE PLACE THE PROSE RULEBOOK RUNS (WP-B15-3) ─────────
+ *
+ * For exactly the same reason. There is no plan table, so "the household's
+ * judgement rules were applied" is a claim about EVERY recomputation, and the
+ * only way to make it true everywhere is to make it a property of this
+ * function. Wiring it beside the planner call at each site would re-create the
+ * half-working shape this function exists to end - and would need a second
+ * `deps.planBasket(` call site, which decisionSpine.test.js forbids outright.
+ *
+ * ── THE ORDER OF THE THREE STAGES IS THE PRECEDENCE, AND IT IS DELIBERATE ───
+ *
+ *   1. planBasket           - what the deterministic rules alone decide
+ *   2. applyRulebook        - what the household's PROSE rules judge
+ *   3. applyDecisionsToPlan - what WARWICK actually said, this week
+ *
+ * The human is last, so a recorded decision always overrules a model
+ * judgement about the same line. Nothing a reasoning consumer says can
+ * displace an answer Warwick gave.
+ *
  * @returns {{plan:object, applied:Array, unresolved:Array, unlinkable:Array,
  *           decisions:Array}}
  */
 async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
-  const plan = deps.planBasket({
+  const planned = deps.planBasket({
     listItems,
     rules: inputs.rules,
     products: inputs.products,
@@ -112,12 +144,36 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
     household: shop.household_id,
   });
 
+  // ── THE JUDGEMENT LAYER (WP-B15-3) ────────────────────────────────────────
+  // The SAME rules array the planner was given, so the two halves cannot
+  // disagree about what the household's rulebook says. `applyRulebook` returns
+  // a NEW plan and never mutates its input.
+  //
+  // `deps.consult` is passed straight through, UNGUARDED, on purpose. Where no
+  // inert rule speaks about this basket the module never calls it and never
+  // asks for it, so a household with no judgement layer spends nothing. Where a
+  // rule DOES speak and nothing is bound, it throws - loudly, at the moment the
+  // rules were about to be applied - rather than skipping the judgement layer
+  // and leaving the shop looking planned. That is the same choice
+  // `realLoadPlanningInputs` makes about priorAnswers, for the same reason: a
+  // silent skip here is indistinguishable from the defect this lane closes.
+  //
+  // A `consult` that THROWS is already caught inside the module: no line
+  // changes, every affected line carries `rulebook not consulted`, and the
+  // audit records why. There is deliberately no second catch here.
+  const { plan: judged } = await applyRulebook({
+    plan: planned,
+    rules: inputs.rules,
+    household: shop.household_id,
+    consult: deps.consult,
+  });
+
   const decisions = await shopDecisions.listDecisions(deps, shop.id);
   const regularsById = catalogue && catalogue.regularsById instanceof Map
     ? catalogue.regularsById
     : new Map(((catalogue && catalogue.regulars) || []).map((r) => [Number(r.id), r]));
 
-  const result = applyDecisionsToPlan({ plan, decisions, questionKeyFor, regularsById });
+  const result = applyDecisionsToPlan({ plan: judged, decisions, questionKeyFor, regularsById });
   return { ...result, decisions };
 }
 

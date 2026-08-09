@@ -42,6 +42,10 @@ const { loadCatalogue } = require('../interpret/loadCatalogue.js');
 const { buildGroundedPrompt } = require('../interpret/groundedPrompt.js');
 const { resolveAll } = require('../interpret/resolveByCatalogue.js');
 const { planBasket } = require('../skill/planner.js');
+// The household's PROSE rulebook (B15-3). Only the prompt builder is needed
+// here: `applyRulebook` is called by runPipeline.js, which owns the plan. This
+// module owns exactly one thing about the rulebook - the model call.
+const { buildRulebookPrompt } = require('../skill/rulebook.js');
 const { buildPayload } = require('../reconcile/record-confirmation.js');
 const { recordConfirmation } = require('../reconcile/recordConfirmation.js');
 const { updateRegulars } = require('../outcome/updateRegulars.js');
@@ -669,6 +673,49 @@ async function realRecordAnswerLearning(answer) {
   }
 }
 
+/**
+ * THE HOUSEHOLD'S JUDGEMENT RULES, READ BY TERRA (WP-B15-3).
+ *
+ * ── WHAT THIS CLOSES ────────────────────────────────────────────────────────
+ * `skill/planner.js actionableRules()` drops every `info` row and every row
+ * with no match_term/match_category - on the live corpus, 23 of 39 active
+ * rules, and not a random subset: precisely the JUDGEMENT layer. "Pick the best
+ * value by price per wash", "buy up to the offer quantity", "round it up to
+ * complete a pair" have been active for weeks and have never once fired.
+ * `skill/rulebook.js` was built to carry them AS PROSE and, until this binding,
+ * was reachable only from its own two test files. This is the seam that makes
+ * it production code.
+ *
+ * ── BOUND TO TERRA, FOR THE SAME REASON interpretAnswer AND correlateAnswer
+ *    ARE ────────────────────────────────────────────────────────────────────
+ * Warwick ruled that reading the household's natural language is Terra's job
+ * and must NOT be substituted with `reason` because `reason` is easier to
+ * reach. `answer()` is gateway-only and THROWS where no gateway is configured -
+ * it never falls back to the box - so the ruling is enforced by the call rather
+ * than by a comment asking nicely. Same gateway, same route, no second
+ * credential path and no configuration this file owns.
+ *
+ * ── NO SECOND LAYER OF ERROR HANDLING HERE, DELIBERATELY ────────────────────
+ * A throw from this function is ALREADY caught inside `applyRulebook`: no line
+ * changes, every affected line is flagged `rulebook not consulted`, and
+ * `audit.error` records why. Catching it here as well would convert a visible
+ * degradation into a silent one, which is the failure the module was written to
+ * prevent. A reply this module cannot read is handled the same way - the parser
+ * returns null and the module treats that as "the consumer said nothing",
+ * NEVER as "the consumer approved the plan".
+ *
+ * PROMPT AND GROUNDING ARE NOT BUILT HERE. `buildRulebookPrompt` owns the
+ * wording and the safety envelope it states; this function is the wire.
+ *
+ * @param {object} grounding the packet buildRulebookGrounding assembled
+ * @returns {Promise<object|null>} the parsed reply, or null when unreadable
+ */
+async function realConsultRulebook(grounding) {
+  const { answer } = await import('../../obsidiwikai/src/core/models.mjs');
+  const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
+  return extractJson(await answer(buildRulebookPrompt(grounding)));
+}
+
 /** The hard allowlist, imported from the route that owns it so the two cannot
  *  drift. add-to-draft-list is the ONLY command that can reach the database. */
 async function realAssertAllowedIntents(intents) {
@@ -727,6 +774,14 @@ export function createDeps(overrides = {}) {
     // when exactly one question is open, and Warwick's "answer them all in one
     // message" cannot work at all.
     correlateAnswer: realCorrelateAnswer,
+
+    // THE PROSE RULEBOOK'S REASONING CONSUMER (WP-B15-3). Without this binding
+    // `applyRulebook` throws the moment a real household rule speaks about a
+    // real basket, and the 23 judgement rules stay exactly where they have been
+    // for weeks: on the floor. A deps.X that nothing binds is undefined at
+    // runtime while every stubbed test passes - which is Veritas D-1, and the
+    // reason productionWiring.test.js asks the REAL container rather than a stub.
+    consult: realConsultRulebook,
 
     // confirmation + learning
     buildConfirmationPayload: buildPayload,

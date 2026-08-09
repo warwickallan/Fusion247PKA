@@ -38,6 +38,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createDeps } from './deps.js';
@@ -623,4 +624,222 @@ test('A1: the deferred clarification is TOLD, and the reading gate is untouched'
     'a deferred clarification is silent again - Warwick is not told what could not be read');
   assert.ok(body.includes('continue'),
     'the deferral itself must remain: the question card still waits for the reading confirmation');
+});
+
+// =====================================================================
+// WP-B15-3 R2 - THE HOUSEHOLD'S PROSE RULEBOOK IS ON THE PRODUCTION ROUTE
+//
+// The SAME defect as D-1, A1 and Lane C, for the fourth time on this build:
+// `skill/rulebook.js` was complete, tested to 29/29 with mutation proofs in
+// both directions, and imported by NOTHING except its own two test files.
+// Veritas measured that at Gate 1 - all five of its exports reachable only
+// from rulebook.test.js and ruleConsumption.test.js.
+//
+// So the property these tests hold is the one Veritas measured, made
+// executable: FROM THE RUNTIME ENTRY POINT, FOLLOWING ONLY PRODUCTION CODE,
+// applyRulebook is reached - with no test-only hop anywhere in the chain.
+//
+// A green rulebook.test.js says nothing about this. Only a walk of the real
+// files can, which is why the chain below is walked from the filesystem and
+// every hop is asserted to be a production file.
+//
+// ZERO MODEL SPEND, ZERO DATABASE. The wiring is asserted, never invoked.
+// =====================================================================
+
+/**
+ * The chain, hop by hop, from the process entry point to the module.
+ *
+ * Each hop names the FILE the evidence must be found in and the exact text
+ * that proves the hop is taken. Written as data rather than as prose so that
+ * breaking any single link fails HERE, naming which link broke, instead of
+ * failing somewhere downstream on a Sunday.
+ */
+const RULEBOOK_CHAIN = [
+  {
+    file: 'runtime.js',
+    hop: 'main() builds the REAL dependency container',
+    evidence: [/await import\('\.\/deps\.js'\)/, /createDeps\(\)/],
+  },
+  {
+    file: 'runtime.js',
+    hop: 'the loop advances a shop through runPipeline',
+    evidence: [/from '\.\/runPipeline\.js'/, /await runPipeline\(\{ shopId: shop\.id \}, deps\)/],
+  },
+  {
+    file: 'runPipeline.js',
+    hop: 'every plan recomputation goes through planWithDecisions',
+    evidence: [/async function planWithDecisions/, /planWithDecisions\s*\(/],
+  },
+  {
+    file: 'runPipeline.js',
+    hop: 'planWithDecisions calls applyRulebook on the REAL module',
+    evidence: [/requireCjs\('\.\.\/skill\/rulebook\.js'\)/, /await applyRulebook\(\{/],
+  },
+];
+
+/** Read a production file from disk, comments stripped. CRLF-safe: nothing
+ *  here splits on a bare '\n'. */
+function productionSource(file) {
+  return stripComments(fs.readFileSync(path.join(HERE, file), 'utf8'));
+}
+
+test('R2: applyRulebook is REACHED from the runtime entry point, with no test-only hop', () => {
+  // 1. Every hop is a PRODUCTION file. A chain that passes through a test
+  //    helper proves only that a test could reach the module, which is exactly
+  //    the evidence this build already has too much of.
+  for (const link of RULEBOOK_CHAIN) {
+    assert.doesNotMatch(link.file, /\.test\.js$/,
+      `the chain passes through the test file ${link.file} - that is a test-only hop`);
+    assert.doesNotMatch(link.file, /(^|[\\/])test[\\/]/,
+      `the chain passes through the test directory at ${link.file} - that is a test-only hop`);
+  }
+
+  // 2. Every hop is actually taken, in the real source.
+  for (const link of RULEBOOK_CHAIN) {
+    const src = productionSource(link.file);
+    for (const proof of link.evidence) {
+      assert.match(src, proof,
+        `the production chain is broken at ${link.file}: ${link.hop}. `
+        + `Expected ${proof} in the real source. Without this hop skill/rulebook.js is back to `
+        + 'being a module reachable only from its own tests, which is Veritas D1.');
+    }
+  }
+
+  // 3. The call site is inside planWithDecisions specifically - the ONE
+  //    function permitted to build a plan - and not merely somewhere in the
+  //    file. Bounded by the NEXT function declaration rather than by a
+  //    line-ending literal: this estate's sources are CRLF, and slicing on
+  //    '\n}\n' silently returns -1 here, which widens the body to the whole
+  //    remaining file and stops the assertion meaning what it says.
+  const runPipelineOnly = productionSource('runPipeline.js');
+  const from = runPipelineOnly.indexOf('async function planWithDecisions');
+  assert.notEqual(from, -1, 'planWithDecisions has disappeared from runPipeline.js');
+  const rest = runPipelineOnly.slice(from + 1);
+  const nextDecl = rest.search(/\r?\n(export )?(async )?function /);
+  const body = nextDecl === -1 ? rest : rest.slice(0, nextDecl);
+  assert.match(body, /await applyRulebook\(\{/,
+    'applyRulebook is called somewhere in runPipeline.js but NOT inside planWithDecisions. '
+    + 'Every production recomputation goes through that function; a call site outside it applies '
+    + "the household's judgement rules to some plans and not others.");
+  assert.match(body, /deps\.planBasket\s*\(/, 'the planner call has left planWithDecisions');
+  assert.match(body, /applyDecisionsToPlan\s*\(/,
+    'planWithDecisions no longer applies the decisions it exists to apply');
+
+  // 4. The module really exports what the chain claims to call.
+  const rulebook = createRequire(import.meta.url)('../skill/rulebook.js');
+  assert.equal(typeof rulebook.applyRulebook, 'function',
+    'skill/rulebook.js does not export applyRulebook - the chain above names a function that is not there');
+});
+
+test('R2: the PRECEDENCE is planner -> rulebook -> Warwick, so a human answer is never overruled', () => {
+  // Order matters more than presence here. If the rulebook ran AFTER
+  // applyDecisionsToPlan, a model judgement could displace an answer Warwick
+  // actually gave - which is the one thing the judgement layer must never do.
+  const src = productionSource('runPipeline.js');
+  const planner = src.indexOf('deps.planBasket');
+  const rulebook = src.indexOf('await applyRulebook(');
+  const human = src.indexOf('applyDecisionsToPlan({');
+  assert.ok(planner !== -1 && rulebook !== -1 && human !== -1, 'one of the three stages is missing');
+  assert.ok(planner < rulebook,
+    'the rulebook runs before the planner - it has no plan to judge');
+  assert.ok(rulebook < human,
+    "Warwick's recorded decisions are applied BEFORE the rulebook, so a model judgement can overrule "
+    + 'an answer he actually gave. The human is always last.');
+});
+
+test('R2: the REAL production container supplies a callable consult', () => {
+  // No overrides. This is the container runtime.js main() builds and uses.
+  // A deps.X that nothing binds is undefined at runtime while every stubbed
+  // test passes - the exact D-1 shape, and applyRulebook THROWS on it the
+  // moment a real household rule speaks about a real basket.
+  const deps = createDeps();
+  assert.equal(typeof deps.consult, 'function',
+    'deps.consult is not bound in production. planWithDecisions passes it to applyRulebook, so the '
+    + "household's 23 judgement rules would throw on a real shop - and no stubbed test can see that.");
+});
+
+test('R2: the consumer and the provider agree on the NAME, exactly', () => {
+  assert.match(runPipelineSrc, /consult: deps\.consult/,
+    'runPipeline no longer passes deps.consult to applyRulebook - if the seam moved, move this test');
+  const depsSrc = stripComments(fs.readFileSync(path.join(HERE, 'deps.js'), 'utf8'));
+  assert.match(depsSrc, /consult:\s*realConsultRulebook/,
+    'deps.js no longer binds consult to a real implementation');
+});
+
+/** The consult body, bounded by the next function declaration. CRLF-safe. */
+function consultBody() {
+  const depsSrc = stripComments(fs.readFileSync(path.join(HERE, 'deps.js'), 'utf8'));
+  const at = depsSrc.indexOf('async function realConsultRulebook');
+  assert.notEqual(at, -1, 'realConsultRulebook is gone - the binding is pointing at something else');
+  const rest = depsSrc.slice(at + 1);
+  const next = rest.search(/\r?\n(export )?(async )?function /);
+  return next === -1 ? rest : rest.slice(0, next);
+}
+
+test('R2: the rulebook consult is BOUND TO TERRA - every import and every model call', () => {
+  // The same ABSENCE property the answer path is held to, and for the same
+  // reason Warwick gave: "Do NOT substitute `reason` because it is easier to
+  // reach." A presence check ("answer( appears") cannot satisfy that - it stays
+  // green when a second import adds reason() as the primary call and leaves
+  // answer() on the retry. So this asserts two absences over the WHOLE body.
+  const body = consultBody();
+
+  const imports = [...body.matchAll(
+    /const\s*\{([^}]*)\}\s*=\s*await import\('\.\.\/\.\.\/obsidiwikai\/src\/core\/models\.mjs'\)/g,
+  )];
+  assert.ok(imports.length > 0, 'the rulebook consult no longer imports from the gateway module at all');
+  const sourceNames = [...new Set(
+    imports.flatMap((m) => m[1].split(',').map((s) => s.trim().split(':')[0].trim()))
+      .filter((s) => s !== ''),
+  )].sort();
+  assert.deepEqual(sourceNames, ['answer'],
+    `the rulebook consult imports {${sourceNames.join(', ')}} from the gateway module across `
+    + `${imports.length} import(s). It must import EXACTLY answer - reaching reason() through a `
+    + 'second import, or under an alias, is the substitution rather than an exception to it.');
+
+  const MODEL_CALLEES = new Set(['answer', 'reason', 'vision', 'generate', 'lightrag']);
+  const modelCalls = [...body.matchAll(/await\s+([A-Za-z_$][\w$]*)\s*\(/g)]
+    .map((m) => m[1])
+    .filter((name) => MODEL_CALLEES.has(name));
+  assert.ok(modelCalls.length > 0, 'the rulebook consult makes no model call at all');
+  assert.deepEqual([...new Set(modelCalls)], ['answer'],
+    `the rulebook path invokes {${[...new Set(modelCalls)].join(', ')}}. EVERY model call on this path `
+    + 'must be answer(), which is gateway-only and cannot fall back to the box.');
+
+  // credential_scope: none. This function must never read a key or a URL, and
+  // must never build its own auth header - the gateway module owns both.
+  assert.doesNotMatch(body, /process\.env\.(FUSION_GATEWAY_KEY|OPENAI_API_KEY|[A-Z_]*TOKEN)/,
+    'the rulebook consult reads a credential directly - the gateway module owns that');
+  assert.doesNotMatch(body, /Authorization|Bearer\s/,
+    'the rulebook consult builds its own auth header instead of using the gateway');
+  assert.doesNotMatch(body, /lightrag/, 'the rulebook consult reaches the box directly');
+});
+
+test('R2: the prompt is built by the module that owns it, not re-written at the wire', () => {
+  // The safety envelope the household is protected by is STATED in
+  // buildRulebookPrompt. A locally-composed prompt here would be a second,
+  // unreviewed copy of it that no rulebook test can see.
+  const body = consultBody();
+  assert.match(body, /buildRulebookPrompt\(grounding\)/,
+    'the consult composes its own prompt instead of using buildRulebookPrompt');
+  const depsSrc = stripComments(fs.readFileSync(path.join(HERE, 'deps.js'), 'utf8'));
+  assert.match(depsSrc, /require\('\.\.\/skill\/rulebook\.js'\)/,
+    'deps.js does not import the real rulebook module');
+});
+
+test('R2: the rulebook error path is the module\'s ONE layer - deps.js adds no second catch', () => {
+  // applyRulebook already catches a throwing consult: no line changes, every
+  // affected line is flagged `rulebook not consulted`, audit.error is set. A
+  // second catch at the wire would swallow that and turn a visible degradation
+  // into a silent one, which is the failure the module exists to prevent.
+  const body = consultBody();
+  assert.doesNotMatch(body, /\bcatch\s*[({]/,
+    'the rulebook consult catches its own failure. applyRulebook already handles it and makes it '
+    + 'VISIBLE on every affected line; catching here hides it.');
+  // And the module's single layer is still there to do the job.
+  const rulebookSrc = stripComments(
+    fs.readFileSync(path.join(HERE, '..', 'skill', 'rulebook.js'), 'utf8'),
+  );
+  assert.match(rulebookSrc, /addFlag\(item, 'rulebook not consulted'\)/,
+    'skill/rulebook.js no longer flags the lines an unreachable consumer left unjudged');
 });
