@@ -802,6 +802,24 @@ applied at `Builds/BUILD-015-.../RUNTIME-DECISION.md` §"Open considerations" it
 search-fallback disagreement is banked there as item 4, an **unresolved product-method decision** for
 Warwick.
 
+**WHAT THE § 12 HANDBACK CARRIES FROM GATE 2 — Warwick, 2026-08-09: *"Carry the Gate 2 HOLD and the
+remaining findings honestly into the § 12 handback."*** The handback is **not** a completion report
+and must not read as one:
+
+- **Veritas Gate 2 = `HOLD`.** §11 row 7 resolved by Warwick's amendment; **rows 6, 10, 11, 12 and
+  completed automation still HOLD.** No completion claim for WP-B15-1 exists.
+- **`D1` (HIGH) stands against Larry** — the misattribution of Warwick's own criterion. Corrected,
+  not erased.
+- **The tap acknowledgement has apparently NEVER worked** (`runtime.js:285-298`; `tap_failed`
+  recurring for weeks under `build`/`retry`/`answer`). **Not introduced by this WP** — this WP is the
+  first work to put a human in front of it. It is a real product defect awaiting Warwick's
+  disposition, and it is NOT folded into either learning flow.
+- **Completed automation is HOLD, not absent** — `Logon Mode: Interactive only` means an unattended
+  reboot serves nobody.
+- **Rows 10 and 11 need TWO future fingerprinted shops**, not one, and cannot be closed by shop 6.
+- **Open thread:** the Telegram offset advanced across a failed pass, bearing on row 12; mechanism
+  unverified.
+
 **RULING 4 — housekeeping happens only AFTER Gate 2, in this order.** Keep the acceptance-record
 branch `build-015/wp-b15-1-acceptance-record` **alive** → place the Veritas receipt **on it** →
 converge that evidence to `main` → **only then** decommission the merged working branches.
