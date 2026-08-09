@@ -1251,10 +1251,32 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 > - **Rule 31** (*"Ariel Pods: pick the BEST VALUE by price-per-wash"*) and **rule 36** (*"if a
 >   multibuy gives ≥50% off the EXTRA item(s), buy up to the offer quantity"*) are **ARCHIVED**. They
 >   were the two headline examples of the dead-59% argument and of D4 on this map.
-> - **Rule 37** (Sure pair rounding, *"any 2 for £X"*) is **multibuy-conditional and cannot be
->   evaluated without offer evidence at plan time** — which is exactly what he removed. **Larry's
->   reading: it is archived with 31 and 36.** Stated so he can overturn it; he ruled no further
->   decision was needed, so it is not being sent back.
+> - > #### ⛔ **RULE 37 IS RETAINED. WARWICK, 2026-08-09 — CORRECTING LARRY. This supersedes the struck text below.**
+>   >
+>   > *"DO NOT ARCHIVE RULE 37. I am explicitly retaining the Sure rule. You have conflated two
+>   > different classes of behaviour: **(1) PRICE/VALUE JUDGEMENT — archive this** … anything that
+>   > requires current price/offer arithmetic to choose the economically 'best' option.
+>   > **(2) DETERMINABLE HOUSEHOLD SHOPPING POLICY — retain this. Rule 37 is in this class.** … Do
+>   > not discard a deterministic quantity/variant rule merely because its prose mentions a multibuy
+>   > context. The product decision I made was: ARCHIVE THE BEST-VALUE / BARGAIN-SHOPPING JUDGEMENT.
+>   > It was NOT: ARCHIVE EVERY RULE THAT MENTIONS AN OFFER OR MULTIBUY. … And do not ask me again
+>   > whether I want to keep the non-price half of Rule 37. I do."*
+>   >
+>   > **The LIVE text proves him right, and it is the whole argument:** rule 37 states its own
+>   > outcome arithmetically and price-free — **"Mum 3 male -> add 1 female = 4"**. Rounding 3 up to
+>   > 4 and adding one female variant needs **no price, no offer state, no browser**. The
+>   > `any 2 for £X` clause is *why the household adopted the habit*, not an input the planner
+>   > evaluates.
+>   >
+>   > **Larry's error, recorded plainly: I conflated "mentions a multibuy context" with "requires
+>   > price arithmetic."** They are different. The worker had labelled the reading as mine and
+>   > invited disagreement; the error is mine alone. **Retained behaviour:** round the Sure line's
+>   > quantity UP to even, add the female variant to complete the final pair, resolved **before** the
+>   > browser handoff from grounded catalogue/household data. It *"combines with the rotate-variant
+>   > rule"* (32), which is already actionable.
+>
+> - ~~**Rule 37** (Sure pair rounding) is multibuy-conditional … **Larry's reading: it is archived
+>   with 31 and 36.**~~ **STRUCK — wrong, and overruled above.**
 > - **R1's AC3 is now testing archived behaviour.** Its three named cases were rules 31, 36 and 37,
 >   chosen at the time *because* they were the judgement layer. **Those tests must be re-cut, not
 >   deleted** — the rulebook's remaining job is real.
@@ -1306,7 +1328,15 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 > >
 > > **⚠️ TWO CORRECTIONS TO LARRY'S OWN ORDER, established by the worker:**
 > > 1. **`asdair.rules` has NO `status` column.** Archival is `active = false` (`db/001:97` — *"superseded rules are set active=false (kept for audit)"*). Larry's evidence line asked for a column that does not exist.
-> > 2. **🔴 RULE 31'S LIVE EXISTENCE IS NOT ESTABLISHED.** The only live-verified rule list in the repo (`skill/ruleConsumption.test.js:62`, queried 2026-08-04) is **12, 25, 32, 36, 37, 38 — no 31.** R1 had already flagged that rule 31's wording was a **constructed paraphrase**. **This map's D4 cites rule 31 as the headline example of the dead judgement layer.** Two sources disagree; the archival SQL is written so a missing 31 is a **visible zero-row result, not an error**. **Expect 2 rows, or 3 if it is live.** ⛔ Do not repeat the rule-31 example as established fact until a live query settles it.
+> > 2. ~~**RULE 31'S LIVE EXISTENCE IS NOT ESTABLISHED** … do not repeat the rule-31 example as established fact.~~ **⛔ SETTLED THE OTHER WAY, AND STRUCK.** Larry live-queried `asdair.rules` on Warwick's instruction (2026-08-09, [[Deliverables/2026-08-09-live-rule-corpus-and-value-rule-identification]]): **rule 31 EXISTS and is ACTIVE** — `info`, household 1, `match_term 'ariel pods'`, *"Ariel Pods: pick the BEST VALUE by price-per-wash across pack sizes (Warwick 2026-07-21)."* The worker's claim rested on `ruleConsumption.test.js:62`, **an incomplete test fixture, not the database.** **D4 was CORRECT** and R1's "constructed paraphrase" caveat was unnecessary — the live wording is almost exactly it. *(Larry's note: the doubt was recorded honestly and resolved by execution, which is the process working — but the map briefly carried a true statement marked as unreliable, which is its own kind of error.)*
+> >
+> > 3. **THE VALUE ROWS ARE 31 AND 36. NOTHING ELSE** — Warwick's requested live identification.
+> >    **Rule 36** is `info`, **scope `global`, `match_term` NULL** (doubly inert, as D4 said):
+> >    *"OFFER RULE: if a multibuy gives >=50% off the EXTRA item(s), buy up to the offer quantity."*
+> >    **Retained after checking:** 12/25 (Nescafe — `needs_decision`, it **asks** rather than
+> >    optimises), 15 (toothpaste — `matched_product` pins the size, already decided), 7 (a budget
+> >    **flag**, not a choice), 32 (rotate, price-free). **40 active rules, not 39** — ids 1–40 with
+> >    21 absent; the *"23 of 39"* denominator is off by one and the argument is unaffected.
 > >
 > > **RULE 37 — Larry's reading CONFIRMED by the worker, with a consequence Larry had not seen.**
 > > Live text: *"Sure any 2 for GBP X: round qty UP to an even number to capture every pair; add a
