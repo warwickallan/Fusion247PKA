@@ -966,6 +966,7 @@ export const READINESS = {
   BASIS_SURFACE_NOT_GRANTED: 'basis-surface-not-granted',
   AC_PATH_NOT_GRANTED: 'ac-path-not-granted',
   MISSING_MANDATORY_FIELD: 'missing-mandatory-field',
+  MALFORMED_FIELD: 'malformed-field',
   NO_ACCEPTANCE_CRITERIA: 'no-acceptance-criteria',
   MISSING_RUNBOOK_PATH: 'missing-runbook-path',
 };
@@ -1058,6 +1059,84 @@ export function templateMandatoryKeys(root) {
   return keys.length === 0
     ? { keys: null, error: unresolved(rel, 'envelope field list is empty') }
     : { keys, error: null };
+}
+
+// ---------------------------------------------------------------------------
+// FIELD SHAPE — the difference between a field being ABSENT and being MALFORMED.
+// ---------------------------------------------------------------------------
+// Warwick, 2026-08-09: "tell you exactly which mandatory field(s) are absent or malformed so a
+// legitimate order can be corrected immediately." Absent and malformed need different fixes, so
+// a refusal that merges them costs the reader a hunt.
+//
+// The MEASURED case this exists for: an order generated on 2026-08-09 carried
+//   document_impact: []  Warwick has not named any affected document.
+// — a list value with prose glued after it, which parses as a SCALAR. Every check downstream
+// that reads it as a list silently saw nothing. `missing-mandatory-field` could not see it
+// either: the key is present and non-empty.
+//
+// The expected shape is DERIVED FROM THE CANONICAL TEMPLATE'S OWN YAML BLOCK, never restated
+// here — the same discipline templateMandatoryKeys() follows, and for the same reason.
+
+/** Strip an unquoted trailing `# comment`. Shape inference only — never used as a value. */
+export function stripYamlComment(value) {
+  const s = String(value ?? '');
+  const cut = s.replace(/(^|\s)#.*$/, '$1').trim();
+  // A value that is ENTIRELY a comment is shapeless, not empty; a value that merely CARRIED a
+  // comment keeps its own text. Returning '' for a genuinely-populated scalar would invent a
+  // "present but empty" failure, which is the false positive this whole file must not create.
+  return cut;
+}
+
+export const SHAPE = {
+  SCALAR: 'scalar',
+  LIST: 'list',
+  MAPPING: 'mapping',
+  EMPTY: 'empty',
+  // A flow collection that opens and then does not close the value: `document_impact: [] prose`.
+  // Named separately because "expected list, found scalar" would misdescribe it and send the
+  // reader looking for the wrong correction.
+  LIST_WITH_TRAILING_TEXT: 'list-with-trailing-text',
+  MAPPING_WITH_TRAILING_TEXT: 'mapping-with-trailing-text',
+};
+
+/**
+ * The shape of one parsed frontmatter field. The FIRST child decides a block's shape: a list
+ * item's own sub-keys are collected as children too, so "every child starts with -" is wrong.
+ */
+export function fieldShape(field) {
+  if (!field) return null;
+  const raw = String(field.value ?? '').trim();
+  const v = stripYamlComment(raw);
+  // A flow collection must also TERMINATE the value. `document_impact: [] Warwick named none`
+  // opens a list and then glues prose after it — which is neither a list nor a plain scalar,
+  // and is the exact defect this check was ordered for.
+  if (v.startsWith('[')) return v.endsWith(']') ? SHAPE.LIST : SHAPE.LIST_WITH_TRAILING_TEXT;
+  if (v.startsWith('{')) return v.endsWith('}') ? SHAPE.MAPPING : SHAPE.MAPPING_WITH_TRAILING_TEXT;
+  if (v !== '') return SHAPE.SCALAR;
+  const kids = (field.children ?? []).filter((c) => c !== '' && !c.startsWith('#'));
+  if (kids.length === 0) {
+    // Value was non-empty before comment-stripping, so the field is populated, just annotated.
+    return raw !== '' ? SHAPE.SCALAR : SHAPE.EMPTY;
+  }
+  if (/^-\s/.test(kids[0]) || kids[0] === '-') return SHAPE.LIST;
+  if (/^[a-z_][a-z0-9_]*:/.test(kids[0])) return SHAPE.MAPPING;
+  return SHAPE.SCALAR;
+}
+
+/** Expected shape per envelope key, read out of the canonical template's own yaml fence. */
+export function templateFieldShapes(root) {
+  const text = readIfPresent(root, SOURCES.template);
+  if (text === null) return { shapes: null, error: unresolved(SOURCES.template, 'envelope field list') };
+  const fence = text.match(/```yaml\n([\s\S]*?)```/);
+  if (!fence) return { shapes: null, error: unresolved(SOURCES.template, '```yaml envelope block') };
+  const shapes = new Map();
+  for (const [key, field] of frontmatterFields(fence[1])) {
+    const s = fieldShape(field);
+    if (s && s !== SHAPE.EMPTY) shapes.set(key, s);
+  }
+  return shapes.size === 0
+    ? { shapes: null, error: unresolved(SOURCES.template, 'envelope block yielded no typed field') }
+    : { shapes, error: null };
 }
 
 /**
@@ -1181,17 +1260,51 @@ export function assessOrder(text, { root = null } = {}) {
   } else if (fm === null) {
     add(READINESS.MISSING_MANDATORY_FIELD, 'fail', 'no `---` frontmatter block was found in the order');
   } else {
-    const missing = [];
+    // ABSENT and EMPTY are reported as two named groups, never merged into one word: the fix
+    // differs (write the field vs fill it in), so the message has to say which you are holding.
+    const absent = [];
+    const empty = [];
     for (const key of mandatory.keys) {
       if (key === 'file_surface' && isMachineOrder) continue;
       const f = fields.get(key);
-      if (!f) { missing.push(`${key} (absent)`); continue; }
-      if (f.value === '' && f.children.length === 0) missing.push(`${key} (present but empty)`);
+      if (!f) { absent.push(key); continue; }
+      if (fieldShape(f) === SHAPE.EMPTY) empty.push(key);
     }
-    if (missing.length) {
-      add(READINESS.MISSING_MANDATORY_FIELD, 'fail', `mandatory envelope field(s) missing or empty: ${missing.join(', ')}`);
+    if (absent.length || empty.length) {
+      const parts = [];
+      if (absent.length) parts.push(`ABSENT (no such key in the envelope): ${absent.join(', ')}`);
+      if (empty.length) parts.push(`EMPTY (key present, no value): ${empty.join(', ')}`);
+      add(READINESS.MISSING_MANDATORY_FIELD, 'fail', `mandatory envelope field(s) — ${parts.join('; ')}`);
     } else {
       add(READINESS.MISSING_MANDATORY_FIELD, 'pass', `all ${mandatory.keys.length} mandatory envelope fields present`);
+    }
+  }
+
+  // 3a — MALFORMED: the key is present and populated, but in the wrong SHAPE, so every reader
+  // downstream sees something other than what the template promises. Distinct from absent/empty
+  // because the correction is different: reshape the value, do not add the field.
+  const expectedShapes = templateFieldShapes(root);
+  if (!expectedShapes.shapes) {
+    add(READINESS.MALFORMED_FIELD, 'not-checked', expectedShapes.error);
+  } else if (fm === null) {
+    add(READINESS.MALFORMED_FIELD, 'not-checked', 'no `---` frontmatter block was found in the order — field shapes were NOT examined');
+  } else {
+    const malformed = [];
+    for (const [key, expected] of expectedShapes.shapes) {
+      if (key === 'file_surface' && isMachineOrder) continue;
+      const f = fields.get(key);
+      if (!f) continue;                        // absent is check 3's finding, not this one
+      // An unauthored slot is check 2's finding. Reporting the same defect a second time under
+      // a different name is the opaque noise this order exists to prevent.
+      if (isAuthorRequired(f.value) || isUnresolved(f.value)) continue;
+      const actual = fieldShape(f);
+      if (actual === SHAPE.EMPTY) continue;    // empty is check 3's finding, not this one
+      if (actual !== expected) malformed.push(`${key} (expected ${expected}, found ${actual})`);
+    }
+    if (malformed.length) {
+      add(READINESS.MALFORMED_FIELD, 'fail', `mandatory envelope field(s) MALFORMED — present but the wrong shape: ${malformed.join(', ')} — the canonical template (${SOURCES.template}) declares the shape; a list with prose glued after it parses as a scalar and every reader downstream silently sees nothing`);
+    } else {
+      add(READINESS.MALFORMED_FIELD, 'pass', `all ${expectedShapes.shapes.size} typed envelope field(s) present in the order carry the template's shape`);
     }
   }
 
@@ -1245,7 +1358,10 @@ export function assessOrder(text, { root = null } = {}) {
       .filter(isImplementationTarget);
     const missing = cited.filter((t) => !isGranted(t, declared));
     if (missing.length) {
-      add(READINESS.AC_PATH_NOT_GRANTED, 'fail', `acceptance criteria name ${missing.length} repository path(s) that file_surface does NOT grant: ${missing.join(', ')} — grant them, or move a read-only reference to "## Inputs supplied"`);
+      // THREE corrections, not two. The third was added on measured evidence: this check's only
+      // false-positive class is a path an AC names in order to PROHIBIT it, and the two-option
+      // message sent the reader looking for a fix that does not apply to their case.
+      add(READINESS.AC_PATH_NOT_GRANTED, 'fail', `acceptance criteria name ${missing.length} repository path(s) that file_surface does NOT grant: ${missing.join(', ')} — either (a) grant them in file_surface, or (b) move a read-only reference to "## Inputs supplied", or (c) if the AC names the path in order to FORBID it, state that under "## Explicitly out of scope" and drop the path from the criterion`);
     } else {
       add(READINESS.AC_PATH_NOT_GRANTED, 'pass', `${cited.length} repository path(s) cited in acceptance criteria, all granted`);
     }

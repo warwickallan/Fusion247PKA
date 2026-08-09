@@ -28,6 +28,16 @@
 // Everything else defers silently: research briefs, assurance dispatches, questions and
 // ordinary sub-tasks are untouched.
 //
+// TWO CONSTRAINTS WARWICK ADDED ON ACTIVATION (2026-08-09), and they bound everything below:
+//   1. "This is an internal delegation-quality control, not a Warwick approval gate. It must
+//      never require me to click/approve routine dispatches."  → see § THE DECISION VOCABULARY.
+//      This guard has no `ask` and no `allow`. It denies, or it stands aside.
+//   2. "Make refusal diagnostic: tell you exactly which mandatory field(s) are absent or
+//      malformed so a legitimate order can be corrected immediately. Do not turn a false
+//      positive into an opaque dead end or another governance ceremony."  → every refusal below
+//      names the specific offending field(s) or path(s), and ABSENT, EMPTY and MALFORMED are
+//      three distinct labels, not one "not ready".
+//
 // FAIL DIRECTION, chosen deliberately and matching tools/governor/worktree-guard.mjs AD-19:
 // an internal error DEFERS rather than denies. A guard that bricks every dispatch when it has
 // a bug is removed within a day, and a removed control protects nothing. The cost is real and
@@ -44,7 +54,40 @@ import { ORDER_MARKER, assessOrder, renderAssessment } from './envelope.mjs';
 /** The host's subagent-dispatch tool. Named once. */
 export const DISPATCH_TOOLS = ['Task'];
 
-export const DECISION = { DENY: 'deny', DEFER: 'defer' };
+// ---------------------------------------------------------------------------
+// ⛔ THE DECISION VOCABULARY — AND THE ONE VALUE THIS GUARD MAY NEVER EMIT
+// ---------------------------------------------------------------------------
+// Established by READING the estate's proven hook idiom, not from any description of it:
+//
+//   tools/governor/worktree-guard.mjs:63
+//     export const DECISION = { ALLOW: 'allow', DENY: 'deny', DEFER: 'defer', ASK: 'ask' };
+//   tools/governor/worktree-guard.mjs:895
+//     const HOOK_DECISION = { [ALLOW]:'allow', [ASK]:'ask', [DENY]:'deny' };   // DEFER emits nothing
+//   tools/governor/worktree-guard.mjs:65
+//     export const PUSH_ASK_REASON = 'Warwick approval required for push to main.';
+//
+// So `ask` is the host's PROMPTING value: it is how that guard deliberately puts a decision in
+// front of Warwick. Warwick, 2026-08-09, ruling on THIS guard:
+//   "This is an internal delegation-quality control, not a Warwick approval gate. It must never
+//    require me to click/approve routine dispatches."
+//
+// AN `ask` ON A ROUTINE DISPATCH IS A FAILURE OF THIS CONTROL, NOT A SAFE DEFAULT. This guard's
+// decision enum therefore does not contain `ask` OR `allow`: it may deny, or it may stand aside.
+// It never speaks for the human in either direction — `allow` would suppress the host's own
+// permission layer, which is not this control's business either.
+//
+// The permitted emission set is a FROZEN literal and `toHookOutput` refuses to emit anything
+// outside it. A structural absence ("we never wrote the word") is not a guarantee; this is.
+export const DECISION = Object.freeze({ DENY: 'deny', DEFER: 'defer' });
+
+/** The `permissionDecision` value that puts a prompt in front of a human. NEVER emitted here. */
+export const PROMPTING_HOOK_DECISION = 'ask';
+
+/** The complete set of `permissionDecision` values this guard may ever emit. Closed. */
+export const PERMITTED_HOOK_DECISIONS = Object.freeze(['deny']);
+
+/** Internal decision → emitted `permissionDecision`. DEFER is absent: it emits nothing. */
+export const HOOK_DECISION = Object.freeze({ [DECISION.DENY]: 'deny' });
 
 export const REFUSAL = {
   UNREADY_ORDER: 'unready-order',
@@ -260,13 +303,25 @@ export function runHook(raw, opts = {}) {
   }
 }
 
-/** Only DENY emits. DEFER emits nothing and the host proceeds exactly as it would have. */
+/**
+ * Only DENY emits. DEFER emits nothing and the host proceeds exactly as it would have.
+ *
+ * THE PROMPT BARRIER IS HERE, and it is deliberately belt-and-braces rather than structural:
+ *   1. the decision is resolved through the frozen HOOK_DECISION map — an unknown decision
+ *      resolves to `undefined`, never to a passed-through string;
+ *   2. the resolved value is then checked against the frozen PERMITTED_HOOK_DECISIONS set.
+ * Anything that fails either test emits NOTHING. The fail direction is silence, never a prompt:
+ * a bug in this guard must cost Larry a missed refusal, never cost Warwick a click.
+ */
 export function toHookOutput(result) {
-  if (!result || result.decision !== DECISION.DENY) return null;
+  if (!result) return null;
+  const permissionDecision = HOOK_DECISION[result.decision];
+  if (!permissionDecision) return null;
+  if (!PERMITTED_HOOK_DECISIONS.includes(permissionDecision)) return null;
   return {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: 'deny',
+      permissionDecision,
       permissionDecisionReason: result.reason,
     },
   };
