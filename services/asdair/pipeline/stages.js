@@ -53,6 +53,11 @@ export const STEPS = Object.freeze({
   AWAIT_BUILD_COMMAND: 'wait:build_command',
   AWAIT_ANSWERS: 'wait:answers',
   AWAIT_INTERPRETATION_CONFIRMATION: 'wait:interpretation_confirmation',
+  // FAIL-SAFE ONLY (WP-B15-2). Lines are undecided but no question is open to
+  // decide them, so the clarification round could not be opened. Parking here
+  // is what makes READY_TO_SHOP unreachable WITHOUT livelocking the shop - see
+  // planOutcome below for why a park and not a transition.
+  AWAIT_LINE_RESOLUTION: 'wait:line_resolution',
   AWAIT_BASKET_REQUEST: 'wait:basket_request',
   AWAIT_RUNNER: 'wait:browser_runner',
   AWAIT_BASKET: 'wait:basket',
@@ -302,8 +307,34 @@ export function decideNextStep(snapshot) {
  * in which case a human is already in the loop - or a human explicitly confirmed
  * the interpretation. `confirmInterpretation` is a LATCH: once issued it stays
  * true for the shop, so consuming the command cannot re-close the gate.
+ *
+ * ── THE LINE GATE (WP-B15-2), AND WHY IT IS A PARK AND NOT A TRANSITION ─────
+ * `'every line is resolved'` used to be an UNCONDITIONAL LITERAL on the
+ * fall-through branch: this function consulted no line, only
+ * `countOpenQuestions`. So CLOSING A QUESTION - not deciding a line - is what
+ * made a shop ready, and a line still `needs_decision` with no matched product
+ * passed the moment its question row stopped being open. `unresolvedLines`
+ * ends that: the string is now earned rather than asserted.
+ *
+ * The obvious implementation returns `NEEDS_DECISION` when lines are
+ * unresolved. THAT LIVELOCKS THE SHOP, and the loop is exact:
+ * `NEEDS_DECISION` with zero open questions -> decideNextStep returns REPLAN ->
+ * PROCESSING -> PLAN -> this function -> `NEEDS_DECISION` again, forever,
+ * writing a transition event on every pass. `openQuestion` cannot rescue it,
+ * because `ON CONFLICT (shop_id, question_key) DO NOTHING` means an already
+ * answered question never re-opens.
+ *
+ * So the unresolved branch PARKS (`to: null`) instead. A park writes no
+ * transition and re-runs `stepPlan` on the next pass, which is the same
+ * self-healing shape the interpretation gate above already uses and proves.
+ * The real exit is upstream: `stepPlan` opens a genuine CLARIFICATION round
+ * for each unresolved line BEFORE calling this function, so in the ordinary
+ * case `openQuestions` is already non-zero here and the first branch takes it.
+ * Reaching the unresolved branch at all means the clarification round could not
+ * be opened - a fail-safe, and the shop waits visibly rather than shopping a
+ * basket nobody decided.
  */
-export function planOutcome({ openQuestions, needsReview, interpretationConfirmed }) {
+export function planOutcome({ openQuestions, needsReview, interpretationConfirmed, unresolvedLines = 0 }) {
   if (Number(openQuestions) > 0) {
     return { to: 'NEEDS_DECISION', reason: `${openQuestions} line(s) need a human decision` };
   }
@@ -312,6 +343,13 @@ export function planOutcome({ openQuestions, needsReview, interpretationConfirme
       to: null,
       step: STEPS.AWAIT_INTERPRETATION_CONFIRMATION,
       reason: 'the list needed review and nobody has confirmed the interpretation yet',
+    };
+  }
+  if (Number(unresolvedLines) > 0) {
+    return {
+      to: null,
+      step: STEPS.AWAIT_LINE_RESOLUTION,
+      reason: `${unresolvedLines} line(s) have no structured decision and no open question to settle them`,
     };
   }
   return { to: 'READY_TO_SHOP', reason: 'every line is resolved' };
