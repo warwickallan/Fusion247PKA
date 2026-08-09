@@ -1251,10 +1251,32 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 > - **Rule 31** (*"Ariel Pods: pick the BEST VALUE by price-per-wash"*) and **rule 36** (*"if a
 >   multibuy gives ≥50% off the EXTRA item(s), buy up to the offer quantity"*) are **ARCHIVED**. They
 >   were the two headline examples of the dead-59% argument and of D4 on this map.
-> - **Rule 37** (Sure pair rounding, *"any 2 for £X"*) is **multibuy-conditional and cannot be
->   evaluated without offer evidence at plan time** — which is exactly what he removed. **Larry's
->   reading: it is archived with 31 and 36.** Stated so he can overturn it; he ruled no further
->   decision was needed, so it is not being sent back.
+> - > #### ⛔ **RULE 37 IS RETAINED. WARWICK, 2026-08-09 — CORRECTING LARRY. This supersedes the struck text below.**
+>   >
+>   > *"DO NOT ARCHIVE RULE 37. I am explicitly retaining the Sure rule. You have conflated two
+>   > different classes of behaviour: **(1) PRICE/VALUE JUDGEMENT — archive this** … anything that
+>   > requires current price/offer arithmetic to choose the economically 'best' option.
+>   > **(2) DETERMINABLE HOUSEHOLD SHOPPING POLICY — retain this. Rule 37 is in this class.** … Do
+>   > not discard a deterministic quantity/variant rule merely because its prose mentions a multibuy
+>   > context. The product decision I made was: ARCHIVE THE BEST-VALUE / BARGAIN-SHOPPING JUDGEMENT.
+>   > It was NOT: ARCHIVE EVERY RULE THAT MENTIONS AN OFFER OR MULTIBUY. … And do not ask me again
+>   > whether I want to keep the non-price half of Rule 37. I do."*
+>   >
+>   > **The LIVE text proves him right, and it is the whole argument:** rule 37 states its own
+>   > outcome arithmetically and price-free — **"Mum 3 male -> add 1 female = 4"**. Rounding 3 up to
+>   > 4 and adding one female variant needs **no price, no offer state, no browser**. The
+>   > `any 2 for £X` clause is *why the household adopted the habit*, not an input the planner
+>   > evaluates.
+>   >
+>   > **Larry's error, recorded plainly: I conflated "mentions a multibuy context" with "requires
+>   > price arithmetic."** They are different. The worker had labelled the reading as mine and
+>   > invited disagreement; the error is mine alone. **Retained behaviour:** round the Sure line's
+>   > quantity UP to even, add the female variant to complete the final pair, resolved **before** the
+>   > browser handoff from grounded catalogue/household data. It *"combines with the rotate-variant
+>   > rule"* (32), which is already actionable.
+>
+> - ~~**Rule 37** (Sure pair rounding) is multibuy-conditional … **Larry's reading: it is archived
+>   with 31 and 36.**~~ **STRUCK — wrong, and overruled above.**
 > - **R1's AC3 is now testing archived behaviour.** Its three named cases were rules 31, 36 and 37,
 >   chosen at the time *because* they were the judgement layer. **Those tests must be re-cut, not
 >   deleted** — the rulebook's remaining job is real.
@@ -1268,6 +1290,83 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 > - **What the rulebook is still FOR:** carrying genuinely non-price household prose (rotation,
 >   out-of-stock meaning, exclusions, aliases) to the reasoning consumer. **The prohibition on
 >   growing a deterministic mini-language is unchanged and unaffected.**
+>
+> **SILAS'S SCHEMA DECISION IS IN** (`f0ebf31`,
+> [[Deliverables/2026-08-09-silas-schema-decision-remembered-last-choice]]): a new table
+> **`asdair.remembered_choice`, migration 018** — append-only, newest-wins, `SELECT`+`INSERT` to
+> `asdair_rw`, **UPDATE/DELETE to nobody**. Both existing seams were rejected on **correctness, not
+> taste**: `rule_qa_log` has no column able to hold a grounded product identity and the planner
+> recovers meaning from it by **prose matching** (`planner.js:1151`); `asdair.rules` has
+> `matched_product` as bare `text` with **no FK**, and `asdair_rw` holds **no UPDATE** on it
+> (`012:106-110`), so `active`/`superseded_by` are **inoperable from the runtime**. Warwick's
+> authorised-vs-accidental distinction is settled **structurally** — a composite FK to
+> `shop_decision (id, decision_kind)`, so the kind is **proved, not asserted**, with no boolean
+> successor to `applies_going_forward`. Honesty is by **absent columns**: no product name is stored,
+> so a dead preference renders as **nothing** rather than a stale-but-authoritative-looking string.
+>
+> > #### ⚠️ FLAG 1 — **`WO-B15-R3` IS NECESSARY BUT NOT SUFFICIENT.** Load-bearing; do not lose it.
+> >
+> > **Archiving the best-value rule needs an OWNER-LEVEL migration** — `asdair_rw` has **no UPDATE**
+> > on `asdair.rules`, so the runtime cannot archive a rule at all. **Until that privileged step
+> > runs, `planner.js:1151` keeps surfacing the archived rule as an advisory note on the Ariel
+> > line.** R3 removes the executable judgement from the code; **the DATA change is a separate
+> > privileged step and is Larry's to run under Warwick's authority**, on the precedent of 017's
+> > application (pre-notification + his §3 authority). ⛔ **Do not report "best value is archived"
+> > on the strength of R3 alone.**
+> >
+> > #### ✅ `WO-B15-R3` RETURNED COMPLETED (`d3362d7`) — the CODE half is done
+> >
+> > **What was actually removed, and it is not what Larry assumed:** `rulebook.js` **never did the
+> > arithmetic itself — it SHIPPED THE MONEY to the consumer and asked it to shop on it.** Three
+> > carriers, all gone: prices in the candidate map (`{name, price}` → `{name}`), `GBP 4.50` printed
+> > by `renderLines`, and a prompt inviting *"pick the best value" / "buy up to the offer"*. **No
+> > flag, no dormant branch.** No rule id is hard-coded, which is why the archive remains a data
+> > change. Control mutation-proved three ways, pinned to a vocabulary in `README.md` rather than in
+> > the module — **honest limit stated: that pin is a sibling doc in the same surface, not an
+> > unwritable authority.** Verified by Larry: pipeline **344/344**, skill **283 run / 274 pass /
+> > 7 fail** (the same seven, by name), `rulebook.test.js` **29 → 31**.
+> >
+> > **⚠️ TWO CORRECTIONS TO LARRY'S OWN ORDER, established by the worker:**
+> > 1. **`asdair.rules` has NO `status` column.** Archival is `active = false` (`db/001:97` — *"superseded rules are set active=false (kept for audit)"*). Larry's evidence line asked for a column that does not exist.
+> > 2. ~~**RULE 31'S LIVE EXISTENCE IS NOT ESTABLISHED** … do not repeat the rule-31 example as established fact.~~ **⛔ SETTLED THE OTHER WAY, AND STRUCK.** Larry live-queried `asdair.rules` on Warwick's instruction (2026-08-09, [[Deliverables/2026-08-09-live-rule-corpus-and-value-rule-identification]]): **rule 31 EXISTS and is ACTIVE** — `info`, household 1, `match_term 'ariel pods'`, *"Ariel Pods: pick the BEST VALUE by price-per-wash across pack sizes (Warwick 2026-07-21)."* The worker's claim rested on `ruleConsumption.test.js:62`, **an incomplete test fixture, not the database.** **D4 was CORRECT** and R1's "constructed paraphrase" caveat was unnecessary — the live wording is almost exactly it. *(Larry's note: the doubt was recorded honestly and resolved by execution, which is the process working — but the map briefly carried a true statement marked as unreliable, which is its own kind of error.)*
+> >
+> > 3. **THE VALUE ROWS ARE 31 AND 36. NOTHING ELSE** — Warwick's requested live identification.
+> >    **Rule 36** is `info`, **scope `global`, `match_term` NULL** (doubly inert, as D4 said):
+> >    *"OFFER RULE: if a multibuy gives >=50% off the EXTRA item(s), buy up to the offer quantity."*
+> >    **Retained after checking:** 12/25 (Nescafe — `needs_decision`, it **asks** rather than
+> >    optimises), 15 (toothpaste — `matched_product` pins the size, already decided), 7 (a budget
+> >    **flag**, not a choice), 32 (rotate, price-free). **40 active rules, not 39** — ids 1–40 with
+> >    21 absent; the *"23 of 39"* denominator is off by one and the argument is unaffected.
+> >
+> > **RULE 37 — Larry's reading CONFIRMED by the worker, with a consequence Larry had not seen.**
+> > Live text: *"Sure any 2 for GBP X: round qty UP to an even number to capture every pair; add a
+> > FEMALE variant to complete the last pair."* It opens on a multibuy offer and cannot be evaluated
+> > without offer evidence — *"a multibuy rule wearing a rounding rule's clothes."* **But archiving it
+> > also kills its NON-PRICE half — the plain household habit that Warwick always wants an EVEN
+> > NUMBER of Sure.** Warwick did not name that, and it is **his data, one sentence, no code** if he
+> > wants it back as an offer-free rule row. **Raised to him (FusionDevBot 463); not decided here.**
+> >
+> > **F1 — PARKED, non-blocking.** `planner.js rankAlternatives` (`:685-790`) still orders candidates
+> > by **price proximity, weight 0.7**. Bounded by two facts the worker established: proximity to the
+> > line's own price is a **similarity heuristic, not a bargain judgement**, and **no price column
+> > exists on the live corpus**, so the score is neutral and the ordering is price-free in practice.
+> > `planner.js` was outside the surface. Guaranteeing it price-free would be a separate order.
+> >
+> > **F4 — OWED, one line.** `skill/README.md` still says *"Nothing is wired. No pipeline caller
+> > invokes `applyRulebook` yet."* **R2 made that false.** Also stale: `pipeline/rulebookWiring.test.js:8`
+> > says the rulebook has *"29 of its own tests"* (now 31), and its fixture rule texts are still worded
+> > as best-value / pair-rounding rules. **Folded into the next order, not left to a sweep.**
+> >
+> > #### ⚠️ FLAG 2 — **018 hard-depends on 017 being applied** (composite FK). 017 IS applied, which
+> > satisfies it; the migration header must state the dependency. 017 was deliberately independent
+> > of 016 — 018 cannot be.
+>
+> **Recorded, not acted on:** two `normaliseTerm` implementations agree only by a sample-based test
+> (`stages.test.js:267`) — pre-existing, mitigated in 018 by a `term_normaliser` column plus a
+> fixed-point CHECK. `012`'s grant matrix is now missing two tables (`shop_decision` and this one).
+> **Price history is compatible** — same `regulars.id` key, reuse `price_basis` from `006` — and a
+> `price` column on `remembered_choice` is an **explicit NON-GOAL** so nobody adds one later *"while
+> we're in there"*.
 >
 > **The seam this lands on, established by execution and NOT to be rebuilt:** `asdair.rule_qa_log`
 > already carries `applies_going_forward` (`db/001:178`), which `planner.js` filters on — *"every
