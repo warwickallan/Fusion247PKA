@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 
 import { makeHarness, HOUSEHOLD_ID } from './test/harness.js';
 import * as commands from './commands.js';
+import { ACCEPTED_ANSWER_SOURCES } from './commands.js';
 import { COMMANDS } from './commandNames.js';
 import { questionKeyFor } from './keys.js';
 
@@ -303,4 +304,98 @@ test('submitConfirmation retains the raw receipt VERBATIM the moment it arrives'
   const raw = 'Your ASDA order\n2 x Arla semi skimmed 4pt  3.50\nOrder total 3.50';
   await commands.submitConfirmation({ shopRef: REF, actor: ACTOR, rawText: raw }, h.deps);
   assert.equal(commandRows(h, COMMANDS.SUBMIT_CONFIRMATION)[0].args.raw_text, raw);
+});
+
+// =====================================================================
+// WP-B15-A1 - answer_source IS REFUSED, NEVER RELABELLED
+//
+// This line used to read `spec.answerSource === 'typed' ? 'typed' : 'button'`.
+// Every unrecognised value was silently rewritten to `button`. shopState DOES
+// validate answer_source against ANSWER_SOURCES - but that check runs AFTER the
+// coercion, so it never saw a bad value: the coercion had already made it legal.
+// The row then said a human tapped a button when a human had typed a sentence.
+// =====================================================================
+
+async function openOne(h, key) {
+  await receive(h);
+  await h.deps.shopStore.openQuestion({
+    shop_id: h.db.shop[0].id, question_key: key,
+    question_text: 'Which product is "Dreamies cheese"?', candidates: [],
+  });
+}
+
+test('A1 THE VOCABULARY IS PINNED to the database, in a literal held OUTSIDE it', async () => {
+  const { createRequire } = await import('node:module');
+  const shopState = createRequire(import.meta.url)('../shop/shopState.js');
+
+  // Deliberately NOT imported from shopState into commands.js. A check that
+  // derives its expectation from the thing it is checking can never disagree
+  // with it, and a control that cannot fail is not a control. If the database
+  // vocabulary widens, THIS test fails and a human decides whether the command
+  // surface should accept the new source too.
+  assert.deepEqual(
+    [...ACCEPTED_ANSWER_SOURCES].sort(),
+    [...shopState.ANSWER_SOURCES].sort(),
+    'commands.js and the database disagree about what an answer_source may be',
+  );
+});
+
+test('A1 AN UNRECOGNISED answerSource IS REFUSED, not quietly relabelled', async () => {
+  const h = makeHarness();
+  const key = questionKeyFor('Dreamies cheese');
+  await openOne(h, key);
+
+  await assert.rejects(
+    () => commands.answerQuestion({
+      shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the cheese one', answerSource: 'sms',
+    }, h.deps),
+    /unrecognised answerSource/,
+    'an unknown source was accepted - it will have been written as `button`',
+  );
+
+  // AND IT WROTE NOTHING. A refusal that half-applies is worse than no refusal.
+  assert.equal(h.db.shop_question[0].status, 'open');
+  assert.equal(h.db.shop_question[0].answer_text, null);
+});
+
+test('A1 THE OLD DEFECT, DIRECTLY: an unknown source must not come out as `button`', async () => {
+  const h = makeHarness();
+  const key = questionKeyFor('Dreamies cheese');
+  await openOne(h, key);
+
+  let recorded = null;
+  try {
+    await commands.answerQuestion({
+      shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'x', answerSource: 'voice',
+    }, h.deps);
+  } catch {
+    recorded = h.db.shop_question[0].answer_source;
+  }
+  assert.equal(recorded, null, 'the bad value was coerced and written anyway');
+});
+
+test('A1 ABSENT IS NOT WRONG: an omitted answerSource still means `button`', async () => {
+  const h = makeHarness();
+  const key = questionKeyFor('Dreamies cheese');
+  await openOne(h, key);
+
+  // Every current producer of a TAP omits the field, and an absent source
+  // asserts nothing false. Throwing here would break callers for no provenance
+  // gain, so absence keeps its long-standing default deliberately.
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'Dreamies Cheese Large',
+  }, h.deps);
+  assert.equal(h.db.shop_question[0].answer_source, 'button');
+});
+
+test('A1 `typed` SURVIVES INTACT - the provenance Warwick actually needs', async () => {
+  const h = makeHarness();
+  const key = questionKeyFor('Dreamies cheese');
+  await openOne(h, key);
+
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the cheese one please', answerSource: 'typed',
+  }, h.deps);
+  assert.equal(h.db.shop_question[0].answer_source, 'typed');
+  assert.equal(h.db.shop_question[0].answer_text, 'the cheese one please');
 });

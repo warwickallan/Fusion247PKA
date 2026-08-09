@@ -601,3 +601,130 @@ test('FINGERPRINT: a text message carries none - there is no image to bind', asy
   assert.equal(r.emitted.length, 1);
   assert.ok(!('imageSha256' in r.emitted[0].meta));
 });
+
+// =====================================================================
+// WP-B15-A1 - ROUTE FIRST, INTAKE SECOND
+//
+// The claim is asked BEFORE a message is treated as a shopping list, and BEFORE
+// its Telegram offset advances. Both halves matter: the first stops an answer
+// also becoming a shop, the second stops a crash losing the answer in the window
+// between the acknowledgement and the write.
+//
+// classifyUpdate is NOT involved and stays pure - the tests above still pass it
+// no state at all. Classification says WHAT a message is; the claim says WHO it
+// belongs to.
+// =====================================================================
+
+test('A1 CLAIMED: a claimed message is never built, never downloaded, never emitted', async () => {
+  const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 5001, messageId: 91 })] });
+  const state = createMemoryStateStore(null);
+
+  const seen = [];
+  const r = await runIntake({
+    config: testConfig(),
+    telegram,
+    state,
+    media: fakeMedia(),
+    now: () => 1_700_000_000_000,
+    claim: async (verdict, update) => { seen.push({ verdict, update }); return true; },
+  });
+
+  assert.equal(r.claimed.length, 1, 'the claim was not honoured');
+  assert.equal(r.emitted.length, 0, 'a claimed message was ALSO emitted as a shopping list');
+  assert.equal(r.ignored.length, 0, 'a claimed message is handled, not ignored - the report must say so');
+  // THE ACK STILL MOVES. The claimant wrote the answer durably before returning
+  // true, so redelivering it would answer the same question twice.
+  assert.equal(r.offsetAfter, 5001);
+  assert.deepEqual(await state.read(), { lastUpdateId: 5001 });
+});
+
+test('A1 THE CLAIM SEES THE CLASSIFIED VERDICT AND THE RAW UPDATE', async () => {
+  const update = textUpdate({ updateId: 5002, messageId: 92 });
+  const telegram = fakeTelegram({ updates: [update] });
+
+  let got = null;
+  await runIntake({
+    config: testConfig(),
+    telegram,
+    state: createMemoryStateStore(null),
+    media: fakeMedia(),
+    now: () => 1,
+    claim: async (verdict, raw) => { got = { verdict, raw }; return false; },
+  });
+
+  assert.equal(got.verdict.kind, 'text', 'the claim needs to know what kind of message this is');
+  assert.equal(got.verdict.updateId, 5002);
+  // The RAW update is needed because correlating an answer needs the message
+  // itself - reply_to_message, sender, chat - not just the classification.
+  assert.equal(got.raw, update);
+});
+
+test('A1 NOT CLAIMED: the message goes to intake exactly as it always has', async () => {
+  const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 5003, messageId: 93 })] });
+  const r = await runIntake({
+    config: testConfig(),
+    telegram,
+    state: createMemoryStateStore(null),
+    media: fakeMedia(),
+    now: () => 1,
+    claim: async () => false,
+  });
+
+  assert.equal(r.claimed.length, 0);
+  assert.equal(r.emitted.length, 1, 'declining the claim lost the shopping list');
+  assert.deepEqual(r.emitted[0].payload, { kind: 'text', text: '2 milk\nbread\neggs x6' });
+});
+
+test('A1 A CLAIM THAT THROWS NEVER EATS THE MESSAGE', async () => {
+  const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 5004, messageId: 94 })] });
+  const events = [];
+  const r = await runIntake({
+    config: testConfig(),
+    telegram,
+    state: createMemoryStateStore(null),
+    media: fakeMedia(),
+    now: () => 1,
+    log: (event, detail) => events.push({ event, detail }),
+    claim: async () => { throw new Error('the correlator is down'); },
+  });
+
+  // Routing failing is not a reason to lose a shopping list. Failing towards
+  // "not claimed" means the worst case is the pre-existing behaviour.
+  assert.equal(r.claimed.length, 0);
+  assert.equal(r.emitted.length, 1, 'a throwing claim discarded the message');
+  assert.equal(events.filter((e) => e.event === 'claim_failed').length, 1,
+    'a failed claim must leave a trace, not fail silently');
+});
+
+test('A1 NO CLAIM HOOK AT ALL: behaviour is byte-for-byte what it was', async () => {
+  const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 5005, messageId: 95 })] });
+  const r = await runIntake({
+    config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1,
+  });
+
+  assert.equal(r.emitted.length, 1);
+  assert.deepEqual(r.claimed, [], 'the new field must exist and be empty, never absent');
+  assert.equal(r.offsetAfter, 5005);
+});
+
+test('A1 AN UNAUTHORISED SENDER IS NEVER OFFERED TO THE CLAIM', async () => {
+  const stranger = textUpdate({ updateId: 5006, messageId: 96, senderId: STRANGER });
+  const telegram = fakeTelegram({ updates: [stranger] });
+
+  let offered = 0;
+  const r = await runIntake({
+    config: testConfig(),
+    telegram,
+    state: createMemoryStateStore(null),
+    media: fakeMedia(),
+    now: () => 1,
+    claim: async () => { offered += 1; return true; },
+  });
+
+  // The allowlist is default-deny and runs FIRST. Routing must never become a
+  // way around it - a stranger must not be able to answer Warwick's questions.
+  assert.equal(offered, 0, 'an unauthorised message reached the claim hook');
+  assert.equal(r.claimed.length, 0);
+  assert.equal(r.ignored.length, 1);
+  assert.equal(r.ignored[0].reason, IGNORE_REASONS.UNAUTHORISED_SENDER);
+});
