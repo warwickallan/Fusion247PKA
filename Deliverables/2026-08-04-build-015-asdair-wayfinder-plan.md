@@ -592,9 +592,16 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 > the live runtime, shop 6's onward progress, or the § 12 handback — *"that should go, carrying these
 > findings."* **Break 8's classification moves only on a discharged receipt, not on this record.**
 >
-> **The one thing Warwick must rule before row 7 can move:** accept the status transition as
-> satisfying *"`needs_review` clears"*, or order the design changed. **It is his criterion and his
-> call. Larry substituted for it once already and that substitution is what D1 is about.**
+> **§11 ROW 7 — RULED BY WARWICK, 2026-08-09. He accepted the substitute and AMENDED his own
+> criterion.** The amendment is his, and it is recorded verbatim at observation 2 below.
+> **It resolves row 7 ONLY.**
+>
+> **⚠️ THE OVERALL GATE 2 VERDICT REMAINS `HOLD`.** Warwick, verbatim: *"This ruling resolves §11
+> row 7 only. It does NOT convert Veritas Gate 2 overall from HOLD: rows 6, 10, 11 and 12 retain
+> their own evidence requirements/findings."* **Rows 6 (callback resolution), 10 (exact-source
+> identity), 11 (wrong-week comparison), 12 (restart across a pending confirmation) and completed
+> automation are unchanged and still HOLD. No completion claim exists.** The line above reading
+> "6 HOLD" is superseded only as to row 7; five HOLDs stand.
 
 #### THE LIVE ACCEPTANCE EVENT — executed evidence, 2026-08-09
 
@@ -668,9 +675,9 @@ runtime.
 1c. **Open thread, mechanism unverified within the Gate 2 ceiling:** the Telegram offset advanced
    `171031136 → 171031140` across a pass that **failed**. It bears directly on §11 row 12 (restart or
    recovery must not lose a pending confirmation) and is not closed.
-2. **`needs_review` remains `true`. Warwick's §11 acceptance criterion "`needs_review` clears" is
-   NOT satisfied, and is UNMEETABLE in the shipped design. Whether to accept a substitute is
-   WARWICK'S CALL, not Larry's.**
+2. **`needs_review` remains `true`. §11 row 7 — AMENDED BY WARWICK, 2026-08-09, and thereby
+   RESOLVED.** *(His amendment is quoted in full at the end of this observation. The correction
+   block immediately below is LARRY'S record of Larry's own failure and is not part of his ruling.)*
 
    > **⛔ CORRECTED 2026-08-09 after Veritas Gate 2 defect D1 (HIGH, blocking). The previous wording
    > here was FALSE and it was self-serving.** It read: *"Warwick's route said 'observe `needs_review`
@@ -696,9 +703,43 @@ runtime.
    (`runPipeline.js:434-437`), not by the flag. Shop 6 is `READY_TO_SHOP` with `needs_review=true`.
 
    **So the criterion as written cannot be met without a design change, and the status transition is
-   a SUBSTITUTE for it.** Larry made that substitution silently. **The open decision is Warwick's:
-   accept the status transition as satisfying §11 row 7, or order the design changed.** Until he
-   rules, this line is HOLD and no PASS may be claimed on it.
+   a SUBSTITUTE for it.** Larry made that substitution silently, which is what `D1` is about.
+
+   > ### AMENDMENT — Warwick, 2026-08-09. §11 row 7. **His words, verbatim.**
+   >
+   > > **"I ACCEPT THE SUBSTITUTE.**
+   > >
+   > > The original §11 criterion "needs_review clears" was mine. Larry did not originate it and had
+   > > no authority to retire or substitute it without asking me.
+   > >
+   > > I now amend that criterion because the shipped data model establishes that `needs_review` is
+   > > an immutable arrival/provenance fact, not the live state of the interpretation-confirmation
+   > > gate.
+   > >
+   > > **DO NOT add a writer merely to turn `needs_review` false.**
+   > >
+   > > §11 row 7 is replaced by:
+   > >
+   > > *"The interpretation-confirmation gate clears durably after the real human confirmation,
+   > > evidenced by the durable `confirmInterpretation` latch and the shop subsequently
+   > > replanning/progressing beyond `wait:interpretation_confirmation`. `needs_review` may remain
+   > > true as the immutable record that the shop originally arrived requiring review."*
+   > >
+   > > Shop 6's PROCESSING → READY_TO_SHOP transition after my Telegram confirmation is acceptable
+   > > evidence for this amended criterion.
+   > >
+   > > This ruling resolves §11 row 7 only. It does NOT convert Veritas Gate 2 overall from HOLD:
+   > > rows 6, 10, 11 and 12 retain their own evidence requirements/findings."
+   >
+   > **⛔ STANDING PROHIBITION, from that ruling: no writer may be added merely to turn
+   > `needs_review` false.** Anyone tempted to "fix" the flag is doing the opposite of what Warwick
+   > decided — it is provenance, not state.
+
+   **LARRY'S RECORD, not Warwick's words.** Row 7 is satisfied on the amended criterion by the
+   evidence already banked above: the durable `confirmInterpretation` latch (`pipeline_command` id
+   22, actor `telegram:8601328832` — a real Telegram principal) and the `PROCESSING → READY_TO_SHOP`
+   transition at 00:41:55 carrying the shop beyond `wait:interpretation_confirmation`. **Row 7 only.
+   The overall Gate 2 verdict is still HOLD** and no completion claim exists.
 3. **`pipeline_command` id 22 remains `status=pending`.** Consistent with the documented design —
    *"A LATCH, not a queue entry: once issued it stays true for this shop, so the runner consuming it
    cannot re-close the gate"* (`commands.js:213-231`). **Honest limit: no writer that marks it `done`

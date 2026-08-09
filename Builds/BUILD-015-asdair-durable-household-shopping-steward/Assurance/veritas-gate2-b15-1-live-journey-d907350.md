@@ -220,3 +220,42 @@ event row changed in the window.**
 **Provenance and its limit, stated plainly:** these two results are **Larry's readings via the
 Supabase connector**, exactly as the receipt labels every other database row in it. They are not
 Veritas's own observation, and this addendum does not convert them into one.
+
+---
+
+## ADDENDUM 2 — WARWICK'S RULING on §11 row 7, 2026-08-09. **NOT a verdict change by Larry.**
+
+**This addendum records a ruling by Warwick, the highest authority in the estate. It does NOT alter
+Veritas's verdict, and Veritas was NOT re-dispatched.** Warwick amended his own acceptance criterion;
+the receipt's grading of the criterion *as it stood at review time* is untouched and correct.
+
+**His words, verbatim:**
+
+> "I ACCEPT THE SUBSTITUTE.
+>
+> The original §11 criterion "needs_review clears" was mine. Larry did not originate it and had no
+> authority to retire or substitute it without asking me.
+>
+> I now amend that criterion because the shipped data model establishes that `needs_review` is an
+> immutable arrival/provenance fact, not the live state of the interpretation-confirmation gate.
+>
+> DO NOT add a writer merely to turn `needs_review` false.
+>
+> §11 row 7 is replaced by:
+>
+> "The interpretation-confirmation gate clears durably after the real human confirmation, evidenced
+> by the durable `confirmInterpretation` latch and the shop subsequently replanning/progressing
+> beyond `wait:interpretation_confirmation`. `needs_review` may remain true as the immutable record
+> that the shop originally arrived requiring review."
+>
+> Shop 6's PROCESSING → READY_TO_SHOP transition after my Telegram confirmation is acceptable
+> evidence for this amended criterion.
+>
+> This ruling resolves §11 row 7 only. It does NOT convert Veritas Gate 2 overall from HOLD: rows 6,
+> 10, 11 and 12 retain their own evidence requirements/findings."
+
+**Effect on this receipt, stated precisely and by Larry:** row 7's HOLD is discharged by the ruling
+above, against the AMENDED criterion. **Rows 6, 10, 11 and 12 and the completed-automation HOLD are
+untouched. The overall Gate 2 verdict remains `HOLD`. Defect `D1` remains a recorded HIGH finding
+against Larry — Warwick's amendment resolves the CRITERION, not Larry's misattribution of it**, which
+was corrected separately on the map.
