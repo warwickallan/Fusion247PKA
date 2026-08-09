@@ -1112,7 +1112,7 @@ Restated here in numbered form so a gate can grade them separately:
 |---|---|---|---|
 | **1** | **Free text is a first-class production input** — a typed natural-language reply reaches the SAME durable question → answer → `shop_decision` → recomputation spine. No button-only dependency, no silently discarded text, no Larry relay. | Lane A, `a61fc44`. `answer_source='typed'`; unrecognised source **throws and writes nothing** | **The real production event has never run.** No live Telegram message has traversed it; **Terra's prompt has never met the model** |
 | **2** | **Coherent question surface** — unresolved questions presented together; one typed reply may answer several where the mapping can be grounded safely | Lane A. Terra called **once** with all open keys; two questions answered; two separate ledger commands | With exactly ONE open question, any answer-shaped message is claimed — so a genuine new list typed while a stale question is open would be read as an answer. **No list-shape heuristic was invented** |
-| **3** | **Terra applies the prose rulebook** — relevant household rules go to the reasoning consumer AS PROSE and Terra applies the judgement. ⛔ No ever-growing deterministic mini-language | Lane R1, `466cba9`. Rules 31/36/37 — inert for weeks — each change a line, attributably. **No directive type, grammar, registry or DSL added**, asserted against a CHECK-constraint literal held outside the module | **🔴 Rules 31 and 36 are gated on PRICE AT PLAN TIME, which the schema does not carry.** On today's corpus they will mostly produce a REASONED QUESTION rather than a pick. Better than silence; **NOT yet "never asked which Ariel again."** Closing it is the browser lane's territory |
+| **3** | **Terra applies the prose rulebook** — relevant household rules go to the reasoning consumer AS PROSE and Terra applies the judgement. ⛔ No ever-growing deterministic mini-language | ⛔ **NOT DELIVERED. `skill/rulebook.js` HAS ZERO PRODUCTION CALLERS** (Veritas D1, `318e0e3`). All five exports are reached only from `rulebook.test.js` and `ruleConsumption.test.js`. The module is written, tested — **and connected to nothing.** What IS true: the code exists, is well-tested, adds no directive type/grammar/registry/DSL, and the AC6 prohibition is pinned to a CHECK-constraint literal held outside it | **BLOCKING.** Corrective dispatch owed for the wiring, then ONE focused confirmation. **The price-at-plan-time limit below is real but SUBORDINATE** — it describes a module that does not run |
 | **4** | **Uncertainty is spoken, never guessed and never silently parked** — applies to an unmappable reply fragment and to an unclear or conflicting prose rule alike | Lanes A and R1. Six executed uncertainty paths incl. unreachable consumer → flag on every affected line; **unparseable reply → error recorded, never read as approval** | — |
 | **5** | **Traced to the real production caller** — not "a model wired to a prompt" | Lane C, `8e625b4`: `buildHandoff`, the execution packet and `verifyBasket` now have production callers, proven reachable from the runtime entry, with `requestBrowserBuild` asserted OFF the path | **AC6(f) OPEN:** `openHandoff` writes `progress.handoff` while `runner.js reconstruct()` reads `progress.plan`, so **a CDP arm can still ignore the payload.** `browser-runner/progress.cjs` was outside every granted surface. Named, not hidden |
 
@@ -1123,6 +1123,38 @@ harness repair (`dde0d51`) and the CRLF control fix (`318e0e3`). **Unpushed. Not
 **Measured suite state at that head** — counts, not exit codes: pipeline **327/327** · handoff
 114/114 · packet 109/109 · browser-runner 75/75 · bot 165/165 · intake 34/34 · reconcile 106/106 ·
 skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB_URL` unset).
+
+> ### 🔴 VERITAS GATE 1 — **HOLD on all five requirements** (`318e0e3`, receipt `b377ce2`)
+>
+> **The blocking finding is D1, against requirement 3: `skill/rulebook.js` has ZERO production
+> callers.** `planner.js`'s entire change is a 13-line comment claiming the dropped rows *"are now
+> picked up as PROSE by rulebook.js … applied by a reasoning consumer"* — **that consumer does not
+> exist.** The route that genuinely carries household rules to Terra is unchanged on `main`
+> (`runPipeline.js:1045 rules: inputs.rules` → `deps.js:448 'Household rules that apply:'`).
+>
+> **This is Larry's failure, not the worker's.** `WO-B15-R1` excluded the wiring by design and stated
+> *"Larry wires it during reconciliation"*. Larry then merged it and commissioned the gate **without
+> wiring it**. CAPAE family: **built, tested, committed — and never activated.**
+>
+> **D4 is its reporting face**, corrected in the row above: the price-at-plan-time residual described
+> the behaviour of a module that never runs, and would have told a fresh session the rulebook
+> operates and is merely price-limited.
+>
+> **What survived independent testing** — all eight suite counts re-executed and matched **exactly**;
+> the CRLF control repair did **not** disarm the control (re-mutation-tested inside a `git archive`
+> export); and **requirement 5's production-caller chain HOLDS** — traced `main()` → `realWiring` →
+> `runOnce` → `queueShopCards` → `buildBrowserHandoff` / `verifyBasket`, **no test-only hops**.
+>
+> **Judged NON-BLOCKING by the reviewer and parked:** the two mis-provenanced WIP commits (*"does not
+> damage the integrity of the record"* — content not misrepresented, correction committed forward)
+> and the `fakePg` regression-test gap.
+>
+> **Queue effect:** gates completion, closure, Gate 2 and Codex for WP-B15-3. **Does NOT block safe
+> work on requirements 1, 2, 4, 5 or on the live-execution frontier.** Corrective dispatch owed for
+> **D1 only**, then ONE focused confirmation of that finding.
+>
+> **`b15-3/integration` has since been PUSHED to `origin`**, clearing the reviewer's second
+> independent HOLD cause (a head reachable from no ref).
 
 **⛔ THE BAR THIS PACKAGE HAS NOT MET.** Every requirement above is proven **OFFLINE ONLY** — no
 live Telegram message, no live ASDA session, no real shop, no database. Under § "Nothing may live
