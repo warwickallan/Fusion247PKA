@@ -115,6 +115,22 @@ contract_basis:
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
   - surface: services/asdair/reconcile/verifyBasket.js
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
+  # AMENDMENT 1, Larry 2026-08-09 — added on Keel's read-back (M1/M3/M4). The original
+  # surface granted five browser-runner SOURCE files and ZERO test paths, which made
+  # AC5's direct-import-bypass proof and AC6(a)'s second-tab proof undeliverable inside
+  # the surface. That was my error, not an over-ask.
+  - surface: services/asdair/browser-runner/oneTab.test.cjs
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
+  - surface: services/asdair/browser-runner/forbidden.test.cjs
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
+  - surface: services/asdair/reconcile/verifyBasket.test.js
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
+  # M4 — ONE mutation harness, not a parallel one. The estate's existing harness is granted
+  # so it is extended rather than duplicated.
+  - surface: services/asdair/handoff/mutation-proof.js
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
+  - surface: services/asdair/handoff/mutation.test.js
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
 
 contract_conflicts: none
 # guidance: bare value only — `none` OR the conflict list. `none` is EARNED, never a default placeholder. Never glue prose to the value.
@@ -157,7 +173,7 @@ operational_handoff: none
 
 ## Acceptance criteria
 
-AC1 - THE PACKET CARRIES THE METHOD. The execution packet produced on the production path contains the full BROWSER_METHOD (18 steps) and PROHIBITED_ACTIONS (5) from instructions.js v2, with INSTRUCTIONS_VERSION recorded on the artefact. A packet built WITHOUT them is refused by the producer, not merely flagged.
+AC1 (AMENDED, Larry 2026-08-09 — Keel's M2/C2 was correct) - THE ARTEFACT PRODUCED ON THE PRODUCTION PATH CARRIES THE METHOD. That artefact is the HANDOFF, not the execution packet. Keel established by grep that packet/committedSchema.js carries no method/instructions/prohibited fields and that buildExecutionPacket.test.js hash-pins the producer to it, so making the PACKET carry the contract would need two out-of-surface files AND would duplicate the contract in two artefacts against the SSOT rule. It must live in exactly one place. So: the handoff produced on the production path contains the full BROWSER_METHOD (18 steps) and PROHIBITED_ACTIONS (5) from instructions.js v2, with INSTRUCTIONS_VERSION recorded on it - buildHandoff.js already stamps all three at :462/:499/:514. A handoff built WITHOUT them is REFUSED by the producer, not merely flagged.
 
 AC2 - buildHandoff HAS A PRODUCTION CALLER. Cite the file:line in pipeline/ that reaches it when a shop becomes browser-ready. Prove reachability from the runtime entry, not from a unit test.
 

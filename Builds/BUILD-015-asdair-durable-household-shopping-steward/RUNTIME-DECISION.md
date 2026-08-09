@@ -1,6 +1,39 @@
 # BUILD-015 — RUNTIME DECISION: who writes the live ASDA basket
 
-**Status:** CANONICAL. Supersedes every conflicting statement anywhere in this repository.
+> ## ⛔ SCOPE CORRECTION — Larry, 2026-08-09. Read this before the Status line below.
+>
+> **The words "Supersedes every conflicting statement anywhere in this repository" overreach and are
+> hereby bounded.** Under `CLAUDE.md` § "Source of truth and precedence" the order is **Warwick (1) →
+> the active Wayfinder (2) → `CLAUDE.md` (3) → the build record under `Builds/` (4)**, and that
+> section states plainly that the build record is *"the authority for build **facts**, never a
+> route"* — and that **"a lower source claiming higher status is itself a defect."** This heading was
+> that defect. It is corrected here rather than argued about again.
+>
+> **This document remains fully authoritative for the FACTS it records** — Warwick's 2026-08-04
+> ruling, why the 2026-08-03 incident happened, what the browser-runner is and is not, and the
+> Sonnet Browser Execution Packet. **It does not outrank a later Warwick ruling or the active
+> Wayfinder.**
+>
+> **Bounded by two later Warwick rulings, both 2026-08-09, both on the active Wayfinder
+> (`Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md`, §10 Lane C):**
+>
+> 1. **The CDP classification is re-cut.** Warwick verbally confirmed one persistent profile, one
+>    session, **one tab**, ten trolley items, basket ready — *"CDP IS NOT THE PROBLEM."* CDP is no
+>    longer dismissed as merely diagnostic. **It is the ARM, it is not the brain, and it is NOT yet
+>    the accepted production method** until authenticated operation, real trolley mutation and full
+>    reconciliation are proven live. §9's framing of the runner is narrowed to that extent and to no
+>    further extent.
+> 2. **The Lane C defect is enforcement, not method choice** — *"THE PROVEN BROWSER OPERATING
+>    CONTRACT EXISTS, BUT THE PRODUCTION ROUTE DOES NOT ENFORCE IT."* The work in flight
+>    (`WO-2026-08-09-B15-C4`) builds an **arm-agnostic** handoff artefact carrying the settled
+>    method, which serves a Sonnet session **or** a CDP worker. **Nothing here is contradicted by
+>    that**, and this document must not be read as forbidding it.
+>
+> *Recorded because a dispatched worker correctly halted on the conflict between this heading and the
+> Wayfinder rather than guessing. It was right to stop; the heading was wrong.*
+
+**Status:** CANONICAL **for the facts it records** — bounded by the scope correction above, and by
+later Warwick rulings on the active Wayfinder. **Not a route authority.**
 **Decided by:** Warwick, 2026-08-04, ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.
 **Supersedes:** the operating assumption used throughout the 2026-08-03 live incident, and
 every document listed under "Documents this correction reaches" below.
