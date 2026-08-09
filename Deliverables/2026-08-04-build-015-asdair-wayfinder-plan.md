@@ -651,6 +651,69 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 > requesting authority; only PRE-3 and PRE-4 were executed on 2026-08-09. The remaining six are being
 > run before the authority request, which is compliance with the runbook, not new scope.
 
+> # 🔄 ROTATION STATE — 2026-08-09. **READ THIS FIRST. It is the resumable frontier.**
+>
+> **Phase:** GROUNDED RECOGNITION, IN PROGRESS · **Sub-phase:** B15-3, ACTIVE, executing.
+>
+> ### ⏳ TWO WORKERS WERE MID-BUILD AT ROTATION — NAMED, NOT DROPPED (`/rotate` step 1)
+>
+> **Neither had written a file when this was banked. Both orders are committed and reconstructible,
+> so a fresh Larry can re-dispatch from the artefact without reconstructing anything.**
+>
+> | Lane | Order (committed) | Branch / worktree | State at rotation |
+> |---|---|---|---|
+> | **Lane C** | `Deliverables/2026-08-09-WO-B15-C4-browser-contract-executable.md` (23-path surface, `ready:true`) | `b15-3/lane-c-browser-wiring` · `C:/Fusion247PKA-lanec` · head `84d07a2`+ | Accepted after 2 × CLARIFY; told to **GO**; building |
+> | **B15-3 Lane A** | `Deliverables/2026-08-09-WO-B15-A1-free-text-production-input.md` (14-path surface, `ready:true`) | `b15-3/free-text-and-question-surface` · `C:/Fusion247PKA-b153-ingress` · head `9b53f1b`+ | Accepted after CLARIFY + HOLD; option (c) granted; building |
+>
+> **If their returns arrive in a later session: write them to `Deliverables/`, commit, and fold them
+> into the record.** An unread worker return is unbanked work.
+>
+> ### 🎯 EXACT NEXT ACTION for a fresh Larry
+>
+> 1. **Check whether the two workers above returned.** If so, bank their returns, commit their
+>    branches, and reconcile the three files both lanes share — `pipeline/runtime.js`,
+>    `runPipeline.js`, `deps.js`. **Larry owns that reconciliation; both workers were told to list
+>    their changes to those three files explicitly.**
+> 2. **If they did not return, re-dispatch from the two committed orders.** They are fully authored;
+>    do **not** regenerate a fresh envelope (`/rotate`-era ruling and 4F CAPA item 7).
+> 3. **In parallel, build the Work Order readiness validator** — spec is the 4F CAPA
+>    (`Deliverables/2026-08-04-proofline-wayfinder-plan.md` on `build-020/4f-control-cost-evidence`,
+>    commit `63c9e18`). **Trace `tools/wo/envelope.mjs` and the dispatch path from source; do not
+>    author it from memory.** ⛔ Item 8 is load-bearing: until dispatch itself refuses an unready
+>    order, items 1–7 are advisory.
+>
+> ### ⚠️ GIT STATE — DELIBERATELY UNPUSHED, CLASSIFIED (`/rotate` step 4)
+>
+> **`main` carries ~10 unpushed commits and this is NOT an accident.** `git push origin main` is
+> **auto-denied without ever prompting Warwick** — established by execution: the `worktree-guard`
+> hook returns `ask` correctly, `settings.local.json` has the push in its **`ask`** array, and no
+> `deny` rule matches. Something above both converts the ask to a denial silently. **Warwick ruled
+> his typed authority satisfies the human-approval requirement and commissioned a governor fix; that
+> work is PARKED and is explicitly NOT on the AsdAIr path.** Everything is committed locally and
+> recoverable; nothing is lost, but **`origin/main` is stale by design, not by omission.**
+>
+> ### 🅿️ PARKED, DELIBERATELY — each is a decision, not forgetfulness
+>
+> - **Shop 7** — honestly parked. Three lines transcribed, image fingerprint bound, one question
+>   answered by button, one still open. **No manufactured progress. Shop 6 remains prohibited.**
+> - **Live authenticated ASDA proof** — Warwick's six live checks need his manual sign-in. **Gates
+>   live proof ONLY, never implementation.**
+> - **The governor / push-permission defect** — parallel housekeeping.
+> - **Lane B1 `forward_intent`** — a genuine product decision awaiting Warwick.
+> - **The 23 inert `info` rules** — the judgement layer; B15-3's rulebook half, not yet ordered.
+> - **AC6(f) residual** — `runner.js` reads `progress.plan` while `openHandoff` writes
+>   `progress.handoff`, so a CDP arm can still ignore the payload. Next slice, named not hidden.
+>
+> ### ⛔ WHAT A FRESH LARRY MUST NOT CONCLUDE
+>
+> - **NOT that the browser operation works.** Chrome being driveable is not that claim.
+> - **NOT that "merged" is "wired".** `instructions.js` v2 is PRESENT on the integration branch;
+>   `buildHandoff`, the execution packet and `verifyBasket` still have **no production caller**.
+> - **NOT that the fresh photograph is the remaining step.** It ran, and failed on the
+>   human-interaction layer.
+> - **NOT that CDP needs re-proving.** Warwick closed it: one profile, one session, one tab, ten
+>   items, basket ready. **Re-proving it is prohibited.**
+
 ## SUB-PHASE B15-3 — NATURAL ANSWERING AND AN EXECUTABLE RULEBOOK. **ACTIVE. Authorised by Warwick 2026-08-09 with execution approval; no further design handback.**
 
 **This is implementation detail required to satisfy the EXISTING North Star. It is NOT a new build,
