@@ -651,6 +651,89 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 > requesting authority; only PRE-3 and PRE-4 were executed on 2026-08-09. The remaining six are being
 > run before the authority request, which is compliance with the runbook, not new scope.
 
+## SUB-PHASE B15-3 — NATURAL ANSWERING AND AN EXECUTABLE RULEBOOK. **ACTIVE. Authorised by Warwick 2026-08-09 with execution approval; no further design handback.**
+
+**This is implementation detail required to satisfy the EXISTING North Star. It is NOT a new build,
+NOT a new direction, and NOT a new success criterion.** Warwick, verbatim: *"This is not a new
+BUILD-015 direction and it is not a new product North Star. It is implementation detail required to
+satisfy the existing one."* The BUILD-015 criterion is unchanged — *"AsdAIr understands the household,
+lets me interact naturally, applies what I tell it to this week's shop, uses the household's actual
+shopping judgement, asks me when it genuinely does not know, and advances the real shopping journey
+safely."*
+
+### Why this sub-phase exists — four defects PROVEN live on 2026-08-09, not theorised
+
+Established by execution against the household database and the shipped code during the shop 7
+attempt. Evidence: [[Deliverables/2026-08-09-fresh-photo-line-selection-evidence]] and the queries
+recorded in this session.
+
+| # | Defect | Evidence |
+|---|---|---|
+| **D1** | **A typed natural-language reply is not a production input at all.** Warwick typed an answer into the Telegram box; it was **never recorded** — question 76463 stayed `open`, `answer_text` NULL, and `asdair.shop_event` holds no event for it. Consumed and silently dropped. | shop 7, 2026-08-09 |
+| **D2** | **The human journey is button-only, one tiny interaction per question.** Two separate cards for a three-line list. `answer_source` on the one answered question is `button`. | shop 7 questions 76462 / 76463 |
+| **D3** | **23 of 39 active rules — 59% — cannot execute.** `actionableRules()` (planner.js:952) drops every `directive='info'` row and every row failing `hasTarget()`; 20 of the 23 also have a NULL `match_term`. The planner's own comment says these *"have never once fired."* | live `asdair.rules` |
+| **D4** | **The dead 59% is precisely the judgement layer.** Not a random subset. Rule 31 *"Ariel Pods: pick the BEST VALUE by price-per-wash"* — active since 2026-07-20, `info`, never fired, which is why Warwick was asked to tap a button his own standing rule already answers. Rule 36 *"if a multibuy gives ≥50% off the EXTRA item(s), buy up to the offer quantity"* (the Tropicana rule) — `info` AND no target, doubly inert. Rule 37 (Sure pair rounding) — same. What survives is only `map` and `exclude`: *"toothpaste means Aquafresh"*, *"never buy banana Yazoo"*. | live `asdair.rules`, grouped by directive |
+
+> **Warwick's diagnosis, verbatim, and it is the durable part:** *"you and sonnet chrome never had a
+> problem!"* — *"there is no way to teach the system new rules and get it to learn if I keep having to
+> tell it which aerial every bloody week!"*
+>
+> **Larry's record, not Warwick's words:** the rules did not fail; the SHAPE they were forced into
+> failed. A judgement cannot be expressed as `map` or `exclude`, so every judgement was filed as
+> `info` and discarded. A model reading the same sentence in prose applies it without any schema at
+> all — which is exactly why it worked when a model ran the shop by hand. **One honest correction to
+> the recollection: `info` rules have never fired automatically. What worked before was a human in
+> the loop, which is the trap, not the solution.**
+
+### The five corrections this sub-phase must deliver
+
+1. **Free text is a first-class production input.** A typed natural-language reply must reach the
+   SAME durable question → answer → `shop_decision` → recomputation spine already built. Through
+   bounded Terra. **No Telegram-button-only dependency. No silently discarded text. No Larry relay.**
+2. **Coherent question surface.** Present the unresolved questions together; one card / one response
+   surface is acceptable. Deterministic candidate selection may remain where useful, **but the product
+   must not require answering only by callback button.** One typed reply may answer several questions
+   where Terra can ground the mapping safely.
+3. **Terra applies the prose rulebook.** Relevant household rules go to the reasoning consumer **as
+   prose**, and Terra applies the judgement. **⛔ Do NOT invent an ever-growing deterministic
+   mini-language for every human shopping judgement** — that is the explicit prohibition, and it is
+   the regrowth cap applied to this sub-phase.
+4. **Uncertainty is spoken, never guessed and never silently parked.** Warwick: *"it should tell me if
+   there is something it does not understand or is not clear!"* Applies to an unmappable reply
+   fragment and to an unclear or conflicting prose rule alike.
+5. **Traced to the real production caller.** Not "a model wired to a prompt". The standing rule binds:
+   **WHEN A MODULE LOOKS COMPLETE, FIND ITS PRODUCTION CALLER; WHEN A COMMENT SAYS THE LOOP CLOSES,
+   TRACE THE VALUE TO THE CONSUMER.**
+
+### What stays rigid — the deterministic floor, unchanged
+
+Terra reasons; it does not get new authority. **Grounded to real catalogue evidence · may NOT invent
+catalogue identities · explicit exclusions and hard prohibitions remain hard · durable human decisions
+remain immutable · no checkout or payment authority is widened.**
+
+### ♻️ REUSE, do not rebuild — Warwick's explicit instruction
+
+**The answer-to-plan spine, migration 017, `shop_decision`, truthful provenance, clarification rounds,
+the line-resolution gate and immutable decisions are useful infrastructure and are REUSED.** The
+correction is at the **human input / interpretation / policy application** layer. *"not an excuse to
+write a second shopping pipeline."*
+
+### Acceptance — by execution, and the last one is the sharpest
+
+- a typed reply enters production, is associated with the open question(s), and produces durable
+  `shop_decision` rows with truthful provenance;
+- recomputation consumes them and the current-week plan visibly changes;
+- an unclear fragment is surfaced back to Warwick as a real, answerable question;
+- **a previously dead `info` policy rule demonstrably changes a plan** — regression-tested. This is
+  the one that proves D3/D4 are actually fixed rather than described.
+
+### Boundaries
+
+- **Shop 7 stays honestly parked.** No manufactured progress, no database patching, no use of it as
+  fake acceptance evidence. Shop 6 remains prohibited.
+- **The governor / push-permission defect remains parallel housekeeping** and must not derail this.
+- Convergence through the existing BUILD-015 integration route.
+
 ### ⛔ HISTORICAL — how the choice was framed at rotation, 2026-08-08 ~23:50. Settled by the amendments above. Directs nothing.
 
 **Where the WP stands (everything below is banked and pushed on this branch):** source complete at
@@ -960,24 +1043,31 @@ exists.**
 1. **Recovered map** — `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` (this file).
 2. **Goal** — `BUILD-015-END-TO-END-RECOVERY`: photograph → ShopperBot → checkout-ready basket, every
    gap closed, integrated, run and proven, with Larry outside the weekly operating path.
-3. **Phase and gate** — **GROUNDED RECOGNITION, the prepared post-jump phase (§10), IN PROGRESS.**
-   The decision spine is merged to `main` (PRs #102, #103, #104) with Veritas Gate 1 **PASS** on the
-   WP-B15-2 boundary. **What is NOT done: migration 017 is unapplied, the runtime is stale, and the
-   live acceptance has never run.** The historical Gate 3 thread ended in a third HOLD whose receipt
-   is historical evidence — **enumerate `Assurance/` and read the newest receipt rather than naming a
-   head from here.** *(Re-cut 2026-08-09; it previously read "NOT STARTED, active only once the
-   BUILD-015 Build switch has completed" — the switch has completed and the phase has begun.
-   Re-cut 2026-08-08 before that; the text then said "phase 0, IN PROGRESS, Veritas Gate 3, two
-   receipts" — all three claims had gone stale.)*
-4. **Exact next action** — **§10 → the 2026-08-09 SECOND amendment (the sequencing correction).**
-   Its seven-step order is authoritative and the two earlier route statements in §10 are superseded
-   at their tails. ⚠️ **The single most important thing a fresh Larry can know: DO NOT restart the
-   AsdAIr runtime before migration 017 is applied.** The merged code reads `asdair.shop_decision`
-   during normal plan recomputation and that table does not yet exist on the household database.
-   ⚠️ **And do not say "only the fresh photograph remains"** — Warwick has explicitly forbidden that
-   claim until 017 is applied AND the restarted runtime is proven to carry the merged bytes.
-   *(Re-cut 2026-08-09; it previously pointed at §10's execution-based bootstrap, which was
-   discharged on 2026-08-09 and no longer names a live action.)*
+3. **Phase and gate** — **GROUNDED RECOGNITION (§10), IN PROGRESS, now executing SUB-PHASE B15-3.**
+   Decision spine merged to `main` (PRs #102, #103, #104), Veritas Gate 1 **PASS** on the WP-B15-2
+   boundary. **Migration 017 is APPLIED and V1–V7 verified. The runtime IS restarted on merged bytes.**
+   **What is NOT done: the merged decision path has still never executed, and the live acceptance
+   FAILED on the human-interaction layer** — see B15-3's four proven defects. The historical Gate 3
+   thread ended in a third HOLD whose receipt is historical evidence — **enumerate `Assurance/` and
+   read the newest receipt rather than naming a head from here.**
+   *(Re-cut 2026-08-09 (second time today): the earlier text said "migration 017 is unapplied, the
+   runtime is stale" — **both were made false within the hour** and are corrected here rather than
+   left standing under a later amendment. Re-cut earlier 2026-08-09 from "NOT STARTED"; re-cut
+   2026-08-08 from a "phase 0 / Gate 3 / two receipts" text whose three claims had all gone stale.)*
+4. **Exact next action** — **§10 → SUB-PHASE B15-3, "NATURAL ANSWERING AND AN EXECUTABLE RULEBOOK".**
+   ACTIVE, authorised with execution approval on 2026-08-09. ⚠️ **Do NOT bring Warwick another
+   Wayfinder or a design plan for it — his word was the approval to execute.**
+   *(Re-cut 2026-08-09 (third time today, and each re-cut is recorded rather than appended over):
+   it first pointed at §10's execution-based bootstrap — discharged; then at the migration/runtime
+   sequencing amendment — **also now discharged**: 017 IS applied and verified
+   ([[Deliverables/2026-08-09-migration-017-production-apply-evidence]]) and the runtime IS restarted
+   on merged bytes ([[Deliverables/2026-08-09-runtime-cutover-evidence]]). Both of that amendment's
+   warnings are spent and are NOT reinstated here.)*
+
+   ⚠️ **What a fresh Larry must NOT conclude:** that the fresh-photo acceptance is the remaining step.
+   **It ran on 2026-08-09 and it FAILED on the human-interaction layer, not the spine** — shop 7 exists
+   with all three lines transcribed and its image fingerprint bound, but a typed reply could not be
+   accepted at all. **The acceptance is blocked behind B15-3, not behind Warwick taking a photograph.**
 
 **Then verify by execution, not belief:**
 
