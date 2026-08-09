@@ -1112,7 +1112,7 @@ Restated here in numbered form so a gate can grade them separately:
 |---|---|---|---|
 | **1** | **Free text is a first-class production input** — a typed natural-language reply reaches the SAME durable question → answer → `shop_decision` → recomputation spine. No button-only dependency, no silently discarded text, no Larry relay. | Lane A, `a61fc44`. `answer_source='typed'`; unrecognised source **throws and writes nothing** | **The real production event has never run.** No live Telegram message has traversed it; **Terra's prompt has never met the model** |
 | **2** | **Coherent question surface** — unresolved questions presented together; one typed reply may answer several where the mapping can be grounded safely | Lane A. Terra called **once** with all open keys; two questions answered; two separate ledger commands | With exactly ONE open question, any answer-shaped message is claimed — so a genuine new list typed while a stale question is open would be read as an answer. **No list-shape heuristic was invented** |
-| **3** | **Terra applies the prose rulebook** — relevant household rules go to the reasoning consumer AS PROSE and Terra applies the judgement. ⛔ No ever-growing deterministic mini-language | ⛔ **NOT DELIVERED. `skill/rulebook.js` HAS ZERO PRODUCTION CALLERS** (Veritas D1, `318e0e3`). All five exports are reached only from `rulebook.test.js` and `ruleConsumption.test.js`. The module is written, tested — **and connected to nothing.** What IS true: the code exists, is well-tested, adds no directive type/grammar/registry/DSL, and the AC6 prohibition is pinned to a CHECK-constraint literal held outside it | **BLOCKING.** Corrective dispatch owed for the wiring, then ONE focused confirmation. **The price-at-plan-time limit below is real but SUBORDINATE** — it describes a module that does not run |
+| **3** | **Terra applies the prose rulebook** — relevant household rules go to the reasoning consumer AS PROSE and Terra applies the judgement. ⛔ No ever-growing deterministic mini-language | **CODE PATH NOW CLOSED.** Lane R1 built it (`466cba9`); **`WO-B15-R2` (`022c874`) WIRED it** — `planWithDecisions` (`runPipeline.js:132`) calls `applyRulebook` at `:164`, `deps.consult` bound in the real `createDeps()`, `decisionSpine.test.js`'s one-call-site constraint satisfied by wiring AROUND it. Pipeline **327 → 344**, all green, **independently re-measured by Larry**. Mutation both directions with sha256-verified restore. `skill/**` untouched — no finding against R1's interface *(supersedes the "ZERO PRODUCTION CALLERS" state Veritas found at `318e0e3`; D1 is answered, awaiting ONE focused confirmation)* | **🔴 NEW, HIGH — recomputation is no longer DETERMINISTIC.** See the block below. **Plus:** attribution never reaches the browser handoff; and the price-at-plan-time limit, real but subordinate |
 | **4** | **Uncertainty is spoken, never guessed and never silently parked** — applies to an unmappable reply fragment and to an unclear or conflicting prose rule alike | Lanes A and R1. Six executed uncertainty paths incl. unreachable consumer → flag on every affected line; **unparseable reply → error recorded, never read as approval** | — |
 | **5** | **Traced to the real production caller** — not "a model wired to a prompt" | Lane C, `8e625b4`: `buildHandoff`, the execution packet and `verifyBasket` now have production callers, proven reachable from the runtime entry, with `requestBrowserBuild` asserted OFF the path | **AC6(f) OPEN:** `openHandoff` writes `progress.handoff` while `runner.js reconstruct()` reads `progress.plan`, so **a CDP arm can still ignore the payload.** `browser-runner/progress.cjs` was outside every granted surface. Named, not hidden |
 
@@ -1155,6 +1155,183 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 >
 > **`b15-3/integration` has since been PUSHED to `origin`**, clearing the reviewer's second
 > independent HOLD cause (a head reachable from no ref).
+
+> ### 📌 WARWICK'S RULING — 2026-08-09, typed mid-turn, quoted. **His authority; no further approval round.**
+>
+> > *"Yes — take option (a). Register the Work Order readiness guard.*
+> >
+> > *Do NOT interrupt the current B15-3 convergence just to activate it. First let the integrated head
+> > finish green and bank the result. Then activate the registered hook at the next natural Claude Code
+> > restart/session rotation.*
+> >
+> > *This is an internal delegation-quality control, not a Warwick approval gate. It must never require
+> > me to click/approve routine dispatches.*
+> >
+> > *Make refusal diagnostic: tell you exactly which mandatory field(s) are absent or malformed so a
+> > legitimate order can be corrected immediately. Do not turn a false positive into an opaque dead end
+> > or another governance ceremony.*
+> >
+> > *The known holes and the measured 1/40 false positive go into the evidence/CAPA record; they do not
+> > block activation.*
+> >
+> > *Your own three failures today are sufficient evidence that advisory discipline is not working.*
+> >
+> > *On product work: continue exactly as you are. Lane A + Lane C convergence first. Prose-rule work is
+> > real progress: bank the fact that previously inert rules 31/36/37 now alter planning behaviour with
+> > attribution. Keep the limitation truthful: price-dependent rules are executable now but cannot make
+> > the final price-informed judgement until planning receives real price evidence. Resolve that through
+> > the existing browser/planning-price seam. Do not invent another architecture or Wayfinder. Do not
+> > call B15-3 live-complete until the integrated production journey proves typed text, Terra
+> > interpretation, prose-rule application, durable decision/recompute, and honest unresolved behaviour."*
+>
+> **LARRY'S RECORD, NOT WARWICK'S WORDS — and it qualifies one line of the above.** He directed that
+> the rules-31/36/37 progress be banked as fact. **At the moment he typed it, Veritas had just proven
+> those rules alter planning behaviour in the MODULE AND ITS TESTS ONLY** — `rulebook.js` had zero
+> production callers (D1). The progress is banked **with that scope stated**, which his own final
+> sentence independently requires: prose-rule application must be proven in the integrated production
+> journey before B15-3 is live-complete. **`WO-B15-R2` is the corrective that closes the code path.**
+> No conflict between the two instructions; the scope is the whole of the difference.
+>
+> **Consequences taken, in his order:**
+> 1. **`WO-B15-R2`** (`6cc713f`) — wire the rulebook into the production planning path. Dispatched.
+> 2. **`WO-4F-08b`** (`c1b0f1f`) — the guard must never emit a human-prompting decision, and must name
+>    the absent/malformed fields. Dispatched. **`.claude/settings.json` is outside the worker's
+>    surface: registration is Larry's, activation is Warwick's restart.**
+> 3. **Registration is DEFERRED until the integrated head is green and banked**, per his sequencing.
+>    **It is owed, not dropped.**
+> 4. The price limit is to be resolved **through the existing browser/planning-price seam** — ⛔ **no
+>    new architecture and no new Wayfinder.**
+
+> ### 🟢 PRODUCT DECISION — WARWICK, 2026-08-09. **BEST VALUE IS ARCHIVED. REMEMBER THE LAST CHOICE.**
+>
+> **His decision, quoted. Applies to the EXISTING BUILD-015 / B15-3 work — he ruled explicitly: no
+> new Wayfinder. "No further decision needed from me on this."**
+>
+> > *"I have changed my mind on the 'best value' rule. **ARCHIVE IT.**
+> >
+> > Do not make Terra, the planner, or the browser phase attempt to optimise Ariel/other choices by
+> > live price, price-per-wash, multibuy maths, or bargain judgement before handing the list to the
+> > browser.
+> >
+> > Replace it with a much simpler household rule: **WHEN THERE IS MORE THAN ONE VALID CHOICE,
+> > REMEMBER THE CHOICE I MADE LAST TIME.**
+> >
+> > - If several grounded catalogue candidates are genuinely acceptable and I choose one, persist that
+> >   choice as the household's most recent preference for that ambiguity.
+> > - On a subsequent shop, use that last choice so the list can resolve before browser execution
+> >   rather than asking me the same choice again.
+> > - This is an explicitly authorised standing preference/learning rule, not an accidental promotion
+> >   of an ordinary one-week answer.
+> > - It is a preference, not permission to invent products or ignore hard exclusions.
+> > - If the remembered product is unavailable or no longer a valid grounded candidate, behave
+> >   honestly rather than fabricating a match.
+> > - Keep normal immutable current-shop decisions and provenance intact.
+> >
+> > The objective is deliberately to SIMPLIFY the handoff: photo/list → AsdAIr resolves household
+> > intent → remembered choices remove repeat ambiguity → completed list handed to browser execution.
+> > Do not push bargain-shopping complexity into that path. …
+> >
+> > For now, Warwick remains the bargain hunter at the ASDA end. If he sees a better offer during
+> > final human review/checkout, he makes the judgement. That is intentional product scope: **AsdAIr
+> > should prepare the right shop reliably. It does not need to become a supermarket arbitrage desk.**
+> >
+> > Also: do not resurrect CDP price-shopping or Terra/browser back-and-forth to compensate for
+> > removing the value rule. Continue through the existing accepted browser contract."*
+>
+> **FUTURE RECONCILIATION ENHANCEMENT — his words, and he ruled it must NOT block B15-3 or the first
+> live photo:** *"During/after each real shop, capture observed prices for ALL accessible
+> Regulars/Favourites, not merely the products actually bought, and persist those observations in
+> Supabase with enough provenance/time information to know when they were observed. That gives us a
+> household price history which can later support useful pre-browser value suggestions from known
+> evidence — even if the latest observation is a week old. We can design that properly in the
+> reconciliation stage."* **Recorded here as the pointer; it is NOT designed and NOT started.**
+>
+> **LARRY'S RECORD, NOT WARWICK'S WORDS — what this makes false, and it is a lot:**
+>
+> - **Rule 31** (*"Ariel Pods: pick the BEST VALUE by price-per-wash"*) and **rule 36** (*"if a
+>   multibuy gives ≥50% off the EXTRA item(s), buy up to the offer quantity"*) are **ARCHIVED**. They
+>   were the two headline examples of the dead-59% argument and of D4 on this map.
+> - **Rule 37** (Sure pair rounding, *"any 2 for £X"*) is **multibuy-conditional and cannot be
+>   evaluated without offer evidence at plan time** — which is exactly what he removed. **Larry's
+>   reading: it is archived with 31 and 36.** Stated so he can overturn it; he ruled no further
+>   decision was needed, so it is not being sent back.
+> - **R1's AC3 is now testing archived behaviour.** Its three named cases were rules 31, 36 and 37,
+>   chosen at the time *because* they were the judgement layer. **Those tests must be re-cut, not
+>   deleted** — the rulebook's remaining job is real.
+> - **The price-at-plan-time residual is DISCHARGED, not outstanding.** It was the gate on rules
+>   31/36; with those archived it describes nothing. ⛔ **It must not be carried forward as an open
+>   limitation** — that would be a residual for work that no longer exists.
+> - **This SUPERSEDES the open determinism decision below.** A remembered choice is **durable data,
+>   not a fresh model judgement**, so the recomputation non-determinism it created is resolved by
+>   his answer rather than by choosing between the three options. The mechanism he has described **is
+>   option (a)** — persist the judgement — arrived at from the product end.
+> - **What the rulebook is still FOR:** carrying genuinely non-price household prose (rotation,
+>   out-of-stock meaning, exclusions, aliases) to the reasoning consumer. **The prohibition on
+>   growing a deterministic mini-language is unchanged and unaffected.**
+>
+> **The seam this lands on, established by execution and NOT to be rebuilt:** `asdair.rule_qa_log`
+> already carries `applies_going_forward` (`db/001:178`), which `planner.js` filters on — *"every
+> answer Warwick ever gave was written, read back, and discarded"* (`db/017` header). `db/017` also
+> fixes the boundary his last bullet protects: *"nothing here touches `asdair.rule_qa_log`,
+> `applies_going_forward`, or rule promotion. Current-shop meaning and future household learning are
+> different concerns and are stored apart."* **Silas is commissioned for the schema decision**
+> (`Deliverables/2026-08-09-silas-schema-decision-remembered-last-choice.md`), explicitly against the
+> 017 precedent that immutability is enforced by **absent grants**, not convention.
+
+> ### ⚫ SUPERSEDED — the determinism decision below is ANSWERED by the ruling above. Retained as record.
+>
+> **Do not action it as an open decision.** It was escalated (FusionDevBot 462) before Warwick's
+> ruling arrived; his "remember the last choice" mechanism is option (a) reached from the product end.
+> **The false comment at `runPipeline.js:1441` is still owed a correction**, and now the correction is
+> knowable rather than presumptuous.
+>
+> ### 🔴 OPEN PRODUCT DECISION — plan recomputation is no longer deterministic (`WO-B15-R2`, `022c874`)
+>
+> **~~Awaiting Warwick.~~ ANSWERED — see above.** Notified 2026-08-09 (FusionDevBot 462).
+>
+> **The fact, verified by Larry's own execution and not taken on the worker's word:**
+> `planWithDecisions` (`runPipeline.js:132`) now calls `applyRulebook` (`:164`), and
+> `stepRecordConfirmation` routes through it (`:1463`) — while the comment at **`:1441` still
+> asserts** *"planBasket is pure and deterministic, so given the same durable inputs it reproduces
+> the same plan — which is exactly what makes recomputation honest rather than a guess."* **That
+> claim is now FALSE.** The rulebook makes a fresh model call at **every** recomputation — measured
+> at **3 consults** on a full journey, **0** on a parked shop.
+>
+> **Consequence in product terms:** the basket handed to the browser and the plan later checked
+> against it **can legitimately disagree**, because the model was asked twice and may judge
+> differently. **That is the exact class of failure the decision spine was built to remove**, and it
+> can mean the trolley does not match what Warwick approved. It clears the HOBBY BRAIN bar — money
+> and the system's core function — which is why it was escalated rather than parked.
+>
+> **It is a consequence of R1's interface, not a defect in `rulebook.js`**, and it could not be
+> resolved inside R2's surface.
+>
+> | Option | What changes |
+> |---|---|
+> | **(a) PERSIST the judgement with the shop** — **Larry's recommendation** | Consult once, store the result, recomputation reuses it. **Restores determinism** and matches how `shop_decision` already works — a decision, once made, is durable. Cost: a judgement made on Monday's prices stands if the offer changes midweek. Needs a small persistence decision (Silas) |
+> | **(b) Re-judge every time** — current behaviour | Always latest evidence; handoff and verification can disagree; 3 model calls per journey |
+> | **(c) Consult only at planning, never on recomputation** | Cheapest; recomputation reuses stored plan lines |
+>
+> **⛔ The false comment at `runPipeline.js:1441` is NOT yet corrected** — the correction belongs with
+> whichever option is chosen, and writing a truthful comment now would presuppose the answer.
+> **Recorded so it is not mistaken for an oversight.**
+>
+> **Also from R2, recorded once, non-blocking:** (MEDIUM) rule attribution never reaches the browser
+> handoff — `packetLinesFromPlan` reads only `status` and `planned_qty`, so neither the durable row
+> nor a supervised runner can say **why** a quantity is 4. (MEDIUM) `decisionSpine.test.js:78` is
+> CRLF-broken — `fn.indexOf('\n}\n')` returns `-1`, verified by execution, so its **second**
+> assertion currently means "somewhere in `runPipeline.js`" rather than "inside `planWithDecisions`";
+> **the first assertion — exactly one call site — is unaffected and fully binding.** The identical
+> defect sits at `productionWiring.test.js:425`.
+>
+> ### 📌 GUARD REGISTRATION — a prerequisite neither Warwick nor Larry had stated
+>
+> Warwick's condition (*"first let the integrated head finish green and bank the result"*) **is now
+> met** — 344/344 pipeline, independently re-measured. **But the guard lives on
+> `build-020/wo-readiness-validator` and is NOT on `main`**, so registering it in
+> `.claude/settings.json` would point the host at a file the live checkout does not have. **That
+> branch must converge to `main` first.** Sequencing unchanged, one more step than either of us said.
+> `WO-4F-08b` still running.
 
 **⛔ THE BAR THIS PACKAGE HAS NOT MET.** Every requirement above is proven **OFFLINE ONLY** — no
 live Telegram message, no live ASDA session, no real shop, no database. Under § "Nothing may live
