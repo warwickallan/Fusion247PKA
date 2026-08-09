@@ -520,7 +520,15 @@ function assertMethodPayload(artefact) {
  */
 function assertSearchIsBounded(lines) {
   for (const line of lines) {
-    if (line.origin === 'known' && line.source_view === 'search' && line.retrieval === null) {
+    // SCOPED TO THE NO-REFERENCE CASE, DELIBERATELY. A known line that HAS a
+    // usable reference and was sent to search is a different regression with a
+    // different name - KNOWN_ITEM_SENT_TO_SEARCH owns it, and it fires first.
+    // Two guards refusing the same input would make each other's proof inert:
+    // remove either one and the other still refuses, so neither could be shown
+    // to be load-bearing. Single ownership per regression is what keeps a
+    // mutation proof meaningful.
+    if (line.origin === 'known' && line.source_view === 'search'
+        && !hasUsableRef(line) && line.retrieval === null) {
       throw new PacketContractError(
         'UNBOUNDED_SEARCH_FALLBACK',
         `lines[seq ${line.seq}]: a known item is routed to free search with no retrieval contract attached. `

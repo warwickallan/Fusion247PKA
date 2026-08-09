@@ -39,7 +39,7 @@
 // =====================================================================
 
 import * as commands from './commands.js';
-import { runPipeline } from './runPipeline.js';
+import { runPipeline, buildBrowserHandoff } from './runPipeline.js';
 import * as store from './store.js';
 import { intentToCommand } from './telegramAdapter.js';
 import { COMMANDS } from './commandNames.js';
@@ -52,6 +52,23 @@ import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
 import { normaliseStoredCandidates, questionLookupFrom } from '../bot/questionRender.js';
 import { resolveCandidateAnswer } from '../bot/resolveTap.js';
 import { ACTIONS } from '../bot/callbackProtocol.js';
+
+// THE RETURN LEG. `handoff/claim.js`, `handoff/completion.js` and
+// `reconcile/verifyBasket.js` are CommonJS, pure, and open no connection of
+// their own - claim.js takes an injected `query` exactly as this file's callers
+// do - so importing them statically preserves the property the dynamic
+// deps.js import above protects: this file stays importable with no `pg`.
+//
+// Before this, `verifyBasket` had zero production callers and `verificationFor`
+// was never supplied by anything, so every basket-ready handback rendered NOT
+// VERIFIED by omission. The card was not lying about a check that had run; it
+// was reporting the absence of one that had never been wired.
+import { createRequire } from 'node:module';
+
+const requireCjs = createRequire(import.meta.url);
+const { peekHandoff } = requireCjs('../handoff/claim.js');
+const { toVerifyBasketArgs } = requireCjs('../handoff/completion.js');
+const { verifyBasket } = requireCjs('../reconcile/verifyBasket.js');
 
 // deps.js is imported DYNAMICALLY, inside main() only. It binds the real
 // components, which transitively pull in `pg` - and the loop's library exports
@@ -772,6 +789,56 @@ function arg(name, fallback = null) {
   return v && !v.startsWith('--') ? v : true;
 }
 
+/**
+ * THE REAL BASKET VERIFICATION, FOR ONE SHOP.
+ *
+ * `queueShopCards` has always taken a `verificationFor` provider and always
+ * failed towards the alarming card when it was absent. Nothing ever supplied
+ * one, so `verification` was permanently null and every basket-ready handback
+ * rendered NOT VERIFIED by omission. That is the lie this closes - not a wrong
+ * check, an absent one reported as though the question had been asked.
+ *
+ * Returns a verifyBasket report, or NULL where there is genuinely nothing to
+ * verify against. Null is not a failure and must never be dressed up as one:
+ * `queueShopCards` renders it as a loud NOT VERIFIED with its own reason, which
+ * is the honest state of a shop whose worker has not reported back yet.
+ *
+ * WHAT IT COMPARES. `expected` is the packet rebuilt from durable state by the
+ * same function that produced the handoff - there is no plan table, and
+ * recomputation is this system's established way of having one truth rather
+ * than two that can drift. `actual` is the completion report the supervised
+ * worker recorded on the durable request (progress.report), converted through
+ * handoff/completion.js, which is the module that owns that shape.
+ */
+export function makeVerificationFor(deps, { log = () => {} } = {}) {
+  return async function verificationFor(shop) {
+    const rows = await peekHandoff(deps.readQuery, { shopId: shop.id });
+    const request = Array.isArray(rows) ? rows[0] : rows;      // most recent first
+    const progress = (request && request.progress) || null;
+    const report = progress && progress.report ? progress.report : null;
+
+    // No request, or a worker that has not reported: NOT a verified basket, and
+    // NOT an empty one either. Both are "no capture has been recorded", which is
+    // exactly what the card says.
+    if (!report) return null;
+
+    const { packet, handoff } = await buildBrowserHandoff(deps, shop);
+
+    // A report recorded against a DIFFERENT packet cannot be verified against
+    // this one. Saying so is the whole point: quietly comparing them would
+    // report a basket built from one list as reconciling against another.
+    const storedFingerprint = (progress.handoff && progress.handoff.packet_fingerprint) || null;
+    if (storedFingerprint && storedFingerprint !== handoff.packet_fingerprint) {
+      log('basket_verification_packet_changed', {
+        shop_ref: shop.shop_ref, stored: storedFingerprint, rebuilt: handoff.packet_fingerprint,
+      });
+      return null;
+    }
+
+    return verifyBasket(toVerifyBasketArgs(packet, handoff, report));
+  };
+}
+
 /** Build the real Telegram wiring from the environment. Names only - no value
  *  is read from a credentials file by this module. */
 async function realWiring(deps) {
@@ -797,6 +864,11 @@ async function realWiring(deps) {
   return {
     questions,
     householdId: Number(process.env.ASDAIR_HOUSEHOLD_ID || 1),
+
+    // THE PROVIDER THAT WAS NEVER THERE. queueShopCards reads
+    // `wiring.verificationFor`; until now nothing put one on this object, so
+    // the basket-ready card could only ever say NOT VERIFIED.
+    verificationFor: makeVerificationFor(deps),
     intake: {
       runIntake: intakeMod.runIntake,
       config,

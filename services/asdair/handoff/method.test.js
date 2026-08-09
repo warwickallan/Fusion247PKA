@@ -83,6 +83,89 @@ test('METHOD: every proven behaviour is present, in order, and none has been dro
   );
 });
 
+// ---------------------------------------------------------------------
+// THE PRODUCER REFUSES, RATHER THAN FLAGS.
+//
+// Warwick, 2026-08-09: "No browser execution path may be able to bypass that
+// contract simply because an agent did not read instructions.js." A handoff
+// that carried no method used to be perfectly well-formed - the payload was
+// present because the import happened to work, which is not an enforcement of
+// anything. These assert the refusal, by its named code.
+//
+// The two counts are written out HERE as literals, a THIRD independent place
+// after buildHandoff.js's own constants and the behaviour list above, so the
+// contract has to be broken in three files at once to go quiet.
+// ---------------------------------------------------------------------
+
+test('CONTRACT: the artefact handed to the worker carries all 18 steps and all 5 prohibitions', () => {
+  const handoff = buildHandoff(basePacket());
+  assert.equal(handoff.method.length, 18, 'the handoff is the thing that travels - the count that matters is on IT');
+  assert.equal(handoff.prohibited_actions.length, 5);
+  assert.equal(handoff.instructions_version, INSTRUCTIONS_VERSION);
+  for (const step of handoff.method) {
+    assert.ok(step.id && step.text, 'an entry present but empty keeps the count right while saying nothing');
+  }
+});
+
+test('CONTRACT: an artefact with NO method is refused by name, never flagged', () => {
+  const { _internal } = require('./buildHandoff');
+  const good = buildHandoff(basePacket());
+
+  const stripped = { ...good, method: [] };
+  assert.throws(() => _internal.assertMethodPayload(stripped), (err) => {
+    assert.equal(err.name, 'PacketContractError');
+    assert.equal(err.code, 'METHOD_PAYLOAD_MISSING', 'the refusal must be identifiable without string-matching prose');
+    return true;
+  }, 'a handoff carrying no operating contract must not be produced at all');
+
+  const partial = { ...good, method: good.method.slice(0, 3) };
+  assert.throws(() => _internal.assertMethodPayload(partial), (err) => {
+    assert.equal(err.code, 'METHOD_PAYLOAD_INCOMPLETE',
+      'v1 shipped THREE behaviours and nothing noticed. A partial method is the exact regression this catches.');
+    return true;
+  });
+
+  const noProhibitions = { ...good, prohibited_actions: good.prohibited_actions.slice(0, 4) };
+  assert.throws(() => _internal.assertMethodPayload(noProhibitions), (err) => {
+    assert.equal(err.code, 'PROHIBITED_ACTIONS_INCOMPLETE',
+      'an artefact missing a prohibition reads as permissive about something that must never happen');
+    return true;
+  });
+
+  const noVersion = { ...good, instructions_version: null };
+  assert.throws(() => _internal.assertMethodPayload(noVersion), (err) => {
+    assert.equal(err.code, 'INSTRUCTIONS_VERSION_MISSING');
+    return true;
+  });
+
+  const hollow = { ...good, method: good.method.map((m, i) => (i === 0 ? { id: m.id, text: '' } : m)) };
+  assert.throws(() => _internal.assertMethodPayload(hollow), (err) => {
+    assert.equal(err.code, 'METHOD_ENTRY_EMPTY');
+    return true;
+  });
+});
+
+test('CONTRACT: search stays a BOUNDED fallback - an unbounded known-item search is refused', () => {
+  const { _internal } = require('./buildHandoff');
+  // A known item with no reference on file: legal to retrieve by search, but
+  // only carrying the verify-before-add and stop-if-ambiguous duties.
+  const unbounded = [{
+    seq: 1, origin: 'known', source_view: 'search',
+    asda_product_ref: null, asda_url: null, retrieval: null,
+    canonical_product_name: 'Oat Crunch',
+  }];
+  assert.throws(() => _internal.assertSearchIsBounded(unbounded), (err) => {
+    assert.equal(err.code, 'UNBOUNDED_SEARCH_FALLBACK',
+      'per-item free search with no duties attached is the slow, wrong shop - it must be refused, not shipped');
+    return true;
+  });
+
+  // The same line WITH its duties is fine, which is what makes the guard about
+  // boundedness rather than about search itself.
+  const bounded = [{ ...unbounded[0], retrieval: { required: true, contract: RETRIEVAL_CONTRACT } }];
+  assert.doesNotThrow(() => _internal.assertSearchIsBounded(bounded));
+});
+
 test('METHOD: v1 carried three of these. The version must have moved', () => {
   assert.ok(INSTRUCTIONS_VERSION >= 2,
     'the method changed materially, so INSTRUCTIONS_VERSION must move - it is what ties a completion report to the wording that was in force');

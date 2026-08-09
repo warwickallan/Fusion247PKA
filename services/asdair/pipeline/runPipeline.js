@@ -1134,7 +1134,7 @@ async function stepApplyCorrections(deps, snapshot) {
  * are the SAME sequence. That is what makes a single top-to-bottom pass
  * possible instead of a search per line.
  */
-function packetLinesFromPlan(planItems, regulars) {
+function packetLinesFromPlan(planItems, regulars, unusableRefs = []) {
   const byName = new Map();
   for (const r of Array.isArray(regulars) ? regulars : []) {
     const key = normaliseTerm(r && r.name);
@@ -1148,23 +1148,49 @@ function packetLinesFromPlan(planItems, regulars) {
       shop_line_no: shopLineNo, original_list_line: original, hold: { reason, detail: detail || null },
     });
 
+    // `hold.reason` is a CLOSED vocabulary owned by the packet contract, so the
+    // reason is MAPPED onto it rather than extended - a private reason string
+    // here would be refused by the producer, and rightly: the reasons are what
+    // the cockpit and the reconciler branch on. The specifics never go missing;
+    // they travel in `detail`.
     if (item.status !== 'add') {
-      return hold('not_planned_for_this_shop', `the planner left this line as "${item.status}"`);
+      const excluded = item.status === 'excluded' || item.status === 'excluded_this_week';
+      return hold(excluded ? 'excluded_by_rule' : 'awaiting_decision',
+        `the planner left this line as "${item.status}"`);
     }
 
     const regular = byName.get(normaliseTerm(item.matched_product));
     if (!regular) {
-      return hold('identity_not_in_catalogue',
+      return hold('ambiguous',
         `the plan names "${item.matched_product}" but no regulars row carries that name, so this line has no `
         + 'durable identity to shop against. Held rather than free-searched on a guess.');
     }
 
     const qty = Number.isInteger(item.planned_qty) ? item.planned_qty : null;
     if (qty === null || qty < 1 || qty > 99) {
-      return hold('quantity_not_established', 'a quantity is never invented - see the packet contract');
+      return hold('awaiting_decision', 'a quantity is never invented - see the packet contract');
     }
 
-    const ref = regular.asda_product_id == null ? null : String(regular.asda_product_id);
+    // A REFERENCE WE CANNOT USE IS, OPERATIONALLY, A REFERENCE WE DO NOT HAVE.
+    //
+    // `asdair.regulars.asda_product_id` is a free-text column (migration 004);
+    // an ASDA reference is 3-12 digits. A value that is neither - a typo, or a
+    // placeholder from before the packet contract existed - cannot be used to
+    // add the product.
+    //
+    // Ruling 2 governs what happens next, and it is explicit: "if we HAVE a
+    // usable reference, use it... If we do NOT have one, retrieval by search is
+    // permitted", travelling with the verify-before-add and stop-if-ambiguous
+    // duties. So the line is SHOPPED, by bounded retrieval against the identity
+    // we do hold - not held. Holding it would mean the household does not get
+    // its groceries because of a typo in a reference column, which is a worse
+    // outcome than looking the product up and verifying it before adding.
+    //
+    // It is not swallowed either: `unusable_references` is counted and reported
+    // on the step, so the data defect is visible without costing the shop.
+    const rawRef = regular.asda_product_id == null ? null : String(regular.asda_product_id);
+    const ref = rawRef !== null && /^[0-9]{3,12}$/.test(rawRef) ? rawRef : null;
+    if (rawRef !== null && ref === null) unusableRefs.push(String(regular.name));
     return {
       shop_line_no: shopLineNo,
       original_list_line: original,
@@ -1214,11 +1240,14 @@ function packetLinesFromPlan(planItems, regulars) {
  * arm, not yet the accepted method". A durable request carrying the contract
  * serves either, and this step does not have to choose between them.
  */
-async function stepQueueBrowserBuild(deps, snapshot, command) {
-  const shop = snapshot.shop;
-
+export async function buildBrowserHandoff(deps, shop) {
   // The plan is recomputed here through the ONE function that applies Warwick's
   // decisions - never `deps.planBasket` directly. See planWithDecisions.
+  //
+  // RECOMPUTED, not stored, for the reason stated at the top of this file:
+  // there is no plan table, and every site that needs a plan derives it from
+  // the same durable inputs. That is what lets the return leg rebuild exactly
+  // what was handed over without a second copy of the truth to keep in step.
   const catalogue = assertCatalogueLoaded(await deps.loadCatalogue(shop.household_id), 'browser handoff');
   const listItems = await store.listListItems(deps, shop.list_id);
   const inputs = await deps.loadPlanningInputs(shop.household_id);
@@ -1228,11 +1257,12 @@ async function stepQueueBrowserBuild(deps, snapshot, command) {
   // rather than from today: a retry must produce the same packet as the run it
   // is retrying. `updated_at` is the durable record of when this shop last
   // moved, which is exactly when its packet was prepared.
+  const unusableRefs = [];
   const packet = buildExecutionPacket({
     shop_ref: shop.shop_ref,
     generated_at: shop.updated_at || shop.created_at,
     household_id: shop.household_id == null ? undefined : Number(shop.household_id),
-    lines: packetLinesFromPlan(plan.items, inputs.regulars),
+    lines: packetLinesFromPlan(plan.items, inputs.regulars, unusableRefs),
   });
 
   // THE REFUSAL THAT MAKES THE CONTRACT REAL. buildHandoff throws
@@ -1245,6 +1275,12 @@ async function stepQueueBrowserBuild(deps, snapshot, command) {
   // rules are a separate lane, and passing rows this step has no contract for
   // would be inventing guidance.
   const handoff = buildHandoff(packet, { operatingRules: [] });
+  return { packet, handoff, unusableRefs };
+}
+
+async function stepQueueBrowserBuild(deps, snapshot, command) {
+  const shop = snapshot.shop;
+  const { handoff, unusableRefs } = await buildBrowserHandoff(deps, shop);
 
   const opened = await openHandoff(deps.writeQuery, {
     shopId: shop.id,
@@ -1274,6 +1310,11 @@ async function stepQueueBrowserBuild(deps, snapshot, command) {
     prohibited_actions: handoff.prohibited_actions.length,
     packet_lines: handoff.lines.length,
     held_lines: handoff.held.length,
+    // Named, not swallowed: catalogue rows whose asda_product_id is not a usable
+    // ASDA reference. Those lines are still shopped, by bounded retrieval - this
+    // is how the data defect stays visible without costing Warwick the item.
+    unusable_references: unusableRefs.length,
+    unusable_reference_products: unusableRefs,
     command,
   };
 }
