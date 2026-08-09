@@ -520,6 +520,48 @@ async function stepPlan(deps, snapshot) {
     unresolvedLines: unresolved.length,
   });
 
+  // ── THE LINE-RESOLUTION PARK MUST SPEAK (WP-B15-2, Veritas D-2) ──────────
+  // A park that tells nobody is the defect this build keeps re-creating. The
+  // gate above makes READY_TO_SHOP unreachable while a line is undecided -
+  // which is correct - and shipping it WITHOUT this card would have re-created
+  // shop 6's exact live shape: a shop stopped indefinitely, no event, no
+  // message, nothing telling Warwick it was waiting on him. That is the
+  // sibling of the very park WP-B15-1 was commissioned to fix, and root
+  // CLAUDE.md is unambiguous: "failure must never be silent."
+  //
+  // Found by Veritas, not by me and not by the external reviewer.
+  //
+  // Same self-healing shape as the confirmation card below, deliberately
+  // reused rather than reinvented: guarded by outboxEverQueued over the FULL
+  // outbox history so it is queued AT MOST ONCE per shop ever, and a shop
+  // ALREADY parked here before this code shipped gets its card on the very
+  // next pass, because every pass over a parked PROCESSING shop re-runs this
+  // step. No manual insert, no restart of durable state.
+  //
+  // Built from durable reads only, so it renders the same facts however many
+  // passes later it is sent. The item names come from the unresolved set the
+  // gate itself computed - the card cannot disagree with the reason the shop
+  // is parked, because they are the same data.
+  if (gate.step === STEPS.AWAIT_LINE_RESOLUTION
+    && !(await store.outboxEverQueued(deps, shop.id, 'lines_unresolved'))) {
+    await store.enqueueMessage(deps, {
+      householdId: shop.household_id,
+      shopId: shop.id,
+      kind: 'lines_unresolved',
+      key: outboxKeyFor(shop.shop_ref, 'lines_unresolved'),
+      payload: {
+        shopRef: shop.shop_ref,
+        // What is actually stuck, by name, so the card is actionable rather
+        // than an apology. Capped: a card is a message, not a report.
+        items: unresolved.slice(0, 10).map((u) => u.item_name),
+        unresolvedCount: unresolved.length,
+        // Why each one is stuck, which is the difference between "I never got
+        // an answer" and "I could not understand the answer you gave".
+        awaitingClarification: unresolved.filter((u) => u.needs_clarification_round === true).length,
+      },
+    });
+  }
+
   if (gate.to === null) {
     // Legally parked: the list needed review and nobody has confirmed it.
     //

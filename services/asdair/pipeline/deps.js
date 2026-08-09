@@ -46,6 +46,28 @@ const { buildPayload } = require('../reconcile/record-confirmation.js');
 const { recordConfirmation } = require('../reconcile/recordConfirmation.js');
 const { updateRegulars } = require('../outcome/updateRegulars.js');
 
+/**
+ * The decision vocabulary, imported from the module that owns it rather than
+ * retyped, so the interpreter cannot drift from migration 017's CHECK.
+ */
+const { DECISION_KINDS } = require('./shopDecisions.js');
+
+/**
+ * What is recorded in shop_decision.interpreted_model.
+ *
+ * HONEST ABOUT WHICH ROLE ANSWERS. The estate's text roles are exported from
+ * obsidiwikai as `reason` and `vision` only; there is no exported `query`
+ * role, and `services/obsidiwikai/**` is outside this Work Package's surface,
+ * so no export was added. The role that answers is therefore `reason`, whose
+ * gateway alias is FUSION_MODEL_REASON (default `fusion.reason`) - NOT
+ * necessarily `gpt-5.6-terra`, which is the `query` role's alias.
+ *
+ * Recording the ROLE and its alias rather than a model name we did not choose
+ * means the decision row says what actually answered. Binding the query role
+ * properly needs an export in obsidiwikai and is REPORTED, not done here.
+ */
+const ANSWER_MODEL_LABEL = `fusion-gateway:reason:${process.env.FUSION_MODEL_REASON || 'fusion.reason'}`;
+
 // NOTE ON WHAT IS *NOT* IMPORTED HERE, AND WHY:
 //   interpret/interpret-list.js, outcome/record-shop.js and shop/shop-cli.js
 //   all call main() at module scope - they are CLIs, not libraries, and
@@ -333,6 +355,149 @@ async function realRecordLearning({ shop, deps }) {
  * is indistinguishable from the bug, and would be discovered next Sunday when
  * Warwick is asked the same question again.
  */
+/**
+ * INTERPRET ONE FREE-TEXT ANSWER, BOUNDED AND GROUNDED (WP-B15-2).
+ *
+ * The other half of the outcome sentence. A tap resolves deterministically and
+ * spends nothing; only free text reaches here, and only ever ONE answer at a
+ * time. Reached through the same gateway route the photo interpreter uses -
+ * FUSION_GATEWAY_URL via obsidiwikai - so there is no second credential path
+ * and no configuration this file owns.
+ *
+ * ── WHAT IT IS GIVEN, AND WHAT IT IS NOT ────────────────────────────────────
+ * Exactly the packet runPipeline's buildAnswerGrounding assembled: the
+ * original photographed/list wording, the exact question, Warwick's exact
+ * answer, the candidates that were offered, the catalogue identities in play,
+ * and the applicable household rules. It is not given the shop, the database,
+ * the other lines, or anything it could use to decide something it was not
+ * asked about.
+ *
+ * ── IT MAY ONLY NAME A PRODUCT IT WAS SHOWN, AND THE PROMPT IS NOT THE
+ *    ENFORCEMENT ─────────────────────────────────────────────────────────────
+ * The prompt says so, and the prompt is the weakest of the three guards. The
+ * real ones are downstream and do not depend on the model cooperating:
+ * `buildDecision` refuses a shape that decides nothing while claiming to, and
+ * `shop_decision.decided_regular_id` is a genuine FOREIGN KEY to
+ * asdair.regulars - so an invented product is refused by the DATABASE. That is
+ * why the id set is also filtered here before the row is built: three guards,
+ * none of them trusting the model's good intentions.
+ *
+ * ── UNKNOWN MEANS ASK AGAIN ─────────────────────────────────────────────────
+ * There is no least-bad match anywhere on this path. Anything the model cannot
+ * settle - an unparseable return, a kind outside the vocabulary, an id it was
+ * never shown - becomes `clarification_required`, which opens a real follow-up
+ * question rather than putting a guess in the basket. A failure to interpret
+ * degrades to another human question; it never degrades to a wrong product.
+ */
+async function realInterpretAnswer(grounding) {
+  const { reason, gatewayConfigured } = await import('../../obsidiwikai/src/core/models.mjs');
+  const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
+
+  // UNKNOWN MEANS ASK AGAIN. Every degraded path below lands on this.
+  const unreadable = (why) => ({
+    decision_kind: 'clarification_required', clarification_reason: why,
+    decided_regular_id: null, decided_quantity: null, decided_item_name: null,
+    forward_intent: null, model: ANSWER_MODEL_LABEL,
+  });
+
+  // ── NO GATEWAY MEANS NO INTERPRETATION, DELIBERATELY ──────────────────────
+  // `reason()` falls back to the box (LightRAG) when FUSION_GATEWAY_URL is
+  // unset. That fallback is right for a canonicaliser tie-break and wrong
+  // here: it would silently substitute a different model for a decision that
+  // changes what Warwick is actually sent this week, and he would have no way
+  // to know which model answered. The same argument `vision()` makes for
+  // refusing to fall back applies, one step weaker - so this asks for a
+  // clarification instead of quietly accepting a substitute.
+  //
+  // This is SAFE TO DO now and would not have been before: the park is no
+  // longer silent, so a shop that cannot interpret says so on Telegram.
+  if (!gatewayConfigured) {
+    return unreadable('no model gateway is configured, so this answer could not be interpreted');
+  }
+
+  // The ONLY ids the model is permitted to assert, taken from the evidence it
+  // is actually given. Anything outside this set is treated as not understood.
+  const offered = Array.isArray(grounding.candidates) ? grounding.candidates : [];
+  const allowedIds = new Set(
+    offered.map((c) => (c && c.regular_id !== undefined && c.regular_id !== null ? Number(c.regular_id) : null))
+      .filter((v) => v !== null),
+  );
+  for (const r of (Array.isArray(grounding.regulars) ? grounding.regulars : [])) {
+    if (r && r.id !== undefined && r.id !== null) allowedIds.add(Number(r.id));
+  }
+
+  const catalogue = [...allowedIds].map((id) => {
+    const fromCandidates = offered.find((c) => c && Number(c.regular_id) === id);
+    const fromRegulars = (grounding.regulars || []).find((r) => r && Number(r.id) === id);
+    return { regular_id: id, name: (fromCandidates && fromCandidates.label) || (fromRegulars && fromRegulars.name) || null };
+  });
+
+  const prompt = [
+    'You are interpreting ONE answer a person gave about ONE line of this week\'s shopping list.',
+    'Return ONLY valid JSON. No prose, no markdown, no code fences.',
+    '',
+    `The line as originally written: ${JSON.stringify(grounding.original_wording)}`,
+    `The question they were asked: ${JSON.stringify(grounding.question_text)}`,
+    `Their exact answer: ${JSON.stringify(grounding.answer_text)}`,
+    '',
+    'The ONLY products you may name, with the id you must use for each:',
+    JSON.stringify(catalogue),
+    '',
+    'Household rules that apply:',
+    JSON.stringify((grounding.rules || []).map((r) => (r && r.text) || (r && r.rule) || r)),
+    '',
+    'Return this shape:',
+    '{"decision_kind":"existing_regular|quantity_change|variant_choice|new_item|skip_this_week|clarification_required",',
+    ' "decided_regular_id": <id from the list above, or null>,',
+    ' "decided_quantity": <integer 1-999, or null>,',
+    ' "decided_item_name": <string, ONLY for new_item, else null>,',
+    ' "clarification_reason": <string, ONLY for clarification_required, else null>,',
+    ' "forward_intent": "yes"|"no"|"unclear"|null}',
+    '',
+    'RULES:',
+    '- You may ONLY use a regular_id from the list above. Never invent one.',
+    '- If you cannot tell which product they mean, return clarification_required',
+    '  with a short reason. NEVER pick the closest match.',
+    '- forward_intent records whether they also said to do this every week from',
+    '  now on. null means they said nothing about it; "unclear" means they did',
+    '  and you could not read it.',
+  ].join('\n');
+
+  // A single strict-JSON retry, and no more. That is a formatting repair, not
+  // a second opinion - the same rule realInterpretPhoto follows.
+  let parsed = await extractJson(await reason(prompt));
+  if (!parsed || typeof parsed !== 'object' || typeof parsed.decision_kind !== 'string') {
+    parsed = await extractJson(await reason(
+      `${prompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`,
+    ));
+  }
+
+  if (!parsed || typeof parsed !== 'object' || typeof parsed.decision_kind !== 'string') {
+    return unreadable('the interpreter did not return a usable structured answer');
+  }
+  if (!DECISION_KINDS.includes(parsed.decision_kind)) {
+    return unreadable(`the interpreter returned an unknown decision kind (${String(parsed.decision_kind).slice(0, 40)})`);
+  }
+
+  const id = parsed.decided_regular_id === null || parsed.decided_regular_id === undefined
+    ? null : Number(parsed.decided_regular_id);
+  // THE GROUNDING CHECK. An id it was never shown is not a product we stock as
+  // far as this answer is concerned - so it is not understood, not corrected.
+  if (id !== null && !allowedIds.has(id)) {
+    return unreadable('the interpreter named a product it was not shown');
+  }
+
+  return {
+    decision_kind: parsed.decision_kind,
+    decided_regular_id: id,
+    decided_quantity: parsed.decided_quantity ?? null,
+    decided_item_name: parsed.decided_item_name ?? null,
+    clarification_reason: parsed.clarification_reason ?? null,
+    forward_intent: parsed.forward_intent ?? null,
+    model: ANSWER_MODEL_LABEL,
+  };
+}
+
 async function realRecordAnswerLearning(answer) {
   const { recordAnswerLearning } = require('../outcome/recordAnswerLearning.js');
   const client = await getWritePool().connect();
@@ -387,6 +552,12 @@ export function createDeps(overrides = {}) {
     // planning
     planBasket,
     loadPlanningInputs: realLoadPlanningInputs,
+
+    // the answer -> current-shop decision seam (WP-B15-2).
+    // A tap never reaches this; only free text does. Without this binding a
+    // button resolves in production and free text CANNOT, which is half the
+    // outcome this Work Package exists to deliver (Veritas D-1).
+    interpretAnswer: realInterpretAnswer,
 
     // confirmation + learning
     buildConfirmationPayload: buildPayload,

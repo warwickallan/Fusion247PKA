@@ -201,6 +201,81 @@ test('AC2 JOURNEY: a button naming an exact candidate spends NO model call', asy
   assert.equal(Number(h.db.shop_decision[0].decided_regular_id), Number(withId.regular_id));
 });
 
+// =====================================================================
+// D-2 - THE PARK SPEAKS
+// =====================================================================
+
+test('D-2 JOURNEY: a shop parked on an unresolved line QUEUES a card, once and only once', async () => {
+  // Without this the gate simply stops the shop forever with nothing telling
+  // Warwick - shop 6's live shape, re-created by this WP's own gate.
+  const h = makeHarness();
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'no idea', answerSource: 'typed',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  const plan = await runPipeline(HANDLE, h.deps);
+  assert.equal(plan.step, STEPS.AWAIT_LINE_RESOLUTION, 'this test must actually reach the park');
+
+  const carded = () => h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'lines_unresolved');
+  assert.equal(carded().length, 1, 'the park queued no card - the shop stopped and nobody was told');
+  assert.equal(carded()[0].args.unresolvedCount, 1);
+  assert.deepEqual(carded()[0].args.items, ['fruit splits'], 'the card must name what is stuck');
+
+  // AT MOST ONCE PER SHOP, EVER. Ten more passes must not queue ten more cards.
+  for (let i = 0; i < 10; i += 1) await runPipeline(HANDLE, h.deps);
+  assert.equal(carded().length, 1,
+    'the park re-queued its card - a stuck shop would spam Warwick on every pass');
+});
+
+test('D-2 JOURNEY: the card is SELF-HEALING for a shop already parked before it existed', async () => {
+  // The property that recovered shop 6 live on 2026-08-09: a shop already
+  // sitting in the park gets its card on the very next pass, with no manual
+  // insert and no restart of durable state.
+  const h = makeHarness();
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'no idea', answerSource: 'typed',
+  }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  const carded = () => h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'lines_unresolved');
+  assert.equal(carded().length, 1);
+
+  // The pre-existing shop: parked, but never carded, because the code did not
+  // exist when it parked.
+  const before = h.db.pipeline_command.length;
+  h.db.pipeline_command = h.db.pipeline_command.filter(
+    (c) => !(c.kind === 'outbox' && c.command === 'lines_unresolved'),
+  );
+  assert.equal(h.db.pipeline_command.length, before - 1, 'the fixture must actually remove the card');
+
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(carded().length, 1,
+    'a shop already parked before this code shipped is never told it is stuck');
+});
+
+test('D-2 JOURNEY: a shop that is NOT parked on lines queues no such card', async () => {
+  // The gate must not narrate at shops that are fine.
+  const h = makeHarness({
+    depsOverride: {
+      interpretAnswer: makeInterpreter({ decision_kind: 'existing_regular', decided_regular_id: 11 }),
+    },
+  });
+  const key = await toFirstQuestion(h);
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: key, answerText: 'the fruity ones', answerSource: 'typed',
+  }, h.deps);
+  await drain(h);
+
+  assert.equal(shopStatus(h), 'READY_TO_SHOP');
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'lines_unresolved').length, 0,
+    'a healthy shop must not be told it is stuck',
+  );
+});
+
 test('a runtime with NO interpreter wired does not guess - the line stays unresolved', async () => {
   // The honest failure mode. Nothing is invented, the shop does not become
   // ready, and the state is visible and recoverable on the next pass.
