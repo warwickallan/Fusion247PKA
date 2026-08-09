@@ -153,6 +153,11 @@ So:
 **Do not read `summary.advisories` as "the multibuy rule works".** It does not.
 It means the rule finally reaches a human instead of being thrown away.
 
+> **This table is the WO-Y record and is left as written.** Rules 36 and 37 were
+> **archived by Warwick on 2026-08-09** -- see *"The best-value judgement is
+> ARCHIVED"* below. The verdicts above describe why they could never be
+> executed here; they are no longer wanted here either.
+
 ### `rulebook.js` -- the prose rulebook, and the rules that finally ACT (B15-3, lane R1)
 
 The section above ends at *"the rule finally reaches a human instead of being
@@ -213,12 +218,6 @@ answer, or the change does not happen.
 
 **What this does NOT yet do, stated plainly:**
 
-- **Prices.** Rules 31 and 36 are conditional on price and offer data. Neither
-  `products` nor `regulars` carries a price column, so on the live corpus today
-  those rules will mostly produce a **reasoned question** rather than a pick --
-  which is still a large improvement on silence, and is proved by a test rather
-  than assumed. A priced candidate list makes them decide; nothing here fakes a
-  price.
 - **Category-targeted rules** are carried at basket scope with their category
   stated in the prose, because `planBasket`'s public item shape carries no
   category. Declared over-inclusion, not a silent omission.
@@ -230,6 +229,63 @@ answer, or the change does not happen.
   real shop has ever exercised it**. Tests use a stand-in consumer; that proves
   the path carries, applies and refuses -- it proves nothing about how well a
   model judges.
+
+### The best-value judgement is ARCHIVED (Warwick, 2026-08-09)
+
+Warwick changed his mind and **removed** the bargain-hunting half of the
+rulebook. His words are the specification:
+
+> *"Do not make Terra, the planner, or the browser phase attempt to optimise
+> Ariel/other choices by live price, price-per-wash, multibuy maths, or bargain
+> judgement before handing the list to the browser. ... The objective is
+> deliberately to SIMPLIFY the handoff. ... For now, Warwick remains the bargain
+> hunter at the ASDA end. **AsdAIr should prepare the right shop reliably. It
+> does not need to become a supermarket arbitrage desk.**"*
+
+What that means concretely, and all of it is enforced by `rulebook.test.js`:
+
+- **No money leaves this module.** `buildRulebookGrounding` maps a line's
+  `alternatives` to **names only**; the planner's `price` field is dropped and
+  never forwarded. `renderLines` prints no figure, no currency and no
+  `(price unknown)` -- saying a price is unknown is still an invitation to shop
+  on it.
+- **The prompt does not invite a value judgement.** It states plainly that the
+  consumer is shown no money, must not ask for or estimate any, and should
+  `ask` where a rule can only be settled by comparing what things cost.
+- **Nothing is left behind a flag.** A dormant price path is exactly what was
+  removed; re-introducing one is a code change that the control below fails.
+- **The rules themselves are archived as DATA**, in `asdair.rules`, by Warwick.
+  This module hard-codes no rule id, so archiving a rule is never a code change
+  here. The rows affected are the best-value-per-wash rule, the multibuy
+  "buy up to the offer quantity" rule (36), and the `any 2 for GBP X` pair
+  rounding rule (37).
+- **Out of scope of the removal:** `planBasket`'s budget estimate
+  (`estimated_total` / `budget_flag`, standing rule 7) and `rankAlternatives`'
+  price-proximity *similarity* score are planner behaviour, not a bargain
+  judgement, and are untouched. The rulebook still nulls a basket estimate its
+  own quantity change has invalidated.
+
+#### The prohibition control, and where its vocabulary is pinned
+
+`rulebook.test.js` scans `rulebook.js` -- comments stripped, split on
+`/\r?\n/` because these files are CRLF -- for the vocabulary below, and reads
+**this list, from this file**, so that widening the module can never widen its
+own check. Editing the list here is a visible, reviewable act.
+
+<!-- ARCHIVED-PRICE-VOCABULARY: read by rulebook.test.js. One backticked token per list line. -->
+
+- `price`
+- `per wash`
+- `multibuy`
+- `cheapest`
+- `best value`
+
+<!-- /ARCHIVED-PRICE-VOCABULARY -->
+
+The source scan is the weaker half and it is stated as such: the load-bearing
+control is behavioural -- a **priced** catalogue is planned, and the assembled
+packet and the rendered prompt are asserted to contain no money at all. Both
+halves are mutation-proved in the return for WO-2026-08-09-07.
 
 ### Prior answers: `asdair.rule_qa_log` is a planning input (WO-Y)
 

@@ -1438,9 +1438,33 @@ async function stepPauseBuild(deps, snapshot, to) {
  *
  * The plan is RECOMPUTED here rather than read from a plan table, because there
  * is no plan table and inventing one would mean a migration in a folder this
- * work package must not touch. planBasket is pure and deterministic, so given
- * the same durable inputs it reproduces the same plan - which is exactly what
- * makes recomputation honest rather than a guess.
+ * work package must not touch.
+ *
+ * ── RECOMPUTATION IS NOT DETERMINISTIC ANY MORE, AND THIS SAYS SO ───────────
+ * This comment used to read "planBasket is pure and deterministic, so given the
+ * same durable inputs it reproduces the same plan - which is exactly what makes
+ * recomputation honest rather than a guess." The first clause is still true and
+ * the conclusion is NOT. Since WP-B15-3 wired the prose rulebook, every plan on
+ * this path is built by `planWithDecisions`, which CONSULTS A MODEL at every
+ * recomputation (measured: 3 consults on a full journey). `planBasket` is pure;
+ * the plan this function reconciles against is not, and two recomputations from
+ * identical durable inputs may legitimately differ wherever a household prose
+ * rule applies.
+ *
+ * What makes recomputation honest today is narrower, and worth having exactly
+ * right:
+ *   * the DETERMINISTIC layer is reproducible - identity, exclusion, mapping,
+ *     quantities and the status chain come from `planBasket` alone;
+ *   * WARWICK'S ANSWERS are applied last and always win, so nothing a model
+ *     says can displace a decision already on record;
+ *   * where the judgement layer cannot be applied confidently it produces a
+ *     QUESTION or a visible flag, never a silent substitution - so a divergence
+ *     between two recomputations is something a person can see and answer.
+ *
+ * That is a weaker guarantee than the old sentence claimed, and writing the
+ * weaker one down is the point. Making a judged choice durable so a later
+ * recomputation REPRODUCES it rather than re-deciding it is separate work; it
+ * is deliberately not anticipated, stubbed or hooked for here.
  *
  * ── AND THAT IS EXACTLY WHY DECISIONS MUST BE APPLIED HERE TOO (WP-B15-2) ───
  * "Deterministic given the same durable inputs" is only true if the DECISIONS

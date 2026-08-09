@@ -1,23 +1,51 @@
 // =====================================================================
-// BUILD-015 AsdAIr - B15-3 lane R1: rulebook.js
+// BUILD-015 AsdAIr - B15-3: rulebook.js
 //
-// THE DEAD 59%, MADE LIVE.
+// THE DEAD 59%, MADE LIVE - AND THEN DELIBERATELY NARROWED.
 //
 // `actionableRules()` (planner.js) drops every `info` row and every row with no
 // match_term / match_category. On the live corpus that is 23 of 39 active rules
 // and it is NOT a random subset: it is precisely the JUDGEMENT layer. What
 // survives is `map` and `exclude` -- identity and prohibition, the two things a
-// deterministic matcher can do. What dies is every rule that says "pick the
+// deterministic matcher can do. What died was every rule that says "pick the
 // better one", "buy up to the offer", "round it up".
-//
-//   rule 31  "Ariel Pods: pick the BEST VALUE by price-per-wash"
-//   rule 36  "if a multibuy gives >=50% off the EXTRA item(s), buy up to the
-//             offer quantity"
-//   rule 37  "Sure male: round the quantity up to complete a pair"
 //
 // Active for weeks. Never fired once. Warwick, verbatim: "there is no way to
 // teach the system new rules and get it to learn if I keep having to tell it
 // which aerial every bloody week!"
+//
+// -- WHAT THIS MODULE NO LONGER DOES (Warwick, 2026-08-09) ------------------
+//
+// He then changed his mind about the BEST-VALUE half of that and ARCHIVED it:
+//
+//   "Do not make Terra, the planner, or the browser phase attempt to optimise
+//    Ariel/other choices by live price, price-per-wash, multibuy maths, or
+//    bargain judgement before handing the list to the browser. ... The
+//    objective is deliberately to SIMPLIFY the handoff. ... AsdAIr should
+//    prepare the right shop reliably. It does not need to become a supermarket
+//    arbitrage desk."
+//
+// So no money reaches the reasoning consumer from here. The grounding packet
+// carries no price field, the rendered lines carry no money, and the prompt no
+// longer invites a value, offer or bargain judgement. The household rules that
+// asked for one - best value per wash, buy up to the multibuy quantity, round a
+// "any 2 for GBP X" quantity up to a pair - are archived as DATA in
+// `asdair.rules`, which is Warwick's change to run. THIS MODULE HARD-CODES NO
+// RULE ID, and archiving a rule is never a code change.
+//
+// The removal is the deliverable, not a regression, and it is not to be
+// re-grown behind a flag: a dormant price path is precisely the thing being
+// removed. `rulebook.test.js` holds a two-part control over it - a behavioural
+// one (a priced catalogue still produces a packet with no money in it) and a
+// source one whose forbidden vocabulary is pinned in README.md rather than in
+// this file, so widening the code cannot widen its own check.
+//
+// -- WHAT THE MODULE IS STILL FOR -------------------------------------------
+//
+// The household's genuinely NON-PRICE prose: rotation, what an add-to-trolley
+// failure actually means, exclusions, aliases, standing quantities. That job is
+// real, it is unchanged, and it is still the 59% the deterministic planner
+// cannot carry.
 //
 // -- WHAT THIS MODULE IS, AND WHAT IT DELIBERATELY IS NOT -------------------
 //
@@ -84,10 +112,10 @@ const termMatch = require('./termMatch.js');
 // is the entire point of prose.
 const JUDGEMENT_KINDS = Object.freeze(['set_product', 'set_quantity', 'ask']);
 
-// A weekly household line. Rules of the "round up to a pair" / "buy up to the
-// offer quantity" kind nudge a count by ones and twos; nothing legitimate here
-// asks for forty. An unbounded numeric effect from a model reply is how a
-// misread "76 washes" becomes 76 boxes in a real basket.
+// A weekly household line. A standing-quantity rule of the "we get through two
+// a week" kind nudges a count by ones and twos; nothing legitimate here asks
+// for forty. An unbounded numeric effect from a model reply is how a misread
+// "76 washes" becomes 76 boxes in a real basket.
 const MAX_JUDGED_QTY = 24;
 
 // Hold causes this module may resolve. All three mean the same thing: the
@@ -287,8 +315,12 @@ function buildRulebookGrounding(plan, rules, household) {
       requested_qty: item.requested_qty,
       planned_qty: item.planned_qty,
       note: item.note || '',
+      // NAMES ONLY. The planner's `alternatives` rows carry a price field; it
+      // is dropped here and never forwarded. A consumer that cannot see money
+      // cannot be asked to shop on it, which is the removal Warwick ordered
+      // made structural rather than merely instructed.
       candidates: (Array.isArray(item.alternatives) ? item.alternatives : []).map(function (a) {
-        return { name: a.name, price: (a.price === undefined ? null : a.price) };
+        return { name: a.name };
       }),
       may_set_product: isResolvableHold(item),
       may_set_quantity: mayChangeQuantity(item),
@@ -346,18 +378,12 @@ function renderLines(lines) {
     ];
     if (l.note) bits.push('    what is known    : ' + l.note);
     if (l.candidates.length) {
+      // NAMES ONLY, and no money in any form - not a figure, not "unknown", not
+      // a currency word. Saying "(unknown)" beside a choice is still an
+      // invitation to shop on the thing that is unknown.
       bits.push('    choices offered  :');
       l.candidates.forEach(function (c) {
-        // ASCII only, two decimals: a price is money and "9" reads as a
-        // different number from "9.00" to something doing arithmetic on it.
-        //
-        // AND AN ABSENT PRICE IS SAID, NEVER COERCED. Number(null) is 0, and a
-        // pack rendered "GBP 0.00" is not a missing price to a reader - it is a
-        // free pack, and it would win every price-per-wash comparison there is.
-        const raw = c.price;
-        const price = (raw === null || raw === undefined || raw === '') ? null : Number(raw);
-        bits.push('      - ' + c.name
-          + (price !== null && Number.isFinite(price) ? '  GBP ' + price.toFixed(2) : '  (price unknown)'));
+        bits.push('      - ' + c.name);
       });
     }
     const may = [];
@@ -373,8 +399,13 @@ function buildRulebookPrompt(grounding) {
   return `You are applying ONE household's own standing shopping rules to this week's planned basket.
 
 These rules are the household's WORDS, not a program. They were written by the person who shops here.
-Several of them express a JUDGEMENT ("pick the best value", "round it up", "buy up to the offer") which
-no deterministic matcher can carry out, which is why they are being shown to you.
+Several of them express a JUDGEMENT ("rotate the scent", "that means the blue one", "we get through two
+a week") which no deterministic matcher can carry out, which is why they are being shown to you.
+
+YOU ARE NOT SHOPPING FOR MONEY. You are shown no money at all - no shelf figures, no offers, no pack
+economics - and you must not ask for them, estimate them or reason about them. Which item is the
+better buy is not your question and is not this system's question; a person makes that call at the
+shop. If a rule can only be settled by comparing what things cost, say so with "ask" and stop there.
 
 THEIR STANDING RULES THAT BEAR ON THIS BASKET:
 ${renderRules(grounding.rules)}
@@ -390,8 +421,9 @@ WHAT YOU MAY DO, PER LINE - and each line says which of these it will accept:
   ask           you cannot apply the rule confidently. SAY SO.
 
 WHEN TO ASK - this matters more than getting an answer:
-  * the rule needs information you were not given (a price, an offer, a pack size) - ASK. Do not
-    estimate it, and do not fall back on what the planner already decided.
+  * the rule needs information you were not given (what was bought last week, what something costs,
+    what is on offer) - ASK. Do not estimate it, and do not fall back on what the planner already
+    decided.
   * two rules point different ways on the same line - ASK, and say which two.
   * the rule's words are unclear, or you are not sure it is really about this line - ASK.
 An answer you are unsure of is worse than a question. A question costs one tap; a wrong product costs
@@ -404,7 +436,7 @@ an answer.
 Return ONLY strict JSON, no prose and no code fences:
 
 {"judgements":[{"line_no":1,
-                "rule_id":31,
+                "rule_id":32,
                 "kind":"one of: ${JUDGEMENT_KINDS.join(' | ')}",
                 "product":null,
                 "quantity":null,
