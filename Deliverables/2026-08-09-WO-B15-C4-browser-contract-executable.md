@@ -68,6 +68,15 @@ file_surface:
   - services/asdair/browser-runner/browser.cjs
   - services/asdair/browser-runner/runner.js
   - services/asdair/reconcile/verifyBasket.js
+  # AMENDMENT 1 (corrected placement), Larry 2026-08-09. These five were first pasted
+  # into contract_basis by mistake — a field that JUSTIFIES a surface but does not GRANT
+  # one. Keel refused to infer across the two fields and was right to. Granted here, in
+  # file_surface, which is the complete writable set.
+  - services/asdair/browser-runner/oneTab.test.cjs
+  - services/asdair/browser-runner/forbidden.test.cjs
+  - services/asdair/reconcile/verifyBasket.test.js
+  - services/asdair/handoff/mutation-proof.js
+  - services/asdair/handoff/mutation.test.js
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -192,7 +201,7 @@ AC7 - NO REGRESSION. Every package suite you touch is green before and after, wi
 
 - ACCEPTANCE COMMANDS - run each in its package directory and ASSERT THE REPORTED COUNT, never the exit code alone: `cd services/asdair/handoff && node --test` (baseline 104 pass) - `cd services/asdair/packet && node --test` (baseline 109 pass) - `cd services/asdair/pipeline && node --test` - `cd services/asdair/browser-runner && node --test` (baseline 65 pass) - `cd services/asdair/reconcile && node --test`. Report before AND after counts for every package you touch.
 # guidance: the exact command that must be EXECUTED — assert the reported count, never the exit code alone
-- `bash scripts/secret-scan.sh --surface services/asdair/handoff/instructions.js services/asdair/handoff/buildHandoff.js services/asdair/handoff/buildHandoff.test.js services/asdair/handoff/method.test.js services/asdair/handoff/renderChecklist.js services/asdair/packet/buildExecutionPacket.js services/asdair/packet/buildExecutionPacket.test.js services/asdair/packet/renderChecklist.js services/asdair/pipeline/runPipeline.js services/asdair/pipeline/runtime.js services/asdair/pipeline/deps.js services/asdair/pipeline/productionWiring.test.js services/asdair/browser-runner/cdp.js services/asdair/browser-runner/actions.cjs services/asdair/browser-runner/readTrolley.cjs services/asdair/browser-runner/browser.cjs services/asdair/browser-runner/runner.js services/asdair/reconcile/verifyBasket.js` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
+- `bash scripts/secret-scan.sh --surface services/asdair/handoff/instructions.js services/asdair/handoff/buildHandoff.js services/asdair/handoff/buildHandoff.test.js services/asdair/handoff/method.test.js services/asdair/handoff/renderChecklist.js services/asdair/packet/buildExecutionPacket.js services/asdair/packet/buildExecutionPacket.test.js services/asdair/packet/renderChecklist.js services/asdair/pipeline/runPipeline.js services/asdair/pipeline/runtime.js services/asdair/pipeline/deps.js services/asdair/pipeline/productionWiring.test.js services/asdair/browser-runner/cdp.js services/asdair/browser-runner/actions.cjs services/asdair/browser-runner/readTrolley.cjs services/asdair/browser-runner/browser.cjs services/asdair/browser-runner/runner.js services/asdair/reconcile/verifyBasket.js services/asdair/browser-runner/oneTab.test.cjs services/asdair/browser-runner/forbidden.test.cjs services/asdair/reconcile/verifyBasket.test.js services/asdair/handoff/mutation-proof.js services/asdair/handoff/mutation.test.js` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
 
 ## Inputs supplied
 
