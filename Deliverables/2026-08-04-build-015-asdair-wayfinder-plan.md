@@ -718,6 +718,38 @@ the line-resolution gate and immutable decisions are useful infrastructure and a
 correction is at the **human input / interpretation / policy application** layer. *"not an excuse to
 write a second shopping pipeline."*
 
+> **⭐ PARTIAL SUCCESS IS A REQUIRED PROPERTY — Warwick, 2026-08-09, verbatim.** Not a refinement:
+>
+> > "If one Warwick message clearly answers A and B and contains an unclear/unmappable fragment for C:
+> > **durably record A**; **durably record B**; **leave/raise only C** as the real clarification;
+> > **do not discard the whole message**; **do not ask again for facts already understood**;
+> > **do not guess the unclear fragment.**"
+>
+> **Consequence for the design, and it is not cosmetic:** an all-or-nothing Terra return is
+> **unacceptable**. The mapping must be per-question, so one low-confidence fragment fails **alone**
+> rather than poisoning its siblings.
+>
+> **Two engineering decisions are SETTLED and Warwick has explicitly refused to be asked again:**
+> deterministic exact-candidate mapping first, then bounded Terra for the remaining open questions ·
+> route-before-intake, claiming an update only when a correlatable open question exists. His words:
+> *"Those are engineering decisions; do not bring them back to Warwick."*
+
+> **⛔ "MERGED" IS NOT "WIRED" — Warwick, 2026-08-09, correcting Larry.** Applies to BOTH lanes:
+>
+> > *"Do not say `instructions.js` v2 is 'on the production route' yet… Until the real runtime
+> > necessarily constructs and consumes that contract, the browser method is PRESENT but not yet
+> > PRODUCTION-WIRED."*
+>
+> **The acceptance proof is never "file merged". It is the chain:**
+>
+> ```
+> confirmed plan -> production caller -> execution packet carrying the settled method
+>   -> browser worker -> one-tab CDP execution -> trolley verification -> reconciliation
+> ```
+>
+> **Also ruled:** *"Do not wait for Warwick's manual ASDA sign-in to finish the offline/executable
+> wiring. That sign-in gates LIVE authenticated proof only, not implementation."*
+
 ### Acceptance — by execution, and the last one is the sharpest
 
 - a typed reply enters production, is associated with the open question(s), and produces durable
