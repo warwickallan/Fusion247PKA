@@ -49,9 +49,15 @@ const HEAVY = '===========================================================';
 
 // Product invariants, not rulebook rows. Sources: RUNTIME-DECISION.md
 // ("Boundaries - unchanged"), CANONICAL-WEEKLY-SHOP-PROCESS.md section F.
+// SUPERSEDED 2026-08-09 by Warwick's Product Ruling 2: the first boundary used
+// to read "NEVER free-search a known item - add it from Regulars or
+// Favourites." That is no longer the rule. Identity and RETRIEVAL are separate
+// concerns: a known item is added by its reference when we hold one, and may be
+// searched for when we do not - what must never happen is a silent swap.
 export const STANDING_BOUNDARIES = Object.freeze([
-  'NEVER free-search a known item - add it from Regulars or Favourites.',
+  'Add a known item by its ASDA reference when this list gives one. Only search for it when it has none.',
   'NEVER substitute. An unavailable item is HELD for a human, not swapped.',
+  'If two or more products could be the one on the list, STOP that line and ask. Never pick the closest.',
   'NEVER book a slot, check out, pay, or enter a password.',
   'STOP at a checkout-ready basket.'
 ]);
@@ -181,7 +187,15 @@ export function renderChecklist(packet, options) {
       brand + ' -- ' + line.canonical_product_name
     );
 
-    if (line.origin === 'known') {
+    if (line.origin === 'known' && (line.asda_product_ref === null || line.asda_product_ref === undefined)) {
+      // Ruling 2. A known household product we hold no ASDA reference for.
+      // It must never render as "ref null", and it is NOT a new item: no
+      // approval is needed and none should be sought.
+      out.push(indent + 'KNOWN - no ASDA ref on file. Find it, then CHECK it is this:');
+      wrapInto(out, indent + '  > ', indent + '  > ',
+        ((line.brand === null || line.brand === undefined) ? '' : line.brand + ' ') + line.canonical_product_name);
+      out.push(indent + 'if two or more could be it, STOP and ask. Never pick the closest.');
+    } else if (line.origin === 'known') {
       out.push(indent + line.source_view.toUpperCase() + '  ref ' + line.asda_product_ref);
     } else {
       // The approved wording is Warwick's, and it must be searched EXACTLY.

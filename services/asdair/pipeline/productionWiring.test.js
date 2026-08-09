@@ -398,6 +398,85 @@ test('D-2: the rendered card names what is stuck and states that nothing was ord
   assert.ok(card.reply_markup, 'the card must give him a way to act on it');
 });
 
+// =====================================================================
+// LANE C - THE BROWSER OPERATING CONTRACT IS ON THE PRODUCTION ROUTE
+//
+// Warwick, 2026-08-09: "THE PROVEN BROWSER OPERATING CONTRACT EXISTS, BUT THE
+// PRODUCTION ROUTE DOES NOT ENFORCE IT."
+//
+// `buildExecutionPacket`, `buildHandoff` and `verifyBasket` were complete,
+// tested, and had ZERO production callers. Their suites were green - 104, 109
+// and 106 tests - and none of it said anything about whether a real shop ever
+// reached them. These tests ask the only question those suites cannot: does the
+// live route actually get there, from the runtime entry, without a stub.
+// =====================================================================
+
+const runtimeSrc = stripComments(fs.readFileSync(path.join(HERE, 'runtime.js'), 'utf8'));
+
+test('LANE C: the browser build step reaches buildHandoff - and no longer takes the payload-less route', async () => {
+  const mod = await import('./runPipeline.js');
+  assert.equal(typeof mod.buildBrowserHandoff, 'function',
+    'buildBrowserHandoff is the production producer for the browser handoff and must be reachable');
+
+  // The dispatch REALLY arrives at it: QUEUE_BROWSER_BUILD -> stepQueueBrowserBuild
+  // -> buildBrowserHandoff -> buildHandoff. Asserted on source rather than on a
+  // call spy, because a spy would prove only that a test could reach it.
+  const step = runPipelineSrc.slice(runPipelineSrc.indexOf('async function stepQueueBrowserBuild'));
+  const body = step.slice(0, step.indexOf('\n}\n'));
+  assert.match(body, /buildBrowserHandoff\(deps, shop\)/,
+    'stepQueueBrowserBuild does not build a handoff. That WAS the defect: it queued a bare request and the '
+    + 'operating contract reached nobody.');
+  assert.match(body, /openHandoff\(/,
+    'the request must be opened through the durable handoff lifecycle, which carries the artefact');
+  assert.doesNotMatch(body, /requestBrowserBuild/,
+    'stepQueueBrowserBuild still uses shopStore.requestBrowserBuild, which inserts (shop_id, status) and '
+    + 'nothing else - a request that physically cannot carry what the worker must be told.');
+
+  assert.match(runPipelineSrc, /buildHandoff\(packet, \{ operatingRules/,
+    'buildBrowserHandoff must call the producer that stamps the method onto the artefact');
+});
+
+test('LANE C: the packet producer is reached on the same path', () => {
+  assert.match(runPipelineSrc, /buildExecutionPacket\(\{/,
+    'nothing on the live route builds an execution packet, so buildExecutionPacket still has no production caller');
+  assert.match(runPipelineSrc, /from '\.\.\/packet\/buildExecutionPacket\.js'/,
+    'the packet producer must be the real module, not a local re-implementation');
+});
+
+test('LANE C: verifyBasket has a production caller on the RETURN leg', () => {
+  assert.match(runtimeSrc, /require[A-Za-z]*\('\.\.\/reconcile\/verifyBasket\.js'\)/,
+    'runtime.js does not import verifyBasket, so the return leg still verifies nothing');
+  assert.match(runtimeSrc, /return verifyBasket\(toVerifyBasketArgs\(/,
+    'verifyBasket must actually be CALLED - an import with no call site is the same zero-caller defect');
+});
+
+test('LANE C: realWiring SUPPLIES verificationFor, so the handback can be truthful', async () => {
+  const wiring = runtimeSrc.slice(runtimeSrc.indexOf('async function realWiring'));
+  assert.match(wiring, /verificationFor: makeVerificationFor\(deps\)/,
+    'realWiring returns the production wiring object and did not put a verificationFor on it. queueShopCards '
+    + 'reads `wiring.verificationFor || null`, so without this every basket-ready handback renders NOT VERIFIED '
+    + 'by omission - a check reported as absent because it was never wired, which is the AC4 lie.');
+
+  const mod = await import('./runtime.js');
+  assert.equal(typeof mod.makeVerificationFor, 'function');
+});
+
+test('LANE C: with no completion report recorded, verification is NULL - never a false verified', async () => {
+  const { makeVerificationFor } = await import('./runtime.js');
+
+  // A durable request exists and the worker has said nothing yet. The only
+  // honest answer is "no capture has been recorded", which is null - and
+  // queueShopCards renders that as a loud NOT VERIFIED.
+  const verificationFor = makeVerificationFor({
+    readQuery: async () => ({ rows: [{ id: 7, shop_id: 1, status: 'claimed', progress: { handoff: { packet_fingerprint: 'fp' } } }] }),
+  });
+  assert.equal(await verificationFor({ id: 1, shop_ref: 'SHOP-2026-08-03' }), null,
+    'a shop whose worker has not reported must never be reported as verified');
+
+  const noRequest = makeVerificationFor({ readQuery: async () => ({ rows: [] }) });
+  assert.equal(await noRequest({ id: 1, shop_ref: 'SHOP-2026-08-03' }), null);
+});
+
 test('D-2: every kind the pipeline queues has a renderer - the general form of the defect', async () => {
   // D-2 was "queued with no voice". This is the same question asked of every
   // kind, so the next one fails here instead of in production.

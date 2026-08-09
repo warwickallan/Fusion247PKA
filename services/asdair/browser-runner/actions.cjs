@@ -1,17 +1,16 @@
 // BUILD-015 AsdAIr browser runner - the ALLOWLISTED action surface.
 // There is deliberately NO command for checkout, payment, slot booking,
 // password entry, enabling substitutions, or accepting a substitute.
-const { targets, connect, newTab } = require('./cdp.js');
+const { openShoppingTab } = require('./cdp.js');
 const HEADER = `JSON.stringify((()=>{const m=document.body.innerText.match(/Trolley\s+(\d+)\s+items?\s+total price\s+([\d.]+)\s+pounds/i);return {items:m?+m[1]:null,total:m?m[2]:null};})())`;
 
+// ONE TAB. This used to be `newTab(url)` on every call, which is a tab per
+// product page - the behaviour BROWSER_METHOD `one_session_one_page_context`
+// forbids and the one Warwick watched go wrong. It now navigates the session's
+// single tab, and there is no longer an exported primitive that could open a
+// second one. See cdp.js.
 async function withPage(url, waitMs = 12000) {
-  const t = await newTab(url);
-  await new Promise(r => setTimeout(r, waitMs));
-  const page = (await targets()).find(x => x.id === t.id);
-  if (!page) throw new Error('page not found: ' + url);
-  const c = await connect(page.webSocketDebuggerUrl);
-  await c.send('Runtime.enable');
-  return c;
+  return openShoppingTab(url, { waitMs });
 }
 const ev = async (c, expression) => (await c.send('Runtime.evaluate', { returnByValue: true, expression })).result?.result?.value;
 

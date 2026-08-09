@@ -112,6 +112,26 @@ jobs:
         working-directory: services/asdair/reconcile
         run: node --test
 
+      # THE BROWSER METHOD AND THE EXECUTION PACKET.
+      #
+      # ADDED 2026-08-09. Both packages existed and were green, and NEITHER was
+      # ever run by this workflow - 213 passing tests CI had never once
+      # executed, including handoff/method.test.js, which pins BROWSER_METHOD
+      # and PROHIBITED_ACTIONS against literals held OUTSIDE the source they
+      # check, and packet/buildExecutionPacket.test.js, which validates the
+      # producer against the committed schema under Builds/.
+      #
+      # An unrun suite is indistinguishable from a green one in a run list.
+      # That is how the entire C3 browser-method deliverable stayed CI-invisible
+      # while being described as complete.
+      - name: Run the browser-method / handoff suite (offline)
+        working-directory: services/asdair/handoff
+        run: node --test
+
+      - name: Run the execution-packet suite (offline, validated against the committed schema)
+        working-directory: services/asdair/packet
+        run: node --test
+
       # THE CATALOGUE-GROUNDING INVARIANT. This suite is the guard against
       # silently regressing to open-ended transcription - the method that read
       # "Gourmet cat food" as "gourmet coffee" and invented a line that was not

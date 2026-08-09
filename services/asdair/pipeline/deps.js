@@ -46,6 +46,21 @@ const { buildPayload } = require('../reconcile/record-confirmation.js');
 const { recordConfirmation } = require('../reconcile/recordConfirmation.js');
 const { updateRegulars } = require('../outcome/updateRegulars.js');
 
+// ── WHY THE BROWSER HANDOFF SUBSYSTEM IS *NOT* IN THIS CONTAINER ────────────
+//
+// `buildExecutionPacket`, `buildHandoff`, `openHandoff` and `verifyBasket` are
+// consumed on the live route (runPipeline.js stepQueueBrowserBuild, runtime.js
+// realWiring) by DIRECT IMPORT, exactly as `store`, `shopLines` and
+// `applyDecisionsToPlan` already are - and deliberately not through `deps`.
+//
+// The container exists for what needs configuration or I/O: a pool, a model
+// call, a clock. These four are pure, or pure-over-an-injected-query
+// (`openHandoff` takes `deps.writeQuery`, which IS in the container). Injecting
+// a pure function buys nothing and costs the D-1 failure mode: a consumer
+// reading `deps.X` that nothing binds resolves to undefined at runtime while
+// every stubbed test passes. A static import cannot fail that way - it fails at
+// load, everywhere, immediately.
+
 /**
  * The decision vocabulary, imported from the module that owns it rather than
  * retyped, so the interpreter cannot drift from migration 017's CHECK.

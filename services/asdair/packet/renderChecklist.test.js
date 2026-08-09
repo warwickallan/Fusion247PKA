@@ -84,9 +84,50 @@ test('the standing boundaries always appear, whatever the caller passes', () => 
   const text = renderChecklist(samplePacket());
   const flattened = flat(text);
   STANDING_BOUNDARIES.forEach((boundary) => assert.ok(flattened.includes(flat(boundary)), 'missing boundary: ' + boundary));
-  assert.match(text, /NEVER free-search a known item/);
+  // SUPERSEDED 2026-08-09 by Warwick's Product Ruling 2. This used to assert
+  // /NEVER free-search a known item/. That instruction was retired - identity
+  // and retrieval are separate concerns, and a known item with no reference may
+  // legitimately be searched for. Its SURVIVAL on the page is now the defect,
+  // so that is what is checked.
+  assert.doesNotMatch(text, /NEVER free-search a known item/,
+    'the retired boundary must not still be printed on the page the shopper reads');
+
+  // The boundaries that did NOT change, plus the one the ruling added.
+  // Flattened, because these wrap at phone width and the assertion is about
+  // the words, not about where the line break landed.
   assert.match(text, /NEVER substitute/);
   assert.match(text, /NEVER book a slot, check out, pay/);
+  assert.ok(flattened.includes(flat('STOP that line and ask')),
+    'the stop-and-ask boundary Ruling 2 added must be on the page');
+  assert.ok(flattened.includes(flat('Only search for it when it has none')),
+    'the reference-first rule must be on the page');
+});
+
+test('RULING 2: a known line with no ASDA reference renders as retrieval, never as "ref null"', () => {
+  // Built through the producer rather than by mutating a sample: the packet it
+  // returns is frozen, and mutating a frozen packet would be testing a shape
+  // this product never produces.
+  const packet = buildExecutionPacket({
+    shop_ref: SHOP_REF,
+    generated_at: GENERATED_AT,
+    household_id: 1,
+    lines: [
+      { original_list_line: 'milk 2', origin: 'known', canonical_product_id: 41, canonical_product_name: 'Semi Skimmed Milk 2L', brand: 'ASDA', source_view: 'search', asda_product_ref: null, required_quantity: 2 }
+    ]
+  });
+  assert.equal(packet.lines[0].asda_product_ref, null, 'the producer must have accepted the missing reference');
+
+  const text = renderChecklist(packet);
+  assert.doesNotMatch(text, /ref null/, 'a missing reference must never be printed as a reference');
+  assert.match(text, /KNOWN - no ASDA ref on file/);
+  assert.match(text, /CHECK it is this/);
+  assert.match(text, /if two or more could be it, STOP and ask/);
+
+  // It must NOT be dressed up as a new approved item - that is the whole
+  // identity/retrieval separation.
+  const flattened = flat(text);
+  assert.ok(!flattened.includes(flat('** NEW - APPROVED **' + ' search these exact words')),
+    'a known item being retrieved must never render as an approved NEW item');
 });
 
 test('the header carries the sort contract and both reconciliation counts', () => {

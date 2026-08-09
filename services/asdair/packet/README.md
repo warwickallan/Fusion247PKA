@@ -52,7 +52,7 @@ const checklist = renderChecklist(packet, {
 | `source_view` | yes | `regulars` \| `favourites` \| `search` — **taken explicitly, never inferred** |
 | `required_quantity` | yes | Integer 1–99, already resolved by the caller |
 | `canonical_product_id` | when `known` | Must be a real positive id; `null` is rejected for a known item |
-| `asda_product_ref` | when `known` | 3–12 digits; `null` is rejected for a known item |
+| `asda_product_ref` | no | 3–12 digits when given. `null` is **permitted** for a known item — see *Ruling 2* below |
 | `approved_search_term` | when `new_approved` | Warwick's approved wording, **never invented** |
 | `brand` | no | `null` permitted and sorts last |
 | `asda_url`, `substitutes_allowed`, `applied_rules`, `quantity_rationale`, `shop_line_no` | no | |
@@ -136,12 +136,49 @@ this schema-valid:
 { "origin": "known", "canonical_product_id": null, "asda_product_ref": null }
 ```
 
-— a known item with **no identity at all**, which Sonnet could only resolve by free-searching
-it, which is forbidden. Schema validation would have been trusted as proof of the one property
-that branch exists to enforce, and it was not.
+— a known item with **no identity at all**. Schema validation would have been trusted as proof
+of the one property that branch exists to enforce, and it was not.
 
 **Raised at read-back on 2026-08-04 and closed in the schema the same day** (`943a262`, which
 added `not: { const: null }` to both conditional branches). **The hole is shut on both sides.**
+
+> **Read the scope of that correction precisely.** It is about `canonical_product_id` —
+> **identity**. Since Warwick's Product Ruling 2 (2026-08-09) a `null` `asda_product_ref` on a
+> known line is **legitimate**, not a defect: see the next section.
+
+## Ruling 2 — identity and retrieval are separate concerns (2026-08-09)
+
+> Use the durable ASDA reference when available and valid; otherwise the supervised route **may**
+> use bounded ASDA search/navigation from the canonical identity, brand and variant. The result
+> **must be verified** against the known household identity before addition. **Search is
+> RETRIEVAL — it does not redefine the item as "new".** If several plausible products remain,
+> **stop that line and ask Warwick.**
+
+This producer used to reject a known line with no `asda_product_ref`, which failed the **entire
+weekly shop** over one missing reference — against a catalogue where a large minority have none.
+What changed, and what did not:
+
+- **`asda_product_ref` is now optional** for a known line. Absent normalises to `null`.
+- **`source_view: "search"` is permitted for a known line only when it has no usable reference.**
+  Where a valid reference exists, search is still refused — using it would throw away identity we
+  already hold.
+- **`canonical_product_id` is still mandatory.** Identity is what makes an item known.
+- **A malformed reference is still refused.** *"Available **and valid**"* — a broken reference is
+  an upstream defect, not a missing one, and downgrading it to "search instead" would hide it.
+
+### ⚠️ Known divergence from the committed schema
+
+`Builds/BUILD-015-.../SONNET-BROWSER-EXECUTION-PACKET.schema.json` **still encodes the retired
+rule** in `$defs.line.allOf[0]`: `asda_product_ref` required and non-null, and `source_view`
+restricted to `regulars|favourites` for a known line. **A packet that is correct under Ruling 2 is
+therefore invalid under the committed schema.**
+
+That file lives under `Builds/**` and was outside the file surface of the change that implemented
+the ruling, so the divergence is **reported rather than worked around**, and pinned by
+`DIVERGENCE PIN` in `buildExecutionPacket.test.js` so it cannot be quietly forgotten. Schema
+validation is **test-only** here — `buildExecutionPacket.js` does not import `schemaAssert` — so
+the runtime path is unaffected. **Larry owns the schema.** When it is corrected, that test fails
+and tells you to delete it; the fix is never to revert the producer.
 
 This module **still rejects it independently**, and that is deliberate: a schema is a contract,
 not a substitute for the producer's own guard, and this half must hold even if the contract is
@@ -161,9 +198,14 @@ ASCII wrapped to 72 columns for a phone. It **renders; it never re-derives** —
 counts and identity all come straight from the packet, so the checklist and the JSON cannot
 disagree.
 
-Standing boundaries (never free-search a known item; never substitute; never book a slot,
-check out or pay; stop at a checkout-ready basket) always appear, whatever the caller passes.
-They are product invariants from `RUNTIME-DECISION.md`, not rulebook rows.
+Standing boundaries always appear, whatever the caller passes: add a known item by its reference
+when one is given and only search when it has none; never substitute; if two or more products
+could be the one on the list, stop that line and ask; never book a slot, check out or pay; stop
+at a checkout-ready basket. They are product invariants from `RUNTIME-DECISION.md` and Warwick's
+Product Ruling 2, not rulebook rows.
+
+A known line with no ASDA reference renders as a **retrieval** line carrying the identity to check
+against — never as `ref null`, and never dressed up as an approved NEW item.
 
 **Packet-level guidance** (e.g. rule 38, *"a failed add means OUT OF STOCK, not an expired
 slot"*) is passed in as `options.guidance` and printed with its rule id, so a rule that fires

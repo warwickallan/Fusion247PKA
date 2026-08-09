@@ -143,6 +143,43 @@ test('the command allowlist contains no command that could order, pay, book or s
   }
 });
 
+// =====================================================================
+// THE ONE-TAB INVARIANT, AT THE LEVEL OF THE SOURCE.
+//
+// BROWSER_METHOD `one_session_one_page_context`. The behaviour is proven in
+// oneTab.test.cjs against a fake CDP endpoint; these two assert the SHAPE that
+// makes the behaviour unavoidable, and they belong here because this is the
+// file that already strips comments before scanning - prose describing the old
+// behaviour must not trip the scan, and must not be able to hide the real thing
+// either.
+// =====================================================================
+
+test('ONE TAB: no module outside cdp.js can create a page target', () => {
+  const findings = [];
+  for (const file of sourceFiles()) {
+    if (file === 'cdp.js') continue;                  // it DEFINES the primitive, unexported
+    const code = stripComments(fs.readFileSync(path.join(HERE, file), 'utf8'));
+    if (/\bnewTab\b/.test(code)) findings.push(`${file} references newTab`);
+    if (/\/json\/new/.test(code)) findings.push(`${file} issues its own /json/new`);
+  }
+  assert.deepStrictEqual(findings, [],
+    'a module has found its own way to open a tab, which is how the arm came to open one per item:\n'
+    + findings.join('\n'));
+});
+
+test('ONE TAB: the proof seam (_internal) is never reachable from production code', () => {
+  const findings = [];
+  for (const file of sourceFiles()) {
+    if (file === 'cdp.js') continue;
+    const code = stripComments(fs.readFileSync(path.join(HERE, file), 'utf8'));
+    if (/_internal/.test(code)) findings.push(file);
+  }
+  assert.deepStrictEqual(findings, [],
+    'cdp._internal exposes setTransport and setOneTabGuard so the guard can be REMOVED on purpose and the break '
+    + 'observed. A production caller would make the guard optional at runtime, which is the same as not having '
+    + `one: ${findings.join(', ')}`);
+});
+
 test('the dispatch table in runner.js covers the allowlist EXACTLY - no orphan, no extra', () => {
   const code = stripComments(fs.readFileSync(path.join(HERE, 'runner.js'), 'utf8'));
   const dispatch = code.slice(code.indexOf('switch (step.command)'));
