@@ -3514,3 +3514,94 @@ Corroborating instances from this session, offered as natural evidence rather th
 - The Lane C1 and Lane A file-surface collision (`services/asdair/shop/**` unassigned in both orders)
   is a **dependency-mapping** failure of exactly the kind item 2 above names — and it was caught by a
   worker's refusal, not by the map.
+
+---
+
+## 📋 FIRST-CLASS 4F CAPA — **THE WORK ORDER READINESS GATE IS A SYNTAX CHECK WEARING A SEMANTICS BADGE** (Warwick, 2026-08-09)
+
+> **This is the direct escalation of the finding immediately above.** That one ended: *"caught by a
+> worker's refusal, not by the map."* It happened again, five more times, in a single day — so it is
+> no longer a mapping lapse. It is a **tooling defect**.
+
+### The evidence, and it is what makes this a CAPA rather than a lesson
+
+**Six Work Orders issued on 2026-08-09. Not one reached a worker in a buildable state.**
+
+| # | Order | Failure |
+|---|---|---|
+| 1–4 | governor, ingress, Lane C, ingress-2 | **REFUSED** — envelope generated but never authored. `--count-markers` → **24 blank mandatory fields** on two of them. |
+| 5 | Lane C, authored | **CLARIFY** — surface granted five browser-runner *source* files and **zero test paths**, so the required mutation proof was undeliverable inside it. |
+| 6 | Lane C, amended | **CLARIFY** — the grant was pasted into **`contract_basis`** instead of **`file_surface`**. **It passed `ready: true`.** |
+
+**Row 6 is the whole finding.** The readiness gate returned `ready: true` for an order whose write
+authority was in a field that does not grant write authority. **The gate validates presence of
+markers, not executable semantics.**
+
+> **Warwick, verbatim:** *"You have now demonstrated that the recurring Work Order problem is NOT a
+> memory/compliance problem. It is a tooling defect… The lesson is not 'Larry must remember to fill
+> the right field.' The lesson is **'the system must make the wrong field impossible to pass as
+> ready.'**"*
+
+**And it is the same failure class as Lane C, on the same day:**
+**THE RULE EXISTS, BUT THE EXECUTION PATH IS NOT FORCED TO OBEY IT.** In Lane C, `instructions.js`
+v2 is complete and nothing delivers it. Here, the surface discipline is canonical and nothing
+enforces it. **Two independent instances of one defect shape, found within hours of each other.**
+
+### The invariant
+
+> **AN AGENT CANNOT BE DISPATCHED WITH A SEMANTICALLY UNDER-AUTHORED WORK ORDER.**
+
+### Required behaviour — Warwick's ten, recorded verbatim in substance
+
+1. **`ready: true` must mean semantically executable**, not merely "no blank markers".
+2. **`file_surface` is the SOLE grant of writable surface.** `contract_basis`, narrative text,
+   dispatch prose and cited files may **never** implicitly grant write authority.
+3. If the work **names, traces to, or necessarily requires** modification of a file absent from
+   `file_surface`, **readiness FAILS before dispatch**.
+4. If `contract_basis` mentions an implementation file absent from `file_surface`, **flag it
+   explicitly** rather than allowing readiness.
+5. **Trace the actual production/file surface before authoring.** Do not guess from memory.
+6. Mandatory placeholders, unresolved decisions, contradictory boundaries or missing acceptance
+   criteria ⇒ **readiness FAIL**.
+7. **Amend an existing order after CLARIFY.** Do not regenerate a fresh envelope unless the work
+   package genuinely changed.
+8. **The dispatch command itself must enforce the validator.** It must not be possible for Larry to
+   bypass it accidentally by sending a worker directly. *(This is the load-bearing one: items 1–7
+   are all bypassable while dispatch remains a free-form message.)*
+9. **Mutation tests for the exact failures of today** — see below.
+10. Bank as tooling/CAPAE work, **run PARALLEL to AsdAIr**. Do not stop product execution to
+    redesign the Work Order framework.
+
+### The five mutation tests, named by Warwick
+
+| Case | Expected |
+|---|---|
+| 24 blank mandatory fields | **FAIL** |
+| Required file only in `contract_basis`, absent from `file_surface` | **FAIL** |
+| Implementation target named in acceptance criteria but absent from `file_surface` | **FAIL** |
+| Correctly authorised order | **PASS** |
+| CLARIFY amendment retaining the same order identity | **PASS** |
+
+### What this must NOT become
+
+**⛔ Not another lesson telling future Larry to be more careful.** Warwick ruled that out explicitly,
+and two such lessons were already written today
+(`read-the-settled-contract-before-demonstrating`, and the dispatch-defect record in
+`Deliverables/2026-08-09-lane-c-progress-and-the-dispatch-defect.md`). **Neither would have stopped
+row 6**, because row 6 was not carelessness — it was a gate that said `ready` when it was not.
+
+**⛔ Not a new control plane.** The regrowth cap applies at full force. The validator belongs **in
+`tools/wo/envelope.mjs` and the dispatch path**, which already exist. **No registry, no tracker, no
+service.**
+
+### Honest scope limit
+
+**Item 8 is the one that decides whether this works.** A validator Larry can forget to run is the
+same class of defect as the rule it replaces — a control that depends on a habit. Until dispatch
+itself refuses an unready order, items 1–7 are advisory. **That must be stated in the delivered work
+rather than discovered later.**
+
+### Status
+
+**RECORDED, NOT YET BUILT.** Banked 2026-08-09 on Warwick's instruction, to run parallel to
+BUILD-015 Lane C and B15-3. **No product execution was paused to write this.**
