@@ -85,7 +85,39 @@
 //   * CHANGE A QUANTITY on a line that is already being bought, bounded, never
 //     to zero. Exclusion stays deterministic: judgement can add nothing to the
 //     basket that was excluded and can remove nothing that was not.
-//   * ASK. Which is the third and most important verb.
+//   * ADD A COMPANION LINE beside a line already being bought - and ONLY a
+//     product that an active `map` rule of this household ALREADY RESOLVES.
+//     See the block below; it is the narrowest verb here and the only one that
+//     puts a new line in a basket.
+//   * ASK. Which is the most important verb, and still the fallback for
+//     everything the other three may not do.
+//
+// -- THE COMPANION LINE, AND THE BOUND THAT DEFINES IT ----------------------
+//
+// Live rule 37 says: "round qty UP to an even number to capture every pair; add
+// a FEMALE variant to complete the last pair (Mum 3 male -> add 1 female = 4)".
+// Its second clause is an ADD-A-LINE outcome, and until 2026-08-09 no verb here
+// could perform it, so the clause was carried to the reader and never applied.
+//
+// What was authorised is NARROWER than the general "add a product" verb the
+// previous Work Order correctly refused to invent (Warwick: "close that one
+// with the narrow deterministic companion-line seam ... not by inventing a
+// general fourth model verb in anticipation"). The bound is one sentence:
+//
+//   A COMPANION LINE MAY ONLY CARRY A PRODUCT AN ACTIVE `map` RULE OF THIS
+//   HOUSEHOLD ALREADY RESOLVES.
+//
+// So no model chooses the product. Rule 24 - `map`, match_term "sure female" -
+// already decided which women's deodorant this household means, weeks ago. The
+// consumer picks from that CLOSED, RULE-DERIVED list exactly as `set_product`
+// picks from the candidates a line itself offered; anything else - a plausible
+// name, a product that is merely in the catalogue, a product mapped for a
+// DIFFERENT household, a product an `exclude` rule forbids, a product already
+// in the basket - is REFUSED and the line is left as it was.
+//
+// The refusal is the feature, and it is built as the default: the permission is
+// reached only by passing every guard in `applyCompanion`, in order, each one
+// recording its own reason.
 //
 // -- UNCERTAINTY IS SPOKEN, NEVER GUESSED AND NEVER SILENTLY PARKED ---------
 //
@@ -101,16 +133,22 @@
 
 const termMatch = require('./termMatch.js');
 
-// The complete verb list. THREE, and the third one is "ask".
+// The complete verb list. FOUR, and one of them is "ask".
 //
 // This is a REPLY contract for one model call - the same shape
 // pipeline/deps.js already uses for `interpretAnswer` (a small closed
 // vocabulary, anything outside it meaning "ask again"). It is NOT a rule
 // vocabulary: no household rule is ever classified, tagged or stored as one of
-// these, and adding a fourth is a design decision, not a way of teaching the
-// system a new kind of rule. New kinds of rule need no code here at all - that
-// is the entire point of prose.
-const JUDGEMENT_KINDS = Object.freeze(['set_product', 'set_quantity', 'ask']);
+// these. New kinds of rule need no code here at all - that is the entire point
+// of prose.
+//
+// `add_companion` was added on 2026-08-09 on Warwick's explicit authority, as
+// the NARROW deterministic seam described in the header - not as a general
+// "add a product" verb, which the previous Work Order refused and was right to
+// refuse. Its product comes from an existing `map` rule and from nowhere else.
+// A FIFTH verb remains a design decision, not a way of teaching this system a
+// new kind of rule.
+const JUDGEMENT_KINDS = Object.freeze(['set_product', 'set_quantity', 'add_companion', 'ask']);
 
 // A weekly household line. A standing-quantity rule of the "we get through two
 // a week" kind nudges a count by ones and twos; nothing legitimate here asks
@@ -289,6 +327,72 @@ function mayChangeQuantity(item) {
   return flags.indexOf('quantity conflict') === -1;
 }
 
+// A companion may only hang off a line that is ACTUALLY BEING BOUGHT. A held
+// line, an excluded line or a line in a quantity conflict is not a pair waiting
+// to be completed - it is a line nobody has settled yet, and hanging a second
+// product off it would add something to the basket on the strength of a
+// question. Deliberately its own predicate rather than an alias of
+// mayChangeQuantity: they answer different questions and one may narrow later.
+function mayAddCompanion(item) {
+  if (!item || item.status !== 'add') return false;
+  const flags = Array.isArray(item.flags) ? item.flags : [];
+  return flags.indexOf('quantity conflict') === -1;
+}
+
+function belongsToHousehold(rule, household) {
+  if (rule.household_id === null || rule.household_id === undefined) return true;
+  return sameHousehold(rule.household_id, household);
+}
+
+// ---------------------------------------------------------------------
+// THE COMPANION POOL - the whole bound, in one function.
+//
+// The closed list of products a companion line may carry. Every entry is a
+// product an ACTIVE `map` rule of THIS household already resolves, which is a
+// decision the household made when it wrote the rule - not one any model makes
+// now. A product that is merely in the catalogue is not here. A product mapped
+// for another household is not here. A product an `exclude` rule forbids is
+// not here.
+//
+// Derived from the rules array on every call. Nothing is cached, no product id
+// is hard-coded, and no rule id is named: a household that writes a new `map`
+// row gets a new companion candidate with no code change, and one that
+// deactivates a row loses it the same way.
+// ---------------------------------------------------------------------
+function mappedProducts(rules, household) {
+  const out = [];
+  (Array.isArray(rules) ? rules : []).forEach(function (r) {
+    if (!r || r.active === false) return;
+    if (!belongsToHousehold(r, household)) return;
+    const d = normalise(r.directive);
+    if (d !== 'map') return;
+    const name = (r.matched_product === null || r.matched_product === undefined)
+      ? '' : String(r.matched_product).trim();
+    if (name === '') return;
+    if (excludedProduct(rules, household, name)) return;   // never OFFER what may not be bought
+    if (out.some(function (p) { return normalise(p.name) === normalise(name); })) return;
+    out.push({ name: name, rule_id: ruleIdOf(r) });
+  });
+  return out;
+}
+
+// Exclusion stays deterministic and stays the strongest rule in the module. It
+// is checked at ANY match tier - deliberately looser than the grade the planner
+// needs before it may buy something, because this direction is the safe one:
+// over-refusing a companion costs a line the household adds itself, while
+// under-refusing puts a forbidden product in a real trolley.
+function excludedProduct(rules, household, name) {
+  if (normalise(name) === '') return false;
+  return (Array.isArray(rules) ? rules : []).some(function (r) {
+    if (!r || r.active === false) return false;
+    if (!belongsToHousehold(r, household)) return false;
+    const d = normalise(r.directive);
+    if (d !== 'exclude') return false;
+    if (normalise(r.match_term) === '') return false;
+    return termMatch.matchTerms(name, r.match_term).tier !== null;
+  });
+}
+
 function buildRulebookGrounding(plan, rules, household) {
   const items = (plan && Array.isArray(plan.items)) ? plan.items : [];
   const rel = selectRelevantRules(items, rules, household);
@@ -324,6 +428,7 @@ function buildRulebookGrounding(plan, rules, household) {
       }),
       may_set_product: isResolvableHold(item),
       may_set_quantity: mayChangeQuantity(item),
+      may_add_companion: mayAddCompanion(item),
       rule_ids: applicable.map(ruleIdOf).filter(function (v) { return v !== null; })
     });
   });
@@ -349,10 +454,19 @@ function buildRulebookGrounding(plan, rules, household) {
     });
   });
 
+  // THE COMPANION POOL IS OFFERED ONLY WHERE IT COULD BE USED. No line that may
+  // take a companion means no list at all - a menu of products a consumer may
+  // not act on is prompt weight at best and an invitation at worst. Same
+  // discipline as the per-line `may_` flags: what cannot be done is not offered.
+  const companions = lines.some(function (l) { return l.may_add_companion; })
+    ? mappedProducts(rules, household)
+    : [];
+
   return {
     household: household === undefined ? null : household,
     lines: lines,
     rules: sent,
+    companion_products: companions,
     omitted_rule_count: rel.omitted.length,
     wordless_rule_count: rel.wordless.length
   };
@@ -367,7 +481,13 @@ function renderRules(rules) {
   }).join('\n');
 }
 
-function renderLines(lines) {
+function renderCompanions(products) {
+  return products.map(function (p) {
+    return '  - ' + p.name + '   (named by rule ' + p.rule_id + ')';
+  }).join('\n');
+}
+
+function renderLines(lines, companionsOffered) {
   return lines.map(function (l) {
     const bits = [
       '  line ' + l.line_no + ': "' + l.item_name + '"',
@@ -389,6 +509,7 @@ function renderLines(lines) {
     const may = [];
     if (l.may_set_product) may.push('set_product');
     if (l.may_set_quantity) may.push('set_quantity');
+    if (companionsOffered && l.may_add_companion) may.push('add_companion');
     may.push('ask');
     bits.push('    you may          : ' + may.join(' | '));
     return bits.join('\n');
@@ -396,6 +517,33 @@ function renderLines(lines) {
 }
 
 function buildRulebookPrompt(grounding) {
+  // The companion half of the prompt EXISTS ONLY WHEN THE POOL DOES. A verb
+  // rendered with nothing it may name teaches a consumer to invent a name, and
+  // every invented name is a refusal - noise, and noise is how a real signal
+  // gets missed.
+  const pool = Array.isArray(grounding.companion_products) ? grounding.companion_products : [];
+  const companionsOffered = pool.length > 0;
+  const kinds = JUDGEMENT_KINDS.filter(function (k) {
+    return k !== 'add_companion' || companionsOffered;
+  });
+  const companionBlock = companionsOffered
+    ? `
+SOME RULES SAY "AND ALSO GET X". A few lines below accept add_companion, which puts a SECOND, SEPARATE
+line in the basket beside the one you were reading. You may name ONLY a product from this list - it is
+this household's OWN standing list of products it has already decided on, and nothing else is possible:
+${renderCompanions(pool)}
+Use it ONLY where one of the rules above actually asks for a second product. Never to be helpful, never
+to complete a set nobody mentioned, and never to substitute for the line's own product. If you are not
+sure the rule asks for a second product, say "ask" instead.
+`
+    : '';
+  const companionVerb = companionsOffered
+    ? `
+  add_companion add a SEPARATE line for ONE product copied EXACTLY from the standing list above, with a
+                whole number of units from 1 to ${MAX_JUDGED_QTY}. Only on a line that offers it, and only
+                where a rule asks for it.`
+    : '';
+
   return `You are applying ONE household's own standing shopping rules to this week's planned basket.
 
 These rules are the household's WORDS, not a program. They were written by the person who shops here.
@@ -411,13 +559,13 @@ THEIR STANDING RULES THAT BEAR ON THIS BASKET:
 ${renderRules(grounding.rules)}
 
 THE PLANNED LINES THOSE RULES SPEAK ABOUT:
-${renderLines(grounding.lines)}
-
+${renderLines(grounding.lines, companionsOffered)}
+${companionBlock}
 WHAT YOU MAY DO, PER LINE - and each line says which of these it will accept:
   set_product   name ONE product for this line, copied EXACTLY from the choices offered on that line.
                 Never a product that is not in that list. Never a product for a line that does not
                 offer set_product.
-  set_quantity  a whole number of units, at least 1 and at most ${MAX_JUDGED_QTY}.
+  set_quantity  a whole number of units, at least 1 and at most ${MAX_JUDGED_QTY}.${companionVerb}
   ask           you cannot apply the rule confidently. SAY SO.
 
 WHEN TO ASK - this matters more than getting an answer:
@@ -437,12 +585,12 @@ Return ONLY strict JSON, no prose and no code fences:
 
 {"judgements":[{"line_no":1,
                 "rule_id":32,
-                "kind":"one of: ${JUDGEMENT_KINDS.join(' | ')}",
+                "kind":"one of: ${kinds.join(' | ')}",
                 "product":null,
                 "quantity":null,
                 "why":"one short sentence a person would accept as the reason"}]}
 
-product is used only with set_product, quantity only with set_quantity, and both are null for ask.
+product is used with set_product${companionsOffered ? ' and add_companion' : ''}; quantity is used with set_quantity${companionsOffered ? ' and add_companion' : ''}; both are null for ask.
 Return an empty judgements list if none of the rules changes anything - that is a valid answer.`;
 }
 
@@ -520,6 +668,119 @@ function askOnLine(item, rule, why) {
 function recordApplied(audit, entry) { audit.applied.push(entry); }
 function recordRejected(audit, entry) { audit.rejected.push(entry); }
 
+// A refused companion LEAVES THE LINE AS IT WAS - same product, same count,
+// same status. It is not turned into a question: the line itself was never in
+// doubt, and holding a settled line because a second product was named badly
+// would punish the wrong thing. But it is never SILENT either - the flag and
+// the note are what a person sees, and the audit entry is what a reviewer
+// reads. "Untouched" means the PLAN is untouched, not that nobody is told.
+function refuseCompanion(ctx, item, lineNo, rule, named, reason) {
+  recordRejected(ctx.audit, {
+    line_no: lineNo, rule_id: rule ? ruleIdOf(rule) : null,
+    kind: 'add_companion', product: named === undefined ? null : named, reason: reason
+  });
+  addFlag(item, 'rulebook answer rejected');
+  addNote(item, 'a rulebook answer asking to also add "' + String(named) + '" was refused: ' + reason);
+}
+
+// EVERY guard below refuses. There is exactly one path out of this function
+// that adds anything, it is the last one, and it is reached only by surviving
+// all six. Written in this order on purpose: the cheap structural checks first,
+// the household's own prohibitions before its permissions.
+function applyCompanion(j, ctx, item, lineNo, rule) {
+  const named = (j.product === null || j.product === undefined) ? '' : String(j.product).trim();
+
+  // 1. IS THIS LINE ONE A COMPANION MAY HANG OFF AT ALL?
+  if (!mayAddCompanion(item)) {
+    refuseCompanion(ctx, item, lineNo, rule, named,
+      'a companion line may only be added beside a line that is being bought (status ' + item.status + ')');
+    return;
+  }
+
+  // 2. WAS A PRODUCT NAMED AT ALL?
+  if (named === '') {
+    refuseCompanion(ctx, item, lineNo, rule, named, 'no product was named');
+    return;
+  }
+
+  // 3. DOES THE HOUSEHOLD FORBID IT? Exclusion outranks every judgement, and it
+  //    is checked against the NAMED string rather than against the offered
+  //    list, so it fires even for a name that never reached the pool.
+  if (excludedProduct(ctx.rules, ctx.household, named)) {
+    refuseCompanion(ctx, item, lineNo, rule, named,
+      'an exclusion rule forbids that product - exclusion is never overruled by a judgement');
+    return;
+  }
+
+  // 4. HAS AN ACTIVE `map` RULE ALREADY RESOLVED IT? THIS IS THE BOUND. The
+  //    pool is the one this packet actually offered, so a product nobody
+  //    offered cannot arrive here by any route - the same structural refusal
+  //    `set_product` uses for a line's own candidates.
+  const offered = Array.isArray(ctx.companions) ? ctx.companions : [];
+  const match = offered.find(function (p) { return normalise(p.name) === normalise(named); });
+  if (!match) {
+    refuseCompanion(ctx, item, lineNo, rule, named,
+      'no active map rule of this household resolves that product, so it may not be added');
+    return;
+  }
+
+  // 5. IS IT ALREADY IN THE BASKET, OR ALREADY ADDED THIS PASS? Buying it twice
+  //    is the failure a household notices in the trolley, not in a log.
+  const already = ctx.items.some(function (it) {
+    return normalise(it.matched_product) === normalise(match.name);
+  });
+  if (already) {
+    refuseCompanion(ctx, item, lineNo, rule, named, 'that product is already in this basket');
+    return;
+  }
+
+  // 6. IS THE COUNT ONE THIS MODULE WILL APPLY UNCHECKED? Absent means one -
+  //    the overwhelmingly common case, and the rule's own example.
+  const qty = (j.quantity === null || j.quantity === undefined) ? 1 : Number(j.quantity);
+  if (!Number.isInteger(qty) || qty < 1 || qty > MAX_JUDGED_QTY) {
+    refuseCompanion(ctx, item, lineNo, rule, named,
+      'the companion quantity ' + String(j.quantity) + ' is outside 1..' + MAX_JUDGED_QTY + ' or not a whole number');
+    return;
+  }
+
+  // ---- and only now, the one path that adds anything ----
+  const causeId = ruleIdOf(rule);
+  const why = j.why ? String(j.why).trim() : ruleWords(rule);
+  const companion = {
+    item_name: match.name,
+    matched_product: match.name,
+    requested_qty: qty,
+    planned_qty: qty,
+    status: 'add',
+    // TWO rule ids, because there are two answers to "why is this here": rule
+    // 37 asked for a companion, and rule 24 decided WHICH product it is. A
+    // person asking about the women's deodorant in the trolley gets both.
+    flags: ['added by household rule', 'rulebook companion',
+      'rulebook rule ' + causeId, 'rulebook rule ' + match.rule_id],
+    note: 'added by rule ' + causeId + ' to go with "' + item.item_name + '"'
+      + '; rule ' + match.rule_id + ' decided which product that is'
+      + (why ? ' - ' + why : ''),
+    alternatives: []
+  };
+  ctx.items.push(companion);
+
+  // The SOURCE line says so too. Without this, the pair is only visible by
+  // reading two lines and inferring the connection.
+  addFlag(item, 'companion added by household rule');
+  addFlag(item, 'rulebook rule ' + causeId);
+  addNote(item, 'rule ' + causeId + ' also added ' + qty + ' x ' + match.name
+    + ' as a separate line (product named by rule ' + match.rule_id + ')');
+
+  recordApplied(ctx.audit, {
+    line_no: lineNo, item_name: item.item_name, rule_id: causeId,
+    kind: 'add_companion', from: null, to: match.name,
+    quantity: qty, product_rule_id: match.rule_id, why: why
+  });
+  // A new line changes the basket, so any estimate computed before this pass is
+  // now wrong for the same reason a quantity change makes it wrong.
+  ctx.quantityChanged = true;
+}
+
 function applyJudgement(j, ctx) {
   const audit = ctx.audit;
   const lineNo = Number(j && j.line_no);
@@ -547,6 +808,11 @@ function applyJudgement(j, ctx) {
       line_no: lineNo, rule_id: ruleIdOf(rule),
       reason: kind === 'ask' ? 'consumer asked' : 'unknown judgement kind "' + kind + '" - treated as ask'
     });
+    return;
+  }
+
+  if (kind === 'add_companion') {
+    applyCompanion(j, ctx, item, lineNo, rule);
     return;
   }
 
@@ -729,7 +995,17 @@ async function applyRulebook(spec) {
     if (grounding.rules.some(function (s) { return String(s.id) === String(id); })) rulesById.set(String(id), r);
   });
 
-  const ctx = { byLineNo: byLineNo, rulesById: rulesById, audit: audit, quantityChanged: false };
+  const ctx = {
+    byLineNo: byLineNo, rulesById: rulesById, audit: audit, quantityChanged: false,
+    // The companion half needs three things the other verbs do not: the live
+    // item list (a new line is APPENDED to it), the rules array (exclusion is
+    // re-checked here rather than trusted from the packet), and the pool this
+    // packet actually offered.
+    items: items,
+    rules: Array.isArray(args.rules) ? args.rules : [],
+    household: household,
+    companions: Array.isArray(grounding.companion_products) ? grounding.companion_products : []
+  };
   reply.judgements.forEach(function (j) { applyJudgement(j, ctx); });
 
   return { plan: recount(working, ctx.quantityChanged, audit), grounding: grounding, audit: audit };
@@ -748,6 +1024,9 @@ module.exports = {
     selectRelevantRules: selectRelevantRules,
     isResolvableHold: isResolvableHold,
     mayChangeQuantity: mayChangeQuantity,
+    mayAddCompanion: mayAddCompanion,
+    mappedProducts: mappedProducts,
+    excludedProduct: excludedProduct,
     ruleWords: ruleWords,
     RESOLVABLE_CAUSES: RESOLVABLE_CAUSES,
     BENIGN_FLAGS: BENIGN_FLAGS

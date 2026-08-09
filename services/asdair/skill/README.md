@@ -212,6 +212,7 @@ exported so the production binding is thin.
 |---|---|
 | name a product for a line the planner could **not identify** (`ambiguous match`, `ambiguous regulars match`, `no explicit product mapping`), **and only from the candidates that line actually offered** | overrule a `map`, an `exclude`, an out-of-stock, a quantity conflict, a foreign-household product id, a line a `needs_decision` rule deliberately holds, or **any hold cause this module does not recognise** -- unrecognised means untouched |
 | change the quantity of a line already being bought, a whole number, `1..24` | set a quantity of zero, or add anything to the basket that was excluded |
+| add a **companion line** beside a line already being bought -- **only** a product an active `map` rule of this household already resolves, `1..24` units | name any other product: unmapped, merely in the catalogue, mapped for another household, forbidden by an `exclude` rule, or already in the basket |
 | **ask** | fall back on the deterministic answer when it is unsure |
 
 **Uncertainty is spoken.** An unclear rule, two rules pointing different ways, a
@@ -236,15 +237,14 @@ answer, or the change does not happen.
   rather than stale, and this module cannot recompute it (it never sees unit
   prices). It is set to `null` with `budget_flag: 'unknown'` and
   `summary.rulebook.estimate_invalidated: true`.
-- **Adding a basket LINE.** The three verbs are `set_product`, `set_quantity`
-  and `ask`; none of them can put a new item in a basket, and `set_product` may
-  only re-resolve a line the planner already held, from candidates that line
-  itself offered. So the second clause of live rule 37 -- *"add a FEMALE variant
-  to complete the last pair"* -- is **carried and said, never applied**: the
-  advisory echo puts it on the line, the grounding packet sends it verbatim to
-  the consumer, and the applied quantity change names it in the note a person
-  reads. A fourth verb is a design decision, not a way of teaching this system a
-  new kind of rule, and it is not taken here.
+- **Adding an ARBITRARY basket line.** *(Corrected 2026-08-09 -- this bullet
+  used to say no verb could add a line at all. `add_companion` now can, under
+  the bound below.)* A companion line may **only** carry a product an active
+  `map` rule of this household already resolves. A product that is merely in the
+  catalogue cannot be added, however real it is; nor can one mapped for another
+  household, one an `exclude` rule forbids, or one already in the basket. A
+  **fifth** verb remains a design decision, not a way of teaching this system a
+  new kind of rule.
 - **It is WIRED, but no real shop has run.** *(Corrected 2026-08-09: this bullet
   used to read "Nothing is wired. No pipeline caller invokes `applyRulebook`
   yet." B15-3 lane R2 made that false.)* `pipeline/runPipeline.js` calls
@@ -253,6 +253,58 @@ answer, or the change does not happen.
   true is the part that matters: **every test injects a stand-in consumer, so no
   real shop has ever exercised it.** That proves the path carries, applies and
   refuses; it proves nothing about how well a model judges household prose.
+
+### The companion line (`add_companion`) -- authorised 2026-08-09, and narrow on purpose
+
+Live rule 37 has two clauses. *"Round qty UP to an even number"* was executable
+from the day the rulebook existed. *"Add a FEMALE variant to complete the last
+pair"* was not: it puts a **new line** in the basket, and no verb could do that.
+`WO-B15-R4` refused to invent a general "add a product" verb for it. **That
+refusal was right and is not overturned.** What Warwick authorised instead:
+
+> *"close that one with the narrow deterministic companion-line seam you already
+> described. Anything else gets handled from actual evidence, **not by inventing
+> a general fourth model verb in anticipation**."*
+
+**What makes it deterministic is rule 24** -- an active `map` row that already
+resolves `sure female` to a named product. The household decided which women's
+deodorant it means when it wrote that rule. So the bound is one sentence, and it
+is the whole design:
+
+> **A companion line may ONLY carry a product an active `map` rule of this
+> household already resolves.**
+
+The consumer picks from a **closed, rule-derived list** exactly as `set_product`
+picks from a line's own candidates. It is built as **refusal by default**: the
+pool never contains a product an `exclude` rule forbids, and at apply time six
+guards run in order -- is this line actually being bought · was a product named ·
+does an exclusion forbid it · did a `map` rule of this household resolve it ·
+is it already in the basket · is the count within `1..24`. Only a reply that
+survives all six adds anything. Every refusal leaves the **shopping on the line
+exactly as it was** -- same product, same count, same status -- and is still
+recorded in `summary.rulebook.rejected` and written on the line, because silence
+is the one option this module never takes.
+
+**The arithmetic, because two readings are possible and the rule settles it.**
+The rule's own worked example is *"Mum 3 male -> add 1 female = 4"*: the male
+line **stays at 3** and the completing unit is the female variant. What gets
+rounded up to an even number is the **pair total**, not the male line -- rounding
+the male line to 4 buys four men's deodorants, which is not what was asked for.
+
+**Attribution names two rules, because there are two answers to "why is this in
+my trolley".** The companion line carries `rulebook rule 37` (which asked for it)
+and `rulebook rule 24` (which decided the product), in its flags and in the note
+a person reads; the source line records the companion beside it; and the audit
+entry carries both ids. Warwick can ask the shop itself.
+
+**What the seam is NOT.** No registry, no rule-expression language, no general
+mechanism. It hard-codes no rule id and no product: a household that writes a new
+`map` row gets a new companion candidate with no code change. **One line can
+produce several companions, of different products, at different quantities** --
+proven by execution in `rulebook.test.js` (`SHAPE:`), so a rule of the *"= 2 of
+this and 1 of that"* form needs no further mechanism here. What such a rule would
+still need is `map` rows for the products it names; **the bound is on the product
+source, not on the cardinality.**
 
 ### The best-value judgement is ARCHIVED (Warwick, 2026-08-09)
 
@@ -300,9 +352,10 @@ What that means concretely, and all of it is enforced by `rulebook.test.js`:
   PROSE mentions an offer.** Rules 12 and 25 (Nescafe Azera) stay for the same
   reason from the other direction: their directive is `needs_decision`, so they
   **ask a person** rather than optimise. Rule 37's outcome is arithmetic on a
-  quantity and is executed through this module; `rulebook.test.js` drives it
-  from a catalogue with no price field at all, and asserts the absence of the
-  price field before it asserts the behaviour.
+  quantity **plus a companion line for a product another rule already mapped**,
+  and both halves are executed through this module; `rulebook.test.js` drives
+  them from a catalogue with no price field at all, and asserts the absence of
+  the price field before it asserts the behaviour.
 - **Out of scope of the removal:** `planBasket`'s budget estimate
   (`estimated_total` / `budget_flag`, standing rule 7) and `rankAlternatives`'
   price-proximity *similarity* score are planner behaviour, not a bargain
