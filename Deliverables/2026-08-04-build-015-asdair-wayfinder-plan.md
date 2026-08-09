@@ -1202,10 +1202,92 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 > 4. The price limit is to be resolved **through the existing browser/planning-price seam** — ⛔ **no
 >    new architecture and no new Wayfinder.**
 
+> ### 🟢 PRODUCT DECISION — WARWICK, 2026-08-09. **BEST VALUE IS ARCHIVED. REMEMBER THE LAST CHOICE.**
+>
+> **His decision, quoted. Applies to the EXISTING BUILD-015 / B15-3 work — he ruled explicitly: no
+> new Wayfinder. "No further decision needed from me on this."**
+>
+> > *"I have changed my mind on the 'best value' rule. **ARCHIVE IT.**
+> >
+> > Do not make Terra, the planner, or the browser phase attempt to optimise Ariel/other choices by
+> > live price, price-per-wash, multibuy maths, or bargain judgement before handing the list to the
+> > browser.
+> >
+> > Replace it with a much simpler household rule: **WHEN THERE IS MORE THAN ONE VALID CHOICE,
+> > REMEMBER THE CHOICE I MADE LAST TIME.**
+> >
+> > - If several grounded catalogue candidates are genuinely acceptable and I choose one, persist that
+> >   choice as the household's most recent preference for that ambiguity.
+> > - On a subsequent shop, use that last choice so the list can resolve before browser execution
+> >   rather than asking me the same choice again.
+> > - This is an explicitly authorised standing preference/learning rule, not an accidental promotion
+> >   of an ordinary one-week answer.
+> > - It is a preference, not permission to invent products or ignore hard exclusions.
+> > - If the remembered product is unavailable or no longer a valid grounded candidate, behave
+> >   honestly rather than fabricating a match.
+> > - Keep normal immutable current-shop decisions and provenance intact.
+> >
+> > The objective is deliberately to SIMPLIFY the handoff: photo/list → AsdAIr resolves household
+> > intent → remembered choices remove repeat ambiguity → completed list handed to browser execution.
+> > Do not push bargain-shopping complexity into that path. …
+> >
+> > For now, Warwick remains the bargain hunter at the ASDA end. If he sees a better offer during
+> > final human review/checkout, he makes the judgement. That is intentional product scope: **AsdAIr
+> > should prepare the right shop reliably. It does not need to become a supermarket arbitrage desk.**
+> >
+> > Also: do not resurrect CDP price-shopping or Terra/browser back-and-forth to compensate for
+> > removing the value rule. Continue through the existing accepted browser contract."*
+>
+> **FUTURE RECONCILIATION ENHANCEMENT — his words, and he ruled it must NOT block B15-3 or the first
+> live photo:** *"During/after each real shop, capture observed prices for ALL accessible
+> Regulars/Favourites, not merely the products actually bought, and persist those observations in
+> Supabase with enough provenance/time information to know when they were observed. That gives us a
+> household price history which can later support useful pre-browser value suggestions from known
+> evidence — even if the latest observation is a week old. We can design that properly in the
+> reconciliation stage."* **Recorded here as the pointer; it is NOT designed and NOT started.**
+>
+> **LARRY'S RECORD, NOT WARWICK'S WORDS — what this makes false, and it is a lot:**
+>
+> - **Rule 31** (*"Ariel Pods: pick the BEST VALUE by price-per-wash"*) and **rule 36** (*"if a
+>   multibuy gives ≥50% off the EXTRA item(s), buy up to the offer quantity"*) are **ARCHIVED**. They
+>   were the two headline examples of the dead-59% argument and of D4 on this map.
+> - **Rule 37** (Sure pair rounding, *"any 2 for £X"*) is **multibuy-conditional and cannot be
+>   evaluated without offer evidence at plan time** — which is exactly what he removed. **Larry's
+>   reading: it is archived with 31 and 36.** Stated so he can overturn it; he ruled no further
+>   decision was needed, so it is not being sent back.
+> - **R1's AC3 is now testing archived behaviour.** Its three named cases were rules 31, 36 and 37,
+>   chosen at the time *because* they were the judgement layer. **Those tests must be re-cut, not
+>   deleted** — the rulebook's remaining job is real.
+> - **The price-at-plan-time residual is DISCHARGED, not outstanding.** It was the gate on rules
+>   31/36; with those archived it describes nothing. ⛔ **It must not be carried forward as an open
+>   limitation** — that would be a residual for work that no longer exists.
+> - **This SUPERSEDES the open determinism decision below.** A remembered choice is **durable data,
+>   not a fresh model judgement**, so the recomputation non-determinism it created is resolved by
+>   his answer rather than by choosing between the three options. The mechanism he has described **is
+>   option (a)** — persist the judgement — arrived at from the product end.
+> - **What the rulebook is still FOR:** carrying genuinely non-price household prose (rotation,
+>   out-of-stock meaning, exclusions, aliases) to the reasoning consumer. **The prohibition on
+>   growing a deterministic mini-language is unchanged and unaffected.**
+>
+> **The seam this lands on, established by execution and NOT to be rebuilt:** `asdair.rule_qa_log`
+> already carries `applies_going_forward` (`db/001:178`), which `planner.js` filters on — *"every
+> answer Warwick ever gave was written, read back, and discarded"* (`db/017` header). `db/017` also
+> fixes the boundary his last bullet protects: *"nothing here touches `asdair.rule_qa_log`,
+> `applies_going_forward`, or rule promotion. Current-shop meaning and future household learning are
+> different concerns and are stored apart."* **Silas is commissioned for the schema decision**
+> (`Deliverables/2026-08-09-silas-schema-decision-remembered-last-choice.md`), explicitly against the
+> 017 precedent that immutability is enforced by **absent grants**, not convention.
+
+> ### ⚫ SUPERSEDED — the determinism decision below is ANSWERED by the ruling above. Retained as record.
+>
+> **Do not action it as an open decision.** It was escalated (FusionDevBot 462) before Warwick's
+> ruling arrived; his "remember the last choice" mechanism is option (a) reached from the product end.
+> **The false comment at `runPipeline.js:1441` is still owed a correction**, and now the correction is
+> knowable rather than presumptuous.
+>
 > ### 🔴 OPEN PRODUCT DECISION — plan recomputation is no longer deterministic (`WO-B15-R2`, `022c874`)
 >
-> **Awaiting Warwick.** Notified 2026-08-09 (FusionDevBot 462). **NOT blocking** — safe work
-> continues either way.
+> **~~Awaiting Warwick.~~ ANSWERED — see above.** Notified 2026-08-09 (FusionDevBot 462).
 >
 > **The fact, verified by Larry's own execution and not taken on the worker's word:**
 > `planWithDecisions` (`runPipeline.js:132`) now calls `applyRulebook` (`:164`), and
