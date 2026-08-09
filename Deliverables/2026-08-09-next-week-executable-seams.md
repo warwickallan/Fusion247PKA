@@ -49,3 +49,27 @@
 ## The standing safety constraint remains
 
 **NO live order-confirmation forwarding to ShopperBot** until Lane D's slice is integrated and proven. Forwarding one today would create a spurious shop and spend a model call.
+
+---
+
+## LANE B1 — answer learning. **The seam is better than the establishment it was given.**
+
+**Line numbers re-pinned at `a5f5b5e`:** the break is `runPipeline.js:811`, **not `:641`** — Lane A moved everything ~170 lines. `applies_going_forward: false` is `:810`.
+
+**Do NOT re-read `rendered_candidates[callback_index]`, as the establishment proposed.** `decideAnswer` has already run **three lines earlier in the same loop** (`runPipeline.js:855`), and its `shop_decision` row carries `decision_kind`, `decided_regular_id` **and** `forward_intent`. **Derive `resolution` from that row** — one call to `shopDecisions.findDecisionForQuestion`, covering the tap path **and** the Terra path with the same code. `decided_regular_id` is a real FK, so a fabricated id is refused by the database rather than by hope.
+
+**Mutation plan.** Vehicle: `pipeline/answerJourney.test.js` — real `runPipeline`, real `recordAnswerLearning` against `test/harness.js:218`'s fake client, **only the model stubbed**. (1) tap a resolver-sourced candidate → assert an `enrichRegular … add_aka` op carrying the photographed wording and `suppression.prevents_repeat === true`; (2) mutate back to `{kind:'none'}` → must go RED, **verifying `git diff` is non-empty before trusting it**; (3) a Terra answer with `forward_intent:'no'` → assert **no** alias op and `one_week_only` set, then mutate the gate to unconditional → must go RED; (4) a label-only candidate → audit row, no alias, reason reported; (5) restore and re-run both suites.
+
+**Baselines at `a5f5b5e`:** pipeline **290/0**, outcome **193 pass / 1 skipped**.
+
+### 🔶 A GENUINE PRODUCT DECISION — WARWICK'S, and B1 cannot be implemented without it
+
+**`forward_intent` can never reach the tap path.** Enumerated repo-wide: its only writer is Terra (`deps.js:498` → `runPipeline.js:898`). `shopDecisions.resolveExactCandidate` (`:294-329`) returns `decision_kind` / `decided_regular_id` / `interpreted_by` **only**, and the **16-byte `callback_data` budget is already spent**. So **every button tap has `forward_intent = NULL`, permanently.**
+
+Warwick's constraint is that a one-off answer must **not** become a standing rule, while explicit forward intent may. A tap expresses neither. So:
+
+- **(a)** alias on any resolved `regular_id` — reaches the acceptance criterion, but **writes durable household state from no stated intent**;
+- **(b)** gate on `=== 'yes'` — only typed answers can ever teach; **taps never close B1**;
+- **(c) RECOMMENDED** — gate on `!== 'no'`, and an explicit this-week-only answer additionally sets `one_week_only: true`. That flag is **already honoured** at `buildAnswerLearning.js:330` and `promoteDecision.js:264` and is **set by no caller today**. Satisfies Warwick's constraint literally, keeps taps able to teach, and **fabricates nothing.**
+
+`applies_going_forward` stays hard `false` in all three. **Do not touch `planner.js:1091`** — that is Lane B's separate cross-week question.
