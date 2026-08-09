@@ -27,16 +27,38 @@ function pad(n, width) {
 
 function lineRow(l, seqWidth) {
   const qty = `x${l.required_quantity}`;
-  const where = l.origin === 'new_approved'
-    ? `SEARCH: "${l.approved_search_term}"`
-    : `${l.source_view.toUpperCase()} ref ${l.asda_product_ref}`;
   const brand = l.brand == null ? '(no brand)' : l.brand;
+
+  // WHERE TO GET IT. Three cases now, and the third is the one Warwick's
+  // Product Ruling 2 created: a KNOWN household product with no ASDA reference
+  // on file. It must never render as "ref null", and it is not a search-for-
+  // anything line either - it carries the identity to verify against.
+  let where;
+  if (l.origin === 'new_approved') {
+    where = `SEARCH: "${l.approved_search_term}"`;
+  } else if (l.retrieval) {
+    where = 'RETRIEVE: known item, no ASDA ref on file - find it, then CHECK it is the right one';
+  } else {
+    where = `${l.source_view.toUpperCase()} ref ${l.asda_product_ref}`;
+  }
+
   const head = `- [ ] ${pad(l.seq, seqWidth)}. ${brand} - ${l.canonical_product_name}  ${qty}`;
   const detail = `      ${where}`;
   const wrote = `      list said: "${l.original_list_line}"`;
   const why = l.quantity_rationale ? `      why: ${l.quantity_rationale}` : null;
   const fav = l.origin === 'new_approved' ? '      NEW: add, then click ASDA Favourite, then capture its product ref + URL.' : null;
-  return [head, detail, wrote, why, fav].filter(Boolean).join('\n');
+
+  // The identity to verify against, printed ON the line rather than only in the
+  // contract higher up the page: someone holding two candidate products should
+  // not have to scroll to remember what they are checking against.
+  let verify = null;
+  if (l.retrieval) {
+    const va = l.retrieval.verify_against;
+    const ident = [va.brand, va.canonical_product_name].filter((v) => v != null && v !== '').join(' ');
+    verify = `      must match: ${ident} - if two or more could be it, STOP this line and ask. Do not pick one.`;
+  }
+
+  return [head, detail, verify, wrote, why, fav].filter(Boolean).join('\n');
 }
 
 /**
@@ -62,10 +84,33 @@ function renderChecklist(handoff) {
   for (const p of handoff.prohibited_actions) out.push(`- **${p.text}**`);
   out.push('');
 
+  // THE FULL METHOD. This block is why this file exists: before 2026-08-09 it
+  // printed `handoff.method` and nothing else, and `handoff.method` carried
+  // three of the proven behaviours. Everything the worker is expected to know
+  // must be ON this page - it is the only thing the worker is given.
   out.push('## Method');
   out.push('');
-  handoff.method.forEach((step, i) => out.push(`${i + 1}. ${step}`));
+  handoff.method.forEach((step, i) => out.push(`${i + 1}. ${step.text}`));
   out.push('');
+
+  if (handoff.environment_constraints && handoff.environment_constraints.length > 0) {
+    out.push('## Things about ASDA you cannot change');
+    out.push('');
+    for (const c of handoff.environment_constraints) out.push(`- ${c.text}`);
+    out.push('');
+  }
+
+  // Rendered only when at least one line actually needs it. A rule with no line
+  // it applies to is noise on a phone, and this page is read while shopping.
+  const needsRetrieval = handoff.lines.filter((l) => l.retrieval).length;
+  if (needsRetrieval > 0) {
+    out.push(`## Items with no ASDA reference (${needsRetrieval})`);
+    out.push('');
+    out.push('These ARE known household products. We just do not have an ASDA product reference on file for them, which is normal and is not a problem to solve at the shelf.');
+    out.push('');
+    for (const c of handoff.retrieval_contract) out.push(`- ${c.text}`);
+    out.push('');
+  }
 
   // Household operating guidance. Rendered under its own heading with the rule
   // id shown, so it is never mistaken for the fixed method and its source is

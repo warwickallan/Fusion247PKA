@@ -44,12 +44,34 @@
 // JSON Schema `required` asserts PRESENCE ONLY, and the contract types
 // canonical_product_id / asda_product_ref / approved_search_term as nullable.
 // So this is SCHEMA-VALID today:
-//     { origin: "known", canonical_product_id: null, asda_product_ref: null }
+//     { origin: "known", canonical_product_id: null }
 // which is exactly the failure the rule exists to prevent - a known item
-// with no identity, which Sonnet could then only resolve by free-searching
-// it. Schema validation ALONE therefore does not prove the requirement.
-// (Reported to Larry at read-back 2026-08-04; he owns the schema and is
-// tightening the conditional branches to forbid null.)
+// with no IDENTITY. Schema validation ALONE therefore does not prove the
+// requirement.
+//
+// -------------------------------------------------------------------
+// KNOWN DIVERGENCE FROM THE COMMITTED SCHEMA (2026-08-09) - READ THIS
+// -------------------------------------------------------------------
+// Warwick's Product Ruling 2 made `asda_product_ref` OPTIONAL for a known
+// line, and permits source_view "search" for a known line that has no
+// usable reference. This producer implements that ruling.
+//
+// The committed contract still encodes the OLD rule. In
+// Builds/BUILD-015-.../SONNET-BROWSER-EXECUTION-PACKET.schema.json, the
+// `$defs.line.allOf[0]` branch for origin "known" still says:
+//     required: [asda_product_ref, canonical_product_id]
+//     asda_product_ref: { type: "string", not: { const: null } }
+//     source_view:      { enum: ["regulars", "favourites"] }
+//
+// So a packet that is CORRECT under the ruling is INVALID under the
+// committed schema. That file sits under Builds/**, which the implementer
+// of this change may not write, so the divergence is REPORTED here rather
+// than silently worked around, and it is pinned by a test in
+// buildExecutionPacket.test.js so it cannot be forgotten. Larry owns the
+// schema. When he corrects it, that test tells you.
+//
+// Schema validation is TEST-ONLY in this service - this module does not
+// import schemaAssert - so the divergence does not block the runtime path.
 //
 // This module rejects it REGARDLESS of what the schema does. Belt and
 // braces: the producer is the control that must hold even if the contract
@@ -278,20 +300,50 @@ function buildLine(raw, where) {
     }
     line.canonical_product_id = requirePositiveInt(raw.canonical_product_id, where + '.canonical_product_id');
 
-    if (raw.asda_product_ref === null || raw.asda_product_ref === undefined) {
-      fail(where + ' has origin "known" but asda_product_ref is ' + JSON.stringify(raw.asda_product_ref) +
-           '. Without an ASDA product reference a known item could only be found by free-searching it, ' +
-           'which is forbidden. (Schema-valid today; rejected here regardless.)');
-    }
-    const ref = requireText(raw.asda_product_ref, where + '.asda_product_ref');
-    if (!ASDA_PRODUCT_REF_PATTERN.test(ref)) {
-      fail(where + '.asda_product_ref "' + ref + '" must be 3-12 digits');
+    // ---------------------------------------------------------------
+    // WARWICK'S PRODUCT RULING 2, 2026-08-09. SUPERSEDES the rejection
+    // that used to live here.
+    // ---------------------------------------------------------------
+    // This producer used to fail any known line whose asda_product_ref was
+    // absent, on the reasoning that "without an ASDA product reference a known
+    // item could only be found by free-searching it, which is forbidden".
+    //
+    // The ruling separates the two ideas that reasoning fused together:
+    //
+    //   "Known household identity and ASDA retrieval method are SEPARATE
+    //    concerns... use its durable ASDA reference when available and valid;
+    //    otherwise the supervised route MAY use bounded ASDA search/navigation
+    //    using the canonical product identity, brand, variant and supplied
+    //    catalogue evidence; the resulting ASDA product MUST be verified
+    //    against the known household identity before addition; search is a
+    //    RETRIEVAL method - it does NOT redefine the household item as new."
+    //
+    // The old rule failed the ENTIRE weekly shop over one missing reference,
+    // against a catalogue where a large minority of known products have none.
+    // Identity (canonical_product_id, asserted above) is still mandatory. The
+    // REFERENCE is now optional, and its absence routes the line to verified
+    // retrieval downstream - see `retrieval` in services/asdair/handoff.
+    //
+    // A reference that is PRESENT must still be valid: "when available and
+    // valid" is the ruling's own wording, and a malformed reference is an
+    // upstream defect rather than a missing one. It is refused rather than
+    // quietly downgraded to "search for it instead", which would hide the bug.
+    let ref = null;
+    if (raw.asda_product_ref !== null && raw.asda_product_ref !== undefined) {
+      ref = requireText(raw.asda_product_ref, where + '.asda_product_ref');
+      if (!ASDA_PRODUCT_REF_PATTERN.test(ref)) {
+        fail(where + '.asda_product_ref "' + ref + '" must be 3-12 digits');
+      }
     }
     line.asda_product_ref = ref;
 
-    if (sourceView === 'search') {
-      fail(where + ' has origin "known" with source_view "search". A known item must NEVER be free-searched - ' +
-           'it is added through Regulars or Favourites.');
+    // Search is now permitted for a known item ONLY where we hold no usable
+    // reference. Where we DO hold one, sending the line to a free search would
+    // throw away identity we already have, so that stays refused.
+    if (sourceView === 'search' && ref !== null) {
+      fail(where + ' has origin "known" with source_view "search" while already carrying a valid ' +
+           'asda_product_ref. Use the reference: it is added through Regulars or Favourites. Search is ' +
+           'permitted for a known item ONLY when no usable reference exists.');
     }
     line.approved_search_term = optionalText(raw.approved_search_term, where + '.approved_search_term');
   } else {
