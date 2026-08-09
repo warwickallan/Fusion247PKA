@@ -651,7 +651,66 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 > requesting authority; only PRE-3 and PRE-4 were executed on 2026-08-09. The remaining six are being
 > run before the authority request, which is compliance with the runbook, not new scope.
 
-> # 🔄 ROTATION STATE — 2026-08-09. **READ THIS FIRST. It is the resumable frontier.**
+> # 🔴 ROTATION STATE — 2026-08-10. **READ THIS FIRST. IT IS THE RESUMABLE FRONTIER.**
+>
+> ## ⏸️ THE NEXT ACTION IS TO WAIT FOR WARWICK'S PHOTOGRAPH. NOTHING ELSE PRECEDES IT.
+>
+> **Larry told him to send it (FusionDevBot 469).** `CONVERGE ✅ → MIGRATE ✅ → CUT OVER ✅ →
+> VERIFY RUNNING TRUTH ✅ → PHOTO ⬅ next.` **Do NOT invent another pre-photo phase, plan, review
+> cycle or readiness ceremony unless execution exposes a genuine blocker** (Warwick, 2026-08-10).
+>
+> **Evidence for every tick above:**
+> [[Deliverables/2026-08-10-convergence-migration-cutover-evidence]] — read it before re-verifying
+> anything, because it is all already measured.
+>
+> | | |
+> |---|---|
+> | **Converged head** | **`c4d74d2`**, on `main` AND pushed to `origin/b15-3/integration` |
+> | **Live runtime** | PID **26856**, started `2026-08-09T23:30:07Z`, bytes proven identical to `HEAD` |
+> | **Migration 018** | **APPLIED and verified** — `asdair.remembered_choice`, 0 rows, 8/8 constraints validated, `asdair_rw` SELECT+INSERT, **UPDATE/DELETE to nobody** |
+> | **Rules 31 & 36** | **ARCHIVED LIVE** (`active=false`). **Rule 37 RETAINED and executable** |
+> | **Suites at that head** | 1,265 tests. pipeline 366/366 · handoff 114 · packet 109 · browser-runner 75 · bot 165 · intake 34 · reconcile 106 · skill 296 run/287 pass/**7 pre-existing env failures by name** · mutation-proof **9/9** |
+> | **Workers running** | **NONE.** All returns banked |
+> | **Uncommitted work** | **NONE** — all 15 worktrees clean, verified by execution |
+>
+> ### ⛔ WHAT A FRESH LARRY MUST NOT CONCLUDE
+>
+> - **NOT that B15-3 is complete.** **No real shop has run.** It is not live-complete until the
+>   integrated journey proves typed text → Terra interpretation → prose-rule application → durable
+>   decision/recompute → honest unresolved behaviour. **Warwick's explicit ruling.**
+> - **NOT that the runtime has read `remembered_choice`.** It has the code and the permission; its
+>   `last_seq_scan` predates the restart and those scans are **Larry's own queries**. The first real
+>   read is the photo journey.
+> - **NOT that anything downstream has handled a companion line.** The handoff packet, browser
+>   runner and reconcile have **never** been given an item that was not on the written list. **The
+>   Sure companion line will be the first, and it is the most likely site of the next real defect.**
+>   Warwick has ruled that this is a reason to run the journey, **not** to delay it.
+>
+> ### 🅿️ OFF THE CRITICAL PATH — must not delay the photo (Warwick, 2026-08-10)
+>
+> - **RULES CRUD** — ⛔ **NOT delivered**, and must not be reported as such merely because
+>   `promoteDecision` exists, INSERT exists, or Silas has a grant recommendation
+>   ([[Deliverables/2026-08-09-silas-decision-rules-crud]], `0437ee6`). The bar is the **proven
+>   production loop**: natural language → typed mutation intent → authorised mutation → active
+>   executable rule or truthful archive → survives restart → affects planning. **Two gates, not one:
+>   the `applies_going_forward: false` literal AND a second gate that would otherwise mint an inert
+>   `info` rule.** ⚠️ Flipping that literal also re-enables the planner's prose prior-answer path.
+> - **RULE 39** — *"Mum 3 Mince Hotpot = 2 beef + 1 chicken"*. **Proven by execution that the R5
+>   companion seam already represents one phrase → two mapped products at different quantities.**
+>   ⛔ **NOT architecture work.** Establish the two real grounded `map` rows from household/catalogue
+>   truth; if unambiguous, add the data and prove it. **No new verb, no new planner, no new Wayfinder.**
+> - **Governor / WO guard** — `build-020/wo-readiness-validator` (`7d63fb1`) is **not on `main`**, so
+>   registering it in `.claude/settings.json` would point the host at a file the live checkout lacks.
+>   **That branch must converge first.** Warwick approved activation at the next natural restart.
+> - **Migration 011 is untracked and gitignored**, and its header carries wording `001:117-139`
+>   records as WRONG. **The live DB is ahead of git for those rows.** Warwick's decision; no action
+>   before the photo.
+>
+> ---
+>
+> <details><summary>📕 SUPERSEDED — the 2026-08-09 rotation block, retained as record. Do not action it.</summary>
+>
+> # 🔄 ROTATION STATE — 2026-08-09 *(superseded by the block above)*
 >
 > **Phase:** GROUNDED RECOGNITION, IN PROGRESS · **Sub-phase:** B15-3, ACTIVE, executing.
 >
@@ -789,6 +848,8 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 >   human-interaction layer.
 > - **NOT that CDP needs re-proving.** Warwick closed it: one profile, one session, one tab, ten
 >   items, basket ready. **Re-proving it is prohibited.**
+
+> </details>
 
 ## SUB-PHASE B15-3 — NATURAL ANSWERING AND AN EXECUTABLE RULEBOOK. **ACTIVE. Authorised by Warwick 2026-08-09 with execution approval; no further design handback.**
 
