@@ -55,6 +55,7 @@ import { questionKeyFor, intentKeyFor, sourceIdFor, outboxKeyFor, normaliseTerm 
 import * as store from './store.js';
 import * as shopLines from './shopLines.js';
 import * as shopDecisions from './shopDecisions.js';
+import * as rememberedChoice from './rememberedChoice.js';
 import { applyDecisionsToPlan } from './applyDecisions.js';
 
 // ── THE BROWSER HANDOFF, ON THE LIVE ROUTE ─────────────────────────────────
@@ -174,7 +175,205 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
     : new Map(((catalogue && catalogue.regulars) || []).map((r) => [Number(r.id), r]));
 
   const result = applyDecisionsToPlan({ plan: judged, decisions, questionKeyFor, regularsById });
-  return { ...result, decisions };
+
+  // ── AND THE CHOICE HE MADE LAST TIME (WP-B15-3-M1) ────────────────────────
+  // LAST, and only over what is STILL unresolved after all three stages above.
+  //
+  // The order is the precedence and it is deliberate: a standing preference is
+  // the WEAKEST of the four inputs. It cannot reach a line a hard exclusion
+  // removed, a line a rule already resolved, or a line Warwick has decided
+  // this week - those are no longer unresolved by the time this runs. It can
+  // only collapse an already-grounded, already-permitted ambiguity down to one
+  // of its own members.
+  //
+  // It lives HERE, inside planWithDecisions, for exactly the reason the
+  // rulebook and the decisions do: there is no plan table, so "the household's
+  // last choice was applied" is a claim about EVERY recomputation, and the only
+  // way to make it true everywhere is to make it a property of this function.
+  // Wiring it into stepPlan alone would resolve the list for the questions and
+  // leave the BROWSER PACKET planning as though nothing had been remembered -
+  // and Warwick's requirement is that the list resolve BEFORE browser
+  // execution.
+  const memory = await resolveRememberedChoices(deps, shop, {
+    plan: result.plan, unresolved: result.unresolved, regularsById,
+  });
+
+  return {
+    ...result,
+    plan: memory.plan,
+    unresolved: memory.unresolved,
+    remembered: memory.remembered,
+    remembered_refused: memory.refused,
+    decisions,
+  };
+}
+
+/**
+ * THE READ HALF OF "REMEMBER THE CHOICE I MADE LAST TIME".
+ *
+ * Warwick, 2026-08-09: "use that last choice so the list can resolve BEFORE
+ * browser execution rather than asking me the same choice again... If the
+ * remembered product is unavailable or no longer a valid grounded candidate,
+ * behave honestly rather than fabricating a match."
+ *
+ * ── THIS WEEK'S CANDIDATE SET IS RECOMPUTED, NEVER READ OFF THE MEMORY ──────
+ * The stored `candidate_regular_ids` is EVIDENCE of what was on the table when
+ * he chose - it is what lets AsdAIr say "last time it was between A, B and C".
+ * It is NOT the set a memory is validated against. That set is derived here,
+ * fresh, by the SAME `planCandidates` that builds a question card, from the
+ * SAME durable interpretation rows - so "a grounded candidate" means one thing
+ * whether a line is being asked about or remembered about.
+ *
+ * ── COSTS NOTHING WHEN THERE IS NOTHING TO REMEMBER ────────────────────────
+ * A plan with no unresolved lines issues no statement at all: no shop_line
+ * read, no memory read. The common case - a fully resolved list - is
+ * byte-for-byte the traffic it was before this existed.
+ *
+ * ── AN UNREADABLE MEMORY DEGRADES VISIBLY; IT NEVER FAILS A SHOP ───────────
+ * MIGRATION 018 IS AUTHORED, NOT APPLIED. Until Larry applies it under
+ * Warwick's authority `asdair.remembered_choice` DOES NOT EXIST, and this read
+ * raises an undefined-table error on every pass. Letting that propagate would
+ * fail every shop in the estate between this merging and that migration
+ * landing - a shop that is otherwise entirely correct, because a household
+ * with no memory simply ASKS, which is what it did last week.
+ *
+ * So the READ is caught, and that is `applyRulebook`'s established precedent
+ * rather than a new one: where the enrichment cannot be consulted NO LINE
+ * CHANGES, every affected line stays held for a human, and the reason is
+ * RECORDED. It is the judgement `realRecordLearning` makes and the opposite of
+ * the one `recordAnswerLearning` makes - for the stated reason that an answer
+ * surviving the week IS that path's outcome, whereas a preference is next
+ * week's convenience and this week's shop is complete without it.
+ *
+ * ⚠️ CAUGHT IS NOT SWALLOWED. The failure travels in `refused`, reaches the
+ * step's own return, and goes through deps.log. A silence here would look
+ * identical to "this household has no preferences yet", which is exactly the
+ * D-1 shape this build has already paid for three times.
+ *
+ * ONLY THE I/O IS INSIDE THE `try`. `applyRememberedToPlan` is pure and is
+ * deliberately outside it: a defect in the RESOLUTION RULE must be loud,
+ * immediately and everywhere, and must never be absorbed as "the memory could
+ * not be read".
+ */
+async function resolveRememberedChoices(deps, shop, { plan, unresolved, regularsById }) {
+  const empty = { plan, unresolved, remembered: [], refused: [] };
+  const held = (Array.isArray(unresolved) ? unresolved : [])
+    .filter((u) => u && u.needs_clarification_round !== true);
+  if (held.length === 0) return empty;
+
+  const candidateIdsByTerm = new Map();
+  const terms = [];
+  let memoriesByTerm = null;
+
+  try {
+    // The interpretation is the ONLY source of trustworthy regulars ids on a
+    // candidate - see planCandidates. Read once, for the whole plan.
+    const interpreted = await shopLines.listLines(deps, shop.id);
+    const byReading = new Map(interpreted.map((l) => [normaliseTerm(l.raw_reading), l]));
+    const lineByKey = new Map();
+    for (const it of (Array.isArray(plan.items) ? plan.items : [])) {
+      if (!it || !it.item_name) continue;
+      try { lineByKey.set(questionKeyFor(it.item_name), it); } catch { /* unreadable line - no key */ }
+    }
+
+    for (const entry of held) {
+      const term = normaliseTerm(entry.item_name);
+      if (term === '') continue;
+      const line = lineByKey.get(entry.question_key) || { item_name: entry.item_name, alternatives: [] };
+      const ids = planCandidates(line, byReading.get(term) || null)
+        .map((c) => c.regular_id)
+        .filter((v) => v !== null && v !== undefined)
+        .map(Number);
+      candidateIdsByTerm.set(term, ids);
+      if (!terms.includes(term)) terms.push(term);
+    }
+    if (terms.length === 0) return empty;
+
+    memoriesByTerm = await rememberedChoice.loadRememberedChoices(deps, shop.household_id, terms);
+  } catch (err) {
+    const detail = String(err && err.message ? err.message : err);
+    if (typeof deps.log === 'function') {
+      deps.log('remembered_choice_read_failed', { shop_ref: shop.shop_ref, detail });
+    }
+    return {
+      ...empty,
+      // NAMED, ONE LINE PER LINE THAT COULD HAVE BEEN RESOLVED. A degradation
+      // nobody can see is a degradation nobody fixes.
+      refused: held.map((u) => ({
+        item_name: u.item_name,
+        question_key: u.question_key,
+        reason: `the household's remembered choices could not be read: ${detail}`,
+      })),
+    };
+  }
+
+  if (memoriesByTerm.size === 0) return empty;
+
+  return rememberedChoice.applyRememberedToPlan({
+    plan,
+    unresolved,
+    memoriesByTerm,
+    candidateIdsByTerm,
+    activeRegularIds: regularsById,
+    normaliseTerm,
+  });
+}
+
+/**
+ * THE WRITE HALF. One settled decision of the authorised kind becomes the
+ * household's most recent preference for that ambiguity.
+ *
+ * ── WHY A FAILURE HERE IS REPORTED AND NOT THROWN ──────────────────────────
+ * Warwick's own boundary: "Keep normal immutable current-shop decisions and
+ * provenance intact." The decision row is ALREADY WRITTEN by the time this
+ * runs, and this week's shop is completely correct without a memory - the
+ * memory is next week's convenience. Failing the shop over it would let a
+ * forward-learning write destroy a current-shop outcome, which is the exact
+ * separation migration 017 exists to preserve.
+ *
+ * It is `realRecordLearning`'s reasoning, not `recordAnswerLearning`'s: the
+ * latter throws because the answer surviving the week IS its outcome. This is
+ * the former case.
+ *
+ * ⚠️ AND IT IS REPORTED, NEVER SWALLOWED. The failure travels back in the
+ * step's own return AND through deps.log. A silence here would look identical
+ * to "there was nothing to remember", which is the shape of defect this whole
+ * Work Package exists to end.
+ *
+ * NOTE FOR THE FIRST LIVE RUN: migration 018 is AUTHORED, NOT APPLIED. Until
+ * Larry applies it under Warwick's authority, this write fails with an
+ * undefined-table error on every shop - reported on every pass, failing
+ * nothing, and self-healing the moment 018 lands because the same decision is
+ * re-offered on the next pass.
+ */
+async function rememberIfAuthorised(deps, shop, question, decision) {
+  let verdict;
+  try {
+    verdict = rememberedChoice.decideToRemember({ shop, question, decision, normaliseTerm });
+  } catch (err) {
+    return { remembered: false, reason: String(err && err.message ? err.message : err) };
+  }
+  if (!verdict.remember) return { remembered: false, reason: verdict.reason };
+
+  try {
+    const res = await rememberedChoice.rememberChoice(deps, verdict.spec);
+    return {
+      remembered: true,
+      created: res.created,
+      remembered_choice_id: res.choice ? res.choice.id ?? null : null,
+      choice_term: verdict.spec.choice_term,
+    };
+  } catch (err) {
+    const detail = String(err && err.message ? err.message : err);
+    if (typeof deps.log === 'function') {
+      deps.log('remembered_choice_write_failed', {
+        shop_ref: shop.shop_ref,
+        question_key: question ? question.question_key : null,
+        detail,
+      });
+    }
+    return { remembered: false, failed: true, reason: detail };
+  }
 }
 
 /** The list_date a shop belongs to, taken from its ref. NO CLOCK: a retry that
@@ -496,7 +695,13 @@ async function stepPlan(deps, snapshot) {
   // THE PLAN, WITH WARWICK'S CURRENT-SHOP DECISIONS ALREADY APPLIED. Not the
   // raw planner output: a line he has decided is no longer a line that needs
   // him, and `unresolved` is the set that genuinely still does.
-  const { plan, applied, unresolved } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
+  // `remembered` is the set of lines that resolved from the choice Warwick made
+  // last time, WITHOUT a question being raised. `remembered_refused` is the
+  // honest other half: a memory existed and was NOT used, with the reason -
+  // reported so a refusal never looks like a memory that simply never existed.
+  const {
+    plan, applied, unresolved, remembered, remembered_refused: rememberedRefused,
+  } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
 
   // The interpretation is the ONLY source of regulars ids on a candidate. See
   // planCandidates below for why that matters.
@@ -761,6 +966,7 @@ async function stepPlan(deps, snapshot) {
       stepped: false, step: gate.step, from: shop.status, to: null,
       reason: gate.reason, plan_summary: plan.summary, questions: opened,
       decisions_applied: applied, lines_unresolved: unresolved,
+      remembered_choices: remembered, remembered_refused: rememberedRefused,
     };
   }
 
@@ -770,6 +976,7 @@ async function stepPlan(deps, snapshot) {
     plan_summary: plan.summary, questions: opened,
     questions_open: openNow,
     decisions_applied: applied, lines_unresolved: unresolved,
+    remembered_choices: remembered, remembered_refused: rememberedRefused,
   };
 }
 
@@ -992,7 +1199,16 @@ async function decideAnswer(deps, shop, question) {
   // Already decided - the database owns that fact, not this process.
   const existing = await shopDecisions.findDecisionForQuestion(deps, question.id);
   if (existing) {
-    return { question_key: question.question_key, decided: false, reason: 'already decided' };
+    // SELF-HEALING, and deliberately so. A shop decided before migration 018
+    // existed - or on a pass where the memory write failed - gets its
+    // remembered choice on the next pass, from the decision the database is
+    // already holding. The insert is idempotent on source_decision_id, so a
+    // decision that has already been remembered costs one refused INSERT and
+    // changes nothing.
+    const memory = await rememberIfAuthorised(deps, shop, question, existing);
+    return {
+      question_key: question.question_key, decided: false, reason: 'already decided', memory,
+    };
   }
 
   // ── 1. DETERMINISTIC. No model call on this path, and a test asserts it. ──
@@ -1001,10 +1217,16 @@ async function decideAnswer(deps, shop, question) {
     const res = await shopDecisions.recordDecision(deps, {
       shop_id: shop.id, question_id: question.id, ...exact.decided,
     });
+    // A TAP ON A CARD OFFERING TWO OR MORE GROUNDED CANDIDATES IS *EXACTLY*
+    // WHAT WARWICK DESCRIBED: "several grounded catalogue candidates are
+    // genuinely acceptable and I choose one". It is also the common case, so
+    // the memory must be written on the deterministic path and not only on the
+    // free-text one - and it costs no model call here either.
+    const memory = await rememberIfAuthorised(deps, shop, question, res.decision);
     return {
       question_key: question.question_key, decided: res.created,
       kind: res.decision.decision_kind, interpreted_by: res.decision.interpreted_by,
-      model_called: false,
+      model_called: false, memory,
     };
   }
 
@@ -1119,9 +1341,14 @@ async function decideAnswer(deps, shop, question) {
     };
   }
 
+  // The free-text half of the same rule. `clarification_required` never
+  // reaches here as a rememberable kind - decideToRemember refuses it, and the
+  // composite foreign key would refuse the row - so an answer AsdAIr could not
+  // read can never become a standing preference.
+  const memory = await rememberIfAuthorised(deps, shop, question, res.decision);
   return {
     question_key: question.question_key, decided: res.created,
-    kind: res.decision.decision_kind, interpreted_by: 'terra', model_called: true,
+    kind: res.decision.decision_kind, interpreted_by: 'terra', model_called: true, memory,
   };
 }
 
