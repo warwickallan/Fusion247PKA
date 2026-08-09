@@ -1,0 +1,125 @@
+{
+  "session_date": "2026-08-09",
+  "branch": "main",
+  "worktree": "C:\\Fusion247PKA",
+  "host": "claude",
+  "host_version": "2.1.226",
+  "model": "claude-opus-5[1m]",
+  "opening_head": "f149f7fd0d8f9dc1d7b87e2afed5adae5b8d8199",
+  "closing_head": "f203e019353e4a4fd06895f8ef9ae6ed34208205",
+  "closing_head_note": "Commissioned closing head, used here for session identity. VERIFIED AT REPORT TIME: .git/refs/heads/main reads 8bc5340d05c4507a0a7501361e7995c8850becf8 — exactly one commit later ('Rotate step 8: report pointer and closing head on the map', epoch 1786303260 = 19:21:00Z). That commit is rotation bookkeeping with no product change. Both artefacts state this identically; there is one SHA in this field and the discrepancy is declared, not hidden.",
+  "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-09-session-performance-report-b15-3-rotation.md",
+  "payload_path": "Deliverables/2026-08-09-session-report-payload.json",
+  "report_status": "DELIVERED by Pax. Same-runtime, separate-context review — NOT external verification.",
+  "session_range_note": "Single-build session. main f149f7f..8bc5340 = 14 commits, of which ZERO are product code. Product change landed (a) in the household database as migration 017 and (b) on branch b15-3/lane-c-browser-wiring (d9c2ca6 CI fix, 6a2c6dc C3 merge). Window established from capae-opening.json snapshot_at (SessionStart) to the last governor statusline sample; reflog epochs resolved by triple correlation against ding-log.jsonl, Work Order generated_at headers and the statusline sample.",
+  "elapsed_minutes": 170,
+  "elapsed_note": "16:31:26.471Z -> 19:21:27.201Z = 2h50m01s. Start = capae-opening.json snapshot_at (SessionStart hook). End = last statusline telemetry sample. Measured agent execution inside that window = 45m36s (sum of duration_ms across all 8 returns), heavily parallel.",
+  "total_context_tokens_in": 614549,
+  "total_context_tokens_in_note": "CLOSING level, MEASURED: 614,549 / 1,000,000 = 61% used, 39% remaining, sampled 2026-08-09T19:21:27.201Z from ~/.mypka/governor/health/C--Fusion247PKA/aa9a5326-b0c8-4e0f-bd82-2ecf23a6447f.json (source: statusLine). The ledger's '~560k at rotation' is Larry's earlier read at /rotate step 5b and is consistent with growth during rotation; the statusline figure is the measured one. OPENING reading UNESTABLISHED — the health store keeps one sample per session and no start sample survives. TOTAL MOVEMENT therefore UNESTABLISHED.",
+  "total_context_tokens_out": 971,
+  "total_subagent_tokens": 975414,
+  "total_subagent_tokens_note": "Total A, deduplicated by agent ID — a FLOOR, not a final: agents a71d28ce and a8b4c945 were still running when the ledger was written. Column-summing would give 1,290,742 and be wrong by ~24% (subagent_tokens is cumulative per agent; tool_uses and duration_ms are per-dispatch, RE-TESTED this session). Ledger: Deliverables/2026-08-09-subagent-token-ledger-asdair-b15-3.md. NEVER added to the context level — occupancy is a level, traffic is a flow. Ratio ~1.6:1 flow to level, an order of magnitude only.",
+  "subagent_footprint_note": "Total B: largest single footprint = Explore 248,516 (one shot, 61 tool uses, the most valuable return of the session). Two persistent agents at >=167,151 and >=190,538, both still growing.",
+  "subagent_counts_note": "Total C: 8 returns, 6 distinct agents, 200 tool uses.",
+  "rate_limit_five_hour_pct": 19,
+  "rate_limit_seven_day_pct": 3,
+  "wo_total": 5,
+  "wo_first_dispatch_success": 0,
+  "wo_first_dispatch_note": "FIVE keel Work Order dispatches, ZERO began substantive work on first dispatch. 3 REFUSE (a7e420aa, aef9bdbe, ac471641), 2 CLARIFY (a71d28ce, a8b4c945) of which one escalated to HOLD on resume. Two orders eventually reached a buildable state after amendment: WO-2026-08-09-B15-C4 (2x CLARIFY) and WO-2026-08-09-B15-A1 (CLARIFY + HOLD). Cause was Larry's in every case: the envelope was GENERATED but not AUTHORED or read back — live recompute returned {\"authorCount\":24,\"unresolvedCount\":0,\"ready\":false} on two dispatched orders, and the recompute command is printed in the footer of the order files themselves. Compounding cause: file_surface guessed rather than traced, despite a fresh production call-path map being in hand.",
+  "wo_amendments": 2,
+  "wo_refusals": 3,
+  "wo_clarifies": 3,
+  "wo_holds": 1,
+  "wo_preventability_note": "3x REFUSE fully preventable by one sub-second command. 2x CLARIFY largely preventable by tracing the surface from the call-path map already produced. 1x HOLD legitimately discovered and NOT preventable — a renderer-less outbox kind is abandoned at runtime.js:624-626, the exact silent-drop defect its own AC4 exists to close.",
+  "dings_sent": 14,
+  "dings_failed_in_window": 0,
+  "dings_note": "Message ids 445-458, contiguous, every one exit 0; parent channel available throughout. One failure at 16:17:59Z (usage-message-file-unreadable, ENOENT, exit 4) sits 13 minutes BEFORE this session's window and was self-corrected by a successful send 31s later. Cadence one ding per 12.1 minutes, 749-2,182 bytes. WHETHER ANY DING WAS ROUTINE NARRATION IS STRUCTURALLY UNMEASURABLE: ding.mjs deliberately does not record message text, so the accountability log cannot audit the rule it exists to serve. A one-word class field would fix that without recording content — reported for Warwick's decision, NOT raised as work.",
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+  "lines_note": "Line-level split UNESTABLISHED — no git available to Pax. Commit-level split IS established: 14/14 commits on main are documentation (5 map, 4 evidence, 4 Work Order/amendment, 1 rotation bookkeeping) and ZERO are product code. The '18 files, +3,343 lines' figure in Larry's account is a MERGE of previously authored work, not new authorship this session.",
+  "allocation_product_pct": 37,
+  "allocation_admin_pct": 23,
+  "allocation_evidence_pct": 9,
+  "allocation_rework_pct": 24,
+  "allocation_waiting_pct": null,
+  "allocation_note": "Derived from commit epochs; segments are NON-EXCLUSIVE because delegation ran in the background during product work, so the figures deliberately sum above 100%. A further ~14% is orientation and rotation admin. Waiting on Warwick is UNESTABLISHED — he was present and ruling throughout, and Pax has no transcript access.",
+  "specialists": {
+    "keel": {
+      "dispatches": 5,
+      "returns": 7,
+      "tokens": 902898,
+      "tool_uses": 139,
+      "note": "Deduplicated per agent ID: 138,580 + 110,715 + 119,914 + 167,151 + 190,538. The last two are FLOORS — both agents were still running. Verdicts: 3 REFUSE, 3 CLARIFY, 1 HOLD. Zero first-dispatch starts. Every adverse return was CORRECT and each found something real."
+    },
+    "explore": {
+      "dispatches": 1,
+      "returns": 1,
+      "tokens": 248516,
+      "tool_uses": 61,
+      "note": "The most expensive single agent and, on the evidence, the most valuable: the seven-question production call-path map that located the dead handoff/ package, the CI gap hiding 213 unrun tests, and the tab-per-item cause. Cost 33% LESS than the three REFUSE returns combined (369,209) and produced more."
+    },
+    "veritas": { "dispatches": 0, "tokens": null, "note": "No assurance gate opened this session. No boundary reached PASS, so none was owed." },
+    "codex_cli": { "executions": 0, "tokens": null, "note": "No Codex run this session." }
+  },
+  "findings": [
+    {
+      "family": "work-order-not-generated",
+      "exposure": "recurrence",
+      "summary": "The generation half of the MUST held — both banked orders carry the GENERATED header with a verified governance_head and four canonical blob SHAs — but the READ-BACK half failed. Five Work Order dispatches, zero began substantive work: 3 REFUSE, 2 CLARIFY, one escalating to HOLD. Live recompute returned ready:false on two dispatched orders; the recompute command is printed in the footer of the order files themselves. Compounding cause: file_surface guessed rather than traced, despite a fresh production call-path map being in hand from the Explore dispatch. Cost ~975k subagent tokens (a floor) against zero committed worker output. The prevention did not hold; the clean streak of 2 is broken.",
+      "evidence_ref": "Deliverables/2026-08-09-subagent-token-ledger-asdair-b15-3.md"
+    },
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "recurrence",
+      "summary": "Fired once and WARWICK caught it, not Larry: Larry described instructions.js v2 as 'on the production route' when it was merged but not production-wired, and Warwick corrected him verbatim. A prevention that requires the human to fire it is not a prevention. Everything after the correction was exemplary and is credited: the cutover evidence refuses the claim on measured grounds (shop_decision seq_scan unchanged at 5 across two watch ticks while shop_question rose 40->47), greps establish there is no boot-time schema assertion so start-up proves nothing, the 017 evidence states plainly that nothing has exercised the table and leaves 1.7 open, and the ROTATION STATE carries 'NOT that merged is wired'. Recurrence, then held under heavy exposure.",
+      "evidence_ref": "Deliverables/2026-08-09-runtime-cutover-evidence.md"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "clean",
+      "summary": "Four qualified exposures, prevention held at every one. Migration byte-exactness proven by sha256 against the COMMITTED BLOB before the call, falsifying two of the runbook's own verified facts in passing (185 U+2500 characters in a file claiming PURE ASCII; CRLF working copy vs LF blob). A failed apply was not re-run until state had been read — five objects and the history row confirmed absent first. The cutover was proven by hashing three on-disk files against HEAD: and by full process identity, not by path or timestamp. The one-tab guard argument — that a guard inside cdp.js is bypassable by direct import and therefore not an invariant — was accepted and the surface amended. Separately a long-standing instance of this exact family was FOUND and CLOSED: the CI workflow named twelve working directories and omitted handoff and packet, hiding 213 tests CI had never once executed (fixed at d9c2ca6). One non-blocking precision defect recorded: the cutover evidence compares a +01:00 commit stamp with a UTC process stamp and states '~2 minutes' where the real gap is 62m16s — conservative direction, load-bearing claim survives.",
+      "evidence_ref": "Deliverables/2026-08-09-migration-017-production-apply-evidence.md"
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "clean",
+      "summary": "Heavy exposure — 7 of 14 commits touch the map or the orders — and the prevention held. The sequencing amendment carries an explicit 'What this SUPERSEDES ... Both halves of that tail are now dead' block in the same commit (1064993), and the amendment it supersedes carries its own 'Superseded by this amendment' block naming option (a) and (a-prime). The attribution convention is honoured throughout: Warwick fenced and verbatim, inference labelled 'Larry's record, not Warwick's words'. The Lane C document was RE-CUT IN PLACE with the wrong heading quoted and killed rather than annotated. Both order amendments corrected the field (file_surface) with an inline note explaining why the original placement in contract_basis was wrong. Two commits are literally named 'Lane C re-cut' and 'Lane C restated'.",
+      "evidence_ref": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md"
+    }
+  ],
+  "findings_without_family": [
+    {
+      "slug": null,
+      "severity": "material — highest consequence in the report",
+      "summary": "STRANDED UNCOMMITTED WORKER OUTPUT. The ROTATION STATE reads 'Neither had written a file when this was banked' — true at 19:17:27Z, false now. C:/Fusion247PKA-lanec holds services/asdair/browser-runner/oneTab.test.cjs, which exists on NO branch (not main, not build-015/browser-method-contract as checked in C:/Fusion247PKA-wo-c3) and is substantive, proving the structural one-tab fix with an injected fake CDP transport; buildHandoff.js, method.test.js and renderChecklist.js also carry recent modification. C:/Fusion247PKA-b153-ingress shows the same pattern on inboundRouter.js, renderMessages.js and renderMessages.test.js. Both worktree reflogs end BEFORE the work. The ROTATION STATE's exact next action tells a fresh Larry to re-dispatch 'if they did not return', which would collide with or discard this output. CLAUDE.md section CONVERGE: 'no useful current work is stranded elsewhere.' Recommended one-line amendment to the ROTATION STATE: inspect both worktrees for uncommitted output and commit it BEFORE concluding a worker did not return.",
+      "evidence_ref": "C:/Fusion247PKA-lanec/services/asdair/browser-runner/oneTab.test.cjs"
+    },
+    {
+      "slug": null,
+      "severity": "non-blocking — record and park",
+      "summary": "Two numeric errors in Larry's own account of the dispatch defect. (1) 'roughly three elapsed hours' — the ENTIRE session is 2h50m, the first lane worktree was cut at 18:10:44Z, the last order amendment landed at 19:08:44Z, and measured agent execution across all eight returns is 45m36s; the prior session's close-state records both lane branches as cut with no commits awaiting an envelope order, so no Work Order had been issued before this session. The claim overstates the elapsed cost by roughly 4x. (2) 'Four of the eight returns are REFUSE' — the ledger's own table shows THREE, and the token figure it quotes (~370k) equals the three REFUSE returns exactly (369,209). Overstating one's own failure is still an accuracy defect and argues for a heavier remedy than the evidence supports.",
+      "evidence_ref": "Deliverables/2026-08-09-subagent-token-ledger-asdair-b15-3.md"
+    },
+    {
+      "slug": null,
+      "severity": "non-blocking — no family minted, a shared symptom is not family identity",
+      "summary": "Deliverables/2026-08-09-session-close-state.md sits on main, dated today, reading as current, with a 'What needs Warwick' list that is entirely discharged (PRs #102/#103/#104 merged, 017 applied, authority granted). Nothing routes a fresh Larry to it and the ROTATION STATE is unambiguous, so the consequence is low. Recorded once.",
+      "evidence_ref": "Deliverables/2026-08-09-session-close-state.md"
+    }
+  ],
+  "unestablished": [
+    "opening context reading — the health store keeps one sample per session and no start sample survives",
+    "total measured context movement — follows from the missing opening reading",
+    "waiting time attributable to Warwick — no transcript access",
+    "line-level documentation-vs-product split — no git available to Pax (commit-level split IS established: 14/14 documentation)",
+    "dings owed and not sent — requires the transcript",
+    "whether any ding was routine narration — ding-log.jsonl deliberately omits message text",
+    "inbound or queued messages to Larry — the transport log is outbound-only",
+    "model identity of any subagent — no usage block exposes it",
+    "final token totals for a71d28ce and a8b4c945 — still running; recorded figures are FLOORS, not finals",
+    "direct read of the 4F CAPA text at 63c9e18 on build-020/4f-control-cost-evidence — not present in any checked worktree; cited as quoted by the ledger and the ROTATION STATE, not read",
+    "attribution of two same-day telemetry samples (8461a9fd 927,822 @ 17:45:47Z host 2.1.222; d06526cd 268,169 @ 18:11:58Z) — not attributable to this session by any available evidence, and used in no figure"
+  ],
+  "notes": "THE HEADLINE VERDICT: the delegation overhead was a delivery tax and it is avoidable, but the remedy is one command and not a redesign. All four claimed refusal findings check out against artefacts — the CI gap, the tab-per-item cause at actions.cjs:8 and readTrolley.cjs:4, the Builds/** precedence trap, and the renderer-less outbox kind. BUT the single most valuable return was the Explore dispatch at 248,516 tokens, correctly framed as research, which cost 33% LESS than the three REFUSE returns combined and produced more. Three of the four findings came from workers reading CODE, which a ready order's read-back would have surfaced sooner and cheaper; the surface gaps and the Builds/** trap are downstream of the same untraced-surface defect, not independent value. A defective order is not reconnaissance. The remedy is already recorded as 4F CAPA item 8 and is printed in the footer of the order files themselves: recompute markers, require ready:true, then dispatch. REGROWTH CAP APPLIES AT FULL FORCE — this must not become a validator, registry, dispatch wrapper or readiness service. The control exists, ships in the tool, and prints its own invocation. Nothing needs building; one command needs running. Secondary change worth Warwick's attention: trace the file surface from the call path instead of guessing it, using evidence already paid for. SAME-RUNTIME REVIEW — Pax is a separate context and a separate dispatch but the same model; this is not external verification and no document may describe it as such."
+}
