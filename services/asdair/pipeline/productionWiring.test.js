@@ -519,7 +519,13 @@ test('D-2: every kind the pipeline queues has a renderer - the general form of t
 // ZERO MODEL SPEND, ZERO DATABASE - the wiring is asserted, never invoked.
 // =====================================================================
 
-const runtimeSrc = stripComments(fs.readFileSync(path.join(HERE, 'runtime.js'), 'utf8'));
+// `runtimeSrc` is DELIBERATELY NOT re-declared here. Lane A and Lane C each
+// added an identical `const runtimeSrc = stripComments(readFileSync(runtime.js))`
+// at the head of their own section; git merged both without a conflict and the
+// whole FILE then failed to parse - which does not report its tests as failing,
+// it removes them from the run. The single declaration above (in the Lane C
+// section) is the one both sections read, and every assertion of both lanes is
+// kept. Sharing the binding is the fix; dropping either lane's claims is not.
 const routerSrc = stripComments(fs.readFileSync(path.join(HERE, '..', 'bot', 'inboundRouter.js'), 'utf8'));
 const rendererSrc = stripComments(fs.readFileSync(path.join(HERE, '..', 'bot', 'renderMessages.js'), 'utf8'));
 

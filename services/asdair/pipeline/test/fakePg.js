@@ -193,6 +193,52 @@ function projectQuestionRow(projection, question, listItem, shopLine) {
   return row;
 }
 
+/**
+ * The asdair.browser_build_request columns this fake can SOURCE.
+ *
+ * Same role as QUESTION_ROW_COLUMNS above, and read it the same way: this list
+ * does NOT decide what a statement returns. It decides only whether the fake
+ * admits it can serve a name the statement asked for. A name outside it throws.
+ *
+ * It is the full column set migration 006 defines for the table, which is also
+ * exactly `handoff/claim.js`'s SELECT_COLS. If claim.js grows a column, the
+ * statement will ask for it, this list will not have it, and the fake will say
+ * so out loud instead of answering with a null the caller cannot distinguish
+ * from a real one.
+ */
+const BROWSER_REQUEST_COLUMNS = new Set([
+  'id', 'shop_id', 'status', 'claimed_by', 'progress',
+  'requested_at', 'claimed_at', 'finished_at', 'last_error',
+]);
+
+/**
+ * Check a browser_build_request projection BEFORE any row is looked at.
+ *
+ * The eager call is the whole point, and it was found by demonstration rather
+ * than by reasoning: validating inside the row loop means a statement asking for
+ * a column the fake cannot source returns an EMPTY RESULT whenever nothing
+ * matched the WHERE - which is a silent wrong answer of exactly the kind D1 was.
+ * "No rows" is a perfectly ordinary outcome here (no live request, no completed
+ * request), so the empty case is the common one, not the edge one.
+ */
+function assertBrowserProjection(projection) {
+  for (const name of projection) {
+    if (!BROWSER_REQUEST_COLUMNS.has(name)) {
+      throw new Error(`fakePg: the select list asks for "${name}", which this fake does not model on `
+        + 'asdair.browser_build_request. Teach it where that column comes from, or the statement is '
+        + 'asking the table for something it cannot give.');
+    }
+  }
+  return projection;
+}
+
+/** Build ONE result row for an already-checked browser_build_request projection. */
+function projectBrowserRow(projection, row) {
+  const out = {};
+  for (const name of projection) out[name] = row[name] === undefined ? null : row[name];
+  return out;
+}
+
 /** Map positional params onto the insert's columns, honouring ::jsonb casts. */
 function insertRow(sql, table, params) {
   const cols = insertColumns(sql, table);
@@ -538,8 +584,142 @@ export function createFakeClient(store, options = {}) {
       return rows([{ id: created.id }]);
     }],
 
-    // ── asdair.browser_build_request ───────────────────────────────────────
-    [/^INSERT INTO asdair\.browser_build_request \(/i, (sql, p) => {
+    // ── asdair.browser_build_request - handoff/claim.js openHandoff ────────
+    //
+    // FOUR STATEMENTS THAT ARE NOT shopStore's, and they sit ABOVE the shopStore
+    // handlers below ON PURPOSE. This list is first-match-wins, and two of the
+    // four WERE already being matched by a handler written for a different
+    // statement: the generic `INSERT INTO asdair.browser_build_request (` read
+    // openHandoff's `$2` (a progress jsonb) as shopStore's `$2` (a status), and
+    // the generic `SET progress` update looked for the row id in openHandoff's
+    // progress parameter. Neither threw. A handler that answers the wrong
+    // statement is worse than no handler, because "no handler" is loud.
+    //
+    // WHY THEY ARE DIFFERENT AT ALL: `openHandoff` opens the request WITH the
+    // handoff artefact already on it (`progress.handoff`), under the PARTIAL
+    // unique index, so exactly one live request per shop exists and it can never
+    // exist without the operating contract it carries. shopStore's older
+    // `requestBrowserBuild` inserts (shop_id, status) and nothing else.
+    //
+    // Each shape below was read off `services/asdair/handoff/claim.js` itself,
+    // not off a description of it.
+
+    // 1/4 - findComplete(): the most recently COMPLETED request for a shop.
+    //   select <cols> from asdair.browser_build_request
+    //    where shop_id = $1::bigint and status = 'complete'
+    //    order by finished_at desc nulls last, id desc limit 1
+    // This is the completed-shop guard, and it runs FIRST in openHandoff -
+    // bbr_one_live_per_shop is partial, so a completed row blocks no insert and
+    // only this read stands between a finished shop and being re-shopped.
+    [/^select .*\bfrom asdair\.browser_build_request\s+where shop_id = \$1::bigint and status = 'complete'/i, (sql, p) => {
+      const projection = assertBrowserProjection(selectProjection(sql));
+      const hits = db.browser_build_request
+        .filter((b) => String(b.shop_id) === String(p[0]) && b.status === 'complete')
+        // ORDER BY finished_at DESC NULLS LAST, id DESC - modelled exactly,
+        // including NULLS LAST, because a cancelled-then-completed history is
+        // precisely when the wrong row would be returned.
+        .sort((a, b) => {
+          const aNull = a.finished_at === null || a.finished_at === undefined;
+          const bNull = b.finished_at === null || b.finished_at === undefined;
+          if (aNull !== bNull) return aNull ? 1 : -1;
+          if (!aNull && a.finished_at !== b.finished_at) return a.finished_at < b.finished_at ? 1 : -1;
+          return Number(b.id) - Number(a.id);
+        })
+        .slice(0, 1);
+      return rows(hits.map((b) => projectBrowserRow(projection, b)));
+    }],
+
+    // 2/4 - the idempotent insert, under the PARTIAL unique index.
+    //   insert into asdair.browser_build_request (shop_id, status, progress)
+    //   values ($1::bigint, 'queued', $2::jsonb)
+    //   on conflict (shop_id) where status in ('queued','claimed','running') do nothing
+    //   returning <cols>
+    // ON CONFLICT ... DO NOTHING over a PARTIAL index: a live row for this shop
+    // means ZERO rows returned (openHandoff then reads to find out what is
+    // there). A terminal row - complete, failed, cancelled - is not covered by
+    // the index and does not block, which is what lets a paused week be asked
+    // for again as a genuinely new request.
+    //
+    // The RETURNING list is not projected from the statement the way the two
+    // SELECTs above are: the stored row carries exactly the nine columns
+    // claim.js names, so there is nothing here for a projection to catch. Said
+    // plainly rather than implied - a column added to RETURNING alone would not
+    // be detected here.
+    [/^insert into asdair\.browser_build_request \(shop_id, status, progress\)/i, (sql, p) => {
+      const shopId = p[0];
+      if (db.browser_build_request.some((b) => String(b.shop_id) === String(shopId)
+        && ['queued', 'claimed', 'running'].includes(b.status))) return none();
+      const row = {
+        id: id('browser_build_request'), shop_id: shopId, status: 'queued',
+        claimed_by: null, progress: asJson(p[1]) || {}, last_error: null,
+        requested_at: nowIso(), claimed_at: null, finished_at: null,
+      };
+      db.browser_build_request.push(row);
+      return rows([row]);
+    }],
+
+    // 3/4 - which live request already exists.
+    //   select <cols> from asdair.browser_build_request
+    //    where shop_id = $1::bigint and status = any($2::text[])
+    //    order by requested_at, id limit 1
+    // The statuses arrive as a PARAMETER (claim.js LIVE_STATUSES), so this
+    // handler reads $2 rather than hard-coding the trio - a fake that pinned
+    // the list here would keep answering after claim.js changed it.
+    [/^select .*\bfrom asdair\.browser_build_request\s+where shop_id = \$1::bigint and status = any\(\$2::text\[\]\)/i, (sql, p) => {
+      const projection = assertBrowserProjection(selectProjection(sql));
+      const live = Array.isArray(p[1]) ? p[1] : [];
+      const hits = db.browser_build_request
+        .filter((b) => String(b.shop_id) === String(p[0]) && live.includes(b.status))
+        .sort((a, b) => (a.requested_at === b.requested_at
+          ? Number(a.id) - Number(b.id)
+          : (a.requested_at < b.requested_at ? -1 : 1)))
+        .slice(0, 1);
+      return rows(hits.map((b) => projectBrowserRow(projection, b)));
+    }],
+
+    // 4/4 - supersede the SAME row in place; never a second row.
+    //   update asdair.browser_build_request
+    //      set progress = (coalesce(progress,'{}'::jsonb) - '_lease' - 'report')
+    //                     || $2::jsonb
+    //                     || jsonb_build_object('_superseded_at', to_jsonb(now()),
+    //                                           '_superseded_from', $3::text),
+    //          status = 'queued', claimed_by = null, last_error = null
+    //    where id = $1::bigint and status = any($4::text[])
+    // Modelled faithfully in three parts, because each is load-bearing:
+    //   * `- '_lease' - 'report'` DROPS those keys. The stale lease must not
+    //     survive a re-point, or the next claim would look held.
+    //   * `||` is a SHALLOW top-level jsonb merge, so the new `handoff` block
+    //     replaces the old one outright rather than being deep-merged into it.
+    //   * the WHERE re-checks status against $4, so a row that went terminal
+    //     between the read and this write matches nothing and openHandoff
+    //     raises HandoffStateError instead of resurrecting it.
+    // claimed_at and finished_at are deliberately NOT reset - the statement
+    // does not touch them.
+    [/^update asdair\.browser_build_request\s+set progress = \(coalesce\(progress/i, (sql, p) => {
+      const live = Array.isArray(p[3]) ? p[3] : [];
+      const target = db.browser_build_request.find((b) => String(b.id) === String(p[0])
+        && live.includes(b.status));
+      if (!target) return none();
+      const next = { ...(target.progress && typeof target.progress === 'object' ? target.progress : {}) };
+      delete next._lease;
+      delete next.report;
+      Object.assign(next, asJson(p[1]) || {}, {
+        _superseded_at: nowIso(),
+        _superseded_from: p[2] === undefined ? null : p[2],
+      });
+      target.progress = next;
+      target.status = 'queued';
+      target.claimed_by = null;
+      target.last_error = null;
+      return rows([target]);
+    }],
+
+    // ── asdair.browser_build_request - shop/shopStore.js ───────────────────
+    // The column list is pinned in the pattern. It used to be an open `(`,
+    // which is how openHandoff's three-column insert was silently answered by
+    // this handler. An insert shape nobody has modelled now reaches the
+    // no-handler throw at the bottom of query(), which is the honest answer.
+    [/^INSERT INTO asdair\.browser_build_request \(shop_id, status\) VALUES/i, (sql, p) => {
       const shopId = p[0];
       // bbr_one_live_per_shop
       if (db.browser_build_request.some((b) => String(b.shop_id) === String(shopId)
@@ -558,7 +738,11 @@ export function createFakeClient(store, options = {}) {
       target.status = 'claimed'; target.claimed_by = p[1]; target.claimed_at = nowIso();
       return rows([target]);
     }],
-    [/^UPDATE asdair\.browser_build_request SET progress/i, (sql, p) => {
+    // shopStore.updateBrowserProgress. The `$1::jsonb` is pinned for the same
+    // reason the insert's column list above is: this pattern used to match
+    // openHandoff's supersede statement too, and answered it by looking for the
+    // row id in a progress parameter - finding nothing, and returning no row.
+    [/^UPDATE asdair\.browser_build_request SET progress = \$1::jsonb/i, (sql, p) => {
       const target = db.browser_build_request.find((b) => String(b.id) === String(p[1])
         && ['claimed', 'running'].includes(b.status));
       if (!target) return none();
