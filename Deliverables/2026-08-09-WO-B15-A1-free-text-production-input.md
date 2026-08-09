@@ -62,6 +62,14 @@ file_surface:
   - services/asdair/pipeline/runPipeline.js
   - services/asdair/pipeline/deps.js
   - services/asdair/pipeline/productionWiring.test.js
+  # AMENDMENT 1, Larry 2026-08-09 — granted on Keel's HOLD, option (1). Warwick's
+  # ruling (c) needs a renderer, and bot/renderMessages.js holds the MESSAGES map.
+  # A kind with NO renderer is not a quiet no-op: runtime.js:624-626 abandons the
+  # outbox row, which is the exact silent-drop defect AC4 exists to close. Granted in
+  # file_surface — the field that GRANTS, not contract_basis, which only justifies.
+  # bot/** is NOT in the concurrent Lane C surface, so reconciliation risk is low.
+  - services/asdair/bot/renderMessages.js
+  - services/asdair/bot/renderMessages.test.js
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -162,7 +170,7 @@ AC9 - NO REGRESSION. bot, intake and pipeline suites green before and after, cou
 
 - ACCEPTANCE COMMANDS - run in each package directory and ASSERT THE REPORTED COUNT, never the exit code alone: `cd services/asdair/bot && node --test` (baseline 156 pass) - `cd services/asdair/intake && node --test` (baseline 28 pass) - `cd services/asdair/pipeline && node --test` (baseline 298 pass). Report before AND after counts for every package touched.
 # guidance: the exact command that must be EXECUTED — assert the reported count, never the exit code alone
-- `bash scripts/secret-scan.sh --surface services/asdair/bot/inboundRouter.js services/asdair/bot/inboundRouter.test.js services/asdair/intake/shopperIntake.js services/asdair/intake/shopperIntake.test.js services/asdair/pipeline/runtime.js services/asdair/pipeline/runtime.test.js services/asdair/pipeline/telegramAdapter.js services/asdair/pipeline/commands.js services/asdair/pipeline/commands.test.js services/asdair/pipeline/runPipeline.js services/asdair/pipeline/deps.js services/asdair/pipeline/productionWiring.test.js` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
+- `bash scripts/secret-scan.sh --surface services/asdair/bot/inboundRouter.js services/asdair/bot/inboundRouter.test.js services/asdair/intake/shopperIntake.js services/asdair/intake/shopperIntake.test.js services/asdair/pipeline/runtime.js services/asdair/pipeline/runtime.test.js services/asdair/pipeline/telegramAdapter.js services/asdair/pipeline/commands.js services/asdair/pipeline/commands.test.js services/asdair/pipeline/runPipeline.js services/asdair/pipeline/deps.js services/asdair/pipeline/productionWiring.test.js services/asdair/bot/renderMessages.js services/asdair/bot/renderMessages.test.js` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
 
 ## Inputs supplied
 
