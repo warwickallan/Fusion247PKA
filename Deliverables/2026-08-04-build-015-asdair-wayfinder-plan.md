@@ -103,6 +103,37 @@ the weekly cycle.**
 
 ---
 
+
+### ⚖️ WARWICK'S PRODUCT RULINGS — 2026-08-09. **These settle three open questions; they are his, quoted.**
+
+**RULING 1 — the packet / handoff / `verifyBasket` subsystem: INTEGRATE AND REUSE IT.**
+> *"Do NOT discard it. Do NOT preserve it merely as historical reference."*
+It corresponds directly to required Product-Star links. **The recurring estate defect is already "correct thing exists but is unwired" — do not respond by writing a THIRD implementation.** What is missing is the production seam and durable storage; the absent `execution_packet` / `basket_reconciliation` migration is **an integration gap, not grounds to abandon the subsystem**.
+
+**RULING 2 — the ASDA-reference hard stop is REJECTED.** It conflicts with the Product Star and with the recovered successful shopping evidence.
+> *"A household product does NOT stop being a known household product merely because we lack a current ASDA reference."*
+**Known household identity and ASDA retrieval method are SEPARATE concerns.** Use the durable reference when valid; otherwise bounded ASDA search/navigation from the canonical identity, **verified against the known household identity before addition**. **Search is RETRIEVAL — it does not redefine the item as "new".** No silent substitution. Several plausible products remaining → **stop that line and ask Warwick**, never the least-bad result. **This also RESOLVES the outstanding search-fallback contradiction** banked in `RUNTIME-DECISION.md` §"Open considerations" item 4.
+
+**RULING 3 — lease/fencing/recovery is RETAINED as the durability model, but NOT a 45-second CDP lease.** A supervised session runs at human pace. Use the **already-built** lease/fencing machinery rather than the live lease-less duplicate; **the heartbeat lands in the SAME coherent cutover**; expiry suits the real workflow; loss of lease fences further writes; **historic dead rows return to a recoverable `queued` state with progress preserved under an explicit recovery marker and do NOT auto-resume an unknown six-day-old trolley** — re-entry is a deliberate supervised act. **`human_reauth_required` is a separate condition and stays separate.**
+
+**Also accepted: Larry's Route B** — apply the durable current-shop decision **after** `planBasket` inside the live pipeline rather than rewriting planner semantics now. Conditions: build the seam so planner-level consumption can replace it later **without another data-model rewrite**, and **prove by execution that EVERY production recomputation used by the shopping journey applies the decisions before readiness is assessed** — *"a passing comment or test saying this happens is not evidence."*
+
+### ⚠️ STANDING SAFETY CONSTRAINT — until Lane D fixes ingress classification
+
+> **NO LIVE ORDER-CONFIRMATION FORWARDING TO SHOPPERBOT.**
+
+Current intake would treat a forwarded ASDA confirmation as **another shopping list**, creating a spurious shop and spending a model call. The comment above that code asserts the opposite.
+
+### 🔎 THE SEARCH HEURISTIC — Warwick, 2026-08-09. Use it; stop re-documenting it.
+
+> **WHEN A MODULE LOOKS COMPLETE, FIND ITS PRODUCTION CALLER.**
+> **WHEN A COMMENT SAYS A LOOP CLOSES, TRACE THE VALUE TO THE CONSUMER.**
+> **Then fix the product.**
+
+The "comment says wired / executable path says unwired" pattern is **sufficiently established**. It is now a search technique, not a finding to re-record.
+
+---
+
 ### LANE A — INPUT → INTERPRETATION → QUESTIONS → CURRENT DECISION ⭐ **THE CRITICAL SPINE**
 
 | | |
@@ -110,8 +141,8 @@ the weekly cycle.**
 | **PRODUCT OUTCOME** | **Warwick can answer AsdAIr naturally, without Larry, and that answer changes THIS WEEK'S shop.** |
 | **PROVEN LIVE** | Photo intake · exact-source fingerprint binding · catalogue-grounded interpretation · the **interpretation-confirmation card, delivered and tapped for real** (2026-08-09, shop 6 recovered `PROCESSING → READY_TO_SHOP` after a real Telegram tap, no Larry in the path) |
 | **BROKEN** | **Question cards are never delivered** — all 11 of shop 6's questions have `card_chat_id`/`card_message_id` NULL, no render fingerprint · **an answer cannot reach the plan** — `runPipeline.js:638` writes `applies_going_forward:false`, `planner.js:1091` admits only `===true`, and `shopLines.markCorrected` has **zero production callers** · **`READY_TO_SHOP` never looks at a line** (`stages.js:306-318` counts open questions only) |
-| **ACTIVE** | **WP-B15-2** — Keel, isolated worktree, read-back gate. Owns `pipeline/**`, `bot/**`, `db/**` |
-| **READY NEXT** | Cockpit parity — assess whether a bounded free-text/candidate control binds cleanly to the shared command surface. **Must NOT hold Telegram autonomy hostage** |
+| **ACTIVE** | **WP-B15-2** — Keel REFUSED the first order (correctly: no envelope route; acceptance unreachable in the declared surface). Its analysis is COMPLETE and banked. **BLOCKED ON Silas's carrier decision only.** Surface now `pipeline/**`, `bot/**`, `db/**`, **`shop/**`** |
+| **READY NEXT** | Silas lands → regenerate WP-B15-2 through the envelope route ONCE → accept the read-back → Keel builds. Then Cockpit parity, which **must NOT hold Telegram autonomy hostage** |
 | **LIVE ACCEPTANCE** | A real delivered card · ≥1 deterministic button resolution · **≥1 genuine natural-language Warwick reply** · any required Terra interpretation · durable structured decision · observable line/plan change · `READY_TO_SHOP` only after lines are actually resolved. **NO Larry answering.** Shop 6 is in an invalid semantic state — **its rows must NOT be hand-patched to manufacture acceptance** |
 | **DEPENDS ON** | Nothing. This is the spine. |
 
@@ -128,8 +159,8 @@ the weekly cycle.**
 | **PRODUCT OUTCOME** | **What the household learns this week is there for Terra BEFORE next week's photograph.** |
 | **PROVEN LIVE** | Static knowledge genuinely reaches Terra / recognition / planner — recognition is authentically grounded |
 | **BROKEN** | **Everything learned by OPERATING is lost or inert.** Shop 6's 11 answers produced zero durable rows · `rule_qa_log` newest row is **2026-07-20** · the 106-key purchase-frequency view is read by nothing · `substitutes_allowed` flattened to `false` for all 103 regulars against a historical 9-of-36 · later regular enrichment has been **Larry-mediated, not production-learned** |
-| **ACTIVE** | Pax establishment of **B1** human decision learning · **B2** confirmed-basket catalogue learning · **B3** order/outcome learning — kept **separate**, not collapsed |
-| **READY NEXT** | Awaiting the establishment |
+| **ACTIVE** | ✅ Establishment RETURNED. **B1's real break is one line earlier than believed** — `runPipeline.js:641` `resolution:{kind:'none'}`, so `buildAnswerLearning` builds no catalogue operation at all and the alias (the only proven mechanism) is never created. Three breaks stack. **B2** is a wired loop over a permanently empty table. **B3** has no production caller — `recordShopOutcome` is CLI-only |
+| **READY NEXT** | Turn the establishment into bounded slices; build whichever are file-surface independent of Lane A. **Do not make every one-off answer a standing rule** — explicit "always/never/from now on" may become policy; this-week-only must not |
 | **LIVE ACCEPTANCE** | An answer given this week demonstrably prevents the same question next week, **against the real planner** · a genuinely new accepted product reaches Regulars/Favourites and Supabase **without Larry** |
 | **DEPENDS ON** | Full product proof closes at the weekly cycle boundary. **Design and implementation readiness do not wait.** |
 
@@ -144,8 +175,8 @@ the weekly cycle.**
 | **PRODUCT OUTCOME** | **A valid confirmed plan becomes a correctly built ASDA trolley, reconciled, never checked out.** |
 | **PROVEN LIVE** | A real ASDA trolley HAS been built successfully by the historical browser method (three runs recovered from evidence) |
 | **BROKEN** | **Stale claims strand shops** — `browser_build_request` ids 1, 2 and 5 held by dead claimants since 28 Jul / 3 Aug, **no lease expiry, no reaper** · **packet/handoff has no production caller** — `handoff/` has zero non-test importers; `buildHandoff` appears in `runtime.js` only in a comment · **no Larry-less claimer by design** (`stages.js:85`: *waitsFor: the supervised browser runner (Larry, at the keyboard)*) |
-| **ACTIVE** | **C1** Keel — lease/recovery, isolated worktree, bounded to `handoff/**` + `browser-runner/**` · **C2/C3/C4** Pax — packet seam, proven operating method, ASDA auth/session durability |
-| **READY NEXT** | Wiring the packet seam — **only once Lane A's corrected plan contract exists** |
+| **ACTIVE** | **C3** Keel — `WO-2026-08-09-B15-C3`, generated through the envelope route, entirely inside `handoff/**`, **no Lane A overlap** · **C1** STOOD DOWN until Lane A releases `shop/**`; its lease design is banked and ready |
+| **READY NEXT** | Packet/handoff production seam + the missing `execution_packet` / `basket_reconciliation` storage — **only once Lane A's corrected plan contract exists.** Prepare the caller, contract, durability, fingerprint and reconciliation result NOW |
 | **LIVE ACCEPTANCE** | A real trolley built from a **semantically valid** plan, reconciled against it, `BASKET_READY` raised. **Never checkout, never pay** |
 | **DEPENDS ON** | **Lane A for a valid plan contract.** Do NOT design against the current invalid transient plan shape. Do NOT execute a real trolley from shop 6 until Lane A is fixed |
 
@@ -156,9 +187,9 @@ the weekly cycle.**
 | | |
 |---|---|
 | **PRODUCT OUTCOME** | **The real order is reconciled against the confirmed plan, discrepancies are visible, and the outcome is durable.** |
-| **PROVEN LIVE** | Nothing yet established |
-| **BROKEN** | Unestablished — this lane has never been exercised. The estate's recurring defect pattern (**a module that exists, is tested, is described in a comment as wired, and has no production caller**) is the primary hunt here |
-| **ACTIVE** | Pax read-only establishment of the confirmation parser, reconciliation, order persistence, outcome writer, `last_order`, favourites/regulars promises, runtime callers and surfaces |
+| **PROVEN LIVE** | Nothing. **The post-shop quarter has never run once.** `order_confirmation` and `order_confirmation_line` hold ZERO rows ever. Warwick's own checkout/pay/slot boundary is the healthiest link in the lane — enforced by four independent mechanisms, not convention |
+| **BROKEN** | ⚠️ **No path from Telegram to `submitConfirmation`** — `runtime.js:145` `pollIntake` makes EVERY message a `receiveList` · **`asdair.orders` has no pipeline writer**, so `loadLastOrder` returns null forever and silently · the reconciliation card payload is `{shopRef}` only against a renderer needing seven counts · new zero-caller instances: `recordShopOutcome`+`buildOutcome`, `reconcile/verifyBasket.js`, and `asdair.previously_ordered` (**106 keys of real purchase frequency read by no code**) |
+| **ACTIVE** | ✅ Establishment RETURNED. **Confirmation ingress is now a high-value INDEPENDENT slice** — Warwick has ruled it must be made truthful BEFORE checkout |
 | **READY NEXT** | The prepared live acceptance sequence, written **before** we reach checkout |
 | **LIVE ACCEPTANCE** | Warwick checks out personally → the confirmation reaches AsdAIr → the real order is parsed and reconciled → discrepancies visible → durable outcome → learning hooks fire. **Larry performs no checkout, payment or slot action** |
 | **DEPENDS ON** | Lane C for `BASKET_READY`. **Establishment does not wait** — Warwick: *"so we do not reach checkout and then discover the last quarter of the product was only unit-tested."* |
