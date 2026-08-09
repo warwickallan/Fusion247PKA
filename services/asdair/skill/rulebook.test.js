@@ -57,17 +57,33 @@
 // ARCHIVED control is untouched and still fires - a correct rule-37
 // implementation does not strain it, because rule 37 needs no money.
 //
-// ONE HALF OF RULE 37 IS NOT DELIVERABLE HERE, AND IT IS SAID RATHER THAN
-// QUIETLY DROPPED. The rule's second clause - "add a FEMALE variant to complete
-// the last pair" - is an ADD-A-PRODUCT-TO-THE-BASKET outcome. The safety
-// envelope has three verbs (set_product, set_quantity, ask) and none of them
-// can put a new line in a basket; `set_product` may only re-resolve a line the
-// planner already held, and only from candidates that line itself offered - and
-// a `map`-resolved Sure line offers none. Adding a fourth verb is a design
-// decision this module's own header refuses to take on its own. What IS proven
-// below is that the clause is never lost: the planner's advisory echo puts rule
-// 37's full words on the line, and the grounding packet carries them verbatim
-// to the consumer. See the return for WO-2026-08-09-08.
+// -- AND THEN THE OTHER HALF OF RULE 37 WAS AUTHORISED (2026-08-09) ---------
+//
+// The rule's second clause - "add a FEMALE variant to complete the last pair" -
+// is an ADD-A-LINE outcome, and no verb could perform it. WO-B15-R4 refused to
+// invent a general "add a product" verb for it, and that refusal stands. What
+// Warwick then authorised is narrower: "close that one with the narrow
+// deterministic companion-line seam ... not by inventing a general fourth model
+// verb in anticipation."
+//
+// The narrowness is the whole design, and it comes from rule 24 - an active
+// `map` row that ALREADY resolves "sure female" to a named product. So:
+//
+//   A COMPANION LINE MAY ONLY CARRY A PRODUCT AN ACTIVE `map` RULE OF THIS
+//   HOUSEHOLD ALREADY RESOLVES.
+//
+// The AC2 block below is that bound under execution, in every direction a
+// plausible name can arrive from: unmapped, merely-in-the-catalogue, mapped for
+// ANOTHER household, forbidden by an `exclude` rule, already in the basket, and
+// hung off a line nobody has settled. Each is refused, the shopping on the line
+// is left exactly as it was, and the refusal is recorded and visible.
+//
+// THE ARITHMETIC, because the two readings differ and the rule settles it. The
+// rule's own worked example is "Mum 3 male -> add 1 female = 4": the male line
+// STAYS at 3 and the completing unit is the female variant. Rounding the male
+// line to 4 - all the envelope could do before this - buys four men's
+// deodorants, which is not what the household asked for. What is rounded up to
+// an even number is the PAIR TOTAL.
 //
 // -- WHAT THE FAKE CONSUMER PROVES, AND WHAT IT CANNOT ----------------------
 //
@@ -88,6 +104,13 @@
 //
 //   LIVE-VERIFIED (queried 2026-08-04, recorded in ruleConsumption.test.js):
 //     rule 23  map     match_term "sure male"  -> a fixed Sure variant
+//     rule 24  map     match_term "sure female" -> the white Sure Women variant
+//       <- recorded from the 2026-08-09 live query in this Work Order's own
+//       capability_evidence. It is NOT in the staged corpus document, which
+//       lists only the rows that query was about; the product string below is
+//       therefore the one place this file depends on the order rather than on a
+//       staged artefact. Nothing in the module names it, so a wrong string here
+//       makes this fixture wrong and the code no less correct.
 //     rule 32  info    match_term "sure male"
 //     rule 38  info    match_term NULL   <- global, no target
 //     rule 12  needs_decision  match_term "Nescafe Azera"
@@ -131,6 +154,17 @@ const RULES = Object.freeze([
     match_term: 'sure male', match_category: null,
     matched_product: 'Sure Men Anti-Perspirant (blue variant)',
     rule_text: 'Sure male means the blue Sure Men anti-perspirant.'
+  },
+  // RULE 24 - the row that makes the companion line DETERMINISTIC rather than a
+  // judgement. The household decided which women's deodorant it means when it
+  // wrote this rule; no model chooses it now, and no code here names it.
+  // Deterministic and untouched by this module, exactly like rule 23 - it is
+  // the SOURCE OF THE PRODUCT for a companion, never a rule the consumer reads.
+  {
+    id: 24, directive: 'map', scope: 'product', active: true, household_id: HOUSEHOLD,
+    match_term: 'sure female', match_category: null,
+    matched_product: 'Sure Women Anti-Perspirant Deodorant (white variant)',
+    rule_text: 'Sure female means the white Sure Women anti-perspirant.'
   },
   {
     id: 12, directive: 'needs_decision', scope: 'product', active: true, household_id: HOUSEHOLD,
@@ -213,6 +247,42 @@ const SURE_PRODUCT = Object.freeze({
 
 const UNPRICED_SURE = Object.freeze([SURE_PRODUCT]);
 
+// THE THREE THINGS A COMPANION LINE MAY NOT CARRY, as fixtures rather than as
+// prose. Each one is a DIFFERENT way a plausible product name can arrive, and
+// each is refused for its own reason.
+//
+//   1. UNMAPPED     - a name that is not in the catalogue and not in any rule.
+//   2. CATALOGUE-ONLY - a real row in `products` that no `map` rule names. This
+//      is the dangerous one: it is a genuine product, it would add to a real
+//      trolley, and only the map-rule bound keeps it out.
+//   3. FOREIGN-HOUSEHOLD - mapped, actively and correctly, for somebody else.
+const UNMAPPED_PRODUCT = 'Sure Women Invisible Aqua 250ml';
+
+const CATALOGUE_ONLY_FEMALE = Object.freeze({
+  id: 202, list_term: 'sure female', matched_product: 'ASDA Womens Anti-Perspirant Deodorant 150ml',
+  category: 'toiletries', household_id: null
+});
+
+// The same catalogue the rule-37 cases use, PLUS a real unmapped row. Still no
+// `price` key anywhere - that property is asserted, not assumed, below.
+const UNPRICED_SURE_PLUS_CATALOGUE = Object.freeze([SURE_PRODUCT, CATALOGUE_ONLY_FEMALE]);
+
+const FOREIGN_HOUSEHOLD_MAP = Object.freeze({
+  id: 91, directive: 'map', scope: 'product', active: true, household_id: 99,
+  match_term: 'sure female', match_category: null,
+  matched_product: 'Sure Women Bright Bouquet 150ml',
+  rule_text: "Another household's rule entirely."
+});
+
+// Mapped for THIS household and forbidden by THIS household. Both rules are
+// live; the exclusion is the stronger one and must stay so.
+const EXCLUDED_MAP = Object.freeze({
+  id: 92, directive: 'map', scope: 'product', active: true, household_id: HOUSEHOLD,
+  match_term: 'yazoo banana milkshake', match_category: null,
+  matched_product: 'Yazoo Banana Milk 400ml',
+  rule_text: 'Yazoo banana milkshake means the 400ml bottle.'
+});
+
 // Two scents under one list term - so the planner holds the line as ambiguous
 // and rule 41 has something to rotate BETWEEN.
 const SHOWER_GELS = Object.freeze([
@@ -281,25 +351,44 @@ const HANDLERS = {
     return { kind: 'set_quantity', quantity: want, why: 'the household gets through ' + want + ' a week' };
   },
 
-  // Rule 37 - EVEN-NUMBER ROUNDING. The household's own words say what "round
-  // up" means here, and the answer is arithmetic on the line's own planned
-  // count. THERE IS NOTHING FOR A PRICE TO DO IN THIS FUNCTION, and there is no
-  // price in the packet for it to read even if there were: `line` carries
-  // item_name, statuses, counts, note, and candidate NAMES.
-  '37': function (line, rule) {
-    if (!line.may_set_quantity) return null;
+  // Rule 37 - THE WHOLE RULE, both clauses, as of 2026-08-09.
+  //
+  // "round qty UP to an even number to capture every pair; add a FEMALE variant
+  // to complete the last pair (Mum 3 male -> add 1 female = 4)". The rule's own
+  // worked example settles the arithmetic: 3 male stay 3, ONE female is added,
+  // and the PAIR TOTAL is 4. The completing unit is the female variant - so
+  // rounding the male line to 4 and stopping (which is all the envelope could
+  // do before this) buys the wrong thing, four times.
+  //
+  // THERE IS NOTHING FOR MONEY TO DO IN THIS FUNCTION and none is in the packet
+  // for it to read: `line` carries item_name, statuses, counts, note and
+  // candidate NAMES, and the companion list carries names and rule ids.
+  //
+  // The product is NOT chosen here. It is picked out of the list the packet
+  // offered, which the module derived from the household's own `map` rules. A
+  // name typed into this function would be refused by the module, and there is
+  // a test below that does exactly that.
+  '37': function (line, rule, grounding) {
+    if (!line.may_add_companion) return null;
     if (!/round\s+qty\s+UP\s+to\s+an\s+even\s+number/i.test(rule.text)) return null;
+    if (!/FEMALE\s+variant/i.test(rule.text)) return null;
     const q = Number(line.planned_qty);
     if (!Number.isInteger(q) || q < 1) return null;
-    if (q % 2 === 0) return null;   // already an even number - every pair is captured
+    if (q % 2 === 0) return null;   // already an even number - every pair is complete
+
+    const pool = (grounding && grounding.companion_products) || [];
+    const female = pool.find(function (p) {
+      if (String(p.name).toLowerCase() === String(line.matched_product || '').toLowerCase()) return false;
+      return /women|female/i.test(String(p.name));
+    });
+    if (!female) {
+      return { kind: 'ask', why: 'the rule asks for a female variant and I was offered none I may add' };
+    }
     return {
-      kind: 'set_quantity',
-      quantity: q + 1,
-      // The second clause of the rule cannot be APPLIED by this module (there is
-      // no verb that adds a basket line), so it is SAID. Silence is the one
-      // option this module never takes.
-      why: 'rounded ' + q + ' up to ' + (q + 1)
-        + ' so every pair is captured; the household rule says the completing unit is a FEMALE variant'
+      kind: 'add_companion',
+      product: female.name,
+      quantity: 1,
+      why: 'the household rule completes the last pair with one female variant, making ' + (q + 1) + ' in all'
     };
   },
 
@@ -335,7 +424,12 @@ function terraFake(options) {
         if (!rule) return;
         const j = handler(line, rule, grounding);
         if (!j) return;
-        judgements.push(Object.assign({ line_no: line.line_no, rule_id: id }, j));
+        // A handler may return one judgement or several. One household line can
+        // legitimately produce more than one answer - the SHAPE test at the end
+        // of this file drives exactly that case.
+        (Array.isArray(j) ? j : [j]).forEach(function (one) {
+          judgements.push(Object.assign({ line_no: line.line_no, rule_id: id }, one));
+        });
       });
     });
     return opts.raw ? JSON.stringify({ judgements: judgements }) : { judgements: judgements };
@@ -357,8 +451,10 @@ test('AC1: the rules actionableRules() drops are enumerated, and it is the judge
   assert.deepEqual(inert, [32, 37, 38, 41, 42, 43],
     'the inert set is not the six judgement/advisory rules - check it against actionableRules()');
 
-  // and the deterministic ones are NOT swept up with them
-  [12, 23, 40].forEach(function (id) {
+  // and the deterministic ones are NOT swept up with them - including rule 24,
+  // whose product the companion seam consumes without ever sending the rule to
+  // the consumer as prose.
+  [12, 23, 24, 40].forEach(function (id) {
     assert.ok(inert.indexOf(id) === -1, 'rule ' + id + ' is deterministic and must stay out of the rulebook path');
   });
 });
@@ -507,19 +603,45 @@ test('AC3 rule 43: a BASKET-WIDE rule changes a line no targeted rule names', as
 //               back; nothing R3 put in its place is removed to make room.
 // =====================================================================
 
-test('AC3 rule 37: an ODD Sure quantity is rounded UP to the next even number, from a catalogue with NO price', async () => {
+// A companion judgement, hand-built, naming whatever product the case is about.
+// Used by every refusal case below: the consumer is made to ask for the wrong
+// thing on purpose, and the module has to be the one that says no.
+function companionReply(product, quantity, ruleId) {
+  return terraFake({
+    judgements: function (g) {
+      return [{
+        line_no: g.lines[0].line_no,
+        rule_id: ruleId === undefined ? 37 : ruleId,
+        kind: 'add_companion',
+        product: product,
+        quantity: quantity === undefined ? 1 : quantity,
+        why: 'the rule says to complete the pair'
+      }];
+    }
+  });
+}
+
+// The state of a line, for "was it left alone?". Deliberately NOT a deepEqual
+// of the whole item: flags and note DO change on a refusal (silence is the one
+// thing this module never does), and what must not change is the shopping.
+function shopping(item) {
+  return { status: item.status, matched_product: item.matched_product, planned_qty: item.planned_qty };
+}
+
+test('AC1 rule 37: an odd Sure line plans as the male line PLUS a female companion line, from a catalogue with NO price', async () => {
   // ESTABLISH THE GROUND FIRST. A control that did not examine what it claims to
   // is worse than no control, so the absence of money is asserted before any
   // behaviour is, and it is asserted about the actual fixture this test plans.
-  UNPRICED_SURE.forEach(function (row) {
+  UNPRICED_SURE_PLUS_CATALOGUE.forEach(function (row) {
     assert.ok(!Object.prototype.hasOwnProperty.call(row, 'price'),
       'the Sure catalogue grew a price field - this case would no longer prove rule 37 is price-free');
   });
 
   const listItems = [{ item_name: 'sure male', requested_qty: 3 }];
-  const before = plan(listItems, UNPRICED_SURE);
+  const before = plan(listItems, UNPRICED_SURE_PLUS_CATALOGUE);
 
   // THE DETERMINISTIC ANSWER, AND IT IS THE ONE THE HOUSEHOLD RULE EXISTS TO FIX.
+  assert.equal(before.items.length, 1);
   assert.equal(before.items[0].status, 'add');
   assert.equal(before.items[0].planned_qty, 3, 'the deterministic plan should buy exactly what was asked for');
   assert.equal(before.summary.estimated_total, null,
@@ -528,6 +650,22 @@ test('AC3 rule 37: an ODD Sure quantity is rounded UP to the next even number, f
   const grounding = rulebook.buildRulebookGrounding(before, RULES, HOUSEHOLD);
   assert.ok(grounding.rules.some(function (r) { return r.id === 37; }),
     'rule 37 did not reach the consumer at all');
+
+  // THE POOL IS THE BOUND, AND IT IS ASSERTED BEFORE THE BEHAVIOUR. It carries
+  // the mapped product and says which rule named it; it does NOT carry the real
+  // catalogue row that no rule maps.
+  const pool = grounding.companion_products;
+  assert.deepEqual(pool.map(function (p) { return p.name; }).sort(),
+    ['Sure Men Anti-Perspirant (blue variant)', 'Sure Women Anti-Perspirant Deodorant (white variant)'],
+    'the companion pool is not exactly the products this household\'s map rules resolve');
+  assert.equal(pool.find(function (p) { return /Women/.test(p.name); }).rule_id, 24,
+    'the pool does not record rule 24 as the source of the product');
+  assert.ok(!pool.some(function (p) { return p.name === CATALOGUE_ONLY_FEMALE.matched_product; }),
+    'a product that is merely in the catalogue reached the companion pool');
+  // and it is NOT a second route into the line's own candidate list
+  assert.deepEqual(grounding.lines[0].candidates, [],
+    'the companion pool leaked into the line candidates set_product draws from');
+
   // The consumer is handed no money to work from. Same recursive walk the
   // ARCHIVED control uses, applied to the packet this case actually sends.
   (function walk(node, at) {
@@ -540,46 +678,273 @@ test('AC3 rule 37: an ODD Sure quantity is rounded UP to the next even number, f
     });
   })(grounding, 'grounding');
 
-  const out = await rulebook.applyRulebook({ plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake() });
-  const line = out.plan.items[0];
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake()
+  });
 
-  assert.equal(line.planned_qty, 4, 'rule 37 did not round the odd quantity up to the next even number');
-  assert.equal(line.matched_product, 'Sure Men Anti-Perspirant (blue variant)',
-    'the deterministic map rule 23 must still decide WHICH product');
-  assert.ok(line.flags.indexOf('quantity set by household rule') !== -1);
-  assert.ok(line.flags.indexOf('rulebook rule 37') !== -1, 'the change does not carry rule 37 as its cause');
-  assert.ok(/rule 37/.test(line.note), 'the change does not say which rule caused it');
+  // THE MALE LINE IS LEFT AT WHAT WAS ASKED FOR. Rounding it to 4 and stopping -
+  // all the envelope could do before this - buys four men's deodorants, which is
+  // not what the rule says.
+  const male = out.plan.items[0];
+  assert.equal(male.planned_qty, 3, 'the male line was re-counted instead of being completed with a companion');
+  assert.equal(male.matched_product, 'Sure Men Anti-Perspirant (blue variant)',
+    'the deterministic map rule 23 must still decide WHICH product the line itself is');
 
-  const applied = out.audit.applied.filter(function (a) { return String(a.rule_id) === '37'; });
-  assert.deepEqual(applied.map(function (a) { return [a.from, a.to]; }), [[3, 4]],
-    'the audit does not record 3 -> 4 attributed to rule 37');
+  // THE COMPANION LINE EXISTS, AND IT IS A LINE - not a note, not a flag.
+  assert.equal(out.plan.items.length, 2, 'the female variant did not become its own basket line');
+  const female = out.plan.items[1];
+  assert.equal(female.matched_product, 'Sure Women Anti-Perspirant Deodorant (white variant)');
+  assert.equal(female.status, 'add');
+  assert.equal(female.planned_qty, 1);
+  assert.equal(female.requested_qty, 1);
+
+  // THE RULE'S OWN ARITHMETIC: "Mum 3 male -> add 1 female = 4".
+  const units = out.plan.items.reduce(function (n, it) { return n + it.planned_qty; }, 0);
+  assert.equal(units, 4, "the pair total is not the rule's own worked example (3 male + 1 female = 4)");
+  assert.equal(units % 2, 0, 'the pair total is odd - no pair is complete');
+
+  assert.equal(out.plan.summary.planned_add, 2, 'the summary does not count the companion line');
+  assert.equal(out.plan.summary.total_requested, 2);
 });
 
-test('AC3 rule 37: the boundary is SWEPT, not spot-checked - odds move, evens are left alone', async () => {
+test('AC1 rule 37: the boundary is SWEPT, not spot-checked - odds get a companion, evens are left alone', async () => {
   // The rule is about parity, so parity is where it can be wrong. Both sides of
   // the boundary are exercised rather than the single example the rule's prose
-  // happens to quote.
+  // happens to quote. What is swept is the PAIR TOTAL, which is what the rule
+  // is about; the male line always stays at what was asked for.
   const cases = [[1, 2], [2, 2], [3, 4], [4, 4], [5, 6]];
-  for (const [asked, expected] of cases) {
+  for (const [asked, expectedTotal] of cases) {
     const before = plan([{ item_name: 'sure male', requested_qty: asked }], UNPRICED_SURE);
     assert.equal(before.items[0].planned_qty, asked, 'fixture drifted at requested_qty ' + asked);
     const out = await rulebook.applyRulebook({ plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake() });
-    assert.equal(out.plan.items[0].planned_qty, expected,
-      'rule 37 turned ' + asked + ' into ' + out.plan.items[0].planned_qty + ', not ' + expected);
-    if (asked === expected) {
-      assert.equal(out.audit.applied.filter(function (a) { return String(a.rule_id) === '37'; }).length, 0,
-        'an already-even quantity was "changed" to itself at requested_qty ' + asked);
+
+    assert.equal(out.plan.items[0].planned_qty, asked,
+      'the male line moved at requested_qty ' + asked + ' - the completing unit is the FEMALE variant');
+    const total = out.plan.items.reduce(function (n, it) { return n + it.planned_qty; }, 0);
+    assert.equal(total, expectedTotal,
+      'rule 37 turned ' + asked + ' into a pair total of ' + total + ', not ' + expectedTotal);
+
+    const companions = out.audit.applied.filter(function (a) { return a.kind === 'add_companion'; });
+    if (asked % 2 === 0) {
+      assert.equal(companions.length, 0,
+        'an already-even quantity was given a companion it does not need at requested_qty ' + asked);
+      assert.equal(out.plan.items.length, 1, 'an even line grew a second line');
+    } else {
+      assert.equal(companions.length, 1, 'an odd quantity got no companion at requested_qty ' + asked);
+      assert.equal(companions[0].quantity, 1, 'the companion is not exactly one unit');
     }
   }
 });
 
-test('AC3 rule 37: the FEMALE-variant clause is NEVER LOST - it reaches the consumer and the line, verbatim', async () => {
-  // THE HONEST HALF OF THIS RULE. `add a FEMALE variant to complete the last
-  // pair` is an add-a-line outcome and no verb in the safety envelope can
-  // perform it (see this file's header). What must never happen is the clause
-  // falling silently on the floor - that is the exact defect this whole module
-  // exists to end. So it is proven to survive in the two places a person and a
-  // model can each see it.
+test('AC4 rule 37: the companion says WHY it is in the trolley - rule 37 asked, rule 24 chose', async () => {
+  // Warwick must be able to look at a women's deodorant he did not write down
+  // and get the answer from the shop itself. TWO rules answer that question and
+  // both must be on the line: 37 asked for a companion, 24 decided which one.
+  const before = plan([{ item_name: 'sure male', requested_qty: 3 }], UNPRICED_SURE);
+  const out = await rulebook.applyRulebook({ plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake() });
+
+  const female = out.plan.items[1];
+  assert.ok(female.flags.indexOf('rulebook companion') !== -1, 'the companion line is not marked as one');
+  assert.ok(female.flags.indexOf('rulebook rule 37') !== -1, 'the companion does not carry the rule that asked for it');
+  assert.ok(female.flags.indexOf('rulebook rule 24') !== -1, 'the companion does not carry the rule that chose the product');
+  assert.match(female.note, /rule 37/, 'the companion does not name its cause in words a person reads');
+  assert.match(female.note, /rule 24/, 'the companion does not name where the product came from');
+  assert.match(female.note, /sure male/, 'the companion does not say which line it belongs to');
+
+  // and the SOURCE line says it too, so the pair is legible from either end
+  assert.match(out.plan.items[0].note, /rule 37 also added 1 x Sure Women/,
+    'the male line says nothing about the companion added beside it');
+  assert.ok(out.plan.items[0].flags.indexOf('companion added by household rule') !== -1);
+
+  const entry = out.audit.applied.find(function (a) { return a.kind === 'add_companion'; });
+  assert.equal(entry.rule_id, 37, 'the audit does not attribute the companion to rule 37');
+  assert.equal(entry.product_rule_id, 24, 'the audit does not record which map rule supplied the product');
+  assert.equal(entry.to, 'Sure Women Anti-Perspirant Deodorant (white variant)');
+  assert.equal(entry.from, null);
+});
+
+// =====================================================================
+// AC2 - THE BOUND. A companion may ONLY carry a product an active `map` rule
+//       already resolves. These cases are the REFUSALS, and they are the
+//       feature: it is easier to prove a narrow thing was widened than to
+//       prove a wide thing was narrowed.
+// =====================================================================
+
+test('AC2: an UNMAPPED product is refused, and the line is left alone', async () => {
+  const before = plan([{ item_name: 'sure male', requested_qty: 3 }], UNPRICED_SURE);
+  const wasShopping = shopping(before.items[0]);
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: RULES, household: HOUSEHOLD, consult: companionReply(UNMAPPED_PRODUCT)
+  });
+
+  assert.equal(out.plan.items.length, 1, 'a product no rule maps was added to the basket');
+  assert.deepEqual(shopping(out.plan.items[0]), wasShopping, 'the line was changed by a refused companion');
+  assert.equal(out.audit.applied.length, 0);
+  assert.equal(out.audit.rejected.length, 1);
+  assert.match(out.audit.rejected[0].reason, /no active map rule/);
+  assert.equal(out.audit.rejected[0].product, UNMAPPED_PRODUCT, 'the audit does not record what was asked for');
+  // refused, but never SILENT
+  assert.ok(out.plan.items[0].flags.indexOf('rulebook answer rejected') !== -1);
+  assert.match(out.plan.items[0].note, /was refused/);
+});
+
+test('AC2: a CATALOGUE-ONLY product is refused - being real is not being mapped', async () => {
+  // The dangerous case. This product exists, the planner can see it, and it
+  // would go in a real trolley. The ONLY thing keeping it out is the bound.
+  const before = plan([{ item_name: 'sure male', requested_qty: 3 }], UNPRICED_SURE_PLUS_CATALOGUE);
+  const wasShopping = shopping(before.items[0]);
+  assert.ok(UNPRICED_SURE_PLUS_CATALOGUE.some(function (p) {
+    return p.matched_product === CATALOGUE_ONLY_FEMALE.matched_product;
+  }), 'the catalogue no longer carries the unmapped row this case is about');
+  assert.ok(!RULES.some(function (r) { return r.matched_product === CATALOGUE_ONLY_FEMALE.matched_product; }),
+    'a rule now maps this product, so this case tests nothing - re-point it');
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: RULES, household: HOUSEHOLD,
+    consult: companionReply(CATALOGUE_ONLY_FEMALE.matched_product)
+  });
+
+  assert.equal(out.plan.items.length, 1, 'a catalogue product no rule maps was added to the basket');
+  assert.deepEqual(shopping(out.plan.items[0]), wasShopping);
+  assert.match(out.audit.rejected[0].reason, /no active map rule/);
+});
+
+test('AC2: a product mapped for ANOTHER HOUSEHOLD is refused', async () => {
+  // Actively and correctly mapped - for somebody else. Household separation is
+  // not softened by a verb that adds lines.
+  const rules = RULES.concat([FOREIGN_HOUSEHOLD_MAP]);
+  const before = plan([{ item_name: 'sure male', requested_qty: 3 }], UNPRICED_SURE);
+  const wasShopping = shopping(before.items[0]);
+
+  const grounding = rulebook.buildRulebookGrounding(before, rules, HOUSEHOLD);
+  assert.ok(!grounding.companion_products.some(function (p) { return p.name === FOREIGN_HOUSEHOLD_MAP.matched_product; }),
+    "another household's mapped product was OFFERED as a companion");
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: rules, household: HOUSEHOLD,
+    consult: companionReply(FOREIGN_HOUSEHOLD_MAP.matched_product)
+  });
+
+  assert.equal(out.plan.items.length, 1, "another household's product was added to this basket");
+  assert.deepEqual(shopping(out.plan.items[0]), wasShopping);
+  assert.match(out.audit.rejected[0].reason, /no active map rule of this household/);
+});
+
+test('AC2: a mapped product an EXCLUDE rule forbids is refused, and never offered', async () => {
+  // Exclusion is the strongest rule in the module and the new verb is the first
+  // thing that could ever have gone round it.
+  const rules = RULES.concat([EXCLUDED_MAP]);
+  const before = plan([{ item_name: 'sure male', requested_qty: 3 }], UNPRICED_SURE);
+
+  const grounding = rulebook.buildRulebookGrounding(before, rules, HOUSEHOLD);
+  assert.ok(!grounding.companion_products.some(function (p) { return p.name === EXCLUDED_MAP.matched_product; }),
+    'an excluded product was offered as a companion - it must never even be on the list');
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: rules, household: HOUSEHOLD,
+    consult: companionReply(EXCLUDED_MAP.matched_product)
+  });
+
+  assert.equal(out.plan.items.length, 1, 'an excluded product was added to the basket by a companion');
+  assert.match(out.audit.rejected[0].reason, /exclusion rule forbids/,
+    'the refusal was recorded for the wrong reason - exclusion must be named as the cause');
+});
+
+test('AC2: a companion may not hang off a line that is not being bought', async () => {
+  const before = plan([{ item_name: 'shower gel', requested_qty: 1 }], SHOWER_GELS);
+  assert.equal(before.items[0].status, 'needs_decision', 'fixture drifted: this line is no longer held');
+
+  const grounding = rulebook.buildRulebookGrounding(before, RULES, HOUSEHOLD);
+  assert.equal(grounding.lines[0].may_add_companion, false);
+  assert.deepEqual(grounding.companion_products, [],
+    'a companion pool was offered for a basket where no line may take one');
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: RULES, household: HOUSEHOLD,
+    consult: companionReply('Sure Women Anti-Perspirant Deodorant (white variant)', 1, 41)
+  });
+  assert.equal(out.plan.items.length, 1, 'a companion was hung off an unsettled line');
+  assert.match(out.audit.rejected[0].reason, /only be added beside a line that is being bought/);
+});
+
+test('AC2: a product already in the basket is not bought twice', async () => {
+  const before = plan([
+    { item_name: 'sure male', requested_qty: 3 },
+    { item_name: 'sure female', requested_qty: 1 }
+  ], UNPRICED_SURE);
+  const femaleName = 'Sure Women Anti-Perspirant Deodorant (white variant)';
+  assert.equal(before.items[1].matched_product, femaleName,
+    'fixture drifted: rule 24 no longer resolves the female line deterministically');
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: RULES, household: HOUSEHOLD, consult: companionReply(femaleName)
+  });
+
+  assert.equal(out.plan.items.length, 2, 'the household is buying the same product on two lines');
+  assert.match(out.audit.rejected[0].reason, /already in this basket/);
+});
+
+test('AC2: a companion quantity outside the bound is refused, not clamped', async () => {
+  const before = plan([{ item_name: 'sure male', requested_qty: 3 }], UNPRICED_SURE);
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: RULES, household: HOUSEHOLD,
+    consult: companionReply('Sure Women Anti-Perspirant Deodorant (white variant)', 76)
+  });
+  assert.equal(out.plan.items.length, 1, 'a 76-unit companion reached the basket');
+  assert.match(out.audit.rejected[0].reason, /outside 1\.\.24/);
+});
+
+test('AC5: the companion pool is not a back door into set_product', async () => {
+  // A mapped product is addable AS A COMPANION. It is still not a candidate for
+  // the line's own IDENTITY, and the two lists must not merge.
+  //
+  // ESTABLISH THE GROUND FIRST, because the obvious version of this test proves
+  // nothing: with no settled line in the basket the pool is EMPTY, and "the
+  // product was refused" then says only that an empty list contains nothing.
+  // (Written that way first, and a mutation that merged the two lists left it
+  // GREEN - a control reporting on ground it never examined.) This basket
+  // carries a settled Sure line SO THAT the pool is real, plus a held shower-gel
+  // line for the consumer to aim the pooled product at.
+  const FEMALE = 'Sure Women Anti-Perspirant Deodorant (white variant)';
+  const before = plan([
+    { item_name: 'sure male', requested_qty: 2 },
+    { item_name: 'shower gel', requested_qty: 1, note: LAST_WEEK }
+  ], UNPRICED_SURE.concat(SHOWER_GELS));
+
+  const grounding = rulebook.buildRulebookGrounding(before, RULES, HOUSEHOLD);
+  assert.ok(grounding.companion_products.some(function (p) { return p.name === FEMALE; }),
+    'the pool does not contain the product this case tries to smuggle - it would prove nothing');
+  const gel = grounding.lines.find(function (l) { return l.item_name === 'shower gel'; });
+  assert.equal(gel.may_set_product, true, 'the held line is not one set_product may act on - re-point this case');
+  assert.ok(!gel.candidates.some(function (c) { return c.name === FEMALE; }),
+    'the pooled product is being offered as a candidate on the line itself');
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: RULES, household: HOUSEHOLD,
+    consult: terraFake({
+      judgements: function (g) {
+        const l = g.lines.find(function (x) { return x.item_name === 'shower gel'; });
+        return [{ line_no: l.line_no, rule_id: 41, kind: 'set_product', product: FEMALE, why: 'it is a mapped product' }];
+      }
+    })
+  });
+
+  const gelLine = itemNamed(out.plan, 'shower gel');
+  assert.notEqual(gelLine.matched_product, FEMALE,
+    "a mapped product was accepted as this line's identity without ever being offered on the line");
+  assert.equal(gelLine.status, 'needs_decision');
+  assert.ok(out.audit.rejected.some(function (r) { return /was not offered on this line/.test(r.reason); }),
+    'the refusal was not recorded');
+  // and nothing was quietly ADDED instead
+  assert.equal(out.plan.items.length, 2, 'a set_product refusal grew the basket');
+});
+
+test('AC3 rule 37: the FEMALE-variant clause is now DONE as well as said', async () => {
+  // Until 2026-08-09 this test could only prove the clause was CARRIED - to the
+  // person, to the packet and to the prompt - because no verb could perform it.
+  // All of that still holds and is still asserted; what is new is the last
+  // assertion, which is the clause actually happening.
   const FEMALE_CLAUSE = 'add a FEMALE variant to complete the last pair (Mum 3 male -> add 1 female = 4)';
   const rule37 = RULES.find(function (r) { return r.id === 37; });
   assert.ok(rule37.rule_text.indexOf(FEMALE_CLAUSE) !== -1,
@@ -593,21 +958,61 @@ test('AC3 rule 37: the FEMALE-variant clause is NEVER LOST - it reaches the cons
     "the planner's advisory echo dropped rule 37's female-variant clause from the line");
 
   // (b) THE CONSUMER. The grounding packet and the rendered prompt carry the
-  //     rule's text verbatim, so a model reading it is told about the variant
-  //     even though this module cannot act on it.
+  //     rule's text verbatim.
   const grounding = rulebook.buildRulebookGrounding(before, RULES, HOUSEHOLD);
   const sent37 = grounding.rules.find(function (r) { return String(r.id) === '37'; });
   assert.equal(sent37.text, rule37.rule_text,
     "rule 37 reached the consumer without the household's own words");
-  assert.ok(rulebook.buildRulebookPrompt(grounding).indexOf(FEMALE_CLAUSE) !== -1,
-    'the rendered prompt dropped the female-variant clause');
+  const prompt = rulebook.buildRulebookPrompt(grounding);
+  assert.ok(prompt.indexOf(FEMALE_CLAUSE) !== -1, 'the rendered prompt dropped the female-variant clause');
+  assert.ok(prompt.indexOf('Sure Women Anti-Perspirant Deodorant (white variant)') !== -1,
+    'the prompt does not tell the consumer which product it may actually add');
+  assert.match(prompt, /add_companion/, 'the prompt does not offer the verb the rule needs');
 
-  // (c) AND AFTER THE JUDGEMENT. The applied change says, on the line, that the
-  //     completing unit is a female variant - so the handoff a person reads is
-  //     not silently "4 male".
+  // (c) AND NOW IT IS DONE. The basket contains the female variant.
   const out = await rulebook.applyRulebook({ plan: before, rules: RULES, household: HOUSEHOLD, consult: terraFake() });
-  assert.match(String(out.plan.items[0].note), /FEMALE variant/,
-    'the rounded line says nothing about the variant the household asked for');
+  assert.ok(out.plan.items.some(function (it) { return /Sure Women/.test(String(it.matched_product)); }),
+    'the household rule is still only being talked about');
+});
+
+test('SHAPE: one line can produce SEVERAL companions, of different products, at different quantities', async () => {
+  // NOT rule 39, and nothing here implements it. This proves a property of the
+  // SEAM that a reviewer would otherwise have to take on trust: it is not
+  // one-companion-of-one-product shaped, so a household rule of the "= 2 of
+  // this and 1 of that" form needs no further mechanism here - only map rows
+  // for the products it names.
+  const twoMaps = [
+    {
+      id: 93, directive: 'map', scope: 'product', active: true, household_id: HOUSEHOLD,
+      match_term: 'beef hotpot', match_category: null,
+      matched_product: 'A Beef Ready Meal', rule_text: 'Beef hotpot means the beef ready meal.'
+    },
+    {
+      id: 94, directive: 'map', scope: 'product', active: true, household_id: HOUSEHOLD,
+      match_term: 'chicken hotpot', match_category: null,
+      matched_product: 'A Chicken Ready Meal', rule_text: 'Chicken hotpot means the chicken ready meal.'
+    }
+  ];
+  const rules = RULES.concat(twoMaps);
+  const before = plan([{ item_name: 'milk', requested_qty: 1 }], [MILK]);
+
+  const out = await rulebook.applyRulebook({
+    plan: before, rules: rules, household: HOUSEHOLD,
+    consult: terraFake({
+      judgements: function (g) {
+        return [
+          { line_no: g.lines[0].line_no, rule_id: 42, kind: 'add_companion', product: 'A Beef Ready Meal', quantity: 2, why: 'two of these' },
+          { line_no: g.lines[0].line_no, rule_id: 42, kind: 'add_companion', product: 'A Chicken Ready Meal', quantity: 1, why: 'one of those' }
+        ];
+      }
+    })
+  });
+
+  assert.equal(out.plan.items.length, 3, 'one line could not produce two companion lines');
+  assert.deepEqual(out.plan.items.slice(1).map(function (it) { return [it.matched_product, it.planned_qty]; }),
+    [['A Beef Ready Meal', 2], ['A Chicken Ready Meal', 1]],
+    'the two companions did not arrive as separate lines at their own quantities');
+  assert.equal(out.audit.applied.filter(function (a) { return a.kind === 'add_companion'; }).length, 2);
 });
 
 test('AC3: the same reply arriving as raw model TEXT behaves identically', async () => {
@@ -971,8 +1376,31 @@ test('AC6: the rulebook introduces no directive value, pinned to the DB CHECK co
     'rulebook.js assigns a directive value - rules are Warwick\'s data, not this module\'s output');
 });
 
-test('AC6: the judgement vocabulary is three verbs and one of them is "ask"', () => {
-  assert.deepEqual(rulebook.JUDGEMENT_KINDS.slice().sort(), ['ask', 'set_product', 'set_quantity']);
+test('AC6: the judgement vocabulary is FOUR verbs, one of them is "ask", and the fourth is bounded', () => {
+  // Updated 2026-08-09, not relaxed. `add_companion` was authorised as a narrow
+  // deterministic seam, so the enumeration must move with it - a list that no
+  // longer describes the vocabulary is a test that has stopped checking
+  // anything. What replaces the old count is the thing that actually matters:
+  // the fourth verb is the ONLY one that adds a line, and its product comes
+  // from the household's own `map` rules rather than from the consumer.
+  assert.deepEqual(rulebook.JUDGEMENT_KINDS.slice().sort(),
+    ['add_companion', 'ask', 'set_product', 'set_quantity'],
+    'the verb list moved - a FIFTH verb is a design decision, not a way of teaching this system a new rule');
+
+  // THE BOUND, asserted directly against the pool builder rather than through a
+  // basket: only products an active map rule of THIS household resolves.
+  const pool = rulebook._internal.mappedProducts(RULES, HOUSEHOLD);
+  assert.deepEqual(pool.map(function (p) { return p.rule_id; }).sort(function (a, b) { return a - b; }), [23, 24],
+    'the companion pool is not exactly what the map rules resolve');
+  RULES.forEach(function (r) {
+    if (String(r.directive) === 'map') return;
+    assert.ok(!pool.some(function (p) { return p.name === r.matched_product; }),
+      'a non-map rule contributed a product to the companion pool');
+  });
+  // a foreign household contributes nothing, whatever its rule says
+  assert.equal(rulebook._internal.mappedProducts([FOREIGN_HOUSEHOLD_MAP], HOUSEHOLD).length, 0);
+  assert.equal(rulebook._internal.mappedProducts([FOREIGN_HOUSEHOLD_MAP], 99).length, 1,
+    'the household filter is not the thing doing the work here - re-point this assertion');
 });
 
 // =====================================================================
