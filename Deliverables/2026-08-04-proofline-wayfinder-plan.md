@@ -3348,3 +3348,77 @@ Any newly discovered **unrelated** defect: record once in [[Deliverables/BACKLOG
 ### 📌 Parked (not this WP)
 
 **V4-9** · **C-1..C-9, C-11..C-15** · legacy `C:/.fusion247/larry-ding.mjs` · ~~reminder-hook A/B/C product choice~~ **⛔ MOOT — the reminder system is descoped and disabled (Amendment 5); there is no product choice left to make** · **next-WP Claude host hook install — ⛔ NEITHER PARKED NOR IN SCOPE: the outcome was WITHDRAWN by Amendment 5.** *(Re-cut 2026-08-07, Veritas Gate 1 @ `443d0fa`. This line said "⊖ UNPARKED by Amendment 3 — now inside row 1", which was true for one day and then contradicted by Amendment 5. **A withdrawn outcome is not parked work; parking implies it could come back.**)*
+
+---
+
+## 📋 FIRST-CLASS 4F FINDING — **DOES THIS CONTROL HELP WARWICK REACH THE PRODUCT STAR?** (Warwick, 2026-08-09)
+
+> **Banked for 4F, NOT solved here. Warwick's explicit instruction: "Do not solve this 4F question now. BANK IT for 4F."**
+
+**The recurring failure is no longer merely "a rule was present but Larry did not follow it."** Warwick's larger question, his words:
+
+> **«DOES THIS CONTROL HELP WARWICK REACH HIS GOAL AND PRODUCT STAR, WITH QUALITY AND RELIABILITY, AS QUICKLY AND EFFICIENTLY AS REASONABLY POSSIBLE?»**
+
+**4F must examine every governance / assurance / permission mechanism against three outcomes:**
+
+- **A.** preventing a meaningful **product, safety, reliability, authority or recoverability** failure;
+- **B.** helping the team ship the Product Star **faster or with materially better confidence**;
+- **C.** consuming time correcting, debating, reviewing and recording **administration whose practical consequence is negligible**.
+
+**If C, the default answer is REMOVE, COLLAPSE or SIMPLIFY the control — NOT add another rule explaining it.**
+
+**This is NOT an instruction to weaken quality, assurance, provenance, safety or product reliability. It IS an instruction that those mechanisms must justify their cost against Warwick's actual outcome.**
+
+### The BUILD-015 evidence carried into 4F — natural, not manufactured
+
+Every item below happened during real product work on 2026-08-08/09 and is recorded elsewhere with its own evidence:
+
+1. **Long periods spent on attribution, record and convergence corrections while the actual shopping journey remained unfinished.** Sharpest instance: Veritas Gate 2 defect `D1` — Larry misattributed Warwick's own §11 acceptance criterion to himself and retired it on that basis, then a correction cycle followed. Real defect, correctly caught; the 4F question is what the whole cycle cost against the Star.
+2. **Native "Allow Claude to run?" prompts leaving an expensive session idle overnight.** An unattended Larry waiting hours for a routine approval is a productiveness defect, not a safety feature.
+3. **192 one-off permission literals accumulated in `.claude/settings.local.json`** from repeated approvals — a control being routed around one literal at a time, which is the signature of a control that is not working as designed.
+4. **A main-push protection change unintentionally making ordinary feature work interrupt Warwick** — any push-shaped command containing `$(` classified as a main push, so every routine feature-branch push asked him. A gate protecting a real boundary, mis-scoped into the everyday path.
+5. **Wrong-worktree protection believed active while actually INERT** — no active programme state existed, so `findCanonical` returned null and the entire location half never ran. **A control everyone believed was live had been enforcing nothing.** This is the strongest single instance of the 4F question: the cost was paid in belief, and the protection was not there.
+6. **Governance behaviour being debated while the Product Star still had unexecuted links** — the packet seam, the basket writer and both learning flows remained unexecuted throughout.
+
+### ⚖️ WARWICK'S WORD IS THE HUMAN AUTHORITY GATE — a 4F product/governance requirement
+
+> **Recorded now so 4F cannot graduate while Warwick is still being used as a human Enter key.**
+
+**Once Warwick has explicitly written a decision — approve this work · proceed · merge this reviewed head · perform this authorised runtime action — THAT IS THE HUMAN DECISION.**
+
+**He should NOT then be asked to decipher an additional low-level "Allow Claude to run?" command box merely because the implementation happens to use Git, PowerShell, Bash or another tool.** His words: *"Those boxes are not meaningful human governance for me. I generally cannot sensibly evaluate the command text, so they add delay without adding real authority."*
+
+**The target operating model:**
+
+```
+WARWICK SEMANTIC AUTHORITY
+        ↓
+Larry executes the authorised route
+        ↓
+machine controls prevent genuinely forbidden/destructive acts
+        ↓
+NO SECOND HUMAN CONFIRMATION unless the HARNESS technically requires one
+that we cannot lawfully eliminate
+```
+
+Specifically:
+
+| Situation | Required behaviour |
+|---|---|
+| Normal feature-branch writes / commits / pushes | **NO** Warwick allow prompt |
+| PR creation / update | **NO** Warwick allow prompt |
+| An already-authorised merge | **NO** second command-level allow prompt |
+| An already-authorised main update that is part of that merge route | **NO** redundant push prompt |
+| Force push / history rewrite / ref deletion / genuinely destructive unapproved action | **machine DENY** |
+| A new consequential decision not previously authorised by Warwick | **ask Warwick in plain English** |
+| Unavoidable host/harness security confirmation that cannot technically be removed | the **ONLY** acceptable mechanical "Allow" prompt class |
+
+**NOT implemented in the 2026-08-09 governor hotfix, deliberately** (Warwick: *"Do NOT implement this whole authority model now inside the governor hotfix"*). Doing it properly requires distinguishing **Warwick's durable semantic decision** from **the host's mechanical permission layer**, which is 4F work.
+
+**What the hotfix DID deliver against this model, and its limit:** ordinary feature-branch writes, commits and pushes no longer prompt, and destination-main still asks. **The main-push ASK is still a command-level box** — under the model above, an *already-authorised* merge route should not raise it. That gap is real, is not closed, and belongs to 4F.
+
+### 🅿️ PARKED TO 4F BY WARWICK, 2026-08-09 — active-programme-state / multi-worktree semantics
+
+**Wrong-worktree enforcement is a REAL DEFECT and must not be forgotten.** It is currently unreachable live because no active programme state exists. Warwick's ruling, verbatim: **"NO — do not restore/re-design multi-worktree enforcement now… solving active-programme-state / multi-worktree semantics is now explicitly PARKED to BUILD-020 4F. Do not let it become a side quest inside BUILD-015."**
+
+The DENY path is proven **by construction** in `tools/governor/worktree-guard.test.mjs` § CONTRACT, and is deliberately **not** claimed to be live.
