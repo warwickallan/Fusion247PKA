@@ -727,6 +727,116 @@ write a second shopping pipeline."*
 - **a previously dead `info` policy rule demonstrably changes a plan** — regression-tested. This is
   the one that proves D3/D4 are actually fixed rather than described.
 
+### LANE C — the browser, and the invariant that is no longer advisory
+
+> **⭐ WARWICK, 2026-08-09, VERBATIM. This is an EXECUTABLE, TESTED invariant, not guidance:**
+>
+> > **"ONE PERSISTENT CHROME PROFILE. ONE VISIBLE BROWSER SESSION. ONE REUSED TAB FOR THE ENTIRE SHOP.**
+> > **No per-item tabs. No opening a new tab for search. No guessed URLs in extra tabs. No
+> > tab-per-product behaviour. No browser restart between lines unless recovery genuinely requires
+> > it."**
+>
+> **`cdp.js reuseTab` (`cdp.js:100-108`) is the intended mechanism and already exists.** The cost of
+> breaking it is measured, not hypothetical: a previous session opened a tab per item and consumed
+> **~12 GB**, nearly taking the machine down.
+
+> **AMENDMENT — Warwick, 2026-08-09: the CDP ruling is RE-CUT by today's evidence.** His words:
+>
+> > **PROVEN today:** *"CDP transport to visible ASDA"* · *"Persistent dedicated profile"* ·
+> > *"Single-tab reuse capability exists."*
+> > **NOT YET PROVEN:** *"Authenticated operation"* · *"Real trolley mutation through that session"* ·
+> > *"Full reconciliation/verification."*
+> >
+> > *"Therefore CDP is no longer dismissed merely as diagnostic, but it does NOT become the accepted
+> > production browser method until those remaining behaviours are proven live."*
+>
+> **This SUPERSEDES the Lane C readiness brief's classification of CDP as category C
+> (experimental/diagnostic) — but ONLY that classification.** Its anti-pattern #4 stands unchanged:
+> reviving the **CDP runner architecture** (per-item product pages, hand-assembled plan files,
+> synthetic clicks) remains prohibited. **CDP is the ARM. It is not the brain, and it is not yet the
+> accepted method.**
+
+**The six behaviours to prove live in the SAME reused tab, once Warwick has signed in by hand:**
+(1) session persists · (2) authenticated state visible · (3) navigation/search without spawning tabs ·
+(4) one bounded test item added · (5) resulting trolley state read back and **verified** ·
+(6) cleanup/recovery leaves no stray tabs or duplicate sessions. **Never checkout, never pay.**
+**Larry does not touch Warwick's sign-in credentials** — the browser is left on the correct ASDA tab
+and Warwick signs in manually.
+
+> **⭐ WHY THE `brand` COLUMN EXISTS — Warwick, 2026-08-09. This CORRECTS the Lane C readiness brief.**
+>
+> > *"This is why we added a brand column to the supabase schema so that the list could be arranged
+> > alphabetically by brand, prior to the browser session being run. That way when the browser goes to
+> > asda, regulars and favourites, sort by A-Z, everything is in the same bloody order."*
+>
+> **Brand A-Z is a MECHANISM, not a stylistic refinement.** The plan is sorted by brand **before** the
+> browser session so that the plan order and the ASDA Regulars page order under Sort A-Z are **the same
+> sequence** — which is what makes `consume_plan_in_order` (work top to bottom, never re-sort) possible
+> at all, and what makes a single top-to-bottom tick-pass viable instead of a search per line.
+>
+> **⛔ SUPERSEDED:** `Deliverables/2026-08-09-pax-lane-c-browser-readiness.md` classifies Brand A-Z as
+> **"DURABLE INSTRUCTION ONLY (class B) — no proven run evidences Brand A-Z as the executed sort"**,
+> and `instructions.js` v2 repeats that caveat in its header for `set_brand_az_ordering`. **That
+> classification is wrong.** It is the load-bearing coupling between `asdair.regulars.brand`, the
+> packet sort contract, and the browser method. The audit judged it by run evidence and missed that it
+> is a schema-level design decision Warwick took deliberately. **Grade it class A on Warwick's
+> statement; do not re-litigate it from run logs.**
+
+> **⭐⭐ WARWICK, 2026-08-09 — THE LANE C DEFECT, RESTATED. This supersedes every earlier framing of
+> Lane C, including "prove CDP".**
+>
+> > **"THE PROVEN BROWSER OPERATING CONTRACT EXISTS, BUT THE PRODUCTION ROUTE DOES NOT ENFORCE IT."**
+> >
+> > *"Stop treating the browser method as advice that Larry or a model may remember to read… No
+> > browser execution path may be able to bypass that contract simply because an agent did not read
+> > `instructions.js`."*
+> >
+> > *"The job is to make it impossible for the production worker to rediscover ASDA badly."*
+>
+> **⛔ THE CDP QUESTION IS CLOSED. Do not reopen it and do not re-prove it.** Warwick visually
+> confirmed on 2026-08-09: one persistent Chrome profile · one browser session · **one tab** · ten
+> trolley items · basket ready for checkout. His ruling: *"CDP IS NOT THE PROBLEM."* The historical
+> audit's caution was only *"do not infer the historic successful method itself was CDP without
+> evidence"* — **which is not the same as saying CDP cannot execute the method.** Spending further
+> time proving CDP can shop is prohibited.
+>
+> **The required production route, end to end:**
+>
+> ```
+> confirmed Brand A-Z plan -> execution packet CONTAINING THE SETTLED METHOD
+>   -> production browser worker -> CDP one-tab execution
+>   -> trolley-state verification -> reconciliation -> checkout-ready notification
+> ```
+>
+> **These become EXECUTABLE PROPERTIES of the production browser worker, not markdown:** one
+> persistent dedicated Chrome profile · one visible session · **exactly one reused shopping tab** ·
+> consume the confirmed Brand A-Z plan · Regulars/Favourites FIRST · sort that surface A-Z · exploit
+> the household `brand` ordering so plan and surface line up · structured DOM interaction, not visual
+> wandering · batch safe selections · quantities via the existing steppers · reacquire DOM references
+> after mutations · verify mutations from resulting trolley state · reconcile the complete trolley
+> against the confirmed plan · **search/product pages ONLY as a bounded fallback** for items not
+> recoverable through Regulars/Favourites · never one tab per item · **never checkout, pay, choose a
+> slot, or enter Warwick's credentials.**
+>
+> **Six mutation proofs are REQUIRED. Each must FAIL when the behaviour regresses:** (1) a second
+> product tab is opened · (2) Regulars/Favourites is bypassed for an ordinary known regular ·
+> (3) Brand A-Z ordering is omitted · (4) per-item search becomes the default · (5) trolley
+> verification is skipped · (6) **the `BROWSER_METHOD` payload is absent from the production execution
+> path.**
+
+**The Lane C integration work, in parallel and not blocked on sign-in:** reconcile the C3 browser-method
+contract onto the live executable route · **wire the EXISTING packet/handoff subsystem rather than
+inventing another** · give `buildHandoff` / the execution packet / `verifyBasket` **real production
+callers** · make `verificationFor` truthful in production. **Do not call browser operation complete
+merely because Chrome can be driven.**
+
+> **The Lane C defect in one line, and it is the whole four-session pattern:** `handoff/instructions.js`
+> **v2 is COMPLETE** — 18 method steps and 5 prohibitions, carrying every behaviour Warwick has had to
+> re-explain — and **nothing delivers it**. It is unmerged, and the package holding it has no
+> production caller. *(Larry's own record: on 2026-08-09 he quoted the audit naming that file and then
+> drove a browser for twenty minutes without opening it. The knowledge is durable; the delivery is
+> not.)*
+
 ### Boundaries
 
 - **Shop 7 stays honestly parked.** No manufactured progress, no database patching, no use of it as
