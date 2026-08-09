@@ -4,17 +4,32 @@
   "title": "AsdAIr Sonnet Browser Execution Packet",
   "description": "The durable handoff artefact between AsdAIr's planning half and Sonnet in Claude for Chrome, which is the Stage 1 live basket writer (see RUNTIME-DECISION.md, Warwick 2026-08-04). Produced by the product itself and stored in Postgres. NO Claude session constructs this by hand - on 2026-08-03 three plan files were hand-assembled, which is the failure this artefact exists to end. Lines MUST be pre-sorted by normalized brand A-Z then canonical product name A-Z, because that is the order Sonnet uses in ASDA and the ordering IS the speed. STATUS: schema only. The producer does not exist yet - WO-P.",
   "type": "object",
-  "required": ["packet_version", "shop_ref", "generated_at", "expected_distinct_products", "expected_total_units", "lines"],
+  "required": [
+    "packet_version",
+    "shop_ref",
+    "generated_at",
+    "expected_distinct_products",
+    "expected_total_units",
+    "lines"
+  ],
   "additionalProperties": false,
   "properties": {
-    "packet_version": { "const": 1 },
+    "packet_version": {
+      "const": 1
+    },
     "shop_ref": {
       "type": "string",
       "pattern": "^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}$",
       "description": "e.g. SHOP-2026-08-03. Scopes every write back to one shop."
     },
-    "generated_at": { "type": "string", "format": "date-time" },
-    "household_id": { "type": "integer", "minimum": 1 },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "household_id": {
+      "type": "integer",
+      "minimum": 1
+    },
     "sort_contract": {
       "type": "string",
       "const": "brand_az_then_product_az",
@@ -25,71 +40,222 @@
       "minimum": 0,
       "description": "Reconciliation input (ruling section 3). A matching headline count alone is NOT sufficient proof - identity and quantity are checked per line too."
     },
-    "expected_total_units": { "type": "integer", "minimum": 0 },
+    "expected_total_units": {
+      "type": "integer",
+      "minimum": 0
+    },
     "lines": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/line" }
+      "items": {
+        "$ref": "#/$defs/line"
+      }
     },
     "held": {
       "type": "array",
       "description": "Lines deliberately NOT in the basket - ambiguous, out of stock, awaiting a decision, or excluded by rule. Present so nothing is silently dropped.",
-      "items": { "$ref": "#/$defs/heldLine" }
+      "items": {
+        "$ref": "#/$defs/heldLine"
+      }
     }
   },
   "$defs": {
     "line": {
       "type": "object",
-      "required": ["seq", "original_list_line", "canonical_product_id", "canonical_product_name", "brand", "source_view", "required_quantity", "origin"],
+      "required": [
+        "seq",
+        "original_list_line",
+        "canonical_product_id",
+        "canonical_product_name",
+        "brand",
+        "source_view",
+        "required_quantity",
+        "origin"
+      ],
       "additionalProperties": false,
       "properties": {
-        "seq": { "type": "integer", "minimum": 1, "description": "Position in the Brand A-Z order. Sonnet works these in order." },
-        "shop_line_no": { "type": "integer", "minimum": 1, "description": "Back-reference to asdair.shop_line." },
-        "original_list_line": { "type": "string", "minLength": 1, "description": "What was actually written on the photograph. Never lost - it becomes the alias on write-back." },
-        "canonical_product_id": { "type": ["integer", "null"], "description": "asdair.regulars.id. NULL only for a newly approved item that has no regulars row yet." },
-        "canonical_product_name": { "type": "string", "minLength": 1, "description": "Looked up from OUR rows, never model prose." },
-        "brand": { "type": ["string", "null"], "description": "Drives the primary sort. NULL sorts last." },
-        "normalized_brand": { "type": ["string", "null"], "description": "Lowercased/trimmed sort key, so the order is reproducible rather than locale-dependent." },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Position in the Brand A-Z order. Sonnet works these in order."
+        },
+        "shop_line_no": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Back-reference to asdair.shop_line."
+        },
+        "original_list_line": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What was actually written on the photograph. Never lost - it becomes the alias on write-back."
+        },
+        "canonical_product_id": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "asdair.regulars.id. NULL only for a newly approved item that has no regulars row yet."
+        },
+        "canonical_product_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Looked up from OUR rows, never model prose."
+        },
+        "brand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Drives the primary sort. NULL sorts last."
+        },
+        "normalized_brand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Lowercased/trimmed sort key, so the order is reproducible rather than locale-dependent."
+        },
         "source_view": {
-          "enum": ["regulars", "favourites", "search"],
+          "enum": [
+            "regulars",
+            "favourites",
+            "search"
+          ],
           "description": "Where Sonnet finds it. 'search' is permitted ONLY when origin is new_approved - a known item must NEVER be free-searched."
         },
-        "asda_product_ref": { "type": ["string", "null"], "pattern": "^[0-9]{3,12}$", "description": "ASDA product id. Required when origin is known." },
-        "asda_url": { "type": ["string", "null"], "format": "uri" },
-        "required_quantity": { "type": "integer", "minimum": 1, "maximum": 99, "description": "Never invented. A list line with no written quantity defaults to 1 per the household's own standing rule." },
+        "asda_product_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]{3,12}$",
+          "description": "ASDA product id. Required when origin is known."
+        },
+        "asda_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "required_quantity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99,
+          "description": "Never invented. A list line with no written quantity defaults to 1 per the household's own standing rule."
+        },
         "origin": {
-          "enum": ["known", "new_approved"],
+          "enum": [
+            "known",
+            "new_approved"
+          ],
           "description": "known = already in Regulars/Favourites. new_approved = genuinely new AND approved by Warwick this shop."
         },
-        "approved_search_term": { "type": ["string", "null"], "description": "Warwick's approved wording. Required when origin is new_approved. NEVER invented by the model." },
-        "substitutes_allowed": { "type": "boolean", "default": false, "description": "Per-product permission. NOTE: no adapter can enforce this automatically - substitution control is a human step before purchase in every runtime. See RUNTIME-DECISION.md." },
+        "approved_search_term": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Warwick's approved wording. Required when origin is new_approved. NEVER invented by the model."
+        },
+        "substitutes_allowed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Per-product permission. NOTE: no adapter can enforce this automatically - substitution control is a human step before purchase in every runtime. See RUNTIME-DECISION.md."
+        },
         "applied_rules": {
           "type": "array",
           "description": "asdair.rules ids that shaped this line - a multibuy round-up, a rotation, a map. Present so Warwick can see WHY a quantity or variant is what it is, and so a rule that never fires is visible. Directly serves the open defect D-2026-08-04-04.",
-          "items": { "type": "integer" }
+          "items": {
+            "type": "integer"
+          }
         },
-        "quantity_rationale": { "type": ["string", "null"], "description": "Human-readable, e.g. 'list said 3; rule 37 rounds up to 4 for the any-2-for-X offer, 4th is the female variant'." }
+        "quantity_rationale": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Human-readable, e.g. 'list said 3; rule 37 rounds up to 4 for the any-2-for-X offer, 4th is the female variant'."
+        }
       },
       "allOf": [
         {
-          "$comment": "CORRECTED 2026-08-04. The earlier version used `required` alone, which asserts PRESENCE only - and because these fields are typed nullable, {origin:'known', canonical_product_id:null, asda_product_ref:null} was SCHEMA-VALID. Schema validation therefore did not prove the one property this branch exists to enforce, and would have been trusted as if it did. The `not: {const: null}` clauses close that. A producer must ALSO reject it independently: a schema is a contract, not a substitute for the producer's own guard.",
-          "if": { "properties": { "origin": { "const": "known" } }, "required": ["origin"] },
-          "then": {
-            "required": ["asda_product_ref", "canonical_product_id"],
+          "$comment": "CORRECTED 2026-08-04. The earlier version used `required` alone, which asserts PRESENCE only - and because these fields are typed nullable, {origin:'known', canonical_product_id:null, asda_product_ref:null} was SCHEMA-VALID. Schema validation therefore did not prove the one property this branch exists to enforce, and would have been trusted as if it did. The `not: {const: null}` clauses close that. A producer must ALSO reject it independently: a schema is a contract, not a substitute for the producer's own guard. | RELAXED 2026-08-09 under Warwick's Product Ruling 2: \"Known household identity and ASDA retrieval method are SEPARATE concerns.\" canonical_product_id REMAINS required and non-null - identity is still governed by the household catalogue and a known line without it is still invalid. asda_product_ref is no longer required, because a missing reference is a RETRIEVAL problem, not grounds to invalidate a known household product. source_view now admits \"search\" as a retrieval route. The 2026-08-04 lesson above still holds for canonical_product_id: `required` asserts presence only, so the `not: {const: null}` clause is what actually enforces it.",
+          "if": {
             "properties": {
-              "source_view": { "enum": ["regulars", "favourites"] },
-              "asda_product_ref": { "type": "string", "not": { "const": null } },
-              "canonical_product_id": { "type": "integer", "not": { "const": null } }
+              "origin": {
+                "const": "known"
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          },
+          "then": {
+            "required": [
+              "canonical_product_id"
+            ],
+            "properties": {
+              "source_view": {
+                "enum": [
+                  "regulars",
+                  "favourites",
+                  "search"
+                ]
+              },
+              "canonical_product_id": {
+                "type": "integer",
+                "not": {
+                  "const": null
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "ADDED 2026-08-09 with the relaxation above, so the contract keeps the half of Ruling 2 that is a CONSTRAINT rather than a permission: \"use its durable ASDA reference when one is available and valid; OTHERWISE the supervised route MAY use bounded ASDA search\". Search where a valid reference already exists is therefore invalid - it would be a silent substitution route. This mirrors the producer guard in services/asdair/packet/buildExecutionPacket.js; if the two ever disagree the producer is authoritative and this clause is the defect.",
+          "if": {
+            "properties": {
+              "source_view": {
+                "const": "search"
+              }
+            },
+            "required": [
+              "source_view"
+            ]
+          },
+          "then": {
+            "properties": {
+              "asda_product_ref": {
+                "const": null
+              }
             }
           }
         },
         {
           "$comment": "Same correction: an approved search term of null must not satisfy this branch. Warwick's approved wording is the only permitted value, never an invented one and never absent.",
-          "if": { "properties": { "origin": { "const": "new_approved" } }, "required": ["origin"] },
-          "then": {
-            "required": ["approved_search_term"],
+          "if": {
             "properties": {
-              "approved_search_term": { "type": "string", "minLength": 1, "not": { "const": null } }
+              "origin": {
+                "const": "new_approved"
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          },
+          "then": {
+            "required": [
+              "approved_search_term"
+            ],
+            "properties": {
+              "approved_search_term": {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "const": null
+                }
+              }
             }
           }
         }
@@ -97,17 +263,43 @@
     },
     "heldLine": {
       "type": "object",
-      "required": ["original_list_line", "reason"],
+      "required": [
+        "original_list_line",
+        "reason"
+      ],
       "additionalProperties": false,
       "properties": {
-        "shop_line_no": { "type": "integer", "minimum": 1 },
-        "original_list_line": { "type": "string", "minLength": 1 },
+        "shop_line_no": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "original_list_line": {
+          "type": "string",
+          "minLength": 1
+        },
         "reason": {
-          "enum": ["ambiguous", "awaiting_decision", "excluded_by_rule", "not_stocked", "out_of_stock", "possible_duplicate"],
+          "enum": [
+            "ambiguous",
+            "awaiting_decision",
+            "excluded_by_rule",
+            "not_stocked",
+            "out_of_stock",
+            "possible_duplicate"
+          ],
           "description": "Never 'substituted' - substitution is not a permitted outcome anywhere in this product."
         },
-        "detail": { "type": ["string", "null"] },
-        "rule_id": { "type": ["integer", "null"] }
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rule_id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
       }
     }
   }

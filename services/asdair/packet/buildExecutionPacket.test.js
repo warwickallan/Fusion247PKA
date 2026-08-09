@@ -395,24 +395,23 @@ test('DEFENCE IN DEPTH: a null-identity line is rejected by the COMMITTED SCHEMA
   );
 });
 
-test('DIVERGENCE PIN: the committed schema still encodes the rule Warwick RETIRED, and this test is how you find out when it is fixed', () => {
-  // WHAT THIS TEST IS FOR. Warwick's Product Ruling 2 (2026-08-09) made
-  // `asda_product_ref` optional for a known line and permits source_view
-  // "search" where no reference exists. The PRODUCER implements that ruling.
-  // The COMMITTED CONTRACT does not yet: $defs.line.allOf[0] still carries
-  //     required: [asda_product_ref, canonical_product_id]
-  //     asda_product_ref: { type: "string", not: { const: null } }
-  //     source_view:      { enum: ["regulars", "favourites"] }
+test('a KNOWN line with NO asda_product_ref is schema-VALID — Warwick Ruling 2, contract and producer agree', () => {
+  // This replaces the DIVERGENCE PIN that stood here from 2026-08-09 until the
+  // committed schema was corrected the same day. The pin existed because the
+  // producer implemented Warwick's Product Ruling 2 while
+  // Builds/BUILD-015-.../SONNET-BROWSER-EXECUTION-PACKET.schema.json still
+  // required a non-null asda_product_ref for every known line — so a packet that
+  // was CORRECT under the ruling was INVALID under the contract. The implementer
+  // could not fix it: Builds/** is categorically outside its file surface. It
+  // asserted the contradiction here instead of leaving it to be rediscovered in a
+  // live shop, and the pin failed the moment the schema was relaxed — exactly as
+  // designed. That is why this test now asserts the opposite.
   //
-  // So a packet that is CORRECT under the ruling is INVALID under the schema.
-  // The schema file lives under Builds/**, which the implementer of this change
-  // may not write. Rather than leave that contradiction to be rediscovered in a
-  // live shop, it is asserted here.
-  //
-  // >>> WHEN THIS TEST FAILS, IT IS PROBABLY GOOD NEWS. <<<
-  // It means the schema was corrected to match the ruling. Delete this test and
-  // replace it with the ordinary assertion that a known-without-reference
-  // packet IS schema-valid. Do NOT "fix" it by reverting the producer.
+  // The RULING, and both halves matter:
+  //   Known household identity and ASDA retrieval method are SEPARATE concerns.
+  //   A missing reference is a RETRIEVAL problem, not grounds to reject a known
+  //   household product — but the durable reference is used WHEN AVAILABLE, so
+  //   search is the fallback and never a parallel route.
   function knownWithoutRefPacket() {
     return {
       packet_version: 1,
@@ -436,16 +435,33 @@ test('DIVERGENCE PIN: the committed schema still encodes the rule Warwick RETIRE
     };
   }
 
-  // The producer accepts it - the ruling is implemented.
+  // The producer accepts it.
   const produced = build([known({ asda_product_ref: null, source_view: 'search' })]);
   assert.equal(produced.lines[0].origin, 'known');
   assert.equal(produced.lines[0].asda_product_ref, null);
 
-  // The committed schema still rejects it - the contract has not caught up.
+  // And so does the committed contract. Producer and contract now agree.
   const verdict = validate(SCHEMA, knownWithoutRefPacket());
-  assert.equal(verdict.valid, false,
-    'The committed schema now ACCEPTS a known line with no asda_product_ref. That is the divergence closing: ' +
-    'delete this test and assert schema-validity instead. Do not revert the producer.');
+  assert.equal(verdict.valid, true,
+    'A known line with no asda_product_ref must be schema-VALID under Ruling 2. If this fails the ' +
+    'schema has regressed to the retired rule — fix the schema, never the producer.');
+
+  // IDENTITY IS STILL MANDATORY. The ruling separated identity from retrieval; it
+  // did not make identity optional. A known line with no canonical_product_id
+  // stays invalid, and this is the half a careless relaxation would have lost.
+  const noIdentity = knownWithoutRefPacket();
+  noIdentity.lines[0].canonical_product_id = null;
+  assert.equal(validate(SCHEMA, noIdentity).valid, false,
+    'A known line with no canonical_product_id must remain INVALID — identity is governed by the ' +
+    'household catalogue and is not what Ruling 2 relaxed.');
+
+  // SEARCH IS A FALLBACK, NOT A PARALLEL ROUTE. Where a valid reference exists,
+  // source_view "search" is a silent-substitution path and stays invalid.
+  const searchDespiteRef = knownWithoutRefPacket();
+  searchDespiteRef.lines[0].asda_product_ref = '123456';
+  assert.equal(validate(SCHEMA, searchDespiteRef).valid, false,
+    'source_view "search" with a valid asda_product_ref must remain INVALID: Ruling 2 permits ' +
+    'search only where no durable reference is available.');
 });
 
 test('an out-of-vocabulary source_view is REJECTED - regulars.source is NEVER silently mapped', () => {
