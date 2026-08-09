@@ -619,9 +619,17 @@ test('AC6: the rulebook introduces no directive value, pinned to the DB CHECK co
   // CODE ONLY. Comments are stripped first: this module's own prohibition
   // comment quotes the directive types it must never add, and a check that
   // trips over the warning against the thing is a check nobody keeps.
+  //
+  // SPLIT ON /\r?\n/, NEVER '\n'. The estate's checked-out files are CRLF. Splitting
+  // on '\n' alone leaves a trailing '\r' on every line; '.' does not match '\r', so
+  // `//.*$` never reaches the end of the line and NOTHING is stripped. The prohibition
+  // comment then trips the very assertion it was written to survive. This test passed
+  // in the lane worktree (LF, freshly written) and failed on the integrated head after
+  // git normalised the file to CRLF -- a false positive, proven by there being zero
+  // non-comment matches. Larry, 2026-08-09, at reconciliation.
   const src = fs.readFileSync(path.join(__dirname, 'rulebook.js'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n').map(function (l) { return l.replace(/(^|[^:])\/\/.*$/, '$1'); }).join('\n');
+    .split(/\r?\n/).map(function (l) { return l.replace(/(^|[^:])\/\/.*$/, '$1'); }).join('\n');
 
   // The permitted set is read from the MIGRATION, not from a literal in this
   // test and not from the module under test - so widening the code cannot
