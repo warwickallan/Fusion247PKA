@@ -262,8 +262,38 @@ export function splitBashSegments(command) {
 export function classifyBashSegment(segment) {
   const raw = String(segment);
 
-  // Command substitution can hide anything at all. Do not attempt to be clever.
-  if (/\$\(|`/.test(raw)) return 'unknown';
+  // ── Command substitution, 2026-08-09 ──────────────────────────────────────
+  // It used to be a flat 'unknown', which is why Larry's ordinary
+  // `… && echo "banked: $(git rev-parse --short HEAD)"` could never be
+  // classified and therefore could never be allowed. A substitution still hides
+  // something — so classify what it hides, recursively, rather than guessing.
+  // Every body must itself be read-only before the outer segment is judged on
+  // the text that remains. `rm -rf $(anything-not-provably-read-only)` stays
+  // 'unknown' and is never auto-allowed.
+  if (/\$\(|`/.test(raw)) {
+    const bodies = [];
+    const dollar = /\$\(([^()]*)\)/g;
+    const backtick = /`([^`]*)`/g;
+    let m;
+    while ((m = dollar.exec(raw)) !== null) bodies.push(m[1]);
+    while ((m = backtick.exec(raw)) !== null) bodies.push(m[1]);
+    // Nested or unbalanced substitution is not read honestly — stay unknown.
+    const stripped = raw.replace(dollar, ' ').replace(backtick, ' ');
+    if (bodies.length === 0 || /\$\(|`/.test(stripped)) return 'unknown';
+
+    // A substitution standing in a COMMAND-DETERMINING position decides what
+    // actually runs — `git $(echo commit)`, or `$(echo rm) -rf x`. Classifying
+    // the visible remainder there would judge a command nobody has read. Only
+    // substitutions in ARGUMENT position may be reduced. Caught by the existing
+    // suite's "writes disguised as not-git are still writes" case, which failed
+    // when this reduction was first written without the positional test.
+    const head = raw.trim().split(/\s+/).slice(0, 2).join(' ');
+    if (/\$\(|`/.test(head)) return 'unknown';
+    for (const body of bodies) {
+      if (classifyBashSegment(body) !== 'read-only') return 'unknown';
+    }
+    return classifyBashSegment(stripped);
+  }
 
   const withoutHarmless = raw.replace(HARMLESS_REDIRECTS, ' ');
   if (/[<>]/.test(withoutHarmless)) return 'mutating'; // a real redirection writes
@@ -339,6 +369,14 @@ const DESTRUCTIVE_PUSH_FLAG =
 export function classifyPushSegment(segment) {
   const raw = String(segment ?? '');
 
+  // The opacity test lives HERE, on the segment that actually pushes, rather
+  // than over the whole compound command (D-B fix, 2026-08-09). A push whose
+  // own arguments are hidden behind a substitution still goes to the human.
+  if (/\bpush\b/.test(raw) && /\$\(|`/.test(raw)) {
+    const bin0 = (raw.trim().split(/\s+/)[0] || '').replace(/^.*[\\/]/, '').toLowerCase();
+    if (bin0 === 'git' || bin0 === 'git.exe') return 'main';
+  }
+
   let tokens = raw.split(/\s+/).filter(Boolean);
   while (tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[0])) tokens = tokens.slice(1);
   if (tokens.length === 0) return null;
@@ -386,10 +424,20 @@ export function classifyPushCommand(command) {
   const raw = String(command ?? '');
   if (!/\bpush\b/.test(raw)) return null;
 
-  // Command substitution can hide the real refspec. Do not try to be clever:
-  // anything push-shaped that we cannot read honestly goes to the human.
-  if (/\$\(|`/.test(raw)) return 'main';
-
+  // ── D-B FIX, 2026-08-09 ───────────────────────────────────────────────────
+  // The opacity test used to run over the WHOLE command string: any `$(` or
+  // backtick ANYWHERE in a push-shaped command returned 'main', and therefore
+  // ASK. Larry's ordinary shape ends
+  //     … && git push -q origin HEAD:<feature> && echo "banked: $(git rev-parse --short HEAD)"
+  // so a substitution in an unrelated `echo` forced Warwick's approval prompt on
+  // every routine feature-branch push. Measured 2026-08-09: that is the repeated
+  // "Allow Claude to run?" on safe work, and the overnight stall.
+  //
+  // The conservatism is KEPT where it is load-bearing and moved to the segment
+  // that actually pushes — see classifyPushSegment. `git push origin $(b)` still
+  // asks, because the substitution is in the push's own arguments. A substitution
+  // in a sibling segment cannot change this push's destination and no longer
+  // gates it.
   const kinds = splitBashSegments(raw).map(classifyPushSegment);
   if (kinds.includes('destructive')) return 'destructive';
   if (kinds.includes('main')) return 'main';
@@ -400,18 +448,51 @@ export function classifyPushCommand(command) {
 // The decision
 // ---------------------------------------------------------------------------
 
+// ── The safe-operation allow (Warwick, 2026-08-09, requirements A/B) ────────
+// ALLOW is emitted only for what the guard can POSITIVELY classify as ordinary.
+// Anything it cannot read stays DEFER and reaches the host's own prompt — that
+// is the difference between this and "allow everything", and it is why an
+// unreadable `rm -rf $(…)` is not auto-approved.
+//
+// This never runs before the push classification in guard(): destination-main
+// pushes ASK and destructive pushes DENY before control reaches here.
+export function safeOperationDecision({ toolName, toolInput, allowReason, deferReason }) {
+  if (!SHELL_TOOLS.includes(toolName)) {
+    // Write/Edit/MultiEdit/NotebookEdit in an established location.
+    return { decision: DECISION.ALLOW, reason: allowReason };
+  }
+  const cls = classifyBashCommand(toolInput?.command);
+  if (cls.kind === 'read-only' || cls.kind === 'mutating') {
+    return { decision: DECISION.ALLOW, reason: allowReason, classification: cls.kind };
+  }
+  return { decision: DECISION.DEFER, reason: deferReason, classification: cls.kind };
+}
+
 export function decide({ toolName, toolInput, comparison, canonical }) {
   if (!GUARDED_TOOLS.includes(toolName)) {
     return { decision: DECISION.DEFER, reason: `${toolName} is not a guarded tool.` };
   }
   if (!comparison || comparison.verdict === LOCATION.NO_PROGRAMME) {
-    return {
-      decision: DECISION.DEFER,
-      reason: 'No active programme state was found, so there is no canonical location to enforce.',
-    };
+    // Location cannot be enforced without programme state, so this branch does
+    // not claim it is. It still answers the SAFETY question it can answer, so
+    // that ordinary work is not pushed down to the host's native prompt for
+    // want of a canonical location (Warwick, 2026-08-09, requirement E's
+    // evidence clause: the unestablished-state semantics were themselves a
+    // cause of the regression — measured, not assumed).
+    return safeOperationDecision({
+      toolName,
+      toolInput,
+      allowReason: 'No active programme state, so no location claim is made; the operation is ordinary and non-destructive.',
+      deferReason: 'No active programme state, and this operation is not positively classifiable as ordinary.',
+    });
   }
   if (comparison.verdict === LOCATION.ALIGNED) {
-    return { decision: DECISION.DEFER, reason: 'Session is in the canonical worktree and branch.' };
+    return safeOperationDecision({
+      toolName,
+      toolInput,
+      allowReason: 'Session is in the canonical worktree and branch, and the operation is ordinary and non-destructive.',
+      deferReason: 'Session is aligned, but this operation is not positively classifiable as ordinary.',
+    });
   }
 
   if (SHELL_TOOLS.includes(toolName)) {
@@ -676,7 +757,31 @@ export function guard(payload, opts = {}) {
 
   const { canonical, reason } = findCanonical({ cwd, ...opts });
   if (!canonical) {
-    return { decision: DECISION.DEFER, reason: `Guard has no canonical location: ${reason}.` };
+    // A guard that FAILED to establish its location is not the same thing as a
+    // guard that correctly established there is no active programme. Only the
+    // second may allow. The first hands the call to the human, because a
+    // component that has just broken has not earned the right to approve
+    // anything. (Found by the existing AD-19 fail-open test, which caught this
+    // branch emitting `allow` after an internal throw.)
+    if (reason !== 'no active programme state found') {
+      return { decision: DECISION.DEFER, reason: `Guard has no canonical location: ${reason}.` };
+    }
+    // Same posture as NO_PROGRAMME in decide(): make no location claim, but do
+    // not force ordinary work down to the host's native prompt for want of one.
+    // MEASURED 2026-08-09: this is the branch every guarded call on this estate
+    // actually takes, because the only programme-state.json present is
+    // BUILD-018's and its status is "complete". The location half of this guard
+    // is therefore inert until an active programme state exists — recorded
+    // honestly rather than papered over.
+    return {
+      ...safeOperationDecision({
+        toolName,
+        toolInput,
+        allowReason: `Guard has no canonical location (${reason}); no location claim is made, and the operation is ordinary and non-destructive.`,
+        deferReason: `Guard has no canonical location (${reason}), and this operation is not positively classifiable as ordinary.`,
+      }),
+      canonical: null,
+    };
   }
 
   const live = liveLocation({ cwd, execFile: opts.execFile });
@@ -685,13 +790,25 @@ export function guard(payload, opts = {}) {
   return { ...d, comparison, canonical, live };
 }
 
+const HOOK_DECISION = {
+  [DECISION.ALLOW]: 'allow',
+  [DECISION.ASK]: 'ask',
+  [DECISION.DENY]: 'deny',
+};
+
 export function toHookOutput(result) {
   if (!result) return null;
-  if (result.decision !== DECISION.DENY && result.decision !== DECISION.ASK) return null;
+  // DEFER alone emits nothing and falls through to the host's own permission
+  // layer. ALLOW now emits, which is the half that was missing: before
+  // 2026-08-09 this function returned null for everything except ASK and DENY,
+  // so safe work reached Warwick's "Allow Claude to run?" prompt however
+  // clearly the guard had established it was ordinary.
+  const permissionDecision = HOOK_DECISION[result.decision];
+  if (!permissionDecision) return null;
   return {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      permissionDecision: result.decision === DECISION.ASK ? 'ask' : 'deny',
+      permissionDecision,
       permissionDecisionReason: result.reason,
     },
   };
