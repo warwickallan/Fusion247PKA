@@ -671,15 +671,38 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 > > is a fact on disk. **Measure the worktree — `git status --porcelain` per worktree — never infer
 > > from what the worker was last told.**
 > >
-> > **Disposition:** both worktrees preserved as explicitly-labelled WIP commits before any other
-> > action — Lane C `6147c2d`, Lane A `a10d75d`. Both are **UNVERIFIED and UNREVIEWED**: no worker
-> > committed them, none wrote a return, and no read-back was ever read. Preservation is not
-> > acceptance.
+> > **Disposition:** both worktrees committed as explicitly-labelled WIP — Lane C `6147c2d`, Lane A
+> > `a10d75d`.
+> >
+> > > ### ⛔⛔ THIS DISPOSITION WAS ITSELF WRONG — corrected 2026-08-09, same session
+> > >
+> > > **The workers were NOT orphaned. `/clear` destroys Larry's context; it does NOT kill
+> > > background subagents.** Both were still running and still writing. Established by execution
+> > > when Lane A's original worker returned in full, and when `C:/Fusion247PKA-lanec` was observed
+> > > carrying NEW modifications absent from `6147c2d` (`handoff/method.test.js`,
+> > > `mutation-proof.js`, `mutation.test.js`, `pipeline/productionWiring.test.js`).
+> > >
+> > > **What Larry did on the false premise, stated plainly because it is the durable part:**
+> > > (a) committed two live workers' mid-flight edits underneath them, permanently misattributing
+> > > provenance in `a10d75d` and `6147c2d` — Lane A's worker correctly objected to this in its
+> > > return; (b) dispatched a SECOND worker into each occupied worktree — **two writers, one
+> > > worktree.** Both duplicates were stopped before either wrote anything; Lane A's duplicate had
+> > > already detected the foreign writer itself and paused.
+> > >
+> > > **The lesson:** a dirty worktree with no return document is equally consistent with *worker
+> > > died* and *worker is mid-sentence*, and those demand OPPOSITE actions. **Establish liveness —
+> > > sample `git status --porcelain` twice, seconds apart — never infer it.** A previous session's
+> > > agents do not appear in `TaskList`, so an empty task list is ignorance, not evidence.
+> > >
+> > > **`a10d75d` and `6147c2d` are NOT rewritten.** `b15-3/free-text-and-question-surface` is
+> > > pushed, and history is never rewritten merely to make a bad message disappear. The provenance
+> > > correction is carried forward here instead. **Neither commit's "UNVERIFIED, UNREVIEWED" label
+> > > is still accurate for Lane A** — `a61fc44` supplies the evidence.
 >
-> | Lane | Order (committed) | Branch / worktree | State at rotation | ACTUAL disposition |
-> |---|---|---|---|---|
-> | **Lane C** | `Deliverables/2026-08-09-WO-B15-C4-browser-contract-executable.md` (23-path surface, `ready:true`) | `b15-3/lane-c-browser-wiring` · `C:/Fusion247PKA-lanec` | Accepted after 2 × CLARIFY; told to **GO**; building | Output preserved as WIP `6147c2d`; **re-dispatched as a RESUMPTION** |
-> | **B15-3 Lane A** | `Deliverables/2026-08-09-WO-B15-A1-free-text-production-input.md` (14-path surface, `ready:true`) | `b15-3/free-text-and-question-surface` · `C:/Fusion247PKA-b153-ingress` | Accepted after CLARIFY + HOLD; option (c) granted; building | Output preserved as WIP `a10d75d`; **re-dispatched as a RESUMPTION** |
+> | Lane | Order (committed) | Branch / worktree | ACTUAL disposition |
+> |---|---|---|---|
+> | **Lane C** | `Deliverables/2026-08-09-WO-B15-C4-browser-contract-executable.md` (23-path surface, `ready:true`) | `b15-3/lane-c-browser-wiring` · `C:/Fusion247PKA-lanec` | **ORIGINAL WORKER STILL LIVE AND WRITING. HANDS OFF THAT WORKTREE.** Larry's duplicate dispatch was stopped without writing. Await its return. |
+> | **B15-3 Lane A** | `Deliverables/2026-08-09-WO-B15-A1-free-text-production-input.md` (14-path surface, `ready:true`) | `b15-3/free-text-and-question-surface` · `C:/Fusion247PKA-b153-ingress` | **COMPLETE.** Original worker returned in full at `a61fc44`, pushed. Larry's duplicate dispatch was stopped without writing. |
 >
 > **If their returns arrive in a later session: write them to `Deliverables/`, commit, and fold them
 > into the record.** An unread worker return is unbanked work.
@@ -687,18 +710,29 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 > ### 🎯 EXACT NEXT ACTION — re-cut 2026-08-09 post-`/clear`, superseding the three steps that stood here
 >
 > Warwick confirmed at orientation that **nothing has changed**, and directed maximum parallelism.
-> Three workers were dispatched concurrently in the background against governance head `8bc5340`:
+> **The two "resumption" dispatches were a mistake and were stopped** (see the correction above).
+> **The live lanes are:**
 >
-> 1. **Lane A resumption** — `C:/Fusion247PKA-b153-ingress`, from WIP `a10d75d`. Read-back stated,
->    not held for acceptance.
-> 2. **Lane C resumption** — `C:/Fusion247PKA-lanec`, from WIP `6147c2d`. Carries the AC6(f)
->    residual (`runner.js` reads `progress.plan`, `openHandoff` writes `progress.handoff`) as an
->    explicit disposition, and the standing prohibition on re-proving CDP.
-> 3. **4F CAPA item 8** — `C:/Fusion247PKA-wo-valid`, branch `build-020/wo-readiness-validator`,
->    cut from local `main` @ `8bc5340`. Trace `tools/wo/envelope.mjs` and the dispatch path from
->    source; do not author from memory. ⛔ Until dispatch itself refuses an unready order, items 1–7
->    are advisory. Regrowth cap applies at full force; a mutation-test in both directions is the
->    acceptance bar.
+> 1. **Lane A** — ✅ **COMPLETE**, `a61fc44`, pushed. 165/34/322 tests green; 7/7 mutation proofs
+>    RED then restored byte-identical. **Awaiting Larry's reconciliation, then a Veritas gate.**
+>    ⛔ **The real production event has NOT been exercised** — no live Telegram message has traversed
+>    this path and Terra's prompt has never met the model. Under § "Nothing may live only in Larry's
+>    head" **this outcome REMAINS ON THE FRONTIER.** The worker recorded that itself rather than
+>    letting a green suite stand in for it.
+> 2. **Lane C** — ⏳ original worker **still live**. Hands off `C:/Fusion247PKA-lanec` until it returns.
+> 3. **R1 prose rulebook** — `C:/Fusion247PKA-b153-rules`, branch `b15-3/terra-prose-rulebook`,
+>    order `Deliverables/2026-08-09-WO-B15-R1-terra-prose-rulebook.md` (generated via the envelope
+>    route, `ready:true`, 0/0). Corrections 3–5: the dead 59%. Running.
+> 4. **4F CAPA item 8** — `C:/Fusion247PKA-wo-valid`, branch `build-020/wo-readiness-validator`,
+>    cut from local `main` @ `8bc5340`. ⛔ Until dispatch itself refuses an unready order, items 1–7
+>    are advisory. Regrowth cap at full force; mutation-test in both directions is the bar. Running.
+>
+> **Rotation step 8 is DISCHARGED.** Pax's session performance report and machine payload arrived
+> and are banked (`e3cab39`). Its corrections to Larry's own account are accepted: "three elapsed
+> hours" was 2 h 50 m with 45 m 36 s of measured agent execution (~4× overstated); "four REFUSE"
+> was three; the declared closing head `f203e01` was stale by one commit. **Steps 7b/7c (Supabase
+> population via `tools/session-report/populate.mjs`, then `capae-sync.mjs` on the same payload)
+> are now unblocked and still OWED.**
 >
 > **Larry owns the reconciliation and has NOT performed it.** Both lanes touch
 > `services/asdair/pipeline/deps.js` and `services/asdair/pipeline/runPipeline.js`; they are on
