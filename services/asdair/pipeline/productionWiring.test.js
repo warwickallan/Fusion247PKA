@@ -190,39 +190,70 @@ function interpreterBody() {
   return fn.slice(0, fn.indexOf('\nasync function realRecordAnswerLearning'));
 }
 
-test('TERRA: the interpreter imports EXACTLY {answer, answerModel} - no aliasing escape', () => {
-  // ── THIS ASSERTION IS PINNED TO THE IMPORT SPECIFIER, AND THAT IS THE POINT.
+test('TERRA: EVERY model import and EVERY model call on the answer path is Terra', () => {
+  // ── THIS IS AN ABSENCE PROPERTY, AND TWO EARLIER VERSIONS GOT THAT WRONG. ──
   //
-  // The first version of this test checked `await answer(` present and
-  // `await reason(` absent. It was DEFEATED by the obvious one-line switch-back:
+  // Warwick's requirement is "would fail if somebody quietly switched this
+  // back". That is a claim about what must NOT be reachable - so a presence
+  // check can never satisfy it, however specific the thing it looks for.
   //
+  // V1 checked `await answer(` present, `await reason(` absent. Defeated by:
   //     const { reason: answer, answerModel } = await import('...models.mjs');
+  // The alias rebinds everything while every call site still reads `answer`.
   //
-  // which rebinds the whole path to the reasoning role while every call site
-  // still reads `await answer(`. The suite stayed green. Found by running the
-  // mutation Warwick asked for, not by reading the test.
+  // V2 re-pinned to the import specifier's SOURCE names, which kills the alias
+  // - but used .exec(), which returns the FIRST match only, and kept
+  // `assert.match(body, /await answer\(/)`, a PRESENCE check that cannot tell
+  // one-of-two calls from two-of-two. Defeated by a SECOND import:
+  //     const { answer, answerModel } = await import('...models.mjs'); // honest
+  //     const { reason }              = await import('...models.mjs'); // added
+  //     let parsed = await extractJson(await reason(prompt));   // PRIMARY call
+  //     if (...) parsed = await extractJson(await answer(       // retry only
+  // 290/290 green with every real answer going to fusion.reason and only the
+  // strict-JSON retry touching Terra.
   //
-  // So the SOURCE names in the destructuring pattern are what is asserted -
-  // the left-hand side of any `:` - because that is the only text an aliased
-  // import cannot disguise.
+  // That is the dangerous one, because it is what a WELL-MEANING edit looks
+  // like: "reason is fine for the first pass, keep Terra for the retry."
+  // Nobody doing it would think they were doing anything wrong.
+  //
+  // So this asserts two absences over the WHOLE body, not one presence:
+  //   1. across EVERY import of the gateway module, the union of source names
+  //      is exactly {answer, answerModel};
+  //   2. EVERY awaited model callee is `answer` - not "at least one is".
   const body = interpreterBody();
-  const importLine = /const\s*\{([^}]*)\}\s*=\s*await import\('\.\.\/\.\.\/obsidiwikai\/src\/core\/models\.mjs'\)/
-    .exec(body);
-  assert.ok(importLine, 'the interpreter no longer imports from the gateway module at all');
 
-  const sourceNames = importLine[1]
-    .split(',')
-    .map((s) => s.trim().split(':')[0].trim())
-    .filter((s) => s !== '')
-    .sort();
+  // ── 1. EVERY import, not the first. matchAll, never exec. ────────────────
+  const imports = [...body.matchAll(
+    /const\s*\{([^}]*)\}\s*=\s*await import\('\.\.\/\.\.\/obsidiwikai\/src\/core\/models\.mjs'\)/g,
+  )];
+  assert.ok(imports.length > 0, 'the interpreter no longer imports from the gateway module at all');
+
+  const sourceNames = [...new Set(
+    imports.flatMap((m) => m[1].split(',').map((s) => s.trim().split(':')[0].trim()))
+      .filter((s) => s !== ''),
+  )].sort();
 
   assert.deepEqual(sourceNames, ['answer', 'answerModel'],
-    `the answer interpreter imports ${sourceNames.join(', ')} from the gateway module. `
-    + 'It must import EXACTLY answer and answerModel. Warwick ruled: "Do NOT substitute '
-    + '`reason` because it is easier to reach" - and aliasing it to the name `answer` is '
-    + 'the substitution, not an exception to it.');
+    `the answer interpreter imports {${sourceNames.join(', ')}} from the gateway module across `
+    + `${imports.length} import(s). It must import EXACTLY answer and answerModel. Warwick ruled: `
+    + '"Do NOT substitute `reason` because it is easier to reach" - and reaching it through a '
+    + 'second import, or under an alias, is the substitution rather than an exception to it.');
 
-  assert.match(body, /await answer\(/, 'the interpreter does not call the answer role');
+  // ── 2. EVERY model call is Terra. A count, not a presence check. ─────────
+  // Any awaited callee that is a known model-invoking name must be `answer`.
+  // Naming the forbidden set explicitly is what makes this an ABSENCE claim:
+  // a new role added to models.mjs and used here would have to be added to
+  // this set deliberately, which is the review moment.
+  const MODEL_CALLEES = new Set(['answer', 'reason', 'vision', 'generate', 'lightrag']);
+  const modelCalls = [...body.matchAll(/await\s+([A-Za-z_$][\w$]*)\s*\(/g)]
+    .map((m) => m[1])
+    .filter((name) => MODEL_CALLEES.has(name));
+
+  assert.ok(modelCalls.length > 0, 'the interpreter makes no model call at all');
+  assert.deepEqual([...new Set(modelCalls)], ['answer'],
+    `the answer path invokes {${[...new Set(modelCalls)].join(', ')}}. EVERY model call on this `
+    + 'path must be answer(). A path where the primary call is reason() and only the retry is '
+    + 'answer() sends every real free-text answer to the wrong model.');
 });
 
 test('TERRA: the wire body names the Terra model, not a role alias', async () => {
