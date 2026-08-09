@@ -1204,3 +1204,299 @@ test('PROCESS DEATH before delivery: the queued card survives the restart and is
   assert.equal(bot.sent.filter((s) => s.message.text.includes('Confirm this reading')).length, 1);
   assert.equal(ledger(restarted, 'outbox', 'confirm_interpretation').length, 1);
 });
+
+// =====================================================================
+// WP-B15-A1 - FREE TEXT AS A FIRST-CLASS PRODUCTION ANSWER
+//
+// The defect, proven live on 2026-08-09: Warwick typed an answer into Telegram
+// and question 76463 stayed `open` with answer_text NULL, because only a message
+// carrying `reply_to_message` ever reached ACTIONS.ANSWER. His words: "I dont
+// have a bloody card I can type an answer... I don't want to be pressing
+// buttons."
+//
+// Every test below drives runOnce - the SAME function the production CLI calls -
+// so what is proven is the production path, not a function in isolation.
+// =====================================================================
+
+/** A shop carrying TWO open questions, for the one-message-many-answers case. */
+async function seedTwoQuestions(h) {
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]) });
+  const shop = h.db.shop[0];
+  const cheeseKey = questionKeyFor('dreamies cheese');
+  const breadKey = questionKeyFor('bread');
+  await h.deps.shopStore.openQuestion({
+    shop_id: shop.id,
+    question_key: cheeseKey,
+    question_text: 'Which product is "dreamies cheese"?',
+    candidates: [{ label: 'Dreamies Cheese 60g', regular_id: 41 }],
+  });
+  await h.deps.shopStore.openQuestion({
+    shop_id: shop.id,
+    question_key: breadKey,
+    question_text: 'Which product is "bread"?',
+    candidates: [{ label: 'Warburtons Toastie 800g', regular_id: 77 }],
+  });
+  return { shop, cheeseKey, breadKey };
+}
+
+const questionRow = (h, key) => h.db.shop_question.find((q) => q.question_key === key);
+
+test('AC1 THE DEFECT ITSELF: a BARE typed message - no reply_to - answers the open question', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+
+  // NO reply_to_message. This is exactly the update that was dropped in
+  // production, and textUpdate builds a plain message.
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'the cheese one please' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  const q = questionRow(h, questionKey);
+  assert.equal(q.status, 'answered', 'a bare typed message still did not answer the question');
+  assert.equal(q.answer_text, 'the cheese one please', 'the human words were not recorded verbatim');
+  assert.equal(report.answers.length, 1);
+  assert.equal(ledger(h, 'command', COMMANDS.ANSWER_QUESTION).length, 1,
+    'the answer must reach the SAME durable command surface a button tap reaches');
+});
+
+test('AC2 AND IT IS NOT ALSO A SHOPPING LIST - both halves', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+  const shopsBefore = h.db.shop.length;
+  const listsBefore = h.db.shopping_lists.length;
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'the cheese one please' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  // HALF ONE: the answer landed.
+  assert.equal(questionRow(h, questionKey).status, 'answered');
+  // HALF TWO: nothing was received as a list, and no shop was created OR resumed.
+  assert.equal(report.intake.received, 0, 'the answer was ALSO eaten as a shopping list');
+  assert.equal(report.intake.claimed, 1, 'the message should be reported as claimed, not ignored');
+  assert.equal(h.db.shop.length, shopsBefore, 'a shop was created from an answer');
+  assert.equal(h.db.shopping_lists.length, listsBefore, 'a list was created from an answer');
+});
+
+test('AC3a A GENUINE LIST STILL WORKS: a typed list with NO open question creates a shop', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 1, text: '3 gourmet cat food\n1 weetabix protein' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(report.intake.received, 1, 'route-first ate a genuine shopping list');
+  assert.equal(report.intake.claimed, 0);
+  assert.equal(h.db.shop.length, 1);
+  assert.equal(h.db.shop[0].raw_text, '3 gourmet cat food\n1 weetabix protein');
+});
+
+test('AC3b A PHOTO IS ALWAYS A LIST, even while a question is open', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+  const shopsBefore = h.db.shop.length;
+
+  const photo = {
+    update_id: 2,
+    message: {
+      message_id: 902,
+      from: { id: 555 },
+      chat: { id: 555, type: 'private' },
+      photo: [{ file_id: 'f1', file_unique_id: 'u1', width: 100, height: 100, file_size: 10 }],
+    },
+  };
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID, intake: makeIntake([photo]), bot, questions: bot.questions,
+  });
+
+  assert.equal(report.intake.claimed, 0, 'a photograph of a list was claimed as an answer');
+  assert.equal(report.intake.received, 1, 'the photo did not reach receiveList');
+  // NOT shopsBefore + 1: createOrResumeShop keys on (household, listDate), so a
+  // photo arriving in the same week RESUMES that week rather than starting a
+  // second one. That is pre-existing behaviour and the correct outcome here -
+  // what this test proves is that the photo went to INTAKE and not to routing.
+  assert.equal(h.db.shop.length, shopsBefore, 'the week was duplicated rather than resumed');
+  assert.equal(h.db.shop_question[0].status, 'open', 'a photo answered a question');
+});
+
+test('AC4 NOTHING IS SILENTLY DROPPED: an unroutable inbound leaves a trace', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const events = [];
+
+  // A foreign callback - the hub `decision:` cards share this phone. It is NOT
+  // ours to refuse out loud, but it must not vanish without a word either.
+  await routeTaps(h.deps, {
+    updates: [callbackUpdate({ updateId: 7, data: 'decision:something-else' })],
+    bot,
+    questions: bot.questions,
+    log: (event, detail) => events.push({ event, detail }),
+  });
+
+  const traces = events.filter((e) => e.event === 'inbound_refused');
+  assert.equal(traces.length, 1, 'a refused inbound left NO trace - this is the 76463 failure mode');
+  assert.equal(traces[0].detail.updateId, 7, 'the trace must name the update it dropped');
+  assert.ok(typeof traces[0].detail.reason === 'string' && traces[0].detail.reason.length > 0,
+    'a trace with no reason cannot be debugged');
+});
+
+test('AC5 PROVENANCE IS TRUTHFUL: a typed answer is `typed`, never relabelled `button`', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'the cheese one please' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(questionRow(h, questionKey).answer_source, 'typed',
+    'free text recorded as a button press is a false provenance record');
+});
+
+test('AC7 ONE REPLY, SEVERAL QUESTIONS - and each is its own durable answer', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { cheeseKey, breadKey } = await seedTwoQuestions(h);
+
+  // TERRA, ONCE, with every open key. The fake stands in for the gateway call;
+  // what is proven here is the WIRING and the per-question split, not the model.
+  const calls = [];
+  h.deps.correlateAnswer = async (grounding) => {
+    calls.push(grounding);
+    return {
+      mappings: [
+        { question_key: cheeseKey, answer_text: 'the cheese one', confidence: 'high' },
+        { question_key: breadKey, answer_text: 'the toastie loaf', confidence: 'high' },
+      ],
+      unmapped_text: null,
+    };
+  };
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'cheese one and the toastie loaf' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(calls.length, 1, 'Terra must be called ONCE with every open question, not once per question');
+  assert.equal(calls[0].questions.length, 2, 'the correlator was not shown every open question');
+  assert.equal(questionRow(h, cheeseKey).status, 'answered');
+  assert.equal(questionRow(h, breadKey).status, 'answered');
+  assert.equal(questionRow(h, cheeseKey).answer_text, 'the cheese one');
+  assert.equal(questionRow(h, breadKey).answer_text, 'the toastie loaf');
+  assert.equal(report.answers.length, 2);
+  assert.equal(ledger(h, 'command', COMMANDS.ANSWER_QUESTION).length, 2,
+    'each settled question must be its own durable command, never one combined write');
+});
+
+test('AC10 PARTIAL SUCCESS: two clear answers land even when a third cannot be placed', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { shop, cheeseKey, breadKey } = await seedTwoQuestions(h);
+  const milkKey = questionKeyFor('milk');
+  await h.deps.shopStore.openQuestion({
+    shop_id: shop.id,
+    question_key: milkKey,
+    question_text: 'Which product is "milk"?',
+    candidates: [{ label: 'Semi Skimmed 4pt', regular_id: 88 }],
+  });
+
+  h.deps.correlateAnswer = async () => ({
+    mappings: [
+      { question_key: cheeseKey, answer_text: 'the cheese one', confidence: 'high' },
+      { question_key: breadKey, answer_text: 'the toastie loaf', confidence: 'high' },
+      // NOT placeable: the correlator is not sure these words were aimed here.
+      { question_key: milkKey, answer_text: 'the usual', confidence: 'low' },
+    ],
+    unmapped_text: null,
+  });
+
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'cheese one, toastie loaf, and the usual' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(questionRow(h, cheeseKey).status, 'answered', 'a clear answer was discarded by an unclear one');
+  assert.equal(questionRow(h, breadKey).status, 'answered', 'a clear answer was discarded by an unclear one');
+  assert.equal(questionRow(h, milkKey).status, 'open',
+    'a low-confidence correlation was claimed anyway - that is a guess');
+  assert.equal(questionRow(h, milkKey).answer_text, null);
+});
+
+test('DETERMINISTIC FIRST: an exact candidate label spends NO model call', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { cheeseKey } = await seedTwoQuestions(h);
+
+  let modelCalls = 0;
+  h.deps.correlateAnswer = async () => { modelCalls += 1; return { mappings: [], unmapped_text: null }; };
+
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    // The EXACT label of one candidate, with two questions open.
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'Dreamies Cheese 60g' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(modelCalls, 0, 'an answer that was already certain spent a model call');
+  assert.equal(questionRow(h, cheeseKey).status, 'answered');
+});
+
+test('NEVER GUESSES: with several questions open and no correlator, nothing is claimed', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { cheeseKey, breadKey } = await seedTwoQuestions(h);
+  // No correlator wired at all - the degraded case.
+  h.deps.correlateAnswer = undefined;
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'you know the one' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(questionRow(h, cheeseKey).status, 'open', 'a question was answered on a guess');
+  assert.equal(questionRow(h, breadKey).status, 'open', 'a question was answered on a guess');
+  // NOT CLAIMED means intake keeps it, which is Warwick own guard: a genuine new
+  // shopping list must never be lost because a stale question was open.
+  assert.equal(report.intake.claimed, 0);
+  assert.equal(report.intake.received, 1);
+});
+
+test('A CORRELATOR THAT THROWS never eats the message', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await seedTwoQuestions(h);
+  h.deps.correlateAnswer = async () => { throw new Error('gateway unreachable'); };
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'milk and bread' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(report.intake.claimed, 0);
+  assert.equal(report.intake.received, 1, 'a failed correlation lost the message entirely');
+});

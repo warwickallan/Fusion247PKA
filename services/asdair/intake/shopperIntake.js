@@ -631,6 +631,26 @@ export async function runIntake({
   // callback before its Telegram offset is acknowledged - see the ordering note
   // at the advance site. The runtime supplies it; standalone/dry-run does not.
   onRecord = null,
+  // ROUTE-FIRST HOOK (WP-B15-A1). Asked, BEFORE this message is treated as a
+  // shopping list, whether the control surface is claiming it as an answer to an
+  // open question. `true` means "handled elsewhere, durably" and intake builds
+  // and persists nothing for it.
+  //
+  // ── WHY A HOOK AND NOT A PREDICATE INSIDE classifyUpdate ──────────────────
+  // classifyUpdate is PURE and stays pure. Deciding whether an open question
+  // exists needs the database and may need a model call; putting that behind a
+  // pure classifier would make "what kind of message is this?" depend on live
+  // state - untestable, and a different answer on every pass. Classification
+  // says WHAT the message is; the claim says WHO it belongs to. Two questions,
+  // two places.
+  //
+  // ── WHY IT SITS HERE AND NOT AFTER THE LOOP ───────────────────────────────
+  // There is exactly one poller and the offset ACK is destructive. The claim
+  // must be decided - and the answer written durably by the claimant - BEFORE
+  // this message's offset advances, for precisely the reason receiveList runs
+  // inside onRecord. A claim resolved after the ACK would lose the answer to any
+  // crash in that window, which is the failure this ordering exists to prevent.
+  claim = null,
 } = {}) {
   if (!config || !Array.isArray(config.allowedSenderIds)) throw new Error('runIntake: config (loadIntakeConfig result) required');
   if (!telegram || typeof telegram.getUpdates !== 'function') throw new Error('runIntake: telegram client required (injected)');
@@ -642,6 +662,7 @@ export async function runIntake({
   const emitted = [];
   const ignored = [];
   const failed = [];
+  const claimed = [];
 
   const updates = await telegram.getUpdates({
     offset: lastUpdateId === null || lastUpdateId === undefined ? undefined : lastUpdateId + 1,
@@ -664,6 +685,42 @@ export async function runIntake({
       if (verdict.updateId !== null) offsetAfter = verdict.updateId;
       if (!dryRun && verdict.updateId !== null) await state.write(verdict.updateId, { now });
       continue;
+    }
+
+    // ── ROUTE FIRST. Does this message belong to an open question? ──────────
+    //
+    // Asked BEFORE buildRecord, so a claimed message is never downloaded, never
+    // becomes a shop and never resumes one. That ordering is AC2: until it
+    // existed, a typed answer was classified as a shopping list and reached
+    // receiveList, so the same words could be both answered and eaten.
+    //
+    // A CLAIM THAT THROWS DOES NOT EAT THE MESSAGE. Routing failing is not a
+    // reason to lose a shopping list, so the error is logged and the message
+    // falls through to intake exactly as it does today. Failing towards "not
+    // claimed" is the safe direction: the worst case is the pre-existing
+    // behaviour, never a silently discarded message.
+    if (typeof claim === 'function') {
+      let wasClaimed = false;
+      try {
+        wasClaimed = (await claim(verdict, update)) === true;
+      } catch (err) {
+        log('claim_failed', {
+          updateId: verdict.updateId,
+          sourceId: verdict.sourceId,
+          error: maskTokenIn(err && err.message ? err.message : String(err), config.botToken),
+        });
+      }
+      if (wasClaimed) {
+        // A terminal decision like `ignored`, and for the same reason: the
+        // message HAS been handled, durably, by the claimant before this point.
+        // The offset advances so it is not redelivered and answered twice.
+        const entry = { updateId: verdict.updateId, sourceId: verdict.sourceId, senderId: verdict.senderId };
+        claimed.push(entry);
+        log('claimed_by_router', entry);
+        if (verdict.updateId !== null) offsetAfter = verdict.updateId;
+        if (!dryRun && verdict.updateId !== null) await state.write(verdict.updateId, { now });
+        continue;
+      }
     }
 
     let record;
@@ -722,6 +779,10 @@ export async function runIntake({
     emitted,
     ignored,
     failed,
+    // Reported separately from `ignored` on purpose: an ignored message was
+    // refused, a claimed one was HANDLED. Collapsing them would make a working
+    // answer path look like a stream of rejections.
+    claimed,
     fetched: ordered.length,
     offsetBefore,
     offsetAfter,

@@ -500,6 +500,150 @@ async function realInterpretAnswer(grounding) {
   };
 }
 
+/**
+ * WHICH open question did this bare typed message answer? (WP-B15-A1)
+ *
+ * ── A DIFFERENT JOB FROM realInterpretAnswer, AND THE TWO MUST NOT MERGE ─────
+ * interpretAnswer is handed ONE question and asked what the answer MEANS. This
+ * is handed EVERY open question and asked WHICH of them the words were aimed at.
+ * It decides nothing about a product: it only says "these words belong to that
+ * question", and the existing decision spine then interprets each mapped answer
+ * exactly as it always has. Correlation and interpretation are separate steps
+ * and stay separate — collapsing them would put a correlation guess inside a
+ * product decision, where it would be invisible.
+ *
+ * ── PER-QUESTION, WHICH IS THE ENTIRE POINT ─────────────────────────────────
+ * The return is an ARRAY, one entry per question the message actually addressed.
+ * One message covering three open questions must be able to settle two of them
+ * durably while the third falls to a clarification. A single-verdict return
+ * would let one unreadable fragment discard two perfectly good answers, which is
+ * the failure this shape exists to make impossible.
+ *
+ * ── NOTHING IS GUESSED, AND `confidence` IS ABOUT CORRELATION ───────────────
+ * `confidence` says how sure the model is that the words were aimed at THAT
+ * question — it says nothing about whether the answer is understandable. Only a
+ * `high` correlation is ever claimed by the caller. A question the model does
+ * not mention is simply not mapped and stays open; text belonging to no question
+ * comes back as `unmapped_text`. There is no least-bad correlation here, exactly
+ * as there is no least-bad match in realInterpretAnswer.
+ *
+ * @param {{answer_text:string, questions:{question_key:string, question_text:string,
+ *          item_name?:string, candidates?:{label?:string}[]}[]}} grounding
+ * @returns {Promise<{mappings:{question_key:string, answer_text:string,
+ *                    confidence:'high'|'low'}[], unmapped_text:string|null, model:*}>}
+ */
+async function realCorrelateAnswer(grounding) {
+  // ── BOUND TO TERRA, FOR THE SAME REASON interpretAnswer IS ────────────────
+  // Warwick ruled that reading a natural-language shopping answer is Terra's
+  // job and must not be substituted with `reason` because `reason` is easier to
+  // reach. `answer()` is gateway-only and THROWS where no gateway is configured
+  // - it never falls back to the box - so the ruling is enforced by the call.
+  const { answer, answerModel } = await import('../../obsidiwikai/src/core/models.mjs');
+  const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
+  const invoked = answerModel();
+
+  const open = Array.isArray(grounding && grounding.questions) ? grounding.questions : [];
+  const text = grounding && grounding.answer_text !== undefined && grounding.answer_text !== null
+    ? String(grounding.answer_text) : '';
+
+  // The ONLY keys the model may name. Anything else is not a question we asked,
+  // and naming one is treated as not understood rather than corrected - the same
+  // grounding check realInterpretAnswer applies to regular ids.
+  const allowedKeys = new Set(
+    open.map((q) => (q && typeof q.question_key === 'string' ? q.question_key : null))
+      .filter((k) => k !== null && k !== ''),
+  );
+  // NOTHING OPEN MEANS NOTHING TO CORRELATE. Never a model call, never a claim.
+  if (allowedKeys.size === 0 || text.trim() === '') {
+    return { mappings: [], unmapped_text: null, model: invoked };
+  }
+
+  const asked = open
+    .filter((q) => q && allowedKeys.has(q.question_key))
+    .map((q) => ({
+      question_key: q.question_key,
+      about: q.item_name || null,
+      question: q.question_text || null,
+      options: (Array.isArray(q.candidates) ? q.candidates : [])
+        .map((c) => (c && c.label !== undefined && c.label !== null ? String(c.label) : null))
+        .filter((l) => l !== null && l !== ''),
+    }));
+
+  const prompt = [
+    'A person was asked several questions about this week\'s shopping list, and',
+    'has replied with ONE message. Work out which questions that message answers.',
+    'Return ONLY valid JSON. No prose, no markdown, no code fences.',
+    '',
+    `Their exact message: ${JSON.stringify(text)}`,
+    '',
+    'The questions currently open, with the key you must use for each:',
+    JSON.stringify(asked),
+    '',
+    'Return this shape:',
+    '{"mappings":[{"question_key":<key from the list above>,',
+    '              "answer_text":<the part of their message that answers it>,',
+    '              "confidence":"high"|"low"}],',
+    ' "unmapped_text": <any part of the message that answers none of them, or null>}',
+    '',
+    'RULES:',
+    '- You may ONLY use a question_key from the list above. Never invent one.',
+    '- Include a question ONLY if the message genuinely addresses it. A question',
+    '  the message says nothing about is simply left out; it stays open.',
+    '- "high" means you are sure the words were aimed at THAT question. Use "low"',
+    '  when the message might be about it but you cannot tell. NEVER pick the',
+    '  closest question just to have an answer.',
+    '- confidence is about WHICH QUESTION the words belong to, not about whether',
+    '  you understand the answer itself. An answer aimed unmistakably at one',
+    '  question is "high" even when its meaning is unclear.',
+    '- answer_text is THEIR wording for that question, copied, never paraphrased',
+    '  and never resolved to a product.',
+    '- If the message looks like a new shopping list rather than an answer,',
+    '  return an empty mappings array.',
+  ].join('\n');
+
+  // A single strict-JSON retry, and no more. That is a formatting repair, not a
+  // second opinion - the same rule realInterpretAnswer and realInterpretPhoto follow.
+  let parsed = await extractJson(await answer(prompt));
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.mappings)) {
+    parsed = await extractJson(await answer(
+      `${prompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`,
+    ));
+  }
+
+  // UNREADABLE MEANS NOTHING IS CLAIMED. A correlation that could not be made is
+  // not an error and never a guess: the caller does not claim the message, so it
+  // reaches intake exactly as it does today. Failing towards "not mine" is the
+  // only safe direction, because the alternative is eating a real shopping list.
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.mappings)) {
+    return { mappings: [], unmapped_text: text, model: invoked };
+  }
+
+  const mappings = [];
+  const seen = new Set();
+  for (const m of parsed.mappings) {
+    if (!m || typeof m !== 'object') continue;
+    const key = typeof m.question_key === 'string' ? m.question_key : '';
+    // THE GROUNDING CHECK, and the duplicate guard. A key it was never shown is
+    // dropped, not corrected; a key named twice settles once.
+    if (!allowedKeys.has(key) || seen.has(key)) continue;
+    const mapped = m.answer_text === null || m.answer_text === undefined ? '' : String(m.answer_text).trim();
+    if (mapped === '') continue;
+    seen.add(key);
+    mappings.push({
+      question_key: key,
+      answer_text: mapped,
+      // Anything that is not explicitly "high" is treated as low. An absent,
+      // misspelled or invented confidence must never read as certainty.
+      confidence: m.confidence === 'high' ? 'high' : 'low',
+    });
+  }
+
+  const leftover = parsed.unmapped_text === null || parsed.unmapped_text === undefined
+    ? null : (String(parsed.unmapped_text).trim() || null);
+
+  return { mappings, unmapped_text: leftover, model: invoked };
+}
+
 async function realRecordAnswerLearning(answer) {
   const { recordAnswerLearning } = require('../outcome/recordAnswerLearning.js');
   const client = await getWritePool().connect();
@@ -560,6 +704,14 @@ export function createDeps(overrides = {}) {
     // button resolves in production and free text CANNOT, which is half the
     // outcome this Work Package exists to deliver (Veritas D-1).
     interpretAnswer: realInterpretAnswer,
+
+    // WHICH open question a bare typed message answered (WP-B15-A1). A separate
+    // binding from interpretAnswer on purpose: that one is handed ONE question
+    // and reads the answer, this one is handed EVERY open question and works out
+    // which the words were aimed at. Without it a plain message can only be read
+    // when exactly one question is open, and Warwick's "answer them all in one
+    // message" cannot work at all.
+    correlateAnswer: realCorrelateAnswer,
 
     // confirmation + learning
     buildConfirmationPayload: buildPayload,

@@ -158,3 +158,119 @@ test('the router never returns a decision — only an intent to be acted on else
   // No resolved product, no outcome, no side-effect handle.
   assert.ok(!('product' in r) && !('decision' in r) && !('db' in r) && !('result' in r));
 });
+
+// =====================================================================
+// WP-B15-A1 - THE THIRD SHAPE: a plain typed message
+//
+// Until this existed, a typed answer counted only if Warwick first long-pressed
+// the right card and used reply-to. Everything else fell out of the bottom of
+// routeAsdairUpdate as NOT_ASDAIR and was never seen again - which is exactly
+// what happened to question 76463 in production on 2026-08-09.
+// =====================================================================
+
+/** A plain message. No reply_to_message, no callback_query - just words. */
+function bareText(text = 'the cheese one please', { chatId = 555, messageId = 900 } = {}) {
+  return {
+    update_id: 11,
+    message: {
+      message_id: messageId,
+      from: { id: chatId },
+      chat: { id: chatId, type: 'private' },
+      text,
+    },
+  };
+}
+
+test('A1: a bare typed message becomes an ANSWER intent when the caller correlates it', () => {
+  const out = routeAsdairUpdate(bareText(), {
+    resolveAnswersByText: () => ({
+      mappings: [{ questionKey: 'q-cheese', shopRef: 'SHOP-2026-08-03', answerText: 'the cheese one please' }],
+    }),
+  });
+
+  assert.equal(out.ok, true, 'a bare typed message is still being dropped');
+  assert.equal(out.action, ACTIONS.ANSWER);
+  assert.equal(out.arg, 'q-cheese', 'the intent must name the QUESTION, not a candidate index');
+  assert.equal(out.shopRef, 'SHOP-2026-08-03');
+  assert.equal(out.raw.kind, 'text', 'a bare message must be distinguishable from a reply');
+  assert.equal(out.raw.text, 'the cheese one please', 'the words must pass through verbatim');
+  assert.equal(out.responder, 'telegram:555');
+});
+
+test('A1: BACKWARD COMPATIBLE - with no correlator injected, behaviour is exactly as before', () => {
+  const out = routeAsdairUpdate(bareText(), {});
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, REFUSALS.NOT_ASDAIR,
+    'a caller that wires nothing must keep the old behaviour, not acquire a new one');
+});
+
+test('A1: an uncorrelated message is refused with its OWN reason, so it can go on to intake', () => {
+  const out = routeAsdairUpdate(bareText('4 pints of milk\n2 bread'), {
+    resolveAnswersByText: () => null,
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, REFUSALS.UNCORRELATED_TEXT,
+    'a genuine new shopping list must be distinguishable from a foreign update');
+  assert.notEqual(out.reason, REFUSALS.UNCORRELATED_REPLY,
+    'a bare message is not a reply that lost its card - conflating them hides a real miss');
+});
+
+test('A1: an EMPTY correlation is never a claim', () => {
+  const out = routeAsdairUpdate(bareText(), { resolveAnswersByText: () => ({ mappings: [] }) });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, REFUSALS.UNCORRELATED_TEXT);
+});
+
+test('A1: a mapping with no questionKey is discarded rather than half-used', () => {
+  const out = routeAsdairUpdate(bareText(), {
+    resolveAnswersByText: () => ({ mappings: [{ shopRef: 'SHOP-2026-08-03', answerText: 'x' }] }),
+  });
+  assert.equal(out.ok, false, 'a mapping naming no question was treated as an answer');
+});
+
+test('A1: ONE message can carry SEVERAL question mappings', () => {
+  const out = routeAsdairUpdate(bareText('cheese one and the toastie loaf'), {
+    resolveAnswersByText: () => ({
+      mappings: [
+        { questionKey: 'q-cheese', shopRef: 'SHOP-2026-08-03', answerText: 'cheese one' },
+        { questionKey: 'q-bread', shopRef: 'SHOP-2026-08-03', answerText: 'the toastie loaf' },
+      ],
+    }),
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.raw.mappings.length, 2, 'a multi-question answer was flattened to one');
+  assert.equal(out.raw.mappings[0].answerText, 'cheese one');
+  assert.equal(out.raw.mappings[1].answerText, 'the toastie loaf');
+  assert.equal(out.arg, 'q-cheese', 'the first mapping should still be readable as a single intent');
+});
+
+test('A1: a mapping with no fragment falls back to the whole message, never to empty', () => {
+  const out = routeAsdairUpdate(bareText('just the usual'), {
+    resolveAnswersByText: () => ({ mappings: [{ questionKey: 'q-cheese', shopRef: 'R' }] }),
+  });
+  assert.equal(out.raw.mappings[0].answerText, 'just the usual');
+});
+
+test('A1: a REPLY still takes the reply path, never the new one', () => {
+  const reply = bareText();
+  reply.message.reply_to_message = { message_id: 9001, chat: { id: 555 } };
+
+  const out = routeAsdairUpdate(reply, {
+    resolveQuestionByMessage: () => ({ questionKey: 'q-from-card', shopRef: 'SHOP-2026-08-03' }),
+    // Deliberately wired too: the reply branch must win, because the card it
+    // replies to is a HARDER correlation than reading the words.
+    resolveAnswersByText: () => ({ mappings: [{ questionKey: 'q-from-text', shopRef: 'R' }] }),
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.raw.kind, 'reply');
+  assert.equal(out.arg, 'q-from-card', 'the card correlation must outrank reading the words');
+});
+
+test('A1: a whitespace-only message is never an answer', () => {
+  const out = routeAsdairUpdate(bareText('   '), {
+    resolveAnswersByText: () => ({ mappings: [{ questionKey: 'q-cheese', shopRef: 'R' }] }),
+  });
+  assert.equal(out.ok, false, 'blank words were treated as an answer');
+});

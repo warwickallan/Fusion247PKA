@@ -419,3 +419,123 @@ test('D-2: every kind the pipeline queues has a renderer - the general form of t
   assert.deepEqual(voiceless, [],
     `these kinds are queued but have no renderer, so they can never reach Warwick: ${voiceless.join(', ')}`);
 });
+
+// =====================================================================
+// WP-B15-A1 - THE FREE-TEXT ANSWER PATH IS GENUINELY WIRED
+//
+// Same discipline as D-1 above, for the same reason: a correlator that exists,
+// is tested and is bound by nothing would make free text work in every test and
+// in no real week. The unit tests inject their own correlator, so only this file
+// can see whether production has one.
+//
+// The PRODUCTION CALL PATH this proves, by file and line:
+//   runtime.js  main()            -> realWiring(deps)      binds bot.routeAsdairUpdate
+//   runtime.js  runOnce()         -> loadOpenQuestions()   reads every open question
+//   runtime.js  runOnce()         -> claim -> correlateTypedAnswer()
+//   runtime.js  correlateTypedAnswer -> deps.correlateAnswer  (bound in deps.js)
+//   runtime.js  claim             -> bot.routeAsdairUpdate -> intentToCommands
+//   runtime.js  claim             -> commands.dispatch(ANSWER_QUESTION)
+//   commands.js answerQuestion    -> shopStore.answerQuestion (the durable CAS)
+//
+// ZERO MODEL SPEND, ZERO DATABASE - the wiring is asserted, never invoked.
+// =====================================================================
+
+const runtimeSrc = stripComments(fs.readFileSync(path.join(HERE, 'runtime.js'), 'utf8'));
+const routerSrc = stripComments(fs.readFileSync(path.join(HERE, '..', 'bot', 'inboundRouter.js'), 'utf8'));
+const rendererSrc = stripComments(fs.readFileSync(path.join(HERE, '..', 'bot', 'renderMessages.js'), 'utf8'));
+
+test('A1: the REAL production container supplies a callable correlateAnswer', () => {
+  const deps = createDeps();
+  assert.equal(typeof deps.correlateAnswer, 'function',
+    'nothing binds correlateAnswer, so a typed message can never be matched to one of several open questions in production');
+});
+
+test('A1: correlateAnswer is BOUND TO TERRA, not to the cheaper `reason` route', () => {
+  const depsSrc = stripComments(fs.readFileSync(path.join(HERE, 'deps.js'), 'utf8'));
+  const at = depsSrc.indexOf('async function realCorrelateAnswer');
+  assert.notEqual(at, -1, 'realCorrelateAnswer is gone - the binding above is pointing at something else');
+  const body = depsSrc.slice(at, at + 2000);
+  assert.ok(body.includes('answerModel()'),
+    'the model actually invoked must be recorded at call time, never a name we hoped was invoked');
+  assert.ok(!/\breason\s*\(/.test(body),
+    'Warwick ruled the answer path is Terra and must NOT be substituted with `reason`');
+});
+
+test('A1: the consumer and the provider agree on the name', () => {
+  // The D-1 failure was exactly this: a consumer reading one name and a
+  // container binding none. Asserted on both sources, not on a call.
+  assert.ok(runtimeSrc.includes('deps.correlateAnswer'), 'runtime does not consume the correlator');
+  const depsSrc = stripComments(fs.readFileSync(path.join(HERE, 'deps.js'), 'utf8'));
+  assert.ok(/correlateAnswer:\s*realCorrelateAnswer/.test(depsSrc),
+    'deps.js does not bind correlateAnswer to its real implementation');
+});
+
+test('A1: the production loop reads open questions BEFORE intake runs', () => {
+  // ROUTE FIRST is an ORDER, and the order is the guarantee: the claim has to be
+  // decided while the message is still in intake's hand and before its offset is
+  // acknowledged. If loadOpenQuestions moved below pollIntake, the claim would
+  // be taken against a stale picture - or not at all.
+  const at = runtimeSrc.indexOf('export async function runOnce');
+  assert.notEqual(at, -1);
+  const body = runtimeSrc.slice(at, at + 4000);
+  assert.ok(body.indexOf('loadOpenQuestions') < body.indexOf('pollIntake'),
+    'intake is polled before the open questions are known - routing cannot claim anything');
+});
+
+test('A1: the claim is handed to runIntake, not applied after the fact', () => {
+  const at = runtimeSrc.indexOf('export async function pollIntake');
+  assert.notEqual(at, -1);
+  const body = runtimeSrc.slice(at, at + 3000);
+  assert.ok(/runIntake\({[\s\S]*claim,/.test(body),
+    'pollIntake does not pass the claim to runIntake, so the decision cannot happen before the offset moves');
+});
+
+test('A1: the production router accepts a bare typed message', () => {
+  // The exact defect: only `reply_to_message` reached ACTIONS.ANSWER, so a plain
+  // message fell out of the bottom of the function as NOT_ASDAIR.
+  assert.ok(routerSrc.includes('resolveAnswersByText'),
+    'the router has no free-text correlation path - question 76463 would still be dropped');
+  assert.ok(routerSrc.includes('UNCORRELATED_TEXT'),
+    'an uncorrelated typed message has no distinct refusal, so a genuine list is indistinguishable from a miss');
+});
+
+test('A1: EVERY outbox kind runtime can enqueue has a renderer - or it is silently discarded', () => {
+  // drainOutbox resolves a row whose kind is not in MESSAGES as `abandoned`. A
+  // new kind without a renderer is therefore not a quiet no-op: the message is
+  // thrown away and nobody is told, which is the exact silent-drop this Work
+  // Package exists to close. This test walks the SOURCE for enqueued kinds so a
+  // future kind cannot be added without its renderer.
+  // Scoped to the enqueueMessage CALL SITES, not to every `kind:` in the file:
+  // `sourceKind` and payload discriminators use the same word and are not
+  // message kinds.
+  const kindsEnqueuedIn = (src) => [...src.matchAll(/enqueueMessage\(/g)]
+    .map((m) => src.slice(m.index, m.index + 600))
+    .map((call) => (call.match(/\bkind:\s*'([a-z_]+)'/) || [])[1])
+    .filter((k) => typeof k === 'string');
+
+  const enqueued = new Set([...kindsEnqueuedIn(runPipelineSrc), ...kindsEnqueuedIn(runtimeSrc)]);
+  assert.ok(enqueued.size > 0, 'no enqueued outbox kind was found - this test would be passing on nothing');
+  assert.ok(enqueued.has('clarification_deferred'), 'the new deferred-clarification kind is not enqueued anywhere');
+
+  for (const kind of enqueued) {
+    assert.ok(
+      new RegExp(`\\n\\s+${kind}:\\s`).test(rendererSrc.slice(rendererSrc.indexOf('export const MESSAGES'))),
+      `outbox kind "${kind}" has no renderer registered in MESSAGES - drainOutbox will abandon it silently`,
+    );
+  }
+});
+
+test('A1: the deferred clarification is TOLD, and the reading gate is untouched', () => {
+  // Warwick's ruling: the round-2 CARD still waits for the reading confirmation,
+  // and he is told now. Both halves are asserted, because removing either one
+  // re-opens a real defect - dropping the gate loses the shop-6 recovery, and
+  // dropping the notice restores the silent park.
+  assert.ok(runPipelineSrc.includes('wantsClarification && !readingConfirmed'),
+    'the reading-confirmation gate has been weakened - it is load-bearing and predates this change');
+  const at = runPipelineSrc.indexOf('wantsClarification && !readingConfirmed');
+  const body = runPipelineSrc.slice(at, at + 1200);
+  assert.ok(body.includes('clarification_deferred'),
+    'a deferred clarification is silent again - Warwick is not told what could not be read');
+  assert.ok(body.includes('continue'),
+    'the deferral itself must remain: the question card still waits for the reading confirmation');
+});
