@@ -384,11 +384,12 @@ manual run of `dispatch-guard.mjs`. Not a green suite. The real event.
 
 ```
 $ git diff --stat 8bc5340..d3caff3
- tools/wo/README.md              |  34 ++-
- tools/wo/dispatch-guard.mjs     | 300 +++++++++++++++++++ (new)
- tools/wo/dispatch-guard.test.mjs| 245 +++++++++++++++ (new)
- tools/wo/envelope.mjs           | 372 ++++++++++++++++++++++++-
- tools/wo/envelope.test.mjs      | 228 +++++++++++++++
+ tools/wo/README.md               |  34 +++-
+ tools/wo/dispatch-guard.mjs      | 307 ++++++++++++++++++++++++++++++++
+ tools/wo/dispatch-guard.test.mjs | 324 ++++++++++++++++++++++++++++++++
+ tools/wo/envelope.mjs            | 372 ++++++++++++++++++++++++++++++++++++++-
+ tools/wo/envelope.test.mjs       | 228 ++++++++++++++++++++++++
+ 5 files changed, 1262 insertions(+), 3 deletions(-)
 ```
 
 Plus this return document. **Paths outside the surface I declared at read-back: 0.** No file
