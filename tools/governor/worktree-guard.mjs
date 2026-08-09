@@ -448,6 +448,59 @@ export function classifyPushCommand(command) {
 // The decision
 // ---------------------------------------------------------------------------
 
+// ── PowerShell classification (Warwick, 2026-08-09) ────────────────────────
+// The Bash classifier reads PowerShell as a wall of unrecognised tokens, so
+// EVERY PowerShell mutation classified 'unknown' and kept prompting. This is an
+// ALLOW-LIST on purpose: an unrecognised cmdlet is 'unknown' and reaches the
+// human, so a verb nobody has considered here is never auto-approved. Destructive
+// verbs are deliberately ABSENT rather than listed — the list cannot be defeated
+// by forgetting to add a dangerous verb to a denylist.
+// VERB-PREFIX matching is used ONLY for verbs where every cmdlet sharing the
+// verb is inspection. `format` is deliberately NOT here: Format-Table is
+// display, Format-Volume WIPES A DISK, and a prefix rule cannot tell them
+// apart. Caught by probing `Format-Volume -DriveLetter C`, which this rule
+// classified read-only — i.e. auto-allowed — on its first draft.
+const PS_READ_ONLY_VERBS = new Set([
+  'get', 'test', 'select', 'measure', 'sort', 'where', 'foreach',
+  'compare', 'resolve', 'convertfrom', 'convertto',
+]);
+// Safe cmdlets whose verb cannot be trusted wholesale, listed by full name.
+const PS_READ_ONLY_NAMES = new Set([
+  'format-table', 'format-list', 'format-wide', 'format-custom', 'format-hex',
+  'out-string', 'out-null', 'out-host', 'write-output', 'write-host',
+  'split-path', 'join-path', 'find-module',
+]);
+const PS_ORDINARY_MUTATING = new Set([
+  'new-item', 'set-content', 'add-content', 'set-itemproperty', 'copy-item',
+  'move-item', 'rename-item', 'out-file', 'new-itemproperty', 'start-scheduledtask',
+  'set-location', 'push-location', 'pop-location', 'write-output', 'write-host',
+]);
+const PS_PASSTHROUGH_BINARIES = new Set(['git', 'git.exe', 'node', 'npm', 'npx', 'gh']);
+
+export function classifyPowerShellSegment(segment) {
+  const raw = String(segment ?? '').trim();
+  if (raw === '') return 'read-only';
+  // Substitution/expression syntax can hide anything; PowerShell has too many
+  // forms to read honestly here, so it goes to the human rather than be guessed.
+  if (/\$\(|`|&\s|iex|invoke-expression/i.test(raw)) return 'unknown';
+  const first = (raw.split(/\s+/)[0] || '').replace(/^.*[\\/]/, '').toLowerCase();
+  if (PS_PASSTHROUGH_BINARIES.has(first)) return classifyBashSegment(raw);
+  if (PS_READ_ONLY_NAMES.has(first)) return 'read-only';
+  if (PS_ORDINARY_MUTATING.has(first)) return 'mutating';
+  const verb = first.split('-')[0];
+  if (first.includes('-') && PS_READ_ONLY_VERBS.has(verb)) return 'read-only';
+  return 'unknown';
+}
+
+export function classifyPowerShellCommand(command) {
+  const segments = splitBashSegments(command);
+  if (segments.length === 0) return { kind: 'unknown', segments: [] };
+  const kinds = segments.map((s) => ({ segment: s, kind: classifyPowerShellSegment(s) }));
+  if (kinds.some((k) => k.kind === 'unknown')) return { kind: 'unknown', segments: kinds };
+  if (kinds.some((k) => k.kind === 'mutating')) return { kind: 'mutating', segments: kinds };
+  return { kind: 'read-only', segments: kinds };
+}
+
 // ── The safe-operation allow (Warwick, 2026-08-09, requirements A/B) ────────
 // ALLOW is emitted only for what the guard can POSITIVELY classify as ordinary.
 // Anything it cannot read stays DEFER and reaches the host's own prompt — that
@@ -461,7 +514,9 @@ export function safeOperationDecision({ toolName, toolInput, allowReason, deferR
     // Write/Edit/MultiEdit/NotebookEdit in an established location.
     return { decision: DECISION.ALLOW, reason: allowReason };
   }
-  const cls = classifyBashCommand(toolInput?.command);
+  const cls = toolName === 'PowerShell'
+    ? classifyPowerShellCommand(toolInput?.command)
+    : classifyBashCommand(toolInput?.command);
   if (cls.kind === 'read-only' || cls.kind === 'mutating') {
     return { decision: DECISION.ALLOW, reason: allowReason, classification: cls.kind };
   }
@@ -626,14 +681,29 @@ export function findCanonical({
   exists = existsSync,
 } = {}) {
   const roots = discoverWorktreeRoots({ probes: [cwd, ...estateRoots], execFile });
+  // No roots at all means the guard could not establish WHERE to look — a
+  // failure of its own machinery, not a finding that no programme is active.
+  // Only the second may allow, so the two must not share a reason string.
+  if (roots.length === 0) {
+    return { canonical: null, reason: 'no worktree roots could be established', candidates: [] };
+  }
 
   const found = [];
+  // A worktree with no Deliverables directory is NORMAL absence. A readdir that
+  // fails for any OTHER reason means this guard could not look, which is not the
+  // same fact and must never be reported as "no active programme" — that reason
+  // is now load-bearing: it is what lets the safe-operation allow run. Caught by
+  // the AD-19 fail-open test, which explodes the filesystem and proved a BROKEN
+  // guard was emitting `allow`.
+  let probeFailed = null;
   for (const root of roots) {
     const deliverables = join(root, 'Deliverables');
     let entries;
     try {
       entries = readdir(deliverables, { withFileTypes: true });
-    } catch {
+    } catch (err) {
+      if (err && (err.code === 'ENOENT' || err.code === 'ENOTDIR')) continue;
+      probeFailed = probeFailed || err;
       continue;
     }
     for (const e of entries) {
@@ -652,7 +722,16 @@ export function findCanonical({
     }
   }
 
-  if (found.length === 0) return { canonical: null, reason: 'no active programme state found', candidates: [] };
+  if (found.length === 0) {
+    if (probeFailed) {
+      return {
+        canonical: null,
+        reason: `programme state could not be read (${probeFailed.message})`,
+        candidates: [],
+      };
+    }
+    return { canonical: null, reason: 'no active programme state found', candidates: [] };
+  }
 
   // ONE PROGRAMME, MANY COPIES.
   // A programme-state file is a tracked file on a branch, so EVERY worktree with
