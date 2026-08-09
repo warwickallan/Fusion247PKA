@@ -1156,6 +1156,52 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 > **`b15-3/integration` has since been PUSHED to `origin`**, clearing the reviewer's second
 > independent HOLD cause (a head reachable from no ref).
 
+> ### 📌 WARWICK'S RULING — 2026-08-09, typed mid-turn, quoted. **His authority; no further approval round.**
+>
+> > *"Yes — take option (a). Register the Work Order readiness guard.*
+> >
+> > *Do NOT interrupt the current B15-3 convergence just to activate it. First let the integrated head
+> > finish green and bank the result. Then activate the registered hook at the next natural Claude Code
+> > restart/session rotation.*
+> >
+> > *This is an internal delegation-quality control, not a Warwick approval gate. It must never require
+> > me to click/approve routine dispatches.*
+> >
+> > *Make refusal diagnostic: tell you exactly which mandatory field(s) are absent or malformed so a
+> > legitimate order can be corrected immediately. Do not turn a false positive into an opaque dead end
+> > or another governance ceremony.*
+> >
+> > *The known holes and the measured 1/40 false positive go into the evidence/CAPA record; they do not
+> > block activation.*
+> >
+> > *Your own three failures today are sufficient evidence that advisory discipline is not working.*
+> >
+> > *On product work: continue exactly as you are. Lane A + Lane C convergence first. Prose-rule work is
+> > real progress: bank the fact that previously inert rules 31/36/37 now alter planning behaviour with
+> > attribution. Keep the limitation truthful: price-dependent rules are executable now but cannot make
+> > the final price-informed judgement until planning receives real price evidence. Resolve that through
+> > the existing browser/planning-price seam. Do not invent another architecture or Wayfinder. Do not
+> > call B15-3 live-complete until the integrated production journey proves typed text, Terra
+> > interpretation, prose-rule application, durable decision/recompute, and honest unresolved behaviour."*
+>
+> **LARRY'S RECORD, NOT WARWICK'S WORDS — and it qualifies one line of the above.** He directed that
+> the rules-31/36/37 progress be banked as fact. **At the moment he typed it, Veritas had just proven
+> those rules alter planning behaviour in the MODULE AND ITS TESTS ONLY** — `rulebook.js` had zero
+> production callers (D1). The progress is banked **with that scope stated**, which his own final
+> sentence independently requires: prose-rule application must be proven in the integrated production
+> journey before B15-3 is live-complete. **`WO-B15-R2` is the corrective that closes the code path.**
+> No conflict between the two instructions; the scope is the whole of the difference.
+>
+> **Consequences taken, in his order:**
+> 1. **`WO-B15-R2`** (`6cc713f`) — wire the rulebook into the production planning path. Dispatched.
+> 2. **`WO-4F-08b`** (`c1b0f1f`) — the guard must never emit a human-prompting decision, and must name
+>    the absent/malformed fields. Dispatched. **`.claude/settings.json` is outside the worker's
+>    surface: registration is Larry's, activation is Warwick's restart.**
+> 3. **Registration is DEFERRED until the integrated head is green and banked**, per his sequencing.
+>    **It is owed, not dropped.**
+> 4. The price limit is to be resolved **through the existing browser/planning-price seam** — ⛔ **no
+>    new architecture and no new Wayfinder.**
+
 **⛔ THE BAR THIS PACKAGE HAS NOT MET.** Every requirement above is proven **OFFLINE ONLY** — no
 live Telegram message, no live ASDA session, no real shop, no database. Under § "Nothing may live
 only in Larry's head", **all five outcomes REMAIN ON THE FRONTIER**: code existence, green suites,
