@@ -657,30 +657,55 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 >
 > ### ⏳ TWO WORKERS WERE MID-BUILD AT ROTATION — NAMED, NOT DROPPED (`/rotate` step 1)
 >
-> **Neither had written a file when this was banked. Both orders are committed and reconstructible,
-> so a fresh Larry can re-dispatch from the artefact without reconstructing anything.**
+> > ### ⛔ SUPERSEDED 2026-08-09, post-`/clear` — THE CLAIM BELOW WAS FALSE
+> >
+> > **This block asserted *"Neither had written a file when this was banked."* Established by
+> > execution on the next session's orientation: BOTH HAD.** Each worker's worktree carried
+> > substantial uncommitted output — Lane C ~514 insertions across 7 files plus a new
+> > `oneTab.test.cjs`; Lane A ~827 insertions across 9 files including `runtime.js` +300. Roughly
+> > **1,340 lines were sitting in dirty worktrees, one `git clean` from gone**, because rotation
+> > recorded a belief about the workers rather than a measurement of their worktrees.
+> >
+> > **The durable lesson, and it is Larry's, not Warwick's:** `/rotate` step 1 banked the state of
+> > the *dispatch* (accepted, told to GO) and inferred the state of the *work*. A worker's progress
+> > is a fact on disk. **Measure the worktree — `git status --porcelain` per worktree — never infer
+> > from what the worker was last told.**
+> >
+> > **Disposition:** both worktrees preserved as explicitly-labelled WIP commits before any other
+> > action — Lane C `6147c2d`, Lane A `a10d75d`. Both are **UNVERIFIED and UNREVIEWED**: no worker
+> > committed them, none wrote a return, and no read-back was ever read. Preservation is not
+> > acceptance.
 >
-> | Lane | Order (committed) | Branch / worktree | State at rotation |
-> |---|---|---|---|
-> | **Lane C** | `Deliverables/2026-08-09-WO-B15-C4-browser-contract-executable.md` (23-path surface, `ready:true`) | `b15-3/lane-c-browser-wiring` · `C:/Fusion247PKA-lanec` · head `84d07a2`+ | Accepted after 2 × CLARIFY; told to **GO**; building |
-> | **B15-3 Lane A** | `Deliverables/2026-08-09-WO-B15-A1-free-text-production-input.md` (14-path surface, `ready:true`) | `b15-3/free-text-and-question-surface` · `C:/Fusion247PKA-b153-ingress` · head `9b53f1b`+ | Accepted after CLARIFY + HOLD; option (c) granted; building |
+> | Lane | Order (committed) | Branch / worktree | State at rotation | ACTUAL disposition |
+> |---|---|---|---|---|
+> | **Lane C** | `Deliverables/2026-08-09-WO-B15-C4-browser-contract-executable.md` (23-path surface, `ready:true`) | `b15-3/lane-c-browser-wiring` · `C:/Fusion247PKA-lanec` | Accepted after 2 × CLARIFY; told to **GO**; building | Output preserved as WIP `6147c2d`; **re-dispatched as a RESUMPTION** |
+> | **B15-3 Lane A** | `Deliverables/2026-08-09-WO-B15-A1-free-text-production-input.md` (14-path surface, `ready:true`) | `b15-3/free-text-and-question-surface` · `C:/Fusion247PKA-b153-ingress` | Accepted after CLARIFY + HOLD; option (c) granted; building | Output preserved as WIP `a10d75d`; **re-dispatched as a RESUMPTION** |
 >
 > **If their returns arrive in a later session: write them to `Deliverables/`, commit, and fold them
 > into the record.** An unread worker return is unbanked work.
 >
-> ### 🎯 EXACT NEXT ACTION for a fresh Larry
+> ### 🎯 EXACT NEXT ACTION — re-cut 2026-08-09 post-`/clear`, superseding the three steps that stood here
 >
-> 1. **Check whether the two workers above returned.** If so, bank their returns, commit their
->    branches, and reconcile the three files both lanes share — `pipeline/runtime.js`,
->    `runPipeline.js`, `deps.js`. **Larry owns that reconciliation; both workers were told to list
->    their changes to those three files explicitly.**
-> 2. **If they did not return, re-dispatch from the two committed orders.** They are fully authored;
->    do **not** regenerate a fresh envelope (`/rotate`-era ruling and 4F CAPA item 7).
-> 3. **In parallel, build the Work Order readiness validator** — spec is the 4F CAPA
->    (`Deliverables/2026-08-04-proofline-wayfinder-plan.md` on `build-020/4f-control-cost-evidence`,
->    commit `63c9e18`). **Trace `tools/wo/envelope.mjs` and the dispatch path from source; do not
->    author it from memory.** ⛔ Item 8 is load-bearing: until dispatch itself refuses an unready
->    order, items 1–7 are advisory.
+> Warwick confirmed at orientation that **nothing has changed**, and directed maximum parallelism.
+> Three workers were dispatched concurrently in the background against governance head `8bc5340`:
+>
+> 1. **Lane A resumption** — `C:/Fusion247PKA-b153-ingress`, from WIP `a10d75d`. Read-back stated,
+>    not held for acceptance.
+> 2. **Lane C resumption** — `C:/Fusion247PKA-lanec`, from WIP `6147c2d`. Carries the AC6(f)
+>    residual (`runner.js` reads `progress.plan`, `openHandoff` writes `progress.handoff`) as an
+>    explicit disposition, and the standing prohibition on re-proving CDP.
+> 3. **4F CAPA item 8** — `C:/Fusion247PKA-wo-valid`, branch `build-020/wo-readiness-validator`,
+>    cut from local `main` @ `8bc5340`. Trace `tools/wo/envelope.mjs` and the dispatch path from
+>    source; do not author from memory. ⛔ Until dispatch itself refuses an unready order, items 1–7
+>    are advisory. Regrowth cap applies at full force; a mutation-test in both directions is the
+>    acceptance bar.
+>
+> **Larry owns the reconciliation and has NOT performed it.** Both lanes touch
+> `services/asdair/pipeline/deps.js` and `services/asdair/pipeline/runPipeline.js`; they are on
+> separate branches so they cannot collide, and **both workers were ordered to return an itemised
+> description of their changes to those two files** so the merge does not require reading both diffs
+> from scratch. *(The earlier note naming `runtime.js` as a third shared file was wrong —
+> measurement shows only Lane A touches it.)*
 >
 > ### 📄 SESSION REPORT POINTER AND CLOSING HEAD (`/rotate` step 8)
 >
