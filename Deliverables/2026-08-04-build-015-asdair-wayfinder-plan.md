@@ -682,6 +682,23 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 >    author it from memory.** ⛔ Item 8 is load-bearing: until dispatch itself refuses an unready
 >    order, items 1–7 are advisory.
 >
+> ### 📄 SESSION REPORT POINTER AND CLOSING HEAD (`/rotate` step 8)
+>
+> | | |
+> |---|---|
+> | **Closing head** | **`f203e01`** on `main` (this pointer commit follows it) |
+> | **Subagent ledger** | `Deliverables/2026-08-09-subagent-token-ledger-asdair-b15-3.md` — **BANKED** |
+> | **Session report** | `Deliverables/2026-08-09-session-performance-report-b15-3-rotation.md` — ⏳ **OUTSTANDING** |
+> | **Machine payload** | `Deliverables/2026-08-09-session-report-payload.json` — ⏳ **OUTSTANDING** |
+>
+> **Pax was commissioned at rotation and deliberately NOT waited for** (`/rotate` step 6 — analysis
+> must never hold the durable publish behind it). **His return is named-and-outstanding, which is the
+> bar; silence would not be.** When it arrives — this session or a later one — **write it to
+> `Deliverables/`, commit it, and fold it into the record.** An unread worker return is unbanked work.
+>
+> **Steps 7b and 7c (Supabase population and `capae-sync`) are consequently OUTSTANDING too**, since
+> both consume the payload Pax produces. **They are owed, not skipped.**
+>
 > ### ⚠️ GIT STATE — DELIBERATELY UNPUSHED, CLASSIFIED (`/rotate` step 4)
 >
 > **`main` carries ~10 unpushed commits and this is NOT an accident.** `git push origin main` is
