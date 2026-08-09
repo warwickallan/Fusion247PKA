@@ -53,20 +53,26 @@ const { updateRegulars } = require('../outcome/updateRegulars.js');
 const { DECISION_KINDS } = require('./shopDecisions.js');
 
 /**
- * What is recorded in shop_decision.interpreted_model.
+ * SUPERSEDED 2026-08-09 (Warwick's ruling, WO-2026-08-09-B15-03).
  *
- * HONEST ABOUT WHICH ROLE ANSWERS. The estate's text roles are exported from
- * obsidiwikai as `reason` and `vision` only; there is no exported `query`
- * role, and `services/obsidiwikai/**` is outside this Work Package's surface,
- * so no export was added. The role that answers is therefore `reason`, whose
- * gateway alias is FUSION_MODEL_REASON (default `fusion.reason`) - NOT
- * necessarily `gpt-5.6-terra`, which is the `query` role's alias.
+ * There used to be an `ANSWER_MODEL_LABEL` constant here reading
+ * `fusion-gateway:reason:${FUSION_MODEL_REASON}`, because the answer path was
+ * bound to the `reason` role. Warwick ruled that out in his own words:
  *
- * Recording the ROLE and its alias rather than a model name we did not choose
- * means the decision row says what actually answered. Binding the query role
- * properly needs an export in obsidiwikai and is REPORTED, not done here.
+ *   "I chose bounded Terra deliberately for natural-language shopping-answer
+ *    interpretation. Do NOT substitute `reason` because it is easier to reach.
+ *    Do NOT widen the durable vocabulary so `reason` can become acceptable
+ *    after the fact."
+ *
+ * So there is no module-level label any more, deliberately: what is recorded
+ * in `shop_decision.interpreted_model` is `answerModel()` resolved AT CALL
+ * TIME inside realInterpretAnswer. A constant captured at import could not
+ * report a mid-life configuration change, and the row's whole job is to say
+ * what actually answered.
+ *
+ * Migration 017 was NOT widened. `interpreted_by` stays 'terra' and is now
+ * TRUE, rather than being made acceptable by loosening the vocabulary.
  */
-const ANSWER_MODEL_LABEL = `fusion-gateway:reason:${process.env.FUSION_MODEL_REASON || 'fusion.reason'}`;
 
 // NOTE ON WHAT IS *NOT* IMPORTED HERE, AND WHY:
 //   interpret/interpret-list.js, outcome/record-shop.js and shop/shop-cli.js
@@ -390,30 +396,26 @@ async function realRecordLearning({ shop, deps }) {
  * degrades to another human question; it never degrades to a wrong product.
  */
 async function realInterpretAnswer(grounding) {
-  const { reason, gatewayConfigured } = await import('../../obsidiwikai/src/core/models.mjs');
+  // ── BOUND TO TERRA, NOT TO `reason` ───────────────────────────────────────
+  // Warwick chose Terra deliberately for interpreting a natural-language
+  // shopping answer and ruled it must not be substituted with `reason` because
+  // `reason` is easier to reach. `answer()` is gateway-only and THROWS where
+  // no gateway is configured - it never falls back to the box - so the ruling
+  // is enforced by the call, not by a comment asking nicely.
+  const { answer, answerModel } = await import('../../obsidiwikai/src/core/models.mjs');
   const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
+
+  // THE ALIAS ACTUALLY INVOKED, resolved at CALL TIME - never a name we hoped
+  // was invoked. If the box points FUSION_MODEL_ANSWER elsewhere, the durable
+  // row says what really answered, which is the entire reason it is recorded.
+  const invoked = answerModel();
 
   // UNKNOWN MEANS ASK AGAIN. Every degraded path below lands on this.
   const unreadable = (why) => ({
     decision_kind: 'clarification_required', clarification_reason: why,
     decided_regular_id: null, decided_quantity: null, decided_item_name: null,
-    forward_intent: null, model: ANSWER_MODEL_LABEL,
+    forward_intent: null, model: invoked,
   });
-
-  // ── NO GATEWAY MEANS NO INTERPRETATION, DELIBERATELY ──────────────────────
-  // `reason()` falls back to the box (LightRAG) when FUSION_GATEWAY_URL is
-  // unset. That fallback is right for a canonicaliser tie-break and wrong
-  // here: it would silently substitute a different model for a decision that
-  // changes what Warwick is actually sent this week, and he would have no way
-  // to know which model answered. The same argument `vision()` makes for
-  // refusing to fall back applies, one step weaker - so this asks for a
-  // clarification instead of quietly accepting a substitute.
-  //
-  // This is SAFE TO DO now and would not have been before: the park is no
-  // longer silent, so a shop that cannot interpret says so on Telegram.
-  if (!gatewayConfigured) {
-    return unreadable('no model gateway is configured, so this answer could not be interpreted');
-  }
 
   // The ONLY ids the model is permitted to assert, taken from the evidence it
   // is actually given. Anything outside this set is treated as not understood.
@@ -465,9 +467,9 @@ async function realInterpretAnswer(grounding) {
 
   // A single strict-JSON retry, and no more. That is a formatting repair, not
   // a second opinion - the same rule realInterpretPhoto follows.
-  let parsed = await extractJson(await reason(prompt));
+  let parsed = await extractJson(await answer(prompt));
   if (!parsed || typeof parsed !== 'object' || typeof parsed.decision_kind !== 'string') {
-    parsed = await extractJson(await reason(
+    parsed = await extractJson(await answer(
       `${prompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`,
     ));
   }
@@ -494,7 +496,7 @@ async function realInterpretAnswer(grounding) {
     decided_item_name: parsed.decided_item_name ?? null,
     clarification_reason: parsed.clarification_reason ?? null,
     forward_intent: parsed.forward_intent ?? null,
-    model: ANSWER_MODEL_LABEL,
+    model: invoked,
   };
 }
 

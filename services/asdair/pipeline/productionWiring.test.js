@@ -38,7 +38,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createDeps } from './deps.js';
 
@@ -104,17 +104,35 @@ test('D-1: the interpreter is reached through the SHARED gateway, not a second c
     'the interpreter builds its own auth header instead of using the gateway');
 });
 
-test('D-1: no gateway means a CLARIFICATION, never a silent substitute model', () => {
-  // `reason()` falls back to the box when FUSION_GATEWAY_URL is unset. That
-  // would swap the model deciding Warwick's shop with nothing on the record
-  // saying so. The interpreter must refuse and ask instead.
-  const depsSrc = fs.readFileSync(path.join(HERE, 'deps.js'), 'utf8');
-  const fn = depsSrc.slice(depsSrc.indexOf('async function realInterpretAnswer'));
-  const body = fn.slice(0, fn.indexOf('\nasync function realRecordAnswerLearning'));
-  assert.match(body, /gatewayConfigured/,
-    'the interpreter does not check whether a gateway exists, so it can silently use the box model');
-  assert.ok(body.indexOf('gatewayConfigured') < body.indexOf('await reason('),
-    'the gateway check must happen BEFORE the model is called');
+test('D-1: no gateway means NO INTERPRETATION - never a silent substitute model', () => {
+  // ── RE-CUT 2026-08-09 (WO-B15-03). The old form described a design that has
+  // been superseded, and would now pass on a weaker guarantee than the one
+  // that exists. It read:
+  //
+  //   assert.match(body, /gatewayConfigured/, ...);
+  //   assert.ok(body.indexOf('gatewayConfigured') < body.indexOf('await reason('), ...);
+  //
+  // That was right when the answer path called `reason()`, which FALLS BACK to
+  // the box, so the interpreter had to guard the call itself. Terra's
+  // `answer()` does not fall back - it THROWS - so the guarantee no longer
+  // depends on the caller remembering to check. Keeping the old assertion
+  // would have required re-introducing a redundant guard to satisfy it.
+  //
+  // The guarantee is now stronger and is asserted where it actually lives:
+  // in models.mjs (see 'TERRA: no gateway THROWS'), plus the degradation chain
+  // below.
+  const body = interpreterBody();
+  assert.doesNotMatch(body, /lightrag/,
+    'the interpreter reaches the box directly');
+  assert.match(body, /await answer\(/,
+    'the interpreter must call the gateway-only answer role, which cannot fall back');
+
+  // And the throw is CAUGHT, so a missing gateway degrades visibly rather than
+  // failing the shop: stepReplan records the failure, no decision row is
+  // written, the line stays unresolved, and the gate refuses READY_TO_SHOP.
+  // Nothing is guessed at any point in that chain.
+  assert.match(runPipelineSrc, /catch \(err\) \{[\s\S]{0,400}?interpretation failed:/,
+    'an interpretation failure is not caught - a missing gateway would fail the whole shop');
 });
 
 test('D-1: unknown always degrades to clarification_required - never to a product', () => {
@@ -128,6 +146,182 @@ test('D-1: unknown always degrades to clarification_required - never to a produc
   // And the grounding check exists: an id the model was not shown is refused.
   assert.match(body, /allowedIds\.has\(id\)/,
     'the interpreter does not check the returned id against the evidence it was given');
+});
+
+// =====================================================================
+// THE TERRA BINDING - DISCRIMINATING, NOT MERELY GREEN
+//
+// Warwick asked for evidence "that would fail if somebody quietly switched
+// this back to `reason`". A test that only asserts "an interpreter is bound"
+// is green either way, and that is exactly how the substitution got in once
+// already.
+//
+// So these assert the SPECIFIC binding. Rebinding the answer path to `reason`
+// turns them RED; restoring Terra turns them GREEN.
+//
+// ZERO MODEL SPEND: the gateway is never reached. The wire-body tests load
+// models.mjs with a fake FUSION_GATEWAY_URL and capture `fetch`, so the body
+// is asserted without a request leaving the process.
+// =====================================================================
+
+const MODELS_PATH = path.join(HERE, '..', '..', 'obsidiwikai', 'src', 'core', 'models.mjs');
+const MODELS_URL = pathToFileURL(MODELS_PATH).href;
+let bust = 0;
+
+/** Load models.mjs under a controlled environment - the same technique
+ *  services/asdair/transcribe/visionRole.test.js already uses. */
+async function loadModels(env) {
+  const keys = ['FUSION_GATEWAY_URL', 'FUSION_GATEWAY_KEY', 'FUSION_MODEL_ANSWER'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  for (const k of keys) delete process.env[k];
+  Object.assign(process.env, env);
+  try {
+    return await import(`${MODELS_URL}?bust=${++bust}`);
+  } finally {
+    for (const k of keys) {
+      if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k];
+    }
+  }
+}
+
+function interpreterBody() {
+  const depsSrc = stripComments(fs.readFileSync(path.join(HERE, 'deps.js'), 'utf8'));
+  const fn = depsSrc.slice(depsSrc.indexOf('async function realInterpretAnswer'));
+  return fn.slice(0, fn.indexOf('\nasync function realRecordAnswerLearning'));
+}
+
+test('TERRA: the interpreter imports EXACTLY {answer, answerModel} - no aliasing escape', () => {
+  // ── THIS ASSERTION IS PINNED TO THE IMPORT SPECIFIER, AND THAT IS THE POINT.
+  //
+  // The first version of this test checked `await answer(` present and
+  // `await reason(` absent. It was DEFEATED by the obvious one-line switch-back:
+  //
+  //     const { reason: answer, answerModel } = await import('...models.mjs');
+  //
+  // which rebinds the whole path to the reasoning role while every call site
+  // still reads `await answer(`. The suite stayed green. Found by running the
+  // mutation Warwick asked for, not by reading the test.
+  //
+  // So the SOURCE names in the destructuring pattern are what is asserted -
+  // the left-hand side of any `:` - because that is the only text an aliased
+  // import cannot disguise.
+  const body = interpreterBody();
+  const importLine = /const\s*\{([^}]*)\}\s*=\s*await import\('\.\.\/\.\.\/obsidiwikai\/src\/core\/models\.mjs'\)/
+    .exec(body);
+  assert.ok(importLine, 'the interpreter no longer imports from the gateway module at all');
+
+  const sourceNames = importLine[1]
+    .split(',')
+    .map((s) => s.trim().split(':')[0].trim())
+    .filter((s) => s !== '')
+    .sort();
+
+  assert.deepEqual(sourceNames, ['answer', 'answerModel'],
+    `the answer interpreter imports ${sourceNames.join(', ')} from the gateway module. `
+    + 'It must import EXACTLY answer and answerModel. Warwick ruled: "Do NOT substitute '
+    + '`reason` because it is easier to reach" - and aliasing it to the name `answer` is '
+    + 'the substitution, not an exception to it.');
+
+  assert.match(body, /await answer\(/, 'the interpreter does not call the answer role');
+});
+
+test('TERRA: the wire body names the Terra model, not a role alias', async () => {
+  const m = await loadModels({ FUSION_GATEWAY_URL: 'http://gateway.invalid/v1' });
+  const realFetch = globalThis.fetch;
+  let body = null;
+  globalThis.fetch = async (_url, init) => {
+    body = JSON.parse(init.body);
+    return { ok: true, json: async () => ({ choices: [{ message: { content: '{}' } }] }) };
+  };
+  try {
+    await m.answer('interpret this');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(body.model, 'gpt-5.6-terra',
+    'the answer role did not resolve to Terra. Warwick chose it deliberately and ruled that '
+    + 'fusion.query must NOT be silently assumed to map to it.');
+  assert.notEqual(body.model, 'fusion.reason', 'the answer path is using the reason alias');
+  assert.equal(body.messages[0].content, 'interpret this');
+  assert.equal(body.stream, false);
+});
+
+test('TERRA: the model is overridable by env and resolved at CALL time', async () => {
+  // The environment is manipulated around the CALL, not around the import -
+  // which is the whole distinction being tested. A module that captured the
+  // alias at import would return the value present when it was loaded and
+  // could never report a mid-life configuration change; the durable row would
+  // then name a model that had not answered for some time.
+  const m = await loadModels({ FUSION_GATEWAY_URL: 'http://gateway.invalid/v1' });
+
+  const saved = process.env.FUSION_MODEL_ANSWER;
+  try {
+    delete process.env.FUSION_MODEL_ANSWER;
+    assert.equal(m.answerModel(), 'gpt-5.6-terra', 'the default must be Terra');
+
+    process.env.FUSION_MODEL_ANSWER = 'gpt-5-mini';
+    assert.equal(m.answerModel(), 'gpt-5-mini',
+      'a deliberate box override must be honoured, and seen WITHOUT reloading the module');
+
+    delete process.env.FUSION_MODEL_ANSWER;
+    assert.equal(m.answerModel(), 'gpt-5.6-terra', 'and it must follow the environment back');
+  } finally {
+    if (saved === undefined) delete process.env.FUSION_MODEL_ANSWER;
+    else process.env.FUSION_MODEL_ANSWER = saved;
+  }
+});
+
+test('TERRA: no gateway THROWS - it never falls back to the box model', async () => {
+  const m = await loadModels({});
+  assert.equal(m.gatewayConfigured, false);
+  const realFetch = globalThis.fetch;
+  let fetched = 0;
+  globalThis.fetch = async () => { fetched += 1; throw new Error('should never be called'); };
+  try {
+    await assert.rejects(() => m.answer('x'), /no gateway configured/,
+      'answer() fell back instead of throwing - a different model would have decided the shop');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(fetched, 0, 'a request was attempted with no gateway configured');
+});
+
+test('TERRA: reason() keeps its box fallback - the reasoning role is unchanged', async () => {
+  // Adding the answer role must not quietly change behaviour for anything else
+  // in the estate that already depends on reason().
+  const m = await loadModels({});
+  assert.equal(typeof m.reason, 'function');
+  const src = fs.readFileSync(MODELS_PATH, 'utf8');
+  assert.match(src, /export async function reason\(prompt\) \{[\s\S]{0,200}?lightrag\.generate\(prompt\)/,
+    'reason() changed - this Work Order must not alter the reasoning role');
+});
+
+test('TERRA: ROLE_ALIAS is byte-identical - the out-of-surface pin still holds', async () => {
+  // services/asdair/transcribe/visionRole.test.js deepEquals this object and is
+  // OUTSIDE this Work Package's surface, so the answer model is resolved by
+  // answerModel() rather than by a new ROLE_ALIAS key. Reported to Larry.
+  const m = await loadModels({});
+  assert.deepEqual(m.ROLE_ALIAS, {
+    extract: 'fusion.extract',
+    keyword: 'fusion.keyword',
+    query: 'fusion.query',
+    reason: 'fusion.reason',
+    embed: 'fusion.embed',
+    vision: 'fusion.vision',
+  });
+});
+
+test('TERRA: provenance agrees with the path invoked - interpreted_by terra is now TRUE', () => {
+  const body = interpreterBody();
+  assert.match(body, /const invoked = answerModel\(\);/,
+    'the recorded model is no longer resolved at call time from answerModel()');
+  assert.match(body, /model: invoked/, 'the returned provenance is not the invoked alias');
+  assert.doesNotMatch(body, /ANSWER_MODEL_LABEL/, 'the superseded reason-role label is back');
+
+  // runPipeline still hard-codes interpreted_by: 'terra' - the claim this order
+  // exists to make TRUE, not to soften. 017's vocabulary was not widened.
+  assert.match(runPipelineSrc, /interpreted_by: 'terra'/,
+    'interpreted_by was changed instead of being made true - Warwick refused widening the vocabulary');
 });
 
 // =====================================================================
