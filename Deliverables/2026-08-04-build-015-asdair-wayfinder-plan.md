@@ -634,6 +634,63 @@ runtime.
    household-knowledge audit and the `runPipeline.js:581` `applies_going_forward: false` finding.
    **Next slice, and explicitly not touched here** (Warwick, 2026-08-09, boundary 8).
 
+#### ⭐ THE § 12 HANDBACK — Warwick's four rulings, 2026-08-09. **This supersedes Larry's "durable human learning / intent promotion" phrasing, which was too narrow.**
+
+**Warwick's product picture, his words:**
+
+> **"Recognition can work. Confirmation can work. Shop recovery can work. But AsdAIr still does not
+> reliably learn from either your answers or the final basket for next week."**
+>
+> **"And that latter half is bigger than Larry's current phrase 'durable human learning / intent
+> promotion'. It is really DURABLE HOUSEHOLD LEARNING BETWEEN SHOPS — with at least two distinct
+> inputs: human decisions and the confirmed basket/catalogue delta."**
+
+**RULING 1 — Veritas Gate 2 is authorised and bounded.** It grades the real journey outcome at the
+merged product boundary `d907350`, against the Asda Build 002 §11 acceptance list. **It does NOT
+re-review Keel's source**; Gate 1's PASS stands and is not reopened.
+
+**RULING 2 — the next-learning recommendation is AMENDED. There are TWO durable learning contracts,
+not one, and they are to be established SEPARATELY.**
+
+> **Flow A — question/decision learning:** *"answered ambiguity becomes future household knowledge."*
+>
+> **Flow B — confirmed-basket catalogue learning:** *"final reconciled ASDA basket is compared with
+> the current household catalogue → genuinely new accepted products are identified → appropriate new
+> products are favourited on ASDA → Regulars/Favourites delta is observed → useful product
+> identity/provenance is persisted into Supabase → next week Terra receives the enriched catalogue
+> before looking at Mum's photograph."*
+
+**Warwick's binding constraint on how this is worked:** *"I would not yet assume the exact fix or
+merge both mechanisms into one giant WP. First establish the two learning flows separately and their
+earliest broken points."* **No Work Package is written until that establishment is done.** Flow B
+must appear explicitly in §12 — it had been absent.
+
+**Supporting evidence already banked for Flow B being unhealthy, per Warwick:** the later regulars
+enrichment was **Larry-mediated**, and the live catalogue has **no genuine Favourites population**.
+Recorded as supporting evidence, **not** as a settled diagnosis.
+
+**Evidence already banked for Flow A being broken:** `runPipeline.js:581` hard-codes
+`applies_going_forward: false` in `stepReplan`'s `recordAnswerLearning` call, so every answer the
+live pipeline records is permanently ineligible to become a standing rule — verified against two
+independent consumers, **cause UNESTABLISHED**, and distinct from the `stepInterpret` call site where
+the same literal *is* legitimately justified. Observed live on 2026-08-09: the gate-clear replan
+wrote nothing, and `rule_qa_log`'s newest row remains 2026-07-20. Sources:
+[[Deliverables/2026-08-09-pax-browser-method-recovery-audit]] §B.1 and
+[[Deliverables/2026-08-08-pax-supabase-household-knowledge-audit]].
+
+**RULING 3 — the browser correction is RECORDED; the browser work is NOT reopened tonight.** Pax
+proved the cancellation premise false — the repository did corroborate a real 25-item bulk operation,
+twice, before the ruling. **That changes the evidential record, not tonight's WP.** Correction
+applied at `Builds/BUILD-015-.../RUNTIME-DECISION.md` §"Open considerations" item 3. The
+search-fallback disagreement is banked there as item 4, an **unresolved product-method decision** for
+Warwick.
+
+**RULING 4 — housekeeping happens only AFTER Gate 2, in this order.** Keep the acceptance-record
+branch `build-015/wp-b15-1-acceptance-record` **alive** → place the Veritas receipt **on it** →
+converge that evidence to `main` → **only then** decommission the merged working branches.
+Warwick's reason, verbatim: *"No reason to throw away the evidence branch before the examiner has
+signed the paper."* **`build-015/grounded-recognition` is NOT deleted yet.**
+
 
 
 > **AMENDMENT — Warwick, 2026-08-09.** Verbatim ruling, mirrored at
