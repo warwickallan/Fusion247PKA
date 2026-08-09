@@ -692,8 +692,82 @@ granted_by: postgres   obj_type: r (table)   acl: {asdair_ro=r/postgres}
 
 **The note, recorded because it is a real interaction:** `shop_decision` will be created **already carrying `asdair_ro` SELECT** from this default ACL. 017's own grant of SELECT to `asdair_ro` is therefore a harmless no-op rather than the thing establishing that privilege. It changes nothing about the insert-only claim — **no default ACL grants anything to `asdair_rw`** — but a future reader comparing 017's grant block against live privileges should know why `asdair_ro` already had SELECT.
 
-### Verdict
+### Verdict — as recorded when only PRE-3 and PRE-4 had been run
 
 **Both preflights pass. No collision, no drift, no partial application** — `shop_decision`, `question_round` and `parent_question_id` are all absent, and both roles exist. **Migration 017 is safe to apply on the evidence available.**
 
 **Applying it remains Warwick's authority and has NOT been done.**
+
+---
+
+## THE REMAINING SIX PREFLIGHTS — executed by Larry against the HOUSEHOLD database, 2026-08-09 (later). **Read-only. Nothing applied.**
+
+**Why these were run:** §2 requires all eight evaluated **before** requesting Warwick's authority, and §6 names PRE-3 and PRE-4 only as the two to prioritise *if only two can be run*. Six had never been executed, four of them carrying ⛔ stop conditions. Running them is compliance with this runbook, not new scope. **The earlier verdict above is left standing as the honest record of what was known at the time; it is superseded by the complete verdict below.**
+
+### PRE-1 — engine version. **RECORDED (no stop condition).**
+
+```
+PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit
+server_version_num = 170006
+```
+
+**This materially strengthens §1.1 rather than merely satisfying it.** Silas proved 017 on **17.4**; the household database is **17.6** — same major version, two patch releases apart. The divergence he honestly flagged as *"a reasoned inference and not an executed one"* is now **executed and closed**. It is no longer a residual.
+
+### PRE-2 — R1: constraint-name collision sweep, database-wide and unqualified. **PASS.**
+
+**0 rows.** None of `shop_question_round_sane`, `shop_question_round_parent_agree`, `shop_question_not_own_parent` exists on any table in any schema.
+
+**This is the one that mattered most of the six.** The three `do $$ … pg_constraint …$$` guards match on `conname` **alone**, unqualified by schema or table — a collision anywhere in a Supabase project's dozen-plus schemas would make a guard report "already exists" and **silently skip creating a constraint that was never there**, while the migration reported success. That failure mode is now excluded by execution.
+
+### PRE-5 — role memberships that could confer DELETE indirectly. **PASS.**
+
+**0 rows.** Neither `asdair_rw` nor `asdair_ro` is a member of any role. Nothing can reach them by inheritance.
+
+**This makes PRE-4's earlier PASS structurally clean** rather than merely true-at-the-time: PRE-4 resolved inheritance via `has_table_privilege()` and found no DELETE; PRE-5 now shows there was no inheritance edge to resolve. The two agree from opposite directions.
+
+### PRE-6 — §1.2: index-name collision sweep in `asdair`. **PASS.**
+
+**0 rows.** None of `shop_question_id_shop_uniq`, `shop_question_round_uniq`, `shop_decision_question_uniq`, `shop_decision_shop_idx`, `shop_decision_shop_kind_idx`, `shop_decision_pkey` exists. `create index if not exists` will therefore create rather than skip — including `shop_decision_question_uniq`, which is the structural idempotency the writer's `ON CONFLICT (question_id) DO NOTHING` depends on.
+
+### PRE-7 — the FK targets are the shape 017 expects. **PASS.**
+
+| Table | Column | Type | NOT NULL |
+|---|---|---|---|
+| `regulars` | `id` | `bigint` | ✅ |
+| `shop_line` | `id` | `bigint` | ✅ |
+| `shop_question` | `id` | `bigint` | ✅ |
+| `shop_question` | `shop_id` | `bigint` | ✅ |
+
+Exactly the expectation. The composite FK `(question_id, shop_id) → shop_question(id, shop_id)` and both simple FKs will be accepted on their true types, with **no implicit cast** to weaken them.
+
+### PRE-8 — §1.3: ownership vs the applying identity. **PASS.**
+
+`shop`, `shop_line`, `shop_question`, `regulars` and **schema `asdair`** are all owned by **`postgres`**, and the MCP connection resolves `current_user` = **`postgres`**.
+
+So the applying identity **owns** the table 017 must `alter … add column` and owns the schema it must `create table` in. The `42501 must be owner of relation` failure path is excluded. *(This also explains PRE-3's single default-ACL row: it was `granted_by: postgres`, the same identity.)*
+
+### PRE-9 — no data-dependent failure. **Assertion, unchanged, and now better supported.**
+
+No query, by design. `add column question_round integer not null default 1` is metadata-only from PG11 and the household database is **17.6**, so the fast path is certain rather than assumed. Existing rows acquire `question_round = 1` / `parent_question_id = NULL`, satisfying all three new CHECKs by construction. **No backfill, no possible violation from existing rows.**
+
+---
+
+## ✅ COMPLETE PREFLIGHT VERDICT — all eight executed, all eight PASS
+
+| Preflight | Subject | Result |
+|---|---|---|
+| PRE-1 | Engine version | **17.6** — recorded; closes the §1.1 inference |
+| PRE-2 | Constraint-name collisions (R1) | **PASS** — 0 rows |
+| PRE-3 | Default ACLs in `asdair` (§1.5) | **PASS with note** — 1 row, `asdair_ro` SELECT only |
+| PRE-4 | Upstream DELETE, inheritance-resolved (R2) | **PASS** — DELETE false for both roles on all four tables |
+| PRE-5 | Role memberships (§1.4) | **PASS** — 0 rows |
+| PRE-6 | Index-name collisions (§1.2) | **PASS** — 0 rows |
+| PRE-7 | FK target shapes | **PASS** — all four `bigint NOT NULL` |
+| PRE-8 | Ownership (§1.3) | **PASS** — `postgres` owns all; connected as `postgres` |
+| PRE-9 | Data-dependent failure | **N/A by construction** — no backfill |
+
+**Both residuals carried forward from the Postgres proof are now discharged on the household database: R1 by PRE-2, R2 by PRE-4 together with PRE-5.** The §1.1 engine-divergence caveat is closed by PRE-1.
+
+**One §7 limit remains genuinely open and is NOT claimed closed:** whether Supabase `apply_migration` is transactional (§1.7) was not verified and will not be verified before the apply. **The stop conditions therefore continue to assume the worse case — that a failure may leave 017 partly applied** — and the recovery remains *re-run the identical idempotent file after reading state with V-ALL*, never hand-patching.
+
+**Applying 017 remains Warwick's authority and has NOT been done.**
