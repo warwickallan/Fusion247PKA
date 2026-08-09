@@ -612,7 +612,46 @@ evidence, is the earliest link in the journey that still cannot happen in produc
 > still-live variant (a′), and the recommendation language. They are retained as the record of how
 > the decision was reached. **Option (a′) is now PROHIBITED, not merely un-chosen.**
 
-### ⛔ HISTORICAL — how the choice was framed at rotation, 2026-08-08 ~23:50. Settled by the amendment above. Directs nothing.
+> **AMENDMENT — Warwick, 2026-08-09 (second ruling of the day). Sequencing correction: the schema
+> migration precedes the runtime restart.** Verbatim:
+>
+> > "DO NOT restart the canonical AsdAIr runtime onto the merged spine yet. The merged WP-B15-2 code
+> > now reads `asdair.shop_decision` during normal plan recomputation. Migration 017 creates that
+> > table and is still NOT applied. Restarting the poller first risks running new executable code
+> > against the old household schema."
+> >
+> > "Do not tell me 'only the fresh photograph remains' until 017 is actually applied and the
+> > restarted runtime is proven to carry the merged code."
+>
+> **His ordered route, quoted in substance:** (1) make commits `f149f7f` and `3aabbb1` durable
+> remotely through the normal protected route; (2) keep the Lane B1 `forward_intent` product decision
+> **separate and ready for him** — *"Do not silently choose it or let it block the migration/runtime
+> sequence unless its executable work genuinely sits on that path"*; (3) bring the exact production
+> migration authority request, carrying **the exact migration, the target household database, the
+> preflight PASS evidence, the immediate post-apply verification, and the stop/rollback posture if
+> anything differs**; (4) **"Do not apply 017 until I explicitly authorise that production write"**;
+> (5) once authorised, apply 017 and **verify the real household schema/grants/constraints
+> immediately, and bank the evidence**; (6) **only AFTER 017 is successfully present**, restart the
+> canonical runtime from `C:\Fusion247PKA` and *"prove by execution that the new PID/process loaded
+> the current merged main bytes rather than relying on path or timestamp inference"*; (7) then the
+> fresh-photo live acceptance — **"Shop 6 remains prohibited as manufactured evidence."**
+>
+> **What this SUPERSEDES in the 2026-08-09 amendment above, and the supersession is the point:** that
+> amendment's route ordered *merge → restart runtime → prove merged bytes → **shop 6** reaches the new
+> confirmation surface*. **Both halves of that tail are now dead.** The restart is displaced to
+> position 6, behind the migration; and shop 6 is prohibited as an acceptance vehicle, replaced by a
+> genuinely new photograph. The merge half of that amendment is DISCHARGED — PRs #102, #103 and #104
+> are all MERGED, and 017's bytes are on `main`.
+>
+> **Larry's record, not Warwick's words:** the stale-runtime finding that prompted the correction —
+> AsdAIr pipeline runtime PID 3704 started 2026-08-09 00:38:40, the WP-B15-2 spine merged at
+> 2026-08-09 17:14:47, so the running process pre-dates the merged code by 16½ hours and cannot be
+> carrying it. Warwick accepted the finding and corrected only its consequence. **Also mine, not
+> his:** Silas's runbook specifies EIGHT read-only preflights and requires all eight evaluated before
+> requesting authority; only PRE-3 and PRE-4 were executed on 2026-08-09. The remaining six are being
+> run before the authority request, which is compliance with the runbook, not new scope.
+
+### ⛔ HISTORICAL — how the choice was framed at rotation, 2026-08-08 ~23:50. Settled by the amendments above. Directs nothing.
 
 **Where the WP stands (everything below is banked and pushed on this branch):** source complete at
 `7db899b` · Veritas Gate 1 **PASS** (all 8, mutation-tested) · **migration 016 APPLIED to the live
@@ -921,13 +960,24 @@ exists.**
 1. **Recovered map** — `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` (this file).
 2. **Goal** — `BUILD-015-END-TO-END-RECOVERY`: photograph → ShopperBot → checkout-ready basket, every
    gap closed, integrated, run and proven, with Larry outside the weekly operating path.
-3. **Phase and gate** — **GROUNDED RECOGNITION, the prepared post-jump phase (§10), NOT STARTED**,
-   active only once the BUILD-015 Build switch has completed. The historical Gate 3 thread ended in
-   a third HOLD whose receipt is historical evidence — **enumerate `Assurance/` and read the newest
-   receipt rather than naming a head from here.** *(Re-cut 2026-08-08; the previous text said
-   "phase 0, IN PROGRESS, Veritas Gate 3, two receipts" — all three claims had gone stale.)*
-4. **Exact next action** — **§10 → "THE EXACT FIRST ACTION"**: the execution-based bootstrap that
-   re-establishes canonical state before anything prepared pre-merge is trusted.
+3. **Phase and gate** — **GROUNDED RECOGNITION, the prepared post-jump phase (§10), IN PROGRESS.**
+   The decision spine is merged to `main` (PRs #102, #103, #104) with Veritas Gate 1 **PASS** on the
+   WP-B15-2 boundary. **What is NOT done: migration 017 is unapplied, the runtime is stale, and the
+   live acceptance has never run.** The historical Gate 3 thread ended in a third HOLD whose receipt
+   is historical evidence — **enumerate `Assurance/` and read the newest receipt rather than naming a
+   head from here.** *(Re-cut 2026-08-09; it previously read "NOT STARTED, active only once the
+   BUILD-015 Build switch has completed" — the switch has completed and the phase has begun.
+   Re-cut 2026-08-08 before that; the text then said "phase 0, IN PROGRESS, Veritas Gate 3, two
+   receipts" — all three claims had gone stale.)*
+4. **Exact next action** — **§10 → the 2026-08-09 SECOND amendment (the sequencing correction).**
+   Its seven-step order is authoritative and the two earlier route statements in §10 are superseded
+   at their tails. ⚠️ **The single most important thing a fresh Larry can know: DO NOT restart the
+   AsdAIr runtime before migration 017 is applied.** The merged code reads `asdair.shop_decision`
+   during normal plan recomputation and that table does not yet exist on the household database.
+   ⚠️ **And do not say "only the fresh photograph remains"** — Warwick has explicitly forbidden that
+   claim until 017 is applied AND the restarted runtime is proven to carry the merged bytes.
+   *(Re-cut 2026-08-09; it previously pointed at §10's execution-based bootstrap, which was
+   discharged on 2026-08-09 and no longer names a live action.)*
 
 **Then verify by execution, not belief:**
 
