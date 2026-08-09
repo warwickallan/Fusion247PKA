@@ -1292,6 +1292,41 @@ skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB
 > > application (pre-notification + his §3 authority). ⛔ **Do not report "best value is archived"
 > > on the strength of R3 alone.**
 > >
+> > #### ✅ `WO-B15-R3` RETURNED COMPLETED (`d3362d7`) — the CODE half is done
+> >
+> > **What was actually removed, and it is not what Larry assumed:** `rulebook.js` **never did the
+> > arithmetic itself — it SHIPPED THE MONEY to the consumer and asked it to shop on it.** Three
+> > carriers, all gone: prices in the candidate map (`{name, price}` → `{name}`), `GBP 4.50` printed
+> > by `renderLines`, and a prompt inviting *"pick the best value" / "buy up to the offer"*. **No
+> > flag, no dormant branch.** No rule id is hard-coded, which is why the archive remains a data
+> > change. Control mutation-proved three ways, pinned to a vocabulary in `README.md` rather than in
+> > the module — **honest limit stated: that pin is a sibling doc in the same surface, not an
+> > unwritable authority.** Verified by Larry: pipeline **344/344**, skill **283 run / 274 pass /
+> > 7 fail** (the same seven, by name), `rulebook.test.js` **29 → 31**.
+> >
+> > **⚠️ TWO CORRECTIONS TO LARRY'S OWN ORDER, established by the worker:**
+> > 1. **`asdair.rules` has NO `status` column.** Archival is `active = false` (`db/001:97` — *"superseded rules are set active=false (kept for audit)"*). Larry's evidence line asked for a column that does not exist.
+> > 2. **🔴 RULE 31'S LIVE EXISTENCE IS NOT ESTABLISHED.** The only live-verified rule list in the repo (`skill/ruleConsumption.test.js:62`, queried 2026-08-04) is **12, 25, 32, 36, 37, 38 — no 31.** R1 had already flagged that rule 31's wording was a **constructed paraphrase**. **This map's D4 cites rule 31 as the headline example of the dead judgement layer.** Two sources disagree; the archival SQL is written so a missing 31 is a **visible zero-row result, not an error**. **Expect 2 rows, or 3 if it is live.** ⛔ Do not repeat the rule-31 example as established fact until a live query settles it.
+> >
+> > **RULE 37 — Larry's reading CONFIRMED by the worker, with a consequence Larry had not seen.**
+> > Live text: *"Sure any 2 for GBP X: round qty UP to an even number to capture every pair; add a
+> > FEMALE variant to complete the last pair."* It opens on a multibuy offer and cannot be evaluated
+> > without offer evidence — *"a multibuy rule wearing a rounding rule's clothes."* **But archiving it
+> > also kills its NON-PRICE half — the plain household habit that Warwick always wants an EVEN
+> > NUMBER of Sure.** Warwick did not name that, and it is **his data, one sentence, no code** if he
+> > wants it back as an offer-free rule row. **Raised to him (FusionDevBot 463); not decided here.**
+> >
+> > **F1 — PARKED, non-blocking.** `planner.js rankAlternatives` (`:685-790`) still orders candidates
+> > by **price proximity, weight 0.7**. Bounded by two facts the worker established: proximity to the
+> > line's own price is a **similarity heuristic, not a bargain judgement**, and **no price column
+> > exists on the live corpus**, so the score is neutral and the ordering is price-free in practice.
+> > `planner.js` was outside the surface. Guaranteeing it price-free would be a separate order.
+> >
+> > **F4 — OWED, one line.** `skill/README.md` still says *"Nothing is wired. No pipeline caller
+> > invokes `applyRulebook` yet."* **R2 made that false.** Also stale: `pipeline/rulebookWiring.test.js:8`
+> > says the rulebook has *"29 of its own tests"* (now 31), and its fixture rule texts are still worded
+> > as best-value / pair-rounding rules. **Folded into the next order, not left to a sweep.**
+> >
 > > #### ⚠️ FLAG 2 — **018 hard-depends on 017 being applied** (composite FK). 017 IS applied, which
 > > satisfies it; the migration header must state the dependency. 017 was deliberately independent
 > > of 016 — 018 cannot be.
