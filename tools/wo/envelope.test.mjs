@@ -1003,3 +1003,231 @@ test('MUT-8 the incompleteness notice suppressed — an incomplete envelope read
     'MUT-8 an incomplete envelope must say so',
   );
 });
+
+// ===========================================================================
+// 4F CAPA (Warwick, 2026-08-09) — SEMANTIC READINESS.
+//
+// Warwick named five mutation cases. Each has a test below, and each is ALSO executed
+// against the REAL orders that produced the CAPA (recorded in the Work Order return, because
+// the defective revision lives in git history and reading it here would break hermeticity):
+//
+//   | 24 blank mandatory fields                                | FAIL |
+//   | Required file only in contract_basis, not file_surface   | FAIL |
+//   | Implementation target in AC, absent from file_surface    | FAIL |
+//   | Correctly authorised order                               | PASS |
+//   | CLARIFY amendment retaining the same order identity      | PASS |
+//
+// The invariants are pinned to literals HELD HERE, never read back off the validator.
+// ===========================================================================
+
+const L_READINESS = {
+  NOT_GENERATED: 'not-generated',
+  BLANK_MARKERS: 'blank-markers',
+  NO_WRITABLE_SURFACE: 'no-writable-surface',
+  BASIS_SURFACE_NOT_GRANTED: 'basis-surface-not-granted',
+  AC_PATH_NOT_GRANTED: 'ac-path-not-granted',
+  MISSING_MANDATORY_FIELD: 'missing-mandatory-field',
+  MISSING_RUNBOOK_PATH: 'missing-runbook-path',
+  NO_ACCEPTANCE_CRITERIA: 'no-acceptance-criteria',
+};
+
+const L_ORDER_ID = 'WO-2026-08-09-FIXTURE';
+
+/** Author every bare slot of a generated order, so the fixture is a REAL generated order. */
+function authorAllSlots(text) {
+  return text
+    .replace(/^(\s*)([a-z_]+): AUTHOR REQUIRED — .*$/gm, '$1$2: authored-for-fixture')
+    .replace(/^work_order_id: .*$/m, 'work_order_id: ' + L_ORDER_ID)
+    .replace(/^# AUTHOR REQUIRED — .*$/gm, '# ' + L_ORDER_ID + ' — fixture')
+    .replace(/^- AUTHOR REQUIRED — .*$/gm, '- authored for fixture')
+    .replace(/^AUTHOR REQUIRED — AC1\.\.ACn$/m, 'AC1 — the delivered module refuses an unready order, proven by mutation.')
+    .replace(/^AUTHOR REQUIRED — .*$/gm, 'authored for fixture');
+}
+
+function readyOrder(overrides = {}) {
+  const r = E.generateOrder(orderSpec(overrides));
+  assert.equal(r.ok, true, 'the fixture generator run must succeed');
+  return authorAllSlots(r.text);
+}
+
+const BASIS_ONLY_SURFACE = 'contract_basis:\n  - surface: services/asdair/browser-runner/oneTab.test.cjs\n    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes"';
+
+test('CASE 4 — a correctly authorised order is READY, and every check actually ran', () => {
+  const a = E.assessOrder(readyOrder(), { root: REPO });
+  assert.equal(a.ready, true, 'fixture must be ready; failures: ' + JSON.stringify(a.failures));
+  assert.equal(a.workOrderId, L_ORDER_ID);
+  assert.equal(a.notChecked.length, 0, 'no check may be silently skipped on a real repository root');
+  // A validator that ran zero checks is a green light for nothing.
+  assert.ok(a.checks.length >= 6, 'expected at least 6 executed checks, ran ' + a.checks.length);
+  for (const id of [
+    L_READINESS.NOT_GENERATED, L_READINESS.BLANK_MARKERS, L_READINESS.MISSING_MANDATORY_FIELD,
+    L_READINESS.NO_WRITABLE_SURFACE, L_READINESS.BASIS_SURFACE_NOT_GRANTED,
+    L_READINESS.NO_ACCEPTANCE_CRITERIA, L_READINESS.AC_PATH_NOT_GRANTED,
+  ]) {
+    assert.ok(a.checks.some((c) => c.id === id), 'check never ran: ' + id);
+  }
+});
+
+test('CASE 1 — a generated but unauthored order (24 blank slots) is NOT READY', () => {
+  const r = E.generateOrder(orderSpec());
+  assert.ok(r.authorCount > 0, 'the generated order must carry unauthored slots');
+  const a = E.assessOrder(r.text, { root: REPO });
+  assert.equal(a.ready, false);
+  assert.ok(a.failures.some((f) => f.id === L_READINESS.BLANK_MARKERS), 'blank slots must fail readiness');
+});
+
+test('CASE 2 — a surface granted ONLY in contract_basis is NOT READY (the row-6 defect)', () => {
+  const order = readyOrder().replace(/^contract_basis:$/m, BASIS_ONLY_SURFACE);
+  const a = E.assessOrder(order, { root: REPO });
+  assert.equal(a.ready, false, 'contract_basis must never grant a writable surface');
+  const f = a.failures.find((x) => x.id === L_READINESS.BASIS_SURFACE_NOT_GRANTED);
+  assert.ok(f, 'the basis/surface divergence must be the named failure');
+  assert.match(f.detail, /oneTab\.test\.cjs/);
+});
+
+test('CASE 5 — the amendment that moves the grant into file_surface is READY, same identity', () => {
+  const broken = readyOrder().replace(/^contract_basis:$/m, BASIS_ONLY_SURFACE);
+  const amended = broken.replace(
+    /^file_surface:$/m,
+    'file_surface:\n  # AMENDMENT 1 — corrected placement, same order identity.\n  - services/asdair/browser-runner/oneTab.test.cjs',
+  );
+  const before = E.assessOrder(broken, { root: REPO });
+  const after = E.assessOrder(amended, { root: REPO });
+  assert.equal(before.ready, false);
+  assert.equal(after.ready, true, 'amended order must be ready; failures: ' + JSON.stringify(after.failures));
+  assert.equal(after.workOrderId, before.workOrderId, 'an amendment keeps the order identity');
+  assert.equal(after.workOrderId, L_ORDER_ID);
+});
+
+test('CASE 3 — an implementation target named in AC but absent from file_surface is NOT READY', () => {
+  const order = readyOrder().replace(
+    /^AC1 — .*$/m,
+    'AC1 — services/asdair/handoff/mutation-proof.js carries the six proofs, each shown RED then GREEN.',
+  );
+  const a = E.assessOrder(order, { root: REPO });
+  assert.equal(a.ready, false);
+  const f = a.failures.find((x) => x.id === L_READINESS.AC_PATH_NOT_GRANTED);
+  assert.ok(f, 'an ungranted implementation target in AC must fail readiness');
+  assert.match(f.detail, /services\/asdair\/handoff\/mutation-proof\.js/);
+});
+
+test('a hand-authored order with no provenance marker is NOT READY (SOP-022 class A)', () => {
+  const a = E.assessOrder('---\nname: hand rolled\n---\n\n## Acceptance criteria\n\nAC1 — do the thing.\n', { root: REPO });
+  assert.equal(a.ready, false);
+  assert.ok(a.failures.some((f) => f.id === L_READINESS.NOT_GENERATED));
+});
+
+test('an order granting no writable surface at all is NOT READY', () => {
+  const order = readyOrder().replace(/^file_surface:\n(?:\s+-\s.*\n)+/m, 'file_surface:\n');
+  const a = E.assessOrder(order, { root: REPO });
+  assert.equal(a.ready, false);
+  assert.ok(a.failures.some((f) => f.id === L_READINESS.NO_WRITABLE_SURFACE));
+});
+
+test('operational_handoff: mack with no runbook_path is NOT READY', () => {
+  const withHandoff = readyOrder().replace(/^operational_handoff: .*$/m, 'operational_handoff: mack');
+  const a = E.assessOrder(withHandoff, { root: REPO });
+  assert.equal(a.ready, false);
+  assert.ok(a.failures.some((f) => f.id === L_READINESS.MISSING_RUNBOOK_PATH));
+  const withRunbook = withHandoff.replace(
+    /^operational_handoff: mack$/m,
+    'operational_handoff: mack\nrunbook_path: services/asdair/RUNBOOK.md',
+  );
+  assert.equal(E.assessOrder(withRunbook, { root: REPO }).ready, true);
+});
+
+test('a check that could not run is NOT-CHECKED, never a silent pass', () => {
+  const a = E.assessOrder(readyOrder(), { root: null });
+  assert.ok(a.notChecked.some((c) => c.id === L_READINESS.AC_PATH_NOT_GRANTED), 'an unexaminable surface must say so');
+  assert.equal(a.checks.find((c) => c.id === L_READINESS.AC_PATH_NOT_GRANTED).state, 'not-checked');
+});
+
+test('the mandatory field list is READ from the canonical template, not restated here', () => {
+  const { keys } = E.templateMandatoryKeys(REPO);
+  assert.ok(Array.isArray(keys) && keys.length > 20, 'expected the template envelope keys, got ' + (keys && keys.length));
+  for (const k of ['work_order_id', 'file_surface', 'private_surface', 'credential_scope', 'live_authority', 'document_impact']) {
+    assert.ok(keys.includes(k), 'mandatory key missing from the extracted list: ' + k);
+  }
+  assert.equal(keys.includes('runbook_path'), false, 'runbook_path is CONDITIONAL and checked separately');
+  assert.equal(keys.includes('veritas_source'), false, 'the template marks the corrective block omit-when-not-applicable');
+  // Barren root: the list is READ, never remembered.
+  assert.equal(E.templateMandatoryKeys(BARREN).keys, null);
+});
+
+test('AC path extraction ignores bare filenames, documents, commands and partial paths', () => {
+  const body = [
+    'AC1 — buildHandoff.js already stamps all three at runtime.js:462.',
+    'AC2 — packet/committedSchema.js carries no method field.',
+    'AC3 — see Deliverables/2026-08-07-subphase-4A-closure.md for context.',
+    'AC4 — `node services/cockpit/template-check.mjs --self-test` exits 0.',
+    'AC5 — services/asdair/handoff/instructions.js gains the contract.',
+  ].join('\n');
+  const top = E.repoTopLevelNames(REPO);
+  const cited = E.pathTokens(body)
+    .filter((t) => top.has(t.split('/')[0].toLowerCase()))
+    .filter(E.isImplementationTarget);
+  assert.deepEqual(cited, ['services/asdair/handoff/instructions.js']);
+});
+
+// ---------------------------------------------------------------------------
+// MUTATION PROOFS for the validator. A check no test can fail is not a check.
+// ---------------------------------------------------------------------------
+
+test('MUT-15 the readiness verdict hardcoded to true — every failure ignored', async () => {
+  const mutant = await loadMutant(
+    '  return { ready: failures.length === 0, checks, failures, notChecked, workOrderId };',
+    '  return { ready: true, checks, failures, notChecked, workOrderId };',
+  );
+  const raw = E.generateOrder(orderSpec()).text; // 24 unauthored slots
+  assert.equal(mutant.assessOrder(raw, { root: REPO }).ready, true, 'mutant should call an unauthored order ready');
+  await assertMutantBreaks(
+    mutant,
+    (m) => assert.equal(m.assessOrder(raw, { root: REPO }).ready, false),
+    'MUT-15 an order with unauthored mandatory slots must never be READY',
+  );
+});
+
+test('MUT-16 surface coverage made permissive — contract_basis silently grants again', async () => {
+  const mutant = await loadMutant(
+    '  return declaredSurfaces.some((s) => e === slashes(s) || matchesPattern(e, s));',
+    '  return true;',
+  );
+  const order = readyOrder().replace(/^contract_basis:$/m, BASIS_ONLY_SURFACE);
+  assert.equal(mutant.assessOrder(order, { root: REPO }).ready, true, 'mutant should re-admit the row-6 defect');
+  await assertMutantBreaks(
+    mutant,
+    (m) => assert.equal(m.assessOrder(order, { root: REPO }).ready, false),
+    'MUT-16 a surface granted only in contract_basis must fail readiness',
+  );
+});
+
+test('MUT-17 an unexaminable check reported as a pass', async () => {
+  const mutant = await loadMutant(
+    "    add(READINESS.AC_PATH_NOT_GRANTED, 'not-checked', `repository root could not be enumerated",
+    "    add(READINESS.AC_PATH_NOT_GRANTED, 'pass', `repository root could not be enumerated",
+  );
+  const order = readyOrder();
+  const saysNotChecked = (mod) =>
+    mod.assessOrder(order, { root: null }).notChecked.some((c) => c.id === L_READINESS.AC_PATH_NOT_GRANTED);
+  assert.equal(saysNotChecked(mutant), false, 'mutant should hide the unexamined acceptance-criteria check');
+  await assertMutantBreaks(
+    mutant,
+    (m) => assert.equal(saysNotChecked(m), true),
+    'MUT-17 a control must never report on ground it did not examine',
+  );
+});
+
+test('MUT-18 the provenance marker check disabled — a hand-rolled order passes', async () => {
+  const mutant = await loadMutant('  if (!body.includes(ORDER_MARKER)) {', '  if (false) {');
+  const hand = '---\nname: hand rolled\n---\n\n## Acceptance criteria\n\nAC1 — do the thing.\n';
+  assert.equal(
+    mutant.assessOrder(hand, { root: REPO }).failures.some((f) => f.id === L_READINESS.NOT_GENERATED),
+    false,
+    'mutant should stop noticing',
+  );
+  await assertMutantBreaks(
+    mutant,
+    (m) => assert.ok(m.assessOrder(hand, { root: REPO }).failures.some((f) => f.id === L_READINESS.NOT_GENERATED)),
+    'MUT-18 an order off the ordinary generation route must be refused (SOP-022 class A)',
+  );
+});

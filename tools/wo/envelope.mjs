@@ -7,8 +7,13 @@
 //    deviation is a Warwick escalation, not a drafting choice."
 //
 // WHAT THIS IS: a producer of envelope field text. Larry runs it BEFORE drafting an order.
-// WHAT THIS IS NOT: a checker. It never reads a Work Order, never scores one, has no verdict
-// vocabulary, and its exit code carries no judgement about any order (WO-17 Amendment 1 F-3).
+// WHAT THIS WAS NOT, until 2026-08-09: a checker. WO-17 Amendment 1 F-3 held that this module
+// "never reads a Work Order, never scores one, has no verdict vocabulary". That is NO LONGER
+// TRUE and the comment is kept only so the change is visible: G-5's `--count-markers` already
+// read an order and printed `ready`, and the 4F CAPA (Warwick, 2026-08-09) rules that the
+// readiness validator belongs HERE and in the dispatch path — no new service. See the
+// § "4F CAPA ITEM 1–7" block below for the supersession and its exact boundary. GENERATION
+// still carries no verdict: only `--assess` does.
 //
 // THE ANTI-FABRICATION PROPERTY — the load-bearing half:
 //   When a field cannot be established from canonical source, this emits
@@ -89,6 +94,7 @@ export function blobSha(bytes) {
  * readIfPresent normalises too. Provenance nobody can check is decoration.
  */
 export function sourceSha(root, rel) {
+  if (typeof root !== 'string' || root === '') return null;
   const abs = join(root, rel);
   if (!existsSync(abs)) return null;
   try {
@@ -157,6 +163,10 @@ export const STANDING_DEFAULT_FIELDS = [
 // therefore means byte-verbatim MODULO line-ending normalisation, and it is said out loud
 // rather than assumed.
 function readIfPresent(root, rel) {
+  // A null/absent root is a legitimate caller state since assessOrder() may be handed one
+  // (the dispatch guard cannot always establish a repository root). It must degrade to
+  // "could not read", never throw — a control that crashes tells the caller nothing.
+  if (typeof root !== 'string' || root === '') return null;
   const abs = join(root, rel);
   if (!existsSync(abs)) return null;
   try {
@@ -926,6 +936,338 @@ export function issuabilitySnapshotFooter(authorCount, unresolvedCount) {
   ].join('\n');
 }
 
+// ===========================================================================
+// 4F CAPA ITEM 1–7 — SEMANTIC READINESS. `assessOrder` reads a FINISHED order.
+//
+// SUPERSESSION, stated here because this file's own header denies it:
+//   WO-17 Amendment 1 F-3 recorded that this module "never reads a Work Order,
+//   never scores one, has no verdict vocabulary". G-5's `--count-markers` already
+//   crossed that line — it reads an order and prints `ready`. The 4F CAPA
+//   (Warwick, 2026-08-09) rules explicitly that "the validator belongs in
+//   tools/wo/envelope.mjs and the dispatch path. No registry, no tracker, no
+//   service." A later explicit Warwick decision outranks an earlier one, so the
+//   validator lands here rather than in a new module.
+//   `--count-markers` keeps its old contract exactly (exit 0 always, counts only).
+//   The verdict lives in the NEW `--assess` flag and nowhere else.
+//
+// WHY IT EXISTS, in one line: `--count-markers` returned `ready: true` for
+// WO-2026-08-09-B15-C4, whose five test paths were granted in `contract_basis` —
+// a field that JUSTIFIES a surface and does not GRANT one. Marker presence is
+// SYNTAX. Whether the order can actually be executed is SEMANTICS.
+//
+// NOT a checker service, registry, store or control plane. It is one pure
+// function over one file's text, plus a flag.
+// ===========================================================================
+
+export const READINESS = {
+  NOT_GENERATED: 'not-generated',
+  BLANK_MARKERS: 'blank-markers',
+  NO_WRITABLE_SURFACE: 'no-writable-surface',
+  BASIS_SURFACE_NOT_GRANTED: 'basis-surface-not-granted',
+  AC_PATH_NOT_GRANTED: 'ac-path-not-granted',
+  MISSING_MANDATORY_FIELD: 'missing-mandatory-field',
+  NO_ACCEPTANCE_CRITERIA: 'no-acceptance-criteria',
+  MISSING_RUNBOOK_PATH: 'missing-runbook-path',
+};
+
+/**
+ * The order's frontmatter — NOT `frontmatter()`, which requires the `---` fence on line 1.
+ * A generated order opens with the provenance HTML comment, so the fence is not first.
+ */
+export function orderFrontmatter(text) {
+  const lines = String(text ?? '').split(/\r?\n/);
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === '---') { start = i; break; }
+  }
+  if (start === -1) return null;
+  for (let j = start + 1; j < lines.length; j++) {
+    if (lines[j].trim() === '---') return lines.slice(start + 1, j).join('\n');
+  }
+  return null;
+}
+
+/** Top-level keys with their inline value and any indented children. Comments ignored. */
+export function frontmatterFields(fmText) {
+  const fields = new Map();
+  let current = null;
+  for (const line of String(fmText ?? '').split(/\r?\n/)) {
+    if (/^\s*#/.test(line) || line.trim() === '') continue;
+    const m = line.match(/^([a-z_][a-z0-9_]*):(.*)$/);
+    if (m) {
+      current = m[1];
+      fields.set(current, { value: m[2].trim(), children: [] });
+      continue;
+    }
+    if (current && /^\s+\S/.test(line)) fields.get(current).children.push(line.trim());
+  }
+  return fields;
+}
+
+/** A `- ` list under a top-level key. Comments inside the block are skipped. */
+export function yamlList(fmText, key) {
+  const out = [];
+  let inKey = false;
+  for (const line of String(fmText ?? '').split(/\r?\n/)) {
+    if (new RegExp(`^${key}:`).test(line)) { inKey = true; continue; }
+    if (/^[a-z_][a-z0-9_]*:/.test(line)) { inKey = false; continue; }
+    if (!inKey || /^\s*#/.test(line)) continue;
+    const m = line.match(/^\s*-\s*(.+?)\s*$/);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+/** Every `- surface:` entry inside `contract_basis`. Actions are deliberately excluded. */
+export function contractBasisSurfaces(fmText) {
+  const out = [];
+  let inBasis = false;
+  for (const line of String(fmText ?? '').split(/\r?\n/)) {
+    if (/^contract_basis:/.test(line)) { inBasis = true; continue; }
+    if (/^[a-z_][a-z0-9_]*:/.test(line)) { inBasis = false; continue; }
+    if (!inBasis) continue;
+    const m = line.match(/^\s*-\s*surface:\s*(.+?)\s*$/);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+/**
+ * The mandatory key list, READ from the canonical template rather than restated — the same
+ * discipline standingDefaults() already follows, and for the same reason: a second copy of
+ * the field list here is the drift the template exists to end.
+ *
+ * Keys after the template's own "omit entirely when not applicable" marker are optional by
+ * the template's own words. `runbook_path` is conditional and checked separately.
+ */
+export const MANDATORY_KEY_STOP_MARKER = 'omit entirely when not applicable';
+export const CONDITIONAL_KEYS = ['runbook_path'];
+
+export function templateMandatoryKeys(root) {
+  const rel = SOURCES.template;
+  const text = readIfPresent(root, rel);
+  if (text === null) return { keys: null, error: unresolved(rel, 'envelope field list') };
+  const fence = text.match(/```yaml\n([\s\S]*?)```/);
+  if (!fence) return { keys: null, error: unresolved(rel, '```yaml envelope block') };
+  const keys = [];
+  for (const line of fence[1].split('\n')) {
+    if (line.includes(MANDATORY_KEY_STOP_MARKER)) break;
+    const m = line.match(/^([a-z_][a-z0-9_]*):/);
+    if (m && !keys.includes(m[1]) && !CONDITIONAL_KEYS.includes(m[1])) keys.push(m[1]);
+  }
+  return keys.length === 0
+    ? { keys: null, error: unresolved(rel, 'envelope field list is empty') }
+    : { keys, error: null };
+}
+
+/**
+ * Repo-relative path tokens inside a block of prose.
+ *
+ * DELIBERATELY NARROW, and the narrowness is the point: only a token containing `/` whose
+ * FIRST SEGMENT is an actual top-level directory of the repository counts. A bare filename
+ * (`runtime.js`), a partial path (`packet/committedSchema.js`), a URL and an absolute machine
+ * path are all ignored. That is a real hole — an acceptance criterion naming its target as a
+ * bare filename slips through — and it is chosen over the alternative, which is a gate that
+ * fires on the honest case. WO-2026-08-09-B15-C4's CORRECTED acceptance criteria cite four
+ * such partial references legitimately; a wider rule would have refused the fixed order.
+ *
+ * A backticked span that IS A COMMAND is removed before scanning: a path inside
+ * `node services/cockpit/template-check.mjs --self-test` is being EXECUTED, not written, and
+ * the canonical template's own grammar says evidence is "the exact command that must be
+ * EXECUTED". Measured: without this, WO-2026-08-07-26 flagged three green gate scripts.
+ */
+export const COMMAND_HEADS = ['node', 'bash', 'sh', 'npm', 'npx', 'python', 'py', 'git', 'cd', 'pwsh', 'powershell'];
+
+export function stripCommandSpans(text) {
+  return String(text ?? '').replace(/`([^`\n]+)`/g, (span, inner) => {
+    const head = inner.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+    return COMMAND_HEADS.includes(head) ? ' ' : span;
+  });
+}
+
+export function pathTokens(rawBody) {
+  const body = stripCommandSpans(rawBody);
+  const out = [];
+  const push = (raw) => {
+    let s = String(raw).trim();
+    s = s.replace(/^[`'"(\[<~*]+/, '').replace(/[`'"),.;\]>~]+$/, '');
+    s = s.replace(/:\d+(-\d+)?$/, '');
+    if (!s || !s.includes('/')) return;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return;
+    if (/^[A-Za-z]:[\\/]/.test(s)) return;
+    if (s.startsWith('/') || s.startsWith('\\\\')) return;
+    s = s.replace(/\\/g, '/');
+    if (!out.includes(s)) out.push(s);
+  };
+  const text = String(body ?? '');
+  for (const m of text.matchAll(/`([^`\n]+)`/g)) for (const t of m[1].split(/\s+/)) push(t);
+  for (const t of text.split(/\s+/)) push(t);
+  return out;
+}
+
+/**
+ * Which cited paths are candidate IMPLEMENTATION TARGETS.
+ *
+ * Two exclusions, both deliberate and both measured against the real order corpus:
+ *   - NO EXTENSION (`services/x/`, `.claude/state/return-cues/`) — a directory reference.
+ *   - `.md` — a DOCUMENT. `document_impact` is the field that names affected documents, and
+ *     the canonical template is explicit that it IDENTIFIES and never AUTHORISES. Treating a
+ *     cited plan, receipt or brief as an ungranted write target misreads that grammar, and
+ *     measured over 40 real orders it produced the only clear false positives this check had.
+ * A glob (`services/cockpit/*.mjs`) is always a candidate — it can only be a surface claim.
+ */
+export function isImplementationTarget(token) {
+  if (token.includes('*')) return true;
+  const m = token.match(/\.([A-Za-z0-9]{1,6})$/);
+  if (!m) return false;
+  return m[1].toLowerCase() !== 'md';
+}
+
+export function repoTopLevelNames(root) {
+  if (!root) return null;
+  try {
+    return new Set(readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name.toLowerCase()));
+  } catch {
+    return null;
+  }
+}
+
+/** Is `entry` covered by any declared surface? Glob-aware, so `tools/**` grants `tools/wo/x.mjs`. */
+export function isGranted(entry, declaredSurfaces) {
+  const e = slashes(entry);
+  return declaredSurfaces.some((s) => e === slashes(s) || matchesPattern(e, s));
+}
+
+/**
+ * SEMANTIC readiness of a finished Work Order.
+ *
+ * Returns `{ ready, checks, failures, notChecked, workOrderId }`. `ready` is true only when
+ * every executed check passed. A check that could not run at all is reported in `notChecked`
+ * and does NOT silently count as a pass — an unexamined question is not an answered one.
+ */
+export function assessOrder(text, { root = null } = {}) {
+  const body = String(text ?? '');
+  const checks = [];
+  const add = (id, state, detail) => checks.push({ id, state, detail });
+
+  // 1 — provenance. SOP-022 class A: an order off the ordinary generation route is refused.
+  if (!body.includes(ORDER_MARKER)) {
+    add(READINESS.NOT_GENERATED, 'fail', `order body does not carry the marker "${ORDER_MARKER}" — it was not produced on the ordinary generation route (SOP-022 class A)`);
+  } else {
+    add(READINESS.NOT_GENERATED, 'pass', 'provenance marker present');
+  }
+
+  // 2 — the existing syntax check, kept: unauthored slots and unread sources.
+  const { authorCount, unresolvedCount } = countMarkers(body);
+  if (authorCount > 0 || unresolvedCount > 0) {
+    add(READINESS.BLANK_MARKERS, 'fail', `${authorCount} AUTHOR REQUIRED and ${unresolvedCount} UNRESOLVED marker(s) remain — the order is unauthored or rests on an unread source`);
+  } else {
+    add(READINESS.BLANK_MARKERS, 'pass', 'no AUTHOR REQUIRED or UNRESOLVED markers');
+  }
+
+  const fm = orderFrontmatter(body);
+  const fields = frontmatterFields(fm);
+  const workOrderId = fields.get('work_order_id')?.value ?? null;
+
+  // G-6 — a machine-install order carries its grant in `machine_surface` and legitimately
+  // emits an EMPTY `file_surface`. Flagging that as a missing mandatory field would fire the
+  // gate on the honest case, which is how gates die.
+  const isMachineOrder = yamlList(fm, 'machine_surface').length > 0;
+
+  // 3 — mandatory fields, from the canonical template.
+  const mandatory = templateMandatoryKeys(root);
+  if (!mandatory.keys) {
+    add(READINESS.MISSING_MANDATORY_FIELD, 'not-checked', mandatory.error);
+  } else if (fm === null) {
+    add(READINESS.MISSING_MANDATORY_FIELD, 'fail', 'no `---` frontmatter block was found in the order');
+  } else {
+    const missing = [];
+    for (const key of mandatory.keys) {
+      if (key === 'file_surface' && isMachineOrder) continue;
+      const f = fields.get(key);
+      if (!f) { missing.push(`${key} (absent)`); continue; }
+      if (f.value === '' && f.children.length === 0) missing.push(`${key} (present but empty)`);
+    }
+    if (missing.length) {
+      add(READINESS.MISSING_MANDATORY_FIELD, 'fail', `mandatory envelope field(s) missing or empty: ${missing.join(', ')}`);
+    } else {
+      add(READINESS.MISSING_MANDATORY_FIELD, 'pass', `all ${mandatory.keys.length} mandatory envelope fields present`);
+    }
+  }
+
+  // 3b — the runbook gate, conditional on the order's own declaration (Keel contract §runbook gate).
+  const handoff = (fields.get('operational_handoff')?.value ?? '').toLowerCase();
+  if (handoff === 'mack') {
+    const runbook = fields.get('runbook_path')?.value ?? '';
+    if (!runbook) {
+      add(READINESS.MISSING_RUNBOOK_PATH, 'fail', 'operational_handoff is `mack` and no runbook_path is declared');
+    } else {
+      add(READINESS.MISSING_RUNBOOK_PATH, 'pass', `runbook_path declared: ${runbook}`);
+    }
+  }
+
+  // 4 — a writable surface must actually exist. CAPA item 2.
+  const fileSurface = yamlList(fm, 'file_surface').filter((s) => !isAuthorRequired(s) && !isUnresolved(s));
+  const machineSurface = yamlList(fm, 'machine_surface');
+  const declared = [...fileSurface, ...machineSurface];
+  if (declared.length === 0) {
+    add(READINESS.NO_WRITABLE_SURFACE, 'fail', 'neither file_surface nor machine_surface grants a single writable path');
+  } else {
+    add(READINESS.NO_WRITABLE_SURFACE, 'pass', `${fileSurface.length} file_surface + ${machineSurface.length} machine_surface entries`);
+  }
+
+  // 5 — THE ROW-6 DEFECT. CAPA items 2 and 4: contract_basis JUSTIFIES; it never GRANTS.
+  const basis = contractBasisSurfaces(fm);
+  const ungranted = basis.filter((s) => !isAuthorRequired(s) && !isUnresolved(s) && !isGranted(s, declared));
+  if (ungranted.length) {
+    add(READINESS.BASIS_SURFACE_NOT_GRANTED, 'fail', `contract_basis cites ${ungranted.length} surface(s) that file_surface does NOT grant: ${ungranted.join(', ')} — contract_basis justifies a surface, it never grants one`);
+  } else {
+    add(READINESS.BASIS_SURFACE_NOT_GRANTED, 'pass', `all ${basis.length} contract_basis surface(s) are granted by file_surface`);
+  }
+
+  // 6 — acceptance criteria must exist, and must not name an ungranted implementation target.
+  const ac = sectionUnder(body, ['Acceptance criteria']);
+  const acLines = (ac?.body ?? '')
+    .split('\n')
+    .filter((l) => l.trim() !== '' && !/^\s*#/.test(l));
+  if (!ac || acLines.length === 0) {
+    add(READINESS.NO_ACCEPTANCE_CRITERIA, 'fail', 'the order carries no `## Acceptance criteria` content');
+  } else {
+    add(READINESS.NO_ACCEPTANCE_CRITERIA, 'pass', `${acLines.length} acceptance-criteria line(s)`);
+  }
+
+  const topLevel = repoTopLevelNames(root);
+  if (!topLevel) {
+    add(READINESS.AC_PATH_NOT_GRANTED, 'not-checked', `repository root could not be enumerated${root ? ` at ${root}` : ' (no root supplied)'} — acceptance-criteria paths were NOT examined`);
+  } else {
+    const cited = pathTokens(acLines.join('\n'))
+      .filter((t) => topLevel.has(t.split('/')[0].toLowerCase()))
+      .filter(isImplementationTarget);
+    const missing = cited.filter((t) => !isGranted(t, declared));
+    if (missing.length) {
+      add(READINESS.AC_PATH_NOT_GRANTED, 'fail', `acceptance criteria name ${missing.length} repository path(s) that file_surface does NOT grant: ${missing.join(', ')} — grant them, or move a read-only reference to "## Inputs supplied"`);
+    } else {
+      add(READINESS.AC_PATH_NOT_GRANTED, 'pass', `${cited.length} repository path(s) cited in acceptance criteria, all granted`);
+    }
+  }
+
+  const failures = checks.filter((c) => c.state === 'fail');
+  const notChecked = checks.filter((c) => c.state === 'not-checked');
+  return { ready: failures.length === 0, checks, failures, notChecked, workOrderId };
+}
+
+/** Human-readable readiness report. One line per failure; the order's identity is named. */
+export function renderAssessment(assessment, label = 'order') {
+  const lines = [
+    assessment.ready
+      ? `READY — ${label}${assessment.workOrderId ? ` (${assessment.workOrderId})` : ''}`
+      : `NOT READY — ${label}${assessment.workOrderId ? ` (${assessment.workOrderId})` : ''}`,
+  ];
+  for (const f of assessment.failures) lines.push(`  ✗ ${f.id}: ${f.detail}`);
+  for (const n of assessment.notChecked) lines.push(`  ? ${n.id}: ${n.detail} (NOT CHECKED — not a pass)`);
+  return lines.join('\n');
+}
+
 /**
  * G-6 — machine-install orders. Closed list of absolute machine paths; never matched against
  * repo contract patterns (that would fabricate a grant — MUT-10 class defect).
@@ -1270,6 +1612,10 @@ This is discipline + refuse-gate, not an auto-invoking service.
   --deviation-authority "..." who authorised the deviation(s), and when
   --envelope-only             envelope rows on stdout, no order body
   --count-markers <file>      G-5 live recomputation of AUTHOR REQUIRED / UNRESOLVED counts
+  --assess <file>             4F CAPA SEMANTIC readiness of a finished order.
+                              Exit 0 = READY, 1 = NOT READY, 3 = file not found.
+                              This is the ONLY flag whose exit code is a verdict.
+  --json                      with --assess: machine-readable output
   --root <repo>               repository root (default: cwd)
 
 Emits a COMPLETE Work Order with every non-authored field copied or extracted from canonical
@@ -1304,6 +1650,28 @@ function main(argv) {
       }) + '\n',
     );
     return 0;
+  }
+
+  // 4F CAPA — semantic readiness. Does not require --owner; the order carries its own owner.
+  if (args.assess) {
+    const file = args.assess === true ? null : String(args.assess);
+    if (!file) {
+      process.stderr.write('usage: node tools/wo/envelope.mjs --assess <file> [--root <repo>]\n');
+      return 2;
+    }
+    if (!existsSync(file)) {
+      process.stderr.write(`FATAL — not found: ${file}\n`);
+      return 3;
+    }
+    const assessment = assessOrder(readFileSync(file, 'utf8'), {
+      root: typeof args.root === 'string' ? args.root : process.cwd(),
+    });
+    process.stdout.write(
+      args.json
+        ? `${JSON.stringify({ file, ...assessment })}\n`
+        : `${renderAssessment(assessment, file)}\n`,
+    );
+    return assessment.ready ? 0 : 1;
   }
 
   if (args.help || !args.owner) {
