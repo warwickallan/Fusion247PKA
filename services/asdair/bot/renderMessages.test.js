@@ -69,6 +69,7 @@ const SAMPLES = {
   failure: { shopRef: REF, stage: 'search items', detail: 'ASDA search returned no results for "yoghurt"' },
   confirmation_received: { shopRef: REF, source: 'forwarded email' },
   reconciliation_summary: { shopRef: REF, purchasedAsPlanned: 33, addedAfterPlanning: 1, omitted: 2, qtyChanged: 1, variantChanged: 0, priceMissing: 35, unresolved: 0 },
+  clarification_deferred: { shopRef: REF, items: ['dreamies cheese'], reason: 'I could not tell which size you meant' },
 };
 
 function everyButton(rendered) {
@@ -84,9 +85,18 @@ test('the catalogue covers every message the directive specifies', () => {
   // line-resolution gate's production surface - Veritas D-2). Both exist for
   // the same reason: a gate that parks a shop must be able to say so.
   // The list grows; nothing was removed or renamed.
+  // 'clarification_deferred' added by WP-B15-A1, for the same reason again: the
+  // reading-confirmation gate DEFERS a round-2 clarification, and a deferral
+  // nobody is told about is a silent park. The card waits; the word does not.
+  //
+  // THIS LIST IS THE CONTROL. A new outbox kind whose renderer is not registered
+  // in MESSAGES is not a quiet no-op - runtime.js drainOutbox resolves it
+  // 'abandoned' and the message is discarded. Pinning the exact key set here,
+  // OUTSIDE renderMessages.js, is what makes an unregistered kind impossible to
+  // ship unnoticed.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
-    'basket_ready', 'confirm_interpretation', 'confirmation_received', 'failure',
-    'lines_unresolved', 'plan_ready', 'progress', 'question', 'receipt',
+    'basket_ready', 'clarification_deferred', 'confirm_interpretation', 'confirmation_received',
+    'failure', 'lines_unresolved', 'plan_ready', 'progress', 'question', 'receipt',
     'reconciliation_summary', 'status',
   ]);
 });

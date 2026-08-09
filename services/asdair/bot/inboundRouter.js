@@ -46,6 +46,12 @@ export const REFUSALS = Object.freeze({
   NO_LOOKUP: 'reply received but no resolveQuestionByMessage lookup was injected',
   UNCORRELATED_REPLY: 'reply not correlated to a known asdair question',
   EMPTY_REPLY: 'reply carried no text',
+  // WP-B15-A1. A plain typed message that answered no open question. NOT an
+  // error and NOT a defect: it is the ordinary case for a new shopping list, and
+  // the caller deliberately leaves such a message to intake instead of claiming
+  // it. Distinct from UNCORRELATED_REPLY, which means a reply pointed at a card
+  // we no longer recognise - that one really is a miss.
+  UNCORRELATED_TEXT: 'typed message did not answer any open question',
 });
 
 /** PURE. Stable identity for whoever acted. Never a name, never a handle — the
@@ -57,7 +63,7 @@ function responderOf(from) {
 /**
  * PURE. Map an inbound Telegram update onto an AsdAIr intent.
  *
- * Two shapes are recognised, and only two:
+ * Three shapes are recognised, and only three (the third added by WP-B15-A1):
  *
  *  1. A TAPPED BUTTON — `update.callback_query` whose `data` starts `asd:`.
  *     The action, shopRef and arg come straight off the wire via
@@ -72,13 +78,22 @@ function responderOf(from) {
  *     `raw.text` — matching it against the candidates is a decision, and
  *     decisions are not this module's job.
  *
+ *  3. A PLAIN TYPED MESSAGE - `update.message` with text and NO
+ *     `reply_to_message`. There is nothing on the wire to correlate on, so the
+ *     injected `resolveAnswersByText` is asked which open question(s) the words
+ *     answer. It returns already-resolved mappings or nothing; the router makes
+ *     no correlation decision of its own, and a message that maps to nothing is
+ *     refused as UNCORRELATED_TEXT so it can go on to intake as a list.
+ *
  * @param {object} update a Telegram Update object
  * @param {{resolveQuestionByMessage?: (chatId:any, messageId:any) =>
- *          (null|string|{questionKey:string, shopRef?:string})}} [deps]
+ *          (null|string|{questionKey:string, shopRef?:string}),
+ *          resolveAnswersByText?: (text:string) =>
+ *          (null|{mappings:{questionKey:string, shopRef?:string, answerText?:string}[]})}} [deps]
  * @returns {{ok:true, action:string, shopRef:string|null, arg:string|null,
  *            responder:string, raw:object}|{ok:false, reason:string}}
  */
-export function routeAsdairUpdate(update, { resolveQuestionByMessage } = {}) {
+export function routeAsdairUpdate(update, { resolveQuestionByMessage, resolveAnswersByText } = {}) {
   if (!update || typeof update !== 'object') return { ok: false, reason: REFUSALS.NOT_AN_UPDATE };
 
   // ── 1. Tapped inline button ────────────────────────────────────────────────
@@ -147,6 +162,69 @@ export function routeAsdairUpdate(update, { resolveQuestionByMessage } = {}) {
         text,
       },
     };
+  }
+
+  // ── 3. A PLAIN TYPED MESSAGE (WP-B15-A1) ───────────────────────────────────
+  //
+  // Warwick: "I dont have a bloody card I can type an answer... I don't want to
+  // be pressing buttons." Until this branch existed, a typed answer only counted
+  // if he first long-pressed the right card and used reply-to. Everything else
+  // fell out of the bottom of this function as NOT_ASDAIR and was never seen
+  // again - which is exactly what happened to question 76463.
+  //
+  // ── CORRELATION IS INJECTED, ALREADY RESOLVED ──────────────────────────────
+  // `resolveAnswersByText` is a SYNC closure the caller has already filled in.
+  // Working out which open question a sentence belongs to needs the database and
+  // may need a model call; this module is PURE and stays pure, exactly as it does
+  // for `resolveQuestionByMessage`. The router asks "whose is this?" and is told;
+  // it never goes and looks.
+  //
+  // ── WITHOUT THE LOOKUP, BEHAVIOUR IS UNCHANGED ─────────────────────────────
+  // No lookup injected means no correlation is possible, so the message is not
+  // ours and falls through to NOT_ASDAIR precisely as before. A caller that
+  // wires nothing keeps today's behaviour.
+  if (msg && typeof msg === 'object' && typeof resolveAnswersByText === 'function') {
+    const text = typeof msg.text === 'string' ? msg.text.trim() : '';
+    if (text) {
+      const hit = resolveAnswersByText(text);
+      const mappings = hit && Array.isArray(hit.mappings) ? hit.mappings.filter(
+        (m) => m && typeof m.questionKey === 'string' && m.questionKey !== '',
+      ) : [];
+
+      // NOT CORRELATED IS NOT A FAILURE. A genuine new shopping list lands here
+      // every week, and claiming it would be the defect - so it is refused with
+      // its own reason and the caller lets intake have it.
+      if (mappings.length === 0) return { ok: false, reason: REFUSALS.UNCORRELATED_TEXT };
+
+      return {
+        ok: true,
+        action: ACTIONS.ANSWER,
+        // One message may settle SEVERAL questions. `shopRef`/`arg` name the
+        // first for callers that read one intent; `raw.mappings` carries all of
+        // them, and the adapter turns each into its own answerQuestion command.
+        // Per-mapping is what makes partial success possible: two clear answers
+        // land durably even when a third fragment cannot be placed.
+        shopRef: mappings[0].shopRef || null,
+        arg: mappings[0].questionKey,
+        responder: responderOf(msg.from),
+        raw: {
+          kind: 'text',
+          callbackQueryId: null,
+          chatId: msg.chat && msg.chat.id !== undefined ? msg.chat.id : null,
+          messageId: msg.message_id !== undefined ? msg.message_id : null,
+          data: null,
+          // VERBATIM, exactly as the reply branch above. Which product the words
+          // mean is a decision, and it is not made here.
+          text,
+          mappings: mappings.map((m) => ({
+            questionKey: m.questionKey,
+            shopRef: m.shopRef || null,
+            answerText: typeof m.answerText === 'string' && m.answerText.trim() !== ''
+              ? m.answerText.trim() : text,
+          })),
+        },
+      };
+    }
   }
 
   return { ok: false, reason: REFUSALS.NOT_ASDAIR };

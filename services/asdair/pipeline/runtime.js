@@ -41,7 +41,11 @@
 import * as commands from './commands.js';
 import { runPipeline } from './runPipeline.js';
 import * as store from './store.js';
-import { intentToCommand } from './telegramAdapter.js';
+import { intentToCommand, intentToCommands } from './telegramAdapter.js';
+// WP-B15-A1. resolveExactCandidate is PURE and opens no connection, so importing
+// it statically does not break this file's "importable on a box with no pg"
+// property - the same reasoning as the three bot imports below.
+import * as shopDecisions from './shopDecisions.js';
 import { COMMANDS } from './commandNames.js';
 import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
 // The bot folder is PURE and zero-dependency (it opens no connection; a test in
@@ -92,8 +96,8 @@ export function createCapturingTelegram(inner) {
  * whole history redelivered, every message would RESUME its existing week and
  * write nothing.
  */
-export async function pollIntake(deps, { intake, householdId, now, log = () => {} } = {}) {
-  if (!intake) return { fetched: 0, received: [], ignored: [], failed: [] };
+export async function pollIntake(deps, { intake, householdId, now, claim = null, log = () => {} } = {}) {
+  if (!intake) return { fetched: 0, received: [], ignored: [], failed: [], claimed: [] };
   // THE CLOCK IS INJECTED, never reached for. The week a list belongs to is
   // derived from the receiver's stamp, so the whole loop is deterministic under
   // test - and a runtime with a wrong clock is a wrong shop_ref, which is the
@@ -153,6 +157,9 @@ export async function pollIntake(deps, { intake, householdId, now, log = () => {
     now: clock,
     log,
     onRecord: persist,
+    // WP-B15-A1. Route first: runIntake asks this BEFORE treating a message as a
+    // shopping list, so an answer is never also eaten as a list.
+    claim,
   });
 
   return {
@@ -160,7 +167,169 @@ export async function pollIntake(deps, { intake, householdId, now, log = () => {
     received,
     ignored: result.ignored,
     failed: result.failed,
+    claimed: result.claimed || [],
   };
+}
+
+/**
+ * Every question still OPEN, across every active shop. (WP-B15-A1)
+ *
+ * Read once per pass, BEFORE the fetch, because the claim decision has to be
+ * taken while a message is still in intake's hand - see runIntake's `claim`
+ * hook for why that ordering is not negotiable.
+ *
+ * A lookup that fails returns an EMPTY list, never a throw. No open questions
+ * means nothing is claimed, which is exactly today's behaviour: an unreadable
+ * question table must degrade to "typed messages are shopping lists", never to
+ * a pass that cannot run at all.
+ */
+export async function loadOpenQuestions(deps, { householdId = null, log = () => {} } = {}) {
+  const open = [];
+  let shops = [];
+  try {
+    shops = await store.listActiveShops(deps, store.CONSUMABLE_COMMANDS);
+  } catch (err) {
+    log('open_questions_lookup_failed', { detail: String(err && err.message ? err.message : err) });
+    return open;
+  }
+
+  for (const shop of shops) {
+    if (householdId !== null && householdId !== undefined
+        && shop.household_id !== null && shop.household_id !== undefined
+        && String(shop.household_id) !== String(householdId)) continue;
+    try {
+      for (const q of await store.listQuestions(deps, shop.id)) {
+        if (q.status !== 'open') continue;
+        open.push({
+          shopRef: shop.shop_ref,
+          shopId: shop.id,
+          questionKey: q.question_key,
+          questionText: q.question_text || null,
+          itemName: q.item_name || null,
+          candidates: Array.isArray(q.candidates) ? q.candidates : [],
+          renderedCandidates: Array.isArray(q.rendered_candidates) ? q.rendered_candidates : [],
+        });
+      }
+    } catch (err) {
+      // One shop's questions must not stop another shop's - same posture as
+      // queueShopCards, and for the same reason.
+      log('open_questions_lookup_failed', {
+        shop_ref: shop.shop_ref, detail: String(err && err.message ? err.message : err),
+      });
+    }
+  }
+  return open;
+}
+
+/**
+ * WHICH open question(s) did this bare typed message answer? (WP-B15-A1)
+ *
+ * Returns already-resolved mappings for the router, or `null` for "not ours".
+ *
+ * ── DETERMINISTIC FIRST, AND THE MODEL IS THE LAST RESORT ───────────────────
+ * Three steps, in this order, and the order is the guarantee:
+ *
+ *   1. An EXACT candidate label match, through the same resolveExactCandidate
+ *      the decision spine uses. Costs no model call. If exactly one open
+ *      question offered that label, the words are unambiguously that question's.
+ *   2. Exactly ONE open question. There is nothing to choose between, so there
+ *      is nothing for a model to decide.
+ *   3. Only then Terra, ONCE, with every open question key at the same time.
+ *
+ * ── AMBIGUITY GOES UP, NEVER SIDEWAYS ───────────────────────────────────────
+ * Two questions offering the SAME label is ambiguous, so it falls through to the
+ * model rather than picking the first - picking would be the least-bad match
+ * this estate refuses everywhere else.
+ *
+ * ── ONLY A SURE CORRELATION IS CLAIMED ──────────────────────────────────────
+ * A `low` confidence mapping is dropped. `confidence` is about WHICH QUESTION
+ * the words belong to, not about whether the answer is understandable: an answer
+ * unmistakably aimed at one question but unclear in meaning is claimed `high`,
+ * recorded as that question's typed answer, and the EXISTING decision spine then
+ * refuses to guess and opens a real round-2 clarification naming what it could
+ * not read. That is the AC6 path, and it needed no new machinery.
+ *
+ * ── NOT CORRELATED IS NOT A FAILURE ─────────────────────────────────────────
+ * `null` means the message is not ours, so intake gets it and a genuine new
+ * shopping list is never lost. Every degraded path - no interpreter wired, a
+ * throw, an unusable return - lands on `null` for that reason. Failing towards
+ * "not mine" is the only safe direction here.
+ */
+export async function correlateTypedAnswer(deps, { text, open, log = () => {} } = {}) {
+  const words = typeof text === 'string' ? text.trim() : '';
+  if (words === '' || !Array.isArray(open) || open.length === 0) return null;
+
+  // ── 1. DETERMINISTIC. No model call, and the same resolver the spine uses. ─
+  const exact = open.filter((q) => shopDecisions.resolveExactCandidate({
+    status: 'open',
+    answer_text: words,
+    candidates: q.candidates,
+    rendered_candidates: q.renderedCandidates,
+  }) !== null);
+  if (exact.length === 1) {
+    return {
+      mappings: [{ questionKey: exact[0].questionKey, shopRef: exact[0].shopRef, answerText: words }],
+      unmapped: null,
+      modelCalled: false,
+    };
+  }
+
+  // ── 2. NOTHING TO CHOOSE BETWEEN. ─────────────────────────────────────────
+  if (open.length === 1) {
+    return {
+      mappings: [{ questionKey: open[0].questionKey, shopRef: open[0].shopRef, answerText: words }],
+      unmapped: null,
+      modelCalled: false,
+    };
+  }
+
+  // ── 3. TERRA, ONCE, WITH EVERY OPEN KEY. ──────────────────────────────────
+  if (typeof deps.correlateAnswer !== 'function') {
+    log('answer_correlation_unavailable', {
+      open_questions: open.length,
+      detail: 'no answer correlator is wired into this runtime, so a typed message cannot be matched to one of several open questions',
+    });
+    return null;
+  }
+
+  let returned = null;
+  try {
+    returned = await deps.correlateAnswer({
+      answer_text: words,
+      questions: open.map((q) => ({
+        question_key: q.questionKey,
+        question_text: q.questionText,
+        item_name: q.itemName,
+        candidates: q.candidates,
+      })),
+    });
+  } catch (err) {
+    log('answer_correlation_failed', {
+      open_questions: open.length, detail: String(err && err.message ? err.message : err),
+    });
+    return null;
+  }
+
+  if (!returned || !Array.isArray(returned.mappings) || returned.mappings.length === 0) {
+    log('answer_correlation_empty', { open_questions: open.length });
+    return null;
+  }
+
+  const byKey = new Map(open.map((q) => [q.questionKey, q]));
+  const mappings = [];
+  for (const m of returned.mappings) {
+    if (!m || m.confidence !== 'high') continue;
+    const q = byKey.get(m.question_key);
+    // A key the correlator was never shown is dropped, not corrected.
+    if (!q) continue;
+    mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText: m.answer_text || words });
+  }
+  if (mappings.length === 0) {
+    log('answer_correlation_low_confidence', { open_questions: open.length, offered: returned.mappings.length });
+    return null;
+  }
+
+  return { mappings, unmapped: returned.unmapped_text || null, modelCalled: true };
 }
 
 /**
@@ -208,12 +377,19 @@ function replyTargetOf(update) {
  * closures are used unchanged, so a caller that wires neither still behaves exactly
  * as before - it just cannot resolve an answer, which is the defect this fixes.
  */
-export async function routeTaps(deps, { updates, bot, questions = null, log = () => {} } = {}) {
+export async function routeTaps(deps, {
+  updates, bot, questions = null, claimedUpdateIds = null, log = () => {},
+} = {}) {
   if (!bot || !Array.isArray(updates) || updates.length === 0) return { routed: [], refused: [] };
   const routed = [];
   const refused = [];
 
   for (const update of updates) {
+    // ALREADY HANDLED. A message the route-first claim answered during intake is
+    // durably settled; routing it a second time would try to answer the same
+    // question twice. Harmless (answerQuestion is a compare-and-set) but noisy
+    // and misleading in the report, so it is skipped explicitly.
+    if (claimedUpdateIds && update && claimedUpdateIds.has(update.update_id)) continue;
     // ── a typed reply: correlate to the card it replies to, before routing.
     let resolveQuestionByMessage = bot.resolveQuestionByMessage;
     const replyTo = questions ? replyTargetOf(update) : null;
@@ -231,7 +407,24 @@ export async function routeTaps(deps, { updates, bot, questions = null, log = ()
     const intent = bot.routeAsdairUpdate(update, { resolveQuestionByMessage });
     if (!intent.ok) {
       // Not ours (the hub's `decision:` cards share this phone), or malformed.
-      // Silently skipped, never guessed at.
+      // Never guessed at - and, since WP-B15-A1, never SILENT either.
+      //
+      // This was a bare `continue` with no log at all, which is how a dropped
+      // inbound became invisible: question 76463 was answered by a real person
+      // and there was nothing anywhere - no row, no line, no counter - saying
+      // the message had arrived and been discarded. A refusal is a decision, and
+      // a decision with no trace cannot be debugged, cannot be counted, and
+      // cannot be noticed. Every refused inbound now leaves one.
+      //
+      // ── THE TRACE IS A LOG LINE, NOT A `refused` ENTRY, AND THAT IS EXACT ──
+      // `refused` is what the pass REPORTS, and a foreign namespace - the hub's
+      // `decision:` cards share this phone - is not AsdAIr's to refuse out loud.
+      // An existing test pins that ("a foreign namespace is not ours to refuse
+      // out loud") and it is right: reporting other systems' traffic as our
+      // refusals would make every pass look broken. So the trace goes to the
+      // journal, where a dropped inbound can be found, and the report stays
+      // about our own messages.
+      log('inbound_refused', { updateId: update && update.update_id, reason: intent.reason });
       continue;
     }
 
@@ -278,6 +471,10 @@ export async function routeTaps(deps, { updates, bot, questions = null, log = ()
         action: intent.action, reason, detail,
         refresh: refusal ? refusal.refresh === true : false,
       });
+      // Recorded as well as returned (WP-B15-A1, AC4). The report reaches
+      // whoever reads the pass result; the log reaches whoever is reading the
+      // journal at 7am wondering why an answer did nothing.
+      log('inbound_refused', { updateId: update && update.update_id, action: intent.action, reason });
       if (bot.answerTap && intent.raw && intent.raw.callbackQueryId) {
         await bot.answerTap(intent.raw.callbackQueryId, detail || reason);
       }
@@ -681,8 +878,91 @@ export async function runOnce(deps, wiring = {}) {
     : null;
   const intake = capturing ? { ...wiring.intake, telegram: capturing } : wiring.intake;
 
+  // ── ROUTE FIRST, INTAKE SECOND (WP-B15-A1) ────────────────────────────────
+  //
+  // Not by call order - by CLAIM order, and the difference is the whole design.
+  // There is exactly one poller: the fetch happens inside pollIntake via
+  // createCapturingTelegram, so calling routeTaps first would hand it an empty
+  // list, and a second poll is forbidden because the offset ACK is destructive
+  // and would race the receiver for the week's shopping list.
+  //
+  // So the open questions are read BEFORE the fetch, and the claim decision is
+  // taken inside runIntake, before that message is treated as a list and before
+  // its offset advances. Routing genuinely goes first; only the function call
+  // order looks otherwise.
+  const openQuestions = await loadOpenQuestions(deps, { householdId: wiring.householdId, log });
+  const claimedUpdateIds = new Set();
+  const answers = [];
+
+  // NO OPEN QUESTION, NO CLAIM. Warwick's guard, and the reason a genuine new
+  // shopping list is never lost: with nothing to correlate to, routing does not
+  // get a vote and intake behaves exactly as it always has.
+  const claim = (openQuestions.length === 0 || !wiring.bot || typeof wiring.bot.routeAsdairUpdate !== 'function')
+    ? null
+    : async (verdict, update) => {
+      // A photo is a list. A reply already correlates through the card it
+      // replies to, and routeTaps handles it. Only bare text reaches here.
+      if (!verdict || verdict.kind !== 'text') return false;
+      const msg = update && update.message;
+      if (!msg || msg.reply_to_message) return false;
+
+      const correlation = await correlateTypedAnswer(deps, {
+        text: verdict.text, open: openQuestions, log,
+      });
+      if (!correlation) {
+        log('typed_message_not_claimed', {
+          updateId: verdict.updateId, open_questions: openQuestions.length,
+        });
+        return false;
+      }
+
+      const intent = wiring.bot.routeAsdairUpdate(update, {
+        resolveAnswersByText: () => correlation,
+      });
+      if (!intent.ok) {
+        log('typed_answer_route_refused', { updateId: verdict.updateId, reason: intent.reason });
+        return false;
+      }
+
+      const mapped = intentToCommands(intent, { parseAnswerArg: wiring.bot.parseAnswerArg });
+      if (!mapped.ok) {
+        log('typed_answer_unmapped', { updateId: verdict.updateId, reason: mapped.reason });
+        return false;
+      }
+
+      // PER MAPPING, DISPATCHED INDEPENDENTLY. One message answering three
+      // questions settles each on its own row: two can land durably while a
+      // third fails, and the two that landed are not rolled back by the one
+      // that did not.
+      let settled = 0;
+      for (const c of mapped.commands) {
+        try {
+          const receipt = await commands.dispatch(c.command, c.spec, deps);
+          answers.push({ question_key: c.spec.questionKey, shop_ref: c.spec.shopRef, duplicate: receipt.duplicate === true });
+          settled += 1;
+        } catch (err) {
+          // Reported, never swallowed.
+          const detail = String(err && err.message ? err.message : err);
+          answers.push({ question_key: c.spec.questionKey, shop_ref: c.spec.shopRef, error: detail });
+          log('typed_answer_failed', { updateId: verdict.updateId, question_key: c.spec.questionKey, detail });
+        }
+      }
+
+      // NOTHING LANDED MEANS NOTHING IS CLAIMED. Returning false hands the
+      // message back to intake, whose own persist path holds the offset and lets
+      // Telegram redeliver - which is the recovery this loop already has.
+      // Claiming a message we failed to answer would throw the answer away.
+      if (settled === 0) return false;
+
+      claimedUpdateIds.add(verdict.updateId);
+      log('typed_answer_claimed', {
+        updateId: verdict.updateId, settled, model_called: correlation.modelCalled === true,
+      });
+      return true;
+    };
+
   const intakeReport = await pollIntake(deps, {
-    intake, householdId: wiring.householdId, now: wiring.now, log,
+    intake, householdId: wiring.householdId, now: wiring.now, claim, log,
   });
   const questions = wiring.questions || (wiring.bot && wiring.bot.questions) || null;
 
@@ -690,6 +970,7 @@ export async function runOnce(deps, wiring = {}) {
     updates: capturing ? capturing.captured : [],
     bot: wiring.bot,
     questions,
+    claimedUpdateIds,
     log,
   });
   const advanced = await advanceAll(deps, { log });
@@ -706,7 +987,14 @@ export async function runOnce(deps, wiring = {}) {
       received: intakeReport.received.length,
       ignored: intakeReport.ignored.length,
       failed: intakeReport.failed.length,
+      // Claimed as an ANSWER rather than received as a list (WP-B15-A1).
+      // Reported separately because "handled" and "refused" are different facts.
+      claimed: (intakeReport.claimed || []).length,
     },
+    // Typed answers settled from plain messages this pass, with the question each
+    // one settled. A pass that answered nothing shows an empty list, not silence.
+    answers,
+    open_questions_seen: openQuestions.length,
     taps: { routed: tapReport.routed.length, refused: tapReport.refused.length, detail: tapReport.refused },
     shops: advanced.map((r) => ({
       shop_ref: r.shop_ref, step: r.step, stepped: r.stepped,

@@ -780,12 +780,73 @@ export function renderLinesUnresolved({
   };
 }
 
+// ── 12. Clarification deferred (WP-B15-A1) ───────────────────────────────────
+
+/**
+ * PURE. AsdAIr could not read one of Warwick's answers, AND the follow-up
+ * question cannot honestly be asked yet.
+ *
+ * ── WHY THIS CARD EXISTS ────────────────────────────────────────────────────
+ * runPipeline DEFERS a round-2 clarification while a photographed list is still
+ * unconfirmed: asking "which variant of line 3?" before Warwick has agreed we
+ * read line 3 correctly at all is asking the wrong question first, and that
+ * deferral recovered a real shop. The deferral is RIGHT. The SILENCE was not.
+ * Warwick's rule is "it should tell me if there is something it does not
+ * understand or is not clear" — so the question card waits and the WORD does not.
+ *
+ * ── WHY IT OFFERS NO ANSWER BUTTON ──────────────────────────────────────────
+ * There is no answerable question yet — that is the whole situation being
+ * reported. An answer button would invite a reply with nowhere to land. The one
+ * action offered is the one that actually unblocks it: confirming the reading,
+ * after which the real round-2 question is asked through ordinary machinery.
+ *
+ * @param {{shopRef:string, items?:string[], reason?:string}} spec
+ */
+export function renderClarificationDeferred({ shopRef, items, reason } = {}) {
+  assertShopRef(shopRef);
+
+  const named = Array.isArray(items) ? items.filter((i) => typeof i === 'string' && i.trim() !== '') : [];
+  const lines = [
+    '🤔 I could not read one of your answers',
+    `Ref: ${value(shopRef)}`,
+    '',
+  ];
+
+  if (named.length > 0) {
+    lines.push('What I could not read:');
+    for (const item of named) lines.push(`  • ${value(item)}`);
+    lines.push('');
+  }
+
+  if (typeof reason === 'string' && reason.trim() !== '') {
+    lines.push(`Why: ${value(reason)}`);
+    lines.push('');
+  }
+
+  lines.push('I have NOT guessed, and nothing has been added to a basket.');
+  lines.push('I will ask you about it properly once you confirm I read the list');
+  lines.push('correctly - that check deliberately comes first.');
+
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      [button('Check what I read', ACTIONS.REVIEW, shopRef)],
+    ]),
+  };
+}
+
 /**
  * The catalogue, by name. Lets a caller (and the test suite) enumerate every
  * renderer without importing them one at a time — the shape test in
  * renderMessages.test.js walks this map, so a NEW renderer added here is
  * automatically covered by the "every renderer returns {text, reply_markup}"
  * and "no secret leaks into rendered output" proofs.
+ *
+ * ── A KIND WITH NO ENTRY HERE IS A SILENT DROP ──────────────────────────────
+ * runtime.js drainOutbox resolves an outbox row whose `kind` is absent from this
+ * map as `abandoned`: the message is discarded and nobody is told. A new outbox
+ * kind is therefore not complete until its renderer is registered HERE, which is
+ * why `clarification_deferred` appears in this map and not merely above it.
  */
 export const MESSAGES = Object.freeze({
   receipt: renderReceipt,
@@ -799,4 +860,5 @@ export const MESSAGES = Object.freeze({
   failure: renderFailure,
   confirmation_received: renderConfirmationReceived,
   reconciliation_summary: renderReconciliationSummary,
+  clarification_deferred: renderClarificationDeferred,
 });

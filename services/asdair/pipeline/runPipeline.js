@@ -497,7 +497,48 @@ async function stepPlan(deps, snapshot) {
     // The clarification round, when one is owed. `question_round` on the
     // decision's own question row is the round we are IN; the next is +1.
     const wantsClarification = held.needs_clarification_round === true;
-    if (wantsClarification && !readingConfirmed) continue;
+    if (wantsClarification && !readingConfirmed) {
+      // ── THE CARD WAITS. THE WORD DOES NOT. (WP-B15-A1) ────────────────────
+      //
+      // The deferral itself is unchanged and stays exactly as it was: asking
+      // "which variant of line 3?" before Warwick has confirmed we read line 3
+      // correctly is asking the wrong question first, and this gate recovered a
+      // real shop. What was wrong was that the deferral was SILENT - he answered,
+      // AsdAIr could not read the answer, and nothing on his phone said so.
+      //
+      // Warwick: "it should tell me if there is something it does not understand
+      // or is not clear!" So the round-2 question still waits for the reading
+      // confirmation, and he is told NOW, durably, through the ordinary outbox.
+      //
+      // IDEMPOTENT BY OUTBOX KEY: one notice per question per shop, however many
+      // passes run while the reading stays unconfirmed. A stuck shop must not
+      // become a stream of identical cards.
+      try {
+        await store.enqueueMessage(deps, {
+          householdId: shop.household_id,
+          shopId: shop.id,
+          kind: 'clarification_deferred',
+          key: outboxKeyFor(shop.shop_ref, `clarification_deferred.${held.question_key}`),
+          payload: {
+            shopRef: shop.shop_ref,
+            items: [held.item_name].filter((i) => typeof i === 'string' && i !== ''),
+            reason: held.clarification_reason || null,
+          },
+        });
+      } catch (err) {
+        // Telling him matters; it does not matter more than the rest of the
+        // pass. Logged, never thrown - one undeliverable notice must not stop
+        // the other lines being planned.
+        if (typeof deps.log === 'function') {
+          deps.log('clarification_notice_failed', {
+            shop_ref: shop.shop_ref,
+            question_key: held.question_key,
+            detail: String(err && err.message ? err.message : err),
+          });
+        }
+      }
+      continue;
+    }
 
     const nextRound = wantsClarification
       ? Number(held.question_round || 1) + 1

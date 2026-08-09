@@ -115,15 +115,32 @@ export function intentToCommand(intent, deps = {}) {
         // No arg means "open the question queue" - a read, not a decision.
         return { ok: true, command: COMMANDS.GET_STATUS, spec: { shopRef, actor, view: 'questions' } };
       }
-      if (intent.raw && intent.raw.kind === 'reply') {
-        // A TYPED reply. `arg` is the question, and the text is passed through
-        // verbatim - deciding which candidate the words mean is a decision the
-        // router deliberately did not make, and neither does this adapter: the
-        // human's own words become the answer.
+      if (intent.raw && (intent.raw.kind === 'reply' || intent.raw.kind === 'text')) {
+        // TYPED. Either a reply to a card, or (WP-B15-A1) a plain message the
+        // caller has already correlated to an open question. `arg` is the
+        // question and the text is passed through verbatim - deciding which
+        // candidate the words mean is a decision the router deliberately did not
+        // make, and neither does this adapter: the human's own words become the
+        // answer, and the decision spine reads them afterwards.
+        //
+        // BOTH ARE 'typed', because both ARE typed. answer_source records HOW the
+        // answer arrived, and labelling free text `button` is the exact
+        // provenance lie commands.js used to tell by silent coercion.
+        const mapped = Array.isArray(intent.raw.mappings)
+          ? intent.raw.mappings.find((m) => m && m.questionKey === intent.arg)
+          : null;
         return {
           ok: true,
           command: COMMANDS.ANSWER_QUESTION,
-          spec: { shopRef, actor, questionKey: intent.arg, answerText: intent.raw.text, answerSource: 'typed' },
+          spec: {
+            shopRef,
+            actor,
+            questionKey: intent.arg,
+            // The FRAGMENT that answered this question when the caller split one
+            // message across several, falling back to the whole message.
+            answerText: (mapped && mapped.answerText) || intent.raw.text,
+            answerSource: 'typed',
+          },
         };
       }
       const parsed = deps.parseAnswerArg ? deps.parseAnswerArg(intent.arg) : { ok: false };
@@ -157,4 +174,60 @@ export function intentToCommand(intent, deps = {}) {
     default:
       return refuse(ADAPTER_REFUSALS.UNKNOWN_ACTION, intent.action);
   }
+}
+
+/**
+ * Map one routed intent onto EVERY command it carries (WP-B15-A1).
+ *
+ * ── WHY THIS EXISTS ALONGSIDE intentToCommand ───────────────────────────────
+ * One typed message can settle several open questions at once - Warwick answers
+ * them in a single sentence rather than tapping three cards - and each settled
+ * question is its OWN durable answerQuestion command against its own question
+ * row. A one-intent-one-command signature cannot express that, and widening
+ * intentToCommand's return would change a shape other callers already switch on.
+ *
+ * ── PARTIAL SUCCESS IS THE POINT ────────────────────────────────────────────
+ * Commands are returned per mapping, so the caller dispatches them
+ * independently. Two answers land durably even when a third is refused - which
+ * is precisely what a single combined command could not do, because one bad
+ * fragment would take the good ones down with it.
+ *
+ * Every other intent yields exactly one command, so this is a safe drop-in: the
+ * single-command path is literally `[intentToCommand(...)]`.
+ *
+ * @returns {{ok:true, commands:{command:string, spec:object}[]}|{ok:false, reason:string, detail:*}}
+ */
+export function intentToCommands(intent, deps = {}) {
+  const mappings = intent && intent.ok !== false && intent.raw && intent.raw.kind === 'text'
+    && Array.isArray(intent.raw.mappings) ? intent.raw.mappings : null;
+
+  if (!mappings || mappings.length <= 1) {
+    const one = intentToCommand(intent, deps);
+    return one.ok ? { ok: true, commands: [{ command: one.command, spec: one.spec }] } : one;
+  }
+
+  const commands = [];
+  const refusals = [];
+  for (const m of mappings) {
+    if (!m || typeof m.questionKey !== 'string' || m.questionKey === '') continue;
+    // Each mapping is mapped as its own intent, through the SAME single-intent
+    // path above - so a multi-answer message can never take a route the
+    // single-answer message does not, and there is one place that builds an
+    // answerQuestion spec rather than two that could drift.
+    const per = intentToCommand({
+      ...intent,
+      shopRef: m.shopRef || intent.shopRef,
+      arg: m.questionKey,
+    }, deps);
+    if (per.ok) commands.push({ command: per.command, spec: per.spec });
+    else refusals.push({ questionKey: m.questionKey, reason: per.reason, detail: per.detail });
+  }
+
+  // Only when NOTHING could be mapped is the whole intent a refusal. A message
+  // that settles two questions and fails on a third is a success carrying a
+  // reported failure, never a discarded message.
+  if (commands.length === 0) {
+    return refuse(ADAPTER_REFUSALS.BAD_ANSWER_ARG, refusals.length ? refusals : 'no mapping produced a command');
+  }
+  return { ok: true, commands, refusals };
 }

@@ -61,6 +61,49 @@ function requireActor(actor) {
   return requireText(actor, 'actor (e.g. "telegram:123456" or "cockpit:warwick")');
 }
 
+/**
+ * Every answer_source this command surface accepts (WP-B15-A1).
+ *
+ * ── PINNED, NOT DERIVED ─────────────────────────────────────────────────────
+ * Held as a literal HERE rather than imported from shop/shopState.js, and a test
+ * in commands.test.js asserts the two lists are identical. Importing it would
+ * make this check pass automatically whenever the database vocabulary widened -
+ * a control that can never disagree with the thing it checks is not a control.
+ */
+export const ACCEPTED_ANSWER_SOURCES = Object.freeze(['button', 'typed']);
+
+/**
+ * WHAT KIND OF ANSWER IS THIS, AND NEVER A GUESS.
+ *
+ * ── THE DEFECT THIS REPLACES ────────────────────────────────────────────────
+ * This used to be `spec.answerSource === 'typed' ? 'typed' : 'button'`. Every
+ * unrecognised value - a typo, a new source someone forgot to add, `'sms'`,
+ * `'voice'` - was silently relabelled `button`. shopState validates
+ * answer_source against ANSWER_SOURCES, but that check runs AFTER this line, so
+ * it never saw the bad value: the coercion had already made it legal. The row
+ * then said a human tapped a button when a human had typed a sentence, and
+ * `interpreted_by` downstream inherited the lie. Provenance that quietly
+ * corrects itself is worse than provenance that fails.
+ *
+ * ── UNDEFINED STILL MEANS 'button', DELIBERATELY ────────────────────────────
+ * Absent is not the same as wrong. A tap has always omitted the field and every
+ * current producer relies on that default; throwing on absence would break
+ * callers outside this change for no provenance gain, because an absent source
+ * asserts nothing false. What is rejected is a value that is PRESENT and not
+ * recognised - the case that actually mislabels a row.
+ */
+function requireAnswerSource(value) {
+  if (value === undefined || value === null || value === '') return 'button';
+  if (typeof value !== 'string' || !ACCEPTED_ANSWER_SOURCES.includes(value)) {
+    throw new Error(
+      `commands: unrecognised answerSource ${JSON.stringify(value)} - `
+      + `expected one of ${ACCEPTED_ANSWER_SOURCES.join(', ')}. `
+      + 'Refusing rather than relabelling it, because a wrong answer_source is a false provenance record.',
+    );
+  }
+  return value;
+}
+
 /** The uniform shape every command returns. */
 function receipt(command, shop, recorded, effect = {}) {
   return {
@@ -304,7 +347,7 @@ export async function answerQuestion(spec, deps) {
   const questionKey = requireText(spec && spec.questionKey, 'questionKey');
   const skip = spec.skip === true;
   const answerText = skip ? null : requireText(spec && spec.answerText, 'answerText (or skip: true)');
-  const answerSource = spec.answerSource === 'typed' ? 'typed' : 'button';
+  const answerSource = requireAnswerSource(spec && spec.answerSource);
 
   const recorded = await record(deps, {
     command: COMMANDS.ANSWER_QUESTION, shop, actor,
