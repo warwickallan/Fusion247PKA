@@ -35,7 +35,25 @@ not zero value, because the refusals located two real defects nothing else had f
 
 ---
 
-## 2. ✅ C3 RECONCILED onto the executable route
+## 2. ✅ C3 RECONCILED onto the executable INTEGRATION BRANCH — **PRESENT, NOT PRODUCTION-WIRED**
+
+> **⚠️ CORRECTION, Warwick 2026-08-09.** An earlier version of this section was headed *"reconciled
+> onto the executable route"*, and Larry told Warwick the contract was *"on the route"*. **Both were
+> wrong, and wrong in exactly the way this whole document criticises** — treating *merged* as *wired*.
+>
+> Warwick: *"Do not say instructions.js v2 is 'on the production route' yet. It is now on the
+> executable integration branch, but you have independently established that buildHandoff / execution
+> packet / verifyBasket still lack production callers. Until the real runtime necessarily constructs
+> and consumes that contract, the browser method is PRESENT but not yet PRODUCTION-WIRED."*
+>
+> **The acceptance proof is not "file merged".** It is:
+>
+> ```
+> confirmed plan -> production caller -> execution packet carrying the settled method
+>   -> browser worker -> one-tab CDP execution -> trolley verification -> reconciliation
+> ```
+>
+> Nothing in this document may be read as claiming any part of that chain is closed.
 
 `git merge build-015/browser-method-contract` → `6a2c6dc`, clean, 18 files, +3,343 lines.
 
