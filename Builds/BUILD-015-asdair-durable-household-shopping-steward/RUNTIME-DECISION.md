@@ -175,8 +175,46 @@ The answer is Sonnet in Claude for Chrome. This file is why.
    that it no longer needs *Larry* — but it does need *a Sonnet browser session*. Whether
    that meets the intent of "fully automated" is Warwick's call, not a builder's, and it is
    not asserted here either way.
-3. **The evidence for the exact proven mechanism is thin.** `EXPERIMENT-RESULT.md` records
+3. ~~**The evidence for the exact proven mechanism is thin.** `EXPERIMENT-RESULT.md` records
    that a bulk control *exists*; it does not record it being used successfully at scale. The
    ruling's "fast ordered traversal" description is Warwick's first-hand account and is
    treated as authoritative — but the repository does not independently corroborate it, and
-   that gap should be closed by capturing evidence during the next real shop.
+   that gap should be closed by capturing evidence during the next real shop.~~
+
+   > **⛔ CORRECTED 2026-08-09 — THIS PREMISE WAS FALSE. Warwick's ruling STANDS; its stated
+   > evidential ground does not.**
+   >
+   > **The repository DID independently corroborate the mechanism, twice, and both artefacts were
+   > committed before this ruling was written:**
+   >
+   > - `Team Knowledge/session-logs/2026/07/2026-07-27-19-03_larry_asdair-weekly-shop-browser-automated.md:29`
+   >   — *"bulk-ticked all 25 and 'Add selected to trolley' in one go (£100 landed)"*. Git-tracked;
+   >   first added in commit `db29c09`.
+   > - `Builds/BUILD-015-.../DEFECT-LEDGER.md:356-362`, defect `D-2026-07-27-09` — *"Found:
+   >   2026-07-27, live, during the real shop"*, describing *"the 25-item bulk tick"*. Git-tracked,
+   >   **and sitting in this same build folder.**
+   >
+   > Established by Pax's commissioned read-only recovery audit,
+   > [[Deliverables/2026-08-09-pax-browser-method-recovery-audit]] (2026-08-09), git-tracking
+   > confirmed by execution. **The account was never uncorroborated first-hand testimony — the
+   > corroboration was already here and was not found.** `WO-D` was cancelled on the stated ground
+   > that there was *"nothing here to build"* because the description *"may never have described a
+   > real mechanism"*. It did describe a real mechanism.
+   >
+   > **Complication, kept because it is the honest shape:** an earlier run records a 14-item bulk
+   > add failing twice. **Bulk add is conditionally reliable, not simply reliable**, and the
+   > out-of-stock diagnosis reconciles both observations. Anyone reviving this method inherits that
+   > nuance, not a blanket guarantee.
+   >
+   > **Scope of this correction:** it changes the EVIDENTIAL RECORD only. The supervised-Sonnet
+   > ruling remains the accepted route and **no browser work is reopened by this note** (Warwick,
+   > 2026-08-09, ruling 3). Whether to revive, adapt or replace the historical method belongs to the
+   > basket-writer seam, decided on Pax's §F evidence — not here, and not tonight.
+
+4. **UNRESOLVED PRODUCT-METHOD DECISION, banked 2026-08-09 — Warwick's call, not a builder's.**
+   The durable instructions forbid search-fallback for a known item (`BROWSER_METHOD:44`, the Drive
+   AGENT doc rule 4 *"Sourcing is Favourites/Regulars only"*, and the START HERE README). **Two
+   proven runs recovered real items exactly that way** — a hayfever product out of stock via
+   Favourites but in stock via general search, and a missed sausage-roll line. **The durable rule
+   and the proven practice genuinely disagree.** Pax deliberately took no side. Recorded once and
+   not chased; it needs settling before a basket worker is built.

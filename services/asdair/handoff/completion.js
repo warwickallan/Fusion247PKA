@@ -261,6 +261,64 @@ function ingestCompletion(handoff, report) {
 }
 
 /**
+ * THE FACTS A CALLER NEEDS IN ORDER TO REFUSE A BASKET THAT WAS NOT BUILT.
+ *
+ * WP-B15-12 installed this rule in the CDP arm - `browser-runner/runner.js`
+ * `finishBasketReady` + `EmptyBasketError`. The SUPERVISED arm needs the same
+ * rule, and the only evidence a supervised operator produces is the line report
+ * `ingestCompletion` above already validates. This turns that record into the
+ * numbers the decision rests on, so no caller re-derives counts this module
+ * owns.
+ *
+ * ── IT EMITS FACTS, NOT A VERDICT, AND THAT IS NOT A TECHNICALITY ───────────
+ * This module's contract (see the header) is that it does not decide whether
+ * the basket is correct or whether Warwick should be told it is ready. Nothing
+ * here changes that. `empty` is an arithmetic fact about a report - intended
+ * above zero, observed zero - in exactly the way `total_units_agree` already
+ * is. The REFUSAL, its wording and its durable consequence belong to the
+ * caller, which is where browser-runner keeps them too.
+ *
+ * `intended > 0` mirrors runner.js's own guard exactly. A packet that asked for
+ * nothing cannot suffer the absence of a basket, and firing the gate there
+ * would fire it on the one case that is honest.
+ *
+ * A SHORTFALL IS NOT AN EMPTY BASKET. Items go out of stock; this estate
+ * reports a shortfall per line and sets no fill-rate threshold anywhere.
+ * Inventing one here would strand a perfectly good trolley behind a number
+ * nobody chose - so `short` is reported BESIDE `empty` and never folded into
+ * it.
+ *
+ * @param {object} ingest the structure returned by ingestCompletion()
+ * @returns {{intended:number, observed:number, unavailable:number,
+ *            shortfall:number, short:boolean, empty:boolean,
+ *            all_unavailable:boolean}}
+ */
+function basketEvidence(ingest) {
+  if (!ingest || typeof ingest !== 'object' || !ingest.expected || !ingest.observed || !Array.isArray(ingest.not_in_basket)) {
+    throw new CompletionContractError('NO_INGEST', 'basketEvidence: pass the structure ingestCompletion() returned');
+  }
+  const intended = ingest.expected.distinct_products;
+  const observed = ingest.observed.distinct_products;
+
+  // `out_of_stock` is the ONLY status that means "ASDA showed this as
+  // unobtainable". `not_found` and `skipped` are different facts and are
+  // deliberately not counted here: conflating them is exactly what makes an
+  // empty trolley unattributable, and the two need different answers.
+  const unavailable = ingest.not_in_basket.filter((l) => l.status === 'out_of_stock').length;
+
+  const shortfall = intended > observed ? intended - observed : 0;
+  return {
+    intended,
+    observed,
+    unavailable,
+    shortfall,
+    short: shortfall > 0,
+    empty: intended > 0 && observed === 0,
+    all_unavailable: intended > 0 && unavailable >= intended,
+  };
+}
+
+/**
  * THE DIRECT ADAPTER TO WORKSTREAM F'S RECONCILER.
  *
  * `reconcile/verifyBasket.js` takes `verifyBasket({ expected, actual })`, where
@@ -398,5 +456,6 @@ function toVerifyBasketArgs(packet, handoff, report) {
 
 module.exports = {
   ingestCompletion, toBasketObservation, toVerifyBasketArgs, assertVerifyBasketExpected,
+  basketEvidence,
   CompletionContractError, INGEST_VERSION, IN_BASKET_STATUSES, REQUIRES_QUANTITY,
 };

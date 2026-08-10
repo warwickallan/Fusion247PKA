@@ -92,6 +92,108 @@ test('WAITING_FOR_BROWSER and SHOPPING wait for a SUPERVISED runner - nothing au
   assert.equal(decideNextStep(snap({ shop: { status: 'SHOPPING' } })).step, STEPS.AWAIT_BASKET);
 });
 
+// ── WP-B15-14: THE SUPERVISED STEP'S RETURN LEG ───────────────────────
+//
+// Both of these transitions had exactly ONE writer in the whole estate -
+// browser-runner/runner.js, which is off the live route and refuses a
+// supervised handoff by design. So a real shop reached WAITING_FOR_BROWSER and
+// stopped there for ever. These cases read the durable request the estate
+// ALREADY has (readSnapshot hands us `browser: {id, status, progress}`) and
+// turn it into the one next legal step. No new command, no new ritual.
+//
+// NOTHING AUTONOMOUS IS CLAIMING ANYTHING HERE. A human, or Sonnet under a
+// human's supervision, does the shopping; the pipeline only records what the
+// durable request already says happened.
+
+const requestWith = (over = {}) => ({
+  id: 7,
+  status: 'complete',
+  progress: {
+    handoff: { packet_fingerprint: 'sha256:packet', shop_ref: 'SHOP-2026-08-03' },
+    report: { packet_fingerprint: 'sha256:packet', lines: [{ seq: 1, status: 'added', quantity: 1 }] },
+  },
+  ...over,
+});
+
+test('WAITING_FOR_BROWSER: a request a supervised operator has PICKED UP moves the shop to SHOPPING', () => {
+  for (const status of ['claimed', 'running']) {
+    const d = decideNextStep(snap({ shop: { status: 'WAITING_FOR_BROWSER' }, browser: requestWith({ status }) }));
+    assert.equal(d.step, STEPS.RECORD_BUILD_STARTED, `a ${status} request must move the shop on`);
+    assert.equal(d.to, 'SHOPPING');
+  }
+});
+
+test('WAITING_FOR_BROWSER: a QUEUED request, or none at all, still waits - nobody has picked it up', () => {
+  assert.equal(decideNextStep(snap({ shop: { status: 'WAITING_FOR_BROWSER' }, browser: requestWith({ status: 'queued' }) })).step, STEPS.AWAIT_RUNNER);
+  assert.equal(decideNextStep(snap({ shop: { status: 'WAITING_FOR_BROWSER' }, browser: null })).step, STEPS.AWAIT_RUNNER);
+});
+
+test('WAITING_FOR_BROWSER: an operator who shopped and reported in one go still goes via SHOPPING', () => {
+  // shopState permits WAITING_FOR_BROWSER -> SHOPPING and SHOPPING ->
+  // BASKET_READY. It does NOT permit WAITING_FOR_BROWSER -> BASKET_READY, and
+  // this must never invent that edge just because the request is already
+  // complete. One step per pass; the advancer walks it.
+  const d = decideNextStep(snap({ shop: { status: 'WAITING_FOR_BROWSER' }, browser: requestWith() }));
+  assert.equal(d.step, STEPS.RECORD_BUILD_STARTED);
+  assert.equal(d.to, 'SHOPPING', 'a legal edge, never a shortcut to BASKET_READY');
+});
+
+test('SHOPPING: a COMPLETED request carrying a report is the basket coming back', () => {
+  const d = decideNextStep(snap({ shop: { status: 'SHOPPING' }, browser: requestWith() }));
+  assert.equal(d.step, STEPS.RECORD_BASKET_READY);
+  assert.equal(d.to, 'BASKET_READY');
+});
+
+test('SHOPPING: a request still in flight, or complete with NOTHING reported, keeps waiting', () => {
+  for (const status of ['queued', 'claimed', 'running']) {
+    assert.equal(decideNextStep(snap({ shop: { status: 'SHOPPING' }, browser: requestWith({ status }) })).step, STEPS.AWAIT_BASKET);
+  }
+  // Terminal but silent: the request finished and no report was recorded. There
+  // is nothing to advance ON, and inventing a basket from silence is the whole
+  // defect this work package exists to avoid.
+  const silent = requestWith({ progress: { handoff: { packet_fingerprint: 'sha256:packet' } } });
+  assert.equal(decideNextStep(snap({ shop: { status: 'SHOPPING' }, browser: silent })).step, STEPS.AWAIT_BASKET);
+  assert.equal(decideNextStep(snap({ shop: { status: 'SHOPPING' }, browser: requestWith({ progress: null }) })).step, STEPS.AWAIT_BASKET);
+  assert.equal(decideNextStep(snap({ shop: { status: 'SHOPPING' }, browser: null })).step, STEPS.AWAIT_BASKET);
+});
+
+test('SHOPPING: a FAILED or CANCELLED request never reports a basket', () => {
+  for (const status of ['failed', 'cancelled']) {
+    assert.equal(decideNextStep(snap({ shop: { status: 'SHOPPING' }, browser: requestWith({ status }) })).step, STEPS.AWAIT_BASKET);
+  }
+});
+
+test('the supervised return leg does NOT outrank cancel or pause', () => {
+  const cancelled = decideNextStep(snap({
+    shop: { status: 'SHOPPING' }, browser: requestWith(), pendingCommands: [cmd(COMMANDS.CANCEL_SHOP)],
+  }));
+  assert.equal(cancelled.step, STEPS.CANCEL, 'Warwick asking to stop must not queue behind a basket report');
+
+  const paused = decideNextStep(snap({
+    shop: { status: 'WAITING_FOR_BROWSER' },
+    browser: requestWith({ status: 'running' }),
+    pendingCommands: [cmd(COMMANDS.PAUSE_BASKET_BUILD)],
+  }));
+  assert.equal(paused.step, STEPS.PAUSE_BUILD);
+});
+
+test('the two new steps are ACTING steps in the frozen vocabulary - nothing else is added', () => {
+  assert.ok(STEPS.RECORD_BUILD_STARTED.startsWith('act:'));
+  assert.ok(STEPS.RECORD_BASKET_READY.startsWith('act:'));
+  // The checkout boundary is untouched. These names buy no new authority.
+  //
+  // The pattern names ACTIONS, not substrings: `wait:order_confirmation` and
+  // `act:record_confirmation` are legitimate and must stay legal, because
+  // RECEIVING the confirmation Warwick forwards after HE checks out is the
+  // whole design. A bare /order/ here would have banned them.
+  const forbidden = /checkout|check_out|place_order|(^|[:_])pay|book|slot|substitut|password/i;
+  for (const s of Object.values(STEPS)) assert.doesNotMatch(s, forbidden, `"${s}" names something this product never does`);
+  // ...and the pattern is not vacuous: it catches what it exists to catch.
+  for (const banned of ['act:checkout', 'act:pay', 'act:book_slot', 'act:substitute_line', 'act:place_order']) {
+    assert.match(banned, forbidden, `the guard would not have caught "${banned}"`);
+  }
+});
+
 // ── questions ─────────────────────────────────────────────────────────
 test('NEEDS_DECISION parks while ANY question is open, and re-plans once none are', () => {
   const waiting = decideNextStep(snap({ shop: { status: 'NEEDS_DECISION' }, openQuestions: 2 }));
