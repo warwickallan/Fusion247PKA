@@ -26,7 +26,7 @@ build: BUILD-015
 # guidance: BUILD-nnn, or standalone
 wp_number: WP-5
 # guidance: WP-n, or n/a
-status: draft
+status: authorised
 authorised_by: Warwick, 2026-08-09 — "INTEGRATE the packet/handoff/verifyBasket subsystem"; and
 #   2026-08-10 — "fix all the bugs so the runtime is ready to accept a real order... nothing left to
 #   do your side than the browser operation."
