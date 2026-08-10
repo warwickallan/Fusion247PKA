@@ -39,6 +39,9 @@ supersedes_as_entry_point: Deliverables/2026-08-10-rotation-handover.md
 |---|---|
 | Local `main` | `cfea559` + this rotation's documentation commits — see the final commit in the log |
 | `origin/main` | **still far behind.** The push and the merge remain Warwick's (`merge-decision`) |
+| **THE REMOTE BRANCH HOLDING TONIGHT'S TRUTH** | **`origin/build-015/durable/2026-08-11-rotation`** — every rotation document and every commit on local `main`. Verified by SHA comparison against local `HEAD`, not assumed. **If this machine is lost, recover from there.** |
+| Worker branches, all SHA-verified on origin | `build-015/b15-18-cross-shop-answer-routing` @ `8181db4` · `b15-19-supervised-completion` @ `cf59894` · `b15-20-remembered-choice-lookup` @ `602caea` · `b15-21-shop-id-emission` @ `6416c0a` |
+| Worktrees still on disk | `C:/Fusion247PKA-b1513`, `-b1518`, `-b1519`, `-b1520`, `-b1521`. **Each carries REAL COPIES of `node_modules`, not junctions** — deliberate, so a red in one is a real red. Safe to delete normally; none carries a junction to destroy the primary through |
 | Runtime | **PID 12204, started 2026-08-10 21:40:57, still on PRE-CHANGE bytes.** Command line, recorded exactly: `"C:\Program Files\nodejs\node.exe" C:\Fusion247PKA\services\asdair\pipeline\runtime.js --watch`. It runs from the **PRIMARY CHECKOUT**, so a restart picks up whatever is on `main` at that moment. Scheduled task `MyPKA-AsdAIr-Runtime` state `Ready`. **No cutover was performed tonight** |
 | Working checkout | clean of product code — Larry's own `shop_id` edit was reverted out and banked to a branch |
 | Live DB | migration 019 applied, ledger `20260810215203`; `asdair.regulars` gained 6 rows (114–119) and 2 enriched (37, 85) |
