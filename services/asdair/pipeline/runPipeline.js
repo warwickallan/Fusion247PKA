@@ -2077,9 +2077,22 @@ export function messageForTransition(shop, result) {
           //
           // A PATH, not an absolute URL: this module has no business knowing the
           // cockpit's host, and a hard-coded one would be wrong on the first
-          // machine that differed. The renderer shows the path; a base URL is
-          // Mack's to configure. Honest either way, and never a dead link.
-          checklistPath: `/asdair/checklist?shop=${shop.shop_ref}`,
+          // machine that differed. The base URL is applied at SEND time by
+          // runtime.js drainOutbox, from deployment config - so the DURABLE
+          // payload never carries a host and stays correct if the host changes.
+          //
+          // ── THE PATH IS THE COCKPIT'S, NOT THE READ SERVICE'S ──────────────
+          // This used to emit `/asdair/checklist`, which exists ONLY on the
+          // AsdAIr read service at 127.0.0.1:8710. Warwick can never open that:
+          // on his phone 127.0.0.1 is the PHONE's own loopback, not this
+          // machine's - the same sentence already written above the cockpit's
+          // media proxy, and the reason that proxy exists. So the card was
+          // handing him a path that resolved on no surface he can reach, which
+          // made the rendered checklist unreachable and the previous work
+          // undelivered. The cockpit is the ONE surface he can reach, and
+          // services/cockpit/asdair-checklist.mjs forwards this route to the
+          // read service. Keep the two strings the same.
+          checklistPath: `/api/asdair/checklist?shop=${shop.shop_ref}`,
           basketLines: result.packet_lines ?? null,
           held: result.held_lines ?? null,
         },

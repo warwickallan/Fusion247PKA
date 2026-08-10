@@ -22,7 +22,7 @@ import { createRequire } from 'node:module';
 import { makeHarness, makeIntake, textUpdate, callbackUpdate, HOUSEHOLD_ID } from './test/harness.js';
 import {
   runOnce, runWatch, pollIntake, routeTaps, drainOutbox, queueShopCards, createCapturingTelegram,
-  BASKET_HANDBACK_CONTRACT, basketHandbackPayload,
+  BASKET_HANDBACK_CONTRACT, basketHandbackPayload, withChecklistUrl,
 } from './runtime.js';
 import { MESSAGES } from '../bot/renderMessages.js';
 import { intentToCommand, ADAPTER_REFUSALS } from './telegramAdapter.js';
@@ -1723,9 +1723,50 @@ test('AC7: the handover card TELLS Warwick where the checklist is', async () => 
 
   const handover = bot.sent.filter((s) => /browser build requested/.test(s.message.text || ''));
   assert.equal(handover.length, 1, 'still exactly one handover card across many passes');
-  assert.match(handover[0].message.text, /\/asdair\/checklist\?shop=SHOP-/,
-    'the card must carry the route to the checklist. Telling him the shop is ready while giving him no '
-    + 'way to reach the list is the silent park this build has already closed three times.');
+  // ── TIGHTENED, because the loose form passed over the defect ──────────────
+  // This assertion was `/\/asdair\/checklist\?shop=SHOP-/`, which the BROKEN
+  // string satisfied: the card emitted `/asdair/checklist?shop=...`, a route
+  // that exists ONLY on the read service at 127.0.0.1:8710 - an address that on
+  // Warwick's phone is the PHONE's own loopback. The card was green here and
+  // unopenable in his hand. A test that cannot tell the reachable route from
+  // the unreachable one is not testing reachability, so it now names the
+  // COCKPIT route, which is the only surface he can actually reach.
+  assert.match(handover[0].message.text, /\/api\/asdair\/checklist\?shop=SHOP-/,
+    'the card must carry the COCKPIT route to the checklist. Telling him the shop is ready while giving '
+    + 'him no way to reach the list is the silent park this build has already closed three times.');
+  assert.ok(!/(^|[^i])\/asdair\/checklist/.test(handover[0].message.text.replace(/\/api\/asdair\/checklist/g, '')),
+    'the card must not carry the read-service-only path, which resolves on nothing he can open');
   assert.match(handover[0].message.text, new RegExp(REF),
     'and it must name HIS shop, not just a route');
+});
+
+// ── THE HOST IS APPLIED AT SEND TIME, NEVER STORED ──────────────────────────
+// A bare path is not tappable in Telegram. An absolute https URL is. The path
+// is the durable fact and the host is deployment config, so the join happens at
+// the last moment before the bytes leave - and absent config degrades to the
+// path rather than to a guessed host.
+test('AC7: a configured cockpit base URL makes the card carry a tappable absolute link', () => {
+  const payload = { shopRef: REF, checklistPath: '/api/asdair/checklist?shop=' + REF };
+
+  const withBase = withChecklistUrl(payload, 'https://warwick-yoga.example.ts.net:8443');
+  assert.equal(withBase.checklistPath, 'https://warwick-yoga.example.ts.net:8443/api/asdair/checklist?shop=' + REF);
+  assert.equal(payload.checklistPath, '/api/asdair/checklist?shop=' + REF, 'the durable payload must not be mutated');
+  assert.match(MESSAGES.progress(withBase).text, /https:\/\/warwick-yoga\.example\.ts\.net:8443\/api\/asdair\/checklist/);
+
+  // A trailing slash on the configured origin must not produce a double slash.
+  assert.equal(withChecklistUrl(payload, 'https://h:8443/').checklistPath, 'https://h:8443/api/asdair/checklist?shop=' + REF);
+
+  // UNSET is the honest degraded state: the path, unchanged. Not a guessed host.
+  assert.equal(withChecklistUrl(payload, null).checklistPath, '/api/asdair/checklist?shop=' + REF);
+  assert.equal(withChecklistUrl(payload, '   ').checklistPath, '/api/asdair/checklist?shop=' + REF);
+
+  // A payload with no checklist path stays without one - an absent path renders
+  // NOTHING, never a dead link on a card someone is holding in a supermarket.
+  const noPath = withChecklistUrl({ shopRef: REF }, 'https://h:8443');
+  assert.equal(noPath.checklistPath, undefined);
+  assert.ok(!/https:/.test(MESSAGES.progress(noPath).text), 'no link may appear when no path was supplied');
+
+  // An already-absolute path is never given a second origin.
+  const already = { checklistPath: 'https://elsewhere/x' };
+  assert.equal(withChecklistUrl(already, 'https://h:8443').checklistPath, 'https://elsewhere/x');
 });
