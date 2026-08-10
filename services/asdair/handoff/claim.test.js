@@ -308,6 +308,50 @@ test('The claim statement really is the guarded one - the SQL carries the fence 
   assert.ok(progressSql.includes("progress->'_lease'->>'runner_id' = $1"), 'the progress write is not fenced on the lease holder');
 });
 
+// ---------------------------------------------------------------------
+// THE LEASE IS SIZED FOR A HUMAN (Warwick, 2026-08-09)
+//
+// "Retain lease/fencing but NOT a 45-second CDP lease for a human-paced step."
+//
+// The bound is asserted against literals held HERE, not read from the module,
+// so restoring the CDP value in claim.js fails this test rather than silently
+// re-opening a window in which a second writer becomes eligible for a trolley a
+// person is standing in front of.
+// ---------------------------------------------------------------------
+
+test('THE LEASE FITS A PERSON: the supervised handoff TTL is human-paced, not the 45s CDP lease', () => {
+  const FORTY_MINUTES = 40 * 60_000;
+  const FOUR_HOURS = 4 * 60 * 60_000;
+
+  assert.ok(DEFAULT_LEASE_MS >= FORTY_MINUTES,
+    `the supervised lease is ${DEFAULT_LEASE_MS}ms. Warwick may take forty minutes, be interrupted, or come `
+    + 'back after a coffee; a lease that expires mid-shop lets a SECOND writer at the same trolley, which is a '
+    + 'data-corruption defect rather than an inconvenience.');
+  assert.notEqual(DEFAULT_LEASE_MS, 45_000,
+    'that is the CDP runner\'s lease, and it belongs to a machine process with a heartbeat - not to a human step');
+  assert.ok(DEFAULT_LEASE_MS <= FOUR_HOURS,
+    'expiry must stay BOUNDED: an abandoned session has to self-heal rather than wedge the request for ever');
+});
+
+test('THE LEASE STILL EXPIRES: a lapsed human lease is recoverable, and a live one is never stealable', async () => {
+  const h = harness();
+  await h.open(buildHandoff(basePacket()));
+  const first = await claimHandoff(h.query, { shopId: SHOP, writerId: 'sonnet-A' });
+
+  // VISIBLE: the expiry is on the durable row, written from the DATABASE clock.
+  assert.ok(first.progress._lease.expires_at, 'the expiry must be readable off the request');
+
+  // NOT STEALABLE WHILE LIVE - the whole point of retaining the lease.
+  assert.equal(await claimHandoff(h.query, { shopId: SHOP, writerId: 'sonnet-B' }), null,
+    'a live human lease must not be stolen, however long it is');
+
+  // RECOVERABLE once it genuinely lapses.
+  h.advance(DEFAULT_LEASE_MS + 1000);
+  const second = await claimHandoff(h.query, { shopId: SHOP, writerId: 'sonnet-B' });
+  assert.ok(second, 'an abandoned lease must still be recoverable after it expires');
+  assert.equal(second.progress._lease.runner_id, 'sonnet-B');
+});
+
 test('The lease key is the SAME one browser-runner/lease.cjs uses - two systems must be able to see each other', async () => {
   const h = harness();
   await h.open(buildHandoff(basePacket()));

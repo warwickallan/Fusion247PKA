@@ -47,7 +47,32 @@
 // =====================================================================
 'use strict';
 
-const DEFAULT_LEASE_MS = 45_000;
+// THE LEASE IS SIZED FOR A PERSON, NOT FOR A CDP RUNNER. Warwick, 2026-08-09:
+// "Retain lease/fencing but NOT a 45-second CDP lease for a human-paced step."
+//
+// This module's claimant is the SUPERVISED browser step - a human, or Sonnet in
+// Claude for Chrome under a human's supervision. It has no programmatic trigger
+// (see README.md) and therefore nothing that reliably heartbeats every ten
+// seconds. browser-runner/lease.cjs keeps 45_000 and is RIGHT to: that claimant
+// is a machine process with a heartbeat timer, and a short window there is what
+// recovers a runner killed with -9.
+//
+// At 45 seconds against a human the expiry did the OPPOSITE of its job. Warwick
+// starts shopping, is interrupted, makes a coffee; the lease lapses under him
+// and a second writer becomes eligible for the same trolley - a data-corruption
+// defect, not an inconvenience. The expiry exists to stop two writers; sized for
+// the wrong actor it invites them.
+//
+// 90 minutes covers a ~40 minute shop plus a long interruption, and stays
+// BOUNDED so an abandoned session self-heals rather than wedging the request for
+// ever. Expiry remains RECOVERABLE (another writer may claim once it lapses) and
+// VISIBLE (`progress._lease.expires_at`, written from the DATABASE clock). The
+// fencing itself is untouched: every progress, heartbeat and completion write
+// still carries the runner_id guard.
+//
+// Pinned by claim.test.js against literals held in the TEST, so restoring the
+// CDP value here fails the suite rather than silently re-opening the window.
+const DEFAULT_LEASE_MS = 90 * 60_000;
 const DEFAULT_HEARTBEAT_MS = 10_000;
 const LIVE_STATUSES = ['queued', 'claimed', 'running'];
 const TERMINAL_STATUSES = ['complete', 'failed', 'cancelled'];
