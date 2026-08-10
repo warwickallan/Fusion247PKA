@@ -1535,7 +1535,53 @@ Then verify which 4E preparation assumptions survived: the seven-break classific
 CI-red row in §2, and the live-runtime row in §2 were all established 2026-08-08 and **each names
 its evidence so it can be re-established or falsified in minutes.**
 
-### ⭐ ACTIVE SESSION WORK PACKAGE — WP-B15-3, corrections 1–5 (authorised by Warwick 2026-08-09)
+### ⭐ ACTIVE SESSION WORK PACKAGE — RE-CUT 2026-08-10 EVENING. **WP-B15-3 IS NO LONGER THE FRONTIER.**
+
+> **⛔ READ THIS BLOCK BEFORE THE ONE BELOW IT. The WP-B15-3 section that follows describes work
+> that is DONE and merged; it is retained as history and directs nothing.**
+>
+> **What happened on 2026-08-10.** Warwick sent a real shopping-list photograph. It was silently
+> absorbed into a CANCELLED shop and produced no acknowledgement card — the list was nearly lost.
+> Fixing that exposed a chain of further live defects, and **Veritas returned Gate 2 `FAIL` on the
+> user journey** at `e0667dc`. Warwick then issued a **STANDING AUTHORITY**: finish everything
+> already asked for, stop asking whether to continue, and interrupt him only for a human-only
+> action or a genuinely new product choice.
+>
+> **DONE AND ON `main`** (integrated, estate suite green at **1,905** across 13 suites):
+>
+> | WP | What it delivered |
+> |---|---|
+> | **B15-07** | a new list never dies in a terminal shop — fresh identity grounded in the inbound message |
+> | **B15-08** | a typed answer is never also a shopping list; dead `Search ASDA` button withdrawn; card self-contradiction fixed; photographed pack-size defect |
+> | **B15-09** | **ONE question board, edited in place** — outstanding vs answered with the accepted answer, and whether anything blocks the shop. Clears the Gate 2 finding. |
+> | **B15-11** | the pack-size rule is SHARED (typed path no longer orders 33 packs); the intake CLI can no longer eat a pending list |
+> | **B15-12** | a basket is never reported built when empty; dry-run no longer moves real shop state; four unawaited terminations fixed |
+>
+> **IN FLIGHT** — `B15-10` (fresh list scoping + retire the superseded `lines_unresolved` card) ·
+> `B15-13` (grounding: `VANISH PRETREAT GEL` must find `Vanish Pre-Treat Gel`) ·
+> `B15-14` (the supervised browser step can finish).
+>
+> **KNOWN AND QUEUED, NOT FORGOTTEN** — each has a durable record under `Deliverables/`:
+> **migration 019** (Silas: the shop owns the list, not the date) · **durable household learning**
+> (`promoteDecision` is built, tested and DELIBERATELY UNWIRED — the second half Warwick asked for
+> has never run) · **the remembered-choice normaliser mismatch** (his answer under one spelling is
+> not found under another) · **`asdairCommands` ignores `idempotency_key`** while `keys.js` mints one.
+>
+> **THE NEXT REAL ACTION.** Land B15-10, B15-13 and B15-14; re-point `runPipeline`'s duplicate
+> pack-size rule; cut the runtime over **via the scheduled task** (`ASDAIR_COCKPIT_BASE_URL` comes
+> from the user environment, NOT the env files — a shell restart silently loses the checklist link);
+> then Veritas Gate 1 + Gate 2 under the **amended contract**. **Only then** ask Warwick for a fresh
+> photograph — a CLEAN acceptance journey. `SHOP-2026-08-10-M64` is **preserved evidence and is NOT
+> the acceptance vehicle.**
+>
+> **⚠️ The Veritas contract was amended THREE times on 2026-08-10** (`65f7375`, `62aa2e8`,
+> `0658290`): current readiness is not capability · Gate 2 grades the real interface and Larry does
+> not set its scope · the user-outcome rule binds by REQUIREMENT TYPE at whatever gate grades it ·
+> `PASS`/`HOLD`/`FAIL` only. Read it before commissioning anything.
+
+---
+
+### ⛔ HISTORY — WP-B15-3, corrections 1–5 (authorised by Warwick 2026-08-09). **DISCHARGED. Directs nothing.**
 
 > **This supersedes WP-B15-1 as the ACTIVE package.** WP-B15-1 was DISCHARGED on 2026-08-08 with a
 > Veritas Gate 1 PASS; its record is retained below and is no longer the frontier. **Re-cut here

@@ -88,6 +88,32 @@ const MARK_CORRECTED_SQL =
   'UPDATE asdair.shop_line SET corrected = true, confirmed_by = $3, confirmed_at = now(), updated_at = now() ' +
   `WHERE shop_id = $1 AND line_no = $2 RETURNING ${SELECT_LIST}`;
 
+// Which of these list items are claimed by the interpretation of a DIFFERENT
+// shop? (WP-B15-10)
+//
+// `asdair.shopping_lists` carries `unique (household_id, list_date)`
+// (001_asdair_schema.sql:251, never altered by a later migration), so two shops
+// on one calendar date SHARE one list row - by schema, not by choice. This
+// statement is the only durable evidence that a row on that shared list was put
+// there by somebody else's shop.
+//
+// ⚠️ IT ANSWERS ONE QUESTION, AND THE NEGATIVE IS NOT ITS ANSWER. A row that
+// comes back is PROVABLY another shop's. A row that does not come back is NOT
+// thereby proven to be this shop's: `stepInterpret` is the ONLY caller of
+// linkListItem in the estate, so a line added by `stepApplyCorrections`
+// (Warwick correcting or adding one) or by the cockpit's
+// `add_regular_to_next_week` (which has no shop context and can never link)
+// carries no claim at all. Unclaimed rows belong to nobody and must be LEFT
+// ALONE.
+//
+// Reading this as an allowlist - keeping only what this shop claims - silently
+// drops the things Warwick himself asked for. That is the same harm as the
+// defect this exists to fix, and worse for being silent. It was built that way
+// once, the suite killed it, and this comment is why it must not come back.
+const SELECT_FOREIGN_CLAIMS_SQL =
+  'SELECT DISTINCT list_item_id FROM asdair.shop_line ' +
+  'WHERE shop_id <> $1 AND list_item_id = ANY($2::bigint[])';
+
 function fail(message) { throw new Error(`shopLines: ${message}`); }
 
 /**
@@ -200,6 +226,32 @@ export async function linkListItem(deps, shopId, lineNo, listItemId) {
   return ((res && res.rows) || [])[0] || null;
 }
 
+/**
+ * The list items, out of those given, that a DIFFERENT shop's interpretation
+ * claims. See SELECT_FOREIGN_CLAIMS_SQL above for what this does and does not
+ * prove - the negative is not its answer.
+ *
+ * Returns ids as STRINGS, because callers compare them against
+ * `shopping_list_items.id` values that arrive from `pg` as either, and a
+ * `bigint` that came back as a string must not silently miss its own row.
+ *
+ * @returns {Promise<string[]>} possibly empty; empty means "nothing here is
+ *          provably another shop's", never "everything here is this shop's".
+ */
+export async function listForeignClaimedItemIds(deps, shopId, listItemIds) {
+  const ids = (Array.isArray(listItemIds) ? listItemIds : [])
+    .filter((v) => v !== null && v !== undefined && v !== '')
+    .map((v) => Number(v))
+    .filter((v) => Number.isInteger(v) && v > 0);
+  // Nothing to ask about. Never send an empty array to the database for it.
+  if (ids.length === 0) return [];
+  const res = await deps.readQuery(SELECT_FOREIGN_CLAIMS_SQL, [shopId, ids]);
+  return ((res && res.rows) || [])
+    .map((r) => (r ? r.list_item_id : null))
+    .filter((v) => v !== null && v !== undefined && v !== '')
+    .map(String);
+}
+
 /** Record that a human corrected (and thereby confirmed) a line. A confirmed
  *  line is immune to being overwritten by a later re-read. */
 export async function markCorrected(deps, shopId, lineNo, confirmedBy) {
@@ -231,4 +283,7 @@ export function withCanonicalNames(lines, catalogue) {
   });
 }
 
-export const _internal = { UPSERT_SQL, SELECT_BY_KEY_SQL, SELECT_BY_SHOP_SQL, LINK_LIST_ITEM_SQL, MARK_CORRECTED_SQL };
+export const _internal = {
+  UPSERT_SQL, SELECT_BY_KEY_SQL, SELECT_BY_SHOP_SQL, LINK_LIST_ITEM_SQL, MARK_CORRECTED_SQL,
+  SELECT_FOREIGN_CLAIMS_SQL,
+};
