@@ -108,3 +108,48 @@ the browser step — which is the same event WP-B15-14 exists to let complete.
 **Minor, recorded not chased:** requests 1 and 5 sit `running` on old shops (1 and 6) with no runner
 holding them — the three "live browser requests" the status tool reports. Stale lease state on dead
 shops, no effect on the current journey.
+
+---
+
+## CORRECTION — 2026-08-10. **This was already recorded. I rediscovered a known-open row.**
+
+**The Wayfinder had this before tonight**, in its own open-items table:
+
+> | 4 | No basket writer | **OPEN** | The ruled writer is supervised Sonnet in Claude for Chrome
+> (`RUNTIME-DECISION.md`); the handoff artefact it would consume is unreachable; **no programmatic
+> invocation surface exists, deliberately** (`996a838`: "none was invented"). The CDP runner remains
+> experimental and prohibited from live-account testing. **No basket has ever been built by the ruled
+> route.** |
+
+The sections above are still **true and independently established**, and the three-hop breakdown and
+the "no handoff has ever been written" measurement are genuinely new detail. But the headline —
+*the supervised route has never run* — was **already on the map**, and this document was written as
+though establishing it fresh. Recording that plainly, because a finding that overstates its own
+novelty is the same defect class as a receipt that overstates its evidence.
+
+### What the record settles, so nobody re-opens it as a question
+
+- **The ruled Stage 1 basket writer is Sonnet in Claude for Chrome**, supervised
+  (`RUNTIME-DECISION.md` — *"A fresh instance must not be left choosing between Sonnet, Larry and
+  the CDP runner. The answer is Sonnet in Claude for Chrome."*).
+- **The absence of a programmatic trigger is DELIBERATE**, not an omission.
+- **The completion step IS specified** — `CANONICAL-WEEKLY-SHOP-PROCESS.md` §G *"Verify the basket,
+  then hand back"*: after Sonnet finishes, reconcile expected against actual, identify unavailable
+  products **without substituting**, confirm no checkout or payment occurred, and only then hand
+  back *«Basket ready for Warwick to review and order.»*
+- **Warwick accepted the supervised bar** on 2026-07-28: *"The accepted bar is SUPERVISED, not
+  hands-off."* A human in the weekly loop is the agreed design, not a defect.
+- That same document already says of itself: *"This document describes the process Warwick
+  commissioned. It is **not** a description of what the code does today."*
+
+### Therefore — disposition CORRECTED
+
+**This is NOT a new product decision and Warwick is not being asked one.** §G is already
+commissioned; what is missing is that its handback is a **message**, while nothing writes the
+durable state transition or routes the operator's report into `completeHandoff`. **Implementing a
+commissioned process is engineering**, and it falls squarely inside his standing authority of
+2026-08-10.
+
+**What remains genuinely undecided is nothing.** The route is ruled, the process is written, the bar
+is accepted. The work is to make the code match the record — which is the same sentence
+`CANONICAL-WEEKLY-SHOP-PROCESS.md` has been carrying about itself since 2026-08-04.
