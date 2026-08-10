@@ -44,9 +44,15 @@ arguments and this code never opens a credential file itself.
 node --env-file=<path to the shopper credentials env file> \
      services/asdair/intake/fetch-shopper-list.js --dry-run
 
-# Actually receive the week's list.
-node --env-file=<path to the shopper credentials env file> \
-     services/asdair/intake/fetch-shopper-list.js
+# Actually receive the week's list — ⛔ THIS CLI NO LONGER DOES THAT, AND MUST NOT.
+#
+# It REFUSES a live run and exits 2 (WP-B15-11, 2026-08-10). It used to advance
+# the shared Telegram offset while persisting nothing, so ONE live run
+# permanently consumed a pending shopping list and Telegram forgot it.
+#
+# The real receiver is the RUNTIME: the scheduled task MyPKA-AsdAIr-Runtime,
+# whose pollIntake supplies onRecord and persists the shop BEFORE the offset
+# moves. That ordering is what protects the list.
 ```
 
 Options: `--dry-run`, `--state-file <path>`, `--media-dir <path>`,

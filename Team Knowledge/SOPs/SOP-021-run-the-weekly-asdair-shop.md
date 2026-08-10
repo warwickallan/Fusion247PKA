@@ -107,9 +107,14 @@ It deliberately **does not transcribe** (that is the vision step below).
 >
 > **`--dry-run` remains safe** — it fetches nothing and writes no state.
 >
-> **Status:** the defect in `fetch-shopper-list.js` is recorded and **NOT yet fixed**; it is Warwick's decision
-> whether it becomes work. Until then this instruction is withdrawn rather than repaired, because a withdrawn
-> instruction cannot eat a list and a repaired-looking one might.
+> **Status — UPDATED 2026-08-10, WP-B15-11: the defect is now FIXED, and the instruction stays withdrawn.**
+> `runIntake` refuses a live run without a durable sink, so the unsafe invocation is impossible from ANY
+> caller present or future — not just from this CLI. The guard is at the SEAM, which is why it survives:
+> a warning in a command decays, a guard bound to the seam does not. The CLI itself now refuses live mode
+> and exits 2 before any fetch happens, so no offset can move. `--dry-run` remains fully safe.
+>
+> The instruction is NOT reinstated. The runtime is the receiver; this CLI has no live role, and
+> `npm run fetch` has been removed from the intake package so nothing advertises one.
 
 > **CONCURRENCY HAZARD — do not ignore.** `getUpdates` is a single-consumer, destructive-ack protocol with no
 > lock or lease. Its entire safety argument is *"nothing else polls this token."* **A second concurrent poller
