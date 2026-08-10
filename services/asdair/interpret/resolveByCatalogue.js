@@ -83,12 +83,21 @@ function resolveReading(rawReading, regulars, opts = {}) {
     return null;
   };
 
+  // Passes 1 and 2 compare on the SEPARATOR-BLIND form (WP-B15-13), so
+  // "VANISH PRETREAT GEL" is recognised as the regular "Vanish Pre-Treat Gel"
+  // HERE, at its true strength, instead of falling through to pass 2b and
+  // being recorded as an "approximate alias". A punctuation-only difference is
+  // the canonical name, and match_basis is a durable record that reviewers and
+  // future sessions read. The letters and digits must still agree exactly and
+  // in order - see skill/termMatch.js squashMatchText().
+  const squashedTerm = termMatch.squashMatchText(term);
+
   // 1. Exact alias - the household's own shorthand. Strongest signal there is.
-  let out = hit(regulars.filter((r) => aliasesOf(r).some((a) => normaliseTerm(a) === term)), BASIS.EXACT_ALIAS);
+  let out = hit(regulars.filter((r) => aliasesOf(r).some((a) => termMatch.squashMatchText(a) === squashedTerm)), BASIS.EXACT_ALIAS);
   if (out) return out;
 
   // 2. Exact canonical name.
-  out = hit(regulars.filter((r) => normaliseTerm(r.name) === term), BASIS.REGULAR);
+  out = hit(regulars.filter((r) => termMatch.squashMatchText(r.name) === squashedTerm), BASIS.REGULAR);
   if (out) return out;
 
   // 2b. TOLERANT alias match (WO-Y). Word order and one-letter spelling only,

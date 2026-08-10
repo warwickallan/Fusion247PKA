@@ -49,7 +49,11 @@
 // Match grades, strongest first. Exported so callers name a tier rather than
 // hardcoding a string.
 const TIER = Object.freeze({
-  EXACT: 'exact',                          // identical after normalisation
+  EXACT: 'exact',                          // identical after normalisation,
+                                           // ignoring WHERE the separators
+                                           // fall (WP-B15-13): the letters and
+                                           // digits must still agree exactly
+                                           // and in order
   TOKEN_SET: 'token_set',                  // same words, different order
   TYPO: 'typo',                            // one word differs by one letter
   KEY_SUBSET: 'key_subset',                // every key word present (>=1 typo allowed)
@@ -102,8 +106,22 @@ const ADVISORY_MIN_KEY_COVERAGE = 0.5;
 // ---------------------------------------------------------------------
 
 // Lower-case, replace anything that is not a letter/digit/& with a space,
-// collapse whitespace, trim. Punctuation and spacing differences therefore
-// cannot cause a miss ("yazoo-choc", "Yazoo  Choc", "yazoo, choc" all agree).
+// collapse whitespace, trim. This is the TOKENISING normal form - it is what
+// splits a term into the words every tier below reasons about.
+//
+// WHAT IT DOES NOT DO. Corrected 2026-08-10 (WP-B15-13). This comment used to
+// claim that "punctuation and spacing differences therefore cannot cause a
+// miss". That was FALSE for punctuation INSIDE a word, and it cost Warwick a
+// question he called "bloody obvious":
+//
+//   "VANISH PRETREAT GEL"  -> "vanish pretreat gel"   (3 tokens)
+//   "Vanish Pre-Treat Gel" -> "vanish pre treat gel"  (4 tokens)
+//
+// A separator BETWEEN words behaves like a space, so "yazoo-choc" does agree
+// with "yazoo choc". A separator INSIDE a word does not: it splits a word the
+// other spelling keeps whole, and no tier below can put it back together.
+// The property is real, but it belongs to the MATCHER rather than to this
+// function - see squashMatchText() and the EXACT tier in matchTerms().
 //
 // This is DELIBERATELY WIDER than planner.js normaliseTerm(), which only
 // lower-cases and collapses whitespace. planner.js keeps its own function for
@@ -116,6 +134,45 @@ function normaliseMatchText(value) {
     .replace(/[^a-z0-9&]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// The SEPARATOR-BLIND normal form: the same letters and digits, in the same
+// order, with every separator removed. Two terms that agree here name the
+// same product no matter where the writer put the hyphens, spaces or commas.
+//
+//   "Vanish Pre-Treat Gel" -> "vanishpretreatgel"
+//   "VANISH PRETREAT GEL"  -> "vanishpretreatgel"
+//
+// THIS IS NOT A SIMILARITY MEASURE. There is no score, no edit distance, no
+// threshold and no exception list: two strings either agree here or they do
+// not, so it can never be loosened by tuning a number. It is used ONLY to
+// decide the EXACT tier, which is why it cannot leak into the token tiers -
+// losing word boundaries is exactly what makes "bread" look like the tail of
+// "shortbread", and only whole-string equality is immune to that.
+//
+// ONE SEPARATOR IS NEVER REMOVED: the one BETWEEN TWO DIGITS. Joining two
+// numbers invents a third:
+//
+//   "Coca-Cola 1.5L" -> "cocacola15l"  and  "Coca Cola 15L" -> "cocacola15l"
+//
+// A 1.5 litre bottle and a 15 litre drum are not the same purchase, and a
+// decimal point is punctuation like any other. This guard was added because
+// that pair was MEASURED to collide, not because it was imagined; the
+// household's own catalogue is full of sizes ("450g", "99g", "2L") and the
+// grade this feeds may establish identity. Digit-to-letter is still joined,
+// so "450g" and "450 g" and "4in1" and "4 in 1" all still agree.
+function squashMatchText(value) {
+  const norm = normaliseMatchText(value);
+  let out = '';
+  for (let i = 0; i < norm.length; i++) {
+    if (norm[i] !== ' ') { out += norm[i]; continue; }
+    if (isDigit(norm[i - 1]) && isDigit(norm[i + 1])) out += ' ';
+  }
+  return out;
+}
+
+function isDigit(ch) {
+  return ch !== undefined && ch >= '0' && ch <= '9';
 }
 
 // A leading count is a QUANTITY, not part of the product's name. Mum writes
@@ -215,7 +272,13 @@ function matchTerms(lineText, keyText) {
   const key = normaliseMatchText(keyText);
   if (line === '' || key === '') return none;
 
-  if (line === key) return { tier: TIER.EXACT, confident: true, via: [] };
+  // EXACT is SEPARATOR-BLIND (WP-B15-13). The second test is what makes
+  // "VANISH PRETREAT GEL" the same product as the regular "Vanish Pre-Treat
+  // Gel"; it adds no tolerance of any other kind, because the letters and
+  // digits must still agree exactly and in order.
+  if (line === key || squashMatchText(line) === squashMatchText(key)) {
+    return { tier: TIER.EXACT, confident: true, via: [] };
+  }
 
   const lineTokens = tokensOf(line);
   const keyTokens = tokensOf(key);
@@ -330,6 +393,7 @@ module.exports = {
   TIER: TIER,
   CONFIDENT_TIERS: CONFIDENT_TIERS,
   normaliseMatchText: normaliseMatchText,
+  squashMatchText: squashMatchText,
   stripLeadingQuantity: stripLeadingQuantity,
   tokensOf: tokensOf,
   isOneEditApart: isOneEditApart,
