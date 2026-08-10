@@ -71,6 +71,16 @@ file_surface:
   - services/asdair/pipeline
   - services/asdair/packet
   - services/asdair/handoff
+  - services/asdair/browser-runner
+  - services/asdair/bot
+  - services/asdair/cockpit-api
+# AMENDMENT 1, 2026-08-10 - Larry. browser-runner/** added because the Wayfinder
+#   records that progress.cjs sat outside every granted surface, which is WHY the
+#   AC6(f) defect survived. bot/** and cockpit-api/** added by AMENDMENT 2 so the
+#   rendered checklist can reach a human; see AC7.
+# PROCESS NOTE, accepted from the worker: AMENDMENT 1 was first issued only in a
+#   dispatch message. SOP-022 asks for the ORDER to carry it so the next reader
+#   sees it. Corrected here.
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -159,6 +169,21 @@ Single-writer fencing on `browser_build_request` **stays** — it is what stops 
 
 **AC5 — acceptance exercises the REAL production event.**
 Per `CLAUDE.md` § *"Nothing may live only in Larry's head"*: **a callable function, a green unit test, or a successful manual invocation prove capability only and DO NOT satisfy this order.** The evidence must be a shop reaching `READY_TO_SHOP` **through the pipeline's own pass** and the artefact existing afterwards. An integration test that drives the real pass function is acceptable; `node -e "buildHandoff(...)"` is not.
+
+> ### ⛔ AMENDMENT 2 — 2026-08-10, Larry. **AC7, and it is now the POINT of this order.**
+>
+> **Your finding that the stored handoff is a receipt rather than a payload is the answer to the question Warwick actually asked, and the answer is currently NO.** He wrote: *"I expect to wake to a system that is ready to do a shop for real, with nothing left to do your side than the browser operation."* Today the pipeline tells him the shop is ready and hands over **a fingerprint and some counts**. There are **no lines, no method and no prohibitions** in what is stored, and **`renderChecklist` has zero production callers in both `packet/` and `handoff/`**. So the artefact he would shop from **is never rendered anywhere**, and the supervised worker claiming the request gets nothing to shop from either.
+>
+> **AC7 — give `renderChecklist` a production caller, and put its output where a human can actually use it.**
+>
+> - **The outcome, not the method:** when a shop is handed over for the browser step, **Warwick can reach a rendered checklist containing the lines, the method and the prohibitions** — the Brand A–Z ordered traversal the estate has already proven — without asking Larry and without anyone running a script by hand.
+> - **Choose the surface yourself** from `bot/**` or `cockpit-api/**`, both now in scope. Telegram has a hard message-length limit and a weekly shop will exceed it, so a single chat message is probably the wrong shape — but that is your call on the evidence, not mine to prescribe.
+> - **Do not invent a new rendering.** `renderChecklist` exists. Wire it. If it is genuinely unfit, say so with the reason rather than writing a second one — a competing renderer is the defect this order was created to close.
+> - **The recompute-not-store design is respected.** You may render on demand rather than persisting a payload. What must not survive is *nothing being rendered for the human at all*.
+>
+> **AC5's bar applies unchanged:** the real production event must do it. A callable renderer proves capability only.
+>
+> **Your AC3 assessment is accepted and is exactly right** — Warwick is told the shop is ready and that the build was handed over, but not *where the checklist is*, because none exists. **AC7 is what closes AC3, and AC3 stays open until it does.**
 
 **AC6 — do NOT touch the browser.** No CDP, no Chrome, no ASDA, no trolley, no live account. Warwick's 2026-08-04 ruling stands: the CDP runner is deferred and **prohibited from further live-account testing without fresh authority**. This order ends at the artefact.
 # guidance: each independently checkable. If automatic, no AC may be satisfiable by a manual invocation of the delivered script alone.
