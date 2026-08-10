@@ -176,6 +176,8 @@ Checks: the whole caller chain · state transitions · integration *between* Wor
 
 **If the exact next action depends on a state combination that has not been examined, that property is UNKNOWN — and unknown on a load-bearing property is `HOLD`.**
 
+**A CURRENT-READINESS VERDICT EXPIRES WHEN THE STATE IT RESTED ON MOVES.** Readiness is a property of *now*, so it cannot be banked. **A material change in the durable production state relevant to the exact next action IS a valid reason to re-examine readiness, and re-examining it is NOT a reviewer standing on its own receipt** — §"No reviewer stands on its own receipt" governs re-reviewing *work*, and its commissioning question is satisfied here because the truthful answer to *"what changed that could change the answer?"* is **the state itself**. A readiness verdict names the state it rested on; when that state no longer holds, the verdict no longer holds either, and neither Larry nor Veritas may quote it forward. *(Added 2026-08-10 on independent read-back of this amendment, which found that durable state was absent from the list of things justifying a later review — leaving a readiness PASS valid on paper while the state underneath it moved overnight. That is this same failure wearing a different hat.)*
+
 **This binds every stateful system, not AsdAIr and not shop refs.** It applies specifically where assurance makes a **current live-readiness claim** about a stateful journey. **It is deliberately NOT a new checklist to run against every component**, and turning it into one is the regrowth failure root `CLAUDE.md` caps.
 
 #### The worked counterexample that produced this rule — 2026-08-10

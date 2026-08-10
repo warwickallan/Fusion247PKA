@@ -3,7 +3,7 @@ title: Forward correction — the 2026-08-10 current-readiness conclusion was fa
 date: 2026-08-10
 author: Larry (orchestrator), on Warwick's direct order
 status: durable record — corrects forward, rewrites nothing
-corrects: Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/ (the 2026-08-10 D-1 confirmation and the Gate 2 live-readiness receipt)
+corrects: Deliverables/2026-08-10-veritas-d1-confirmation-receipt.md (the D-1 confirmation) and Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/veritas-phase-b15-live-readiness-gate2-3696960.md (the Gate 2 live-readiness receipt)
 governs: Team/Veritas - Internal Quality and Truth Assurance/AGENTS.md § "Current readiness is NOT capability"
 ---
 

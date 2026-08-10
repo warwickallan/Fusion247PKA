@@ -86,8 +86,30 @@ idempotency keys. `--dry-run` fetches nothing and writes no state.
 > That is why it now lives in Git with 21 offline tests. If you find yourself about to write a `getUpdates`
 > snippet, stop — you are recreating the exact defect this SOP exists to prevent.
 
-It deliberately **does not transcribe** (that is the vision step below) and holds the offset on genuine failure
-so a list can never be silently consumed and lost.
+It deliberately **does not transcribe** (that is the vision step below).
+
+> ## ⛔ DO NOT RUN THIS CLI IN LIVE MODE. Corrected 2026-08-10 — the claim that stood here was FALSE.
+>
+> This paragraph used to say the receiver *"holds the offset on genuine failure so a list can never be silently
+> consumed and lost."* **That is not true of this CLI**, and following the instruction would destroy a shopping
+> list. Found by Veritas (`WP-B15-07`, D-1) during the live acceptance window, while it was still telling an
+> operator to run it.
+>
+> **Why.** In live mode `fetch-shopper-list.js` calls `runIntakeFromConfig`, which supplies **no `onRecord`**.
+> `runIntake` only awaits durable capture `if (typeof onRecord === 'function')` — so with no `onRecord` it
+> downloads the photo, **advances the shared Telegram offset**, and persists **nothing to the database**. The
+> offset it moves is the same `intakeStateFile()` the live runtime depends on, so **one live run permanently
+> consumes a pending shopping list.** Telegram then forgets the message and it cannot be recovered.
+>
+> **The safe route is the RUNTIME, not this CLI.** The scheduled task `MyPKA-AsdAIr-Runtime` runs
+> `pipeline-runtime/ensure-asdair-runtime.mjs`, whose `pollIntake` **does** supply `onRecord` and persists the
+> shop *before* the offset advances. That ordering is correct and is what protects the list.
+>
+> **`--dry-run` remains safe** — it fetches nothing and writes no state.
+>
+> **Status:** the defect in `fetch-shopper-list.js` is recorded and **NOT yet fixed**; it is Warwick's decision
+> whether it becomes work. Until then this instruction is withdrawn rather than repaired, because a withdrawn
+> instruction cannot eat a list and a repaired-looking one might.
 
 > **CONCURRENCY HAZARD — do not ignore.** `getUpdates` is a single-consumer, destructive-ack protocol with no
 > lock or lease. Its entire safety argument is *"nothing else polls this token."* **A second concurrent poller
