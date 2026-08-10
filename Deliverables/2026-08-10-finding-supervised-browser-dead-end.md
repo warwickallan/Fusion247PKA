@@ -153,3 +153,40 @@ commissioned process is engineering**, and it falls squarely inside his standing
 **What remains genuinely undecided is nothing.** The route is ruled, the process is written, the bar
 is accepted. The work is to make the code match the record — which is the same sentence
 `CANONICAL-WEEKLY-SHOP-PROCESS.md` has been carrying about itself since 2026-08-04.
+
+---
+
+## SELF-CORRECTION — the record reconciliation was incomplete, and luck closed it
+
+**Recorded because a verification that reports success while missing something is the exact class of
+defect this whole day has been about.**
+
+Earlier tonight I reconciled 11 documents that existed on `origin/main` and not on local `main`, and
+verified the result with:
+
+```
+git diff --numstat HEAD origin/main | awk '$2==0 && $1>0 {print $3}' | wc -l   →  0
+```
+
+**That instrument was wrong for the question.** `--numstat` counts line changes, so it conflates
+"file absent here" with "file present but differing", and it reports a one-line DELETION on main as
+an addition on origin — `services/asdair/intake/package.json` shows up that way purely because I
+removed the `npm run fetch` script.
+
+**It also missed a real file.** `Deliverables/2026-08-09-wo-b15-03-terra-order.md` was on
+`origin/main` and absent from `main`. It reached `main` only because WP-B15-14's worker merged
+`origin/main` into its branch — the unauthorised merge I flagged it for — and I then integrated that
+branch. **A process breach fixed a gap my own verification had declared closed.**
+
+**The correct instrument, and the one to use in future:**
+
+```
+git diff --diff-filter=A --name-only HEAD origin/main    → files present on origin, ABSENT here
+```
+
+Run now, it returns **zero**. The record side of the estate is genuinely converged — but it is
+converged by accident on one file, and the claim I made earlier was not supported by the check I ran
+to support it.
+
+**No product code was ever stranded**; that half of the earlier claim was verified separately and
+holds.
