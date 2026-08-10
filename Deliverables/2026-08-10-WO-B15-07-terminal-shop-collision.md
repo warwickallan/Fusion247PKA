@@ -18,35 +18,35 @@
 -->
 ---
 # --- identity and authority ---
-name: AUTHOR REQUIRED — name
+name: A new list never dies in a terminal shop
 # guidance: one-line slice title
-work_order_id: AUTHOR REQUIRED — work_order_id
+work_order_id: WO-2026-08-10-07
 # guidance: WO-YYYY-MM-DD-nn
-build: AUTHOR REQUIRED — build
+build: BUILD-015
 # guidance: BUILD-nnn, or standalone
-wp_number: AUTHOR REQUIRED — wp_number
+wp_number: WP-B15-07
 # guidance: WP-n, or n/a
 status: draft
-authorised_by: AUTHOR REQUIRED — authorised_by
+authorised_by: Warwick, in session 2026-08-10 — ruling "A", with the PRODUCT RULE and required behaviours 1-10 quoted verbatim below. Amendment 1 is Larry's, on Keel's read-back.
 # guidance: who authorised this work — a claim only you can make
-authorised_date: AUTHOR REQUIRED — authorised_date
+authorised_date: 2026-08-10
 # guidance: YYYY-MM-DD of the AUTHORISATION (not the generation date)
 owner: keel
 return_to: larry
-blocking_dependencies: AUTHOR REQUIRED — blocking_dependencies
+blocking_dependencies: []
 # guidance: [] or the exact blockers — overstating one was WO-11 A-3
-tags: AUTHOR REQUIRED — tags
+tags: [build-015, wp-b15-07, live-defect, intake]
 # guidance: [build-nnn, wp-n]
 
 # --- scope ---
-outcome: AUTHOR REQUIRED — outcome
+outcome: A genuinely new inbound shopping list that lands on a calendar date whose shop is TERMINAL (CANCELLED or RECONCILED) creates a FRESH live shop carrying that inbound event, which can then ADVANCE through the pipeline — instead of being silently absorbed into the dead row and acknowledged to Telegram as consumed. INTENDED AUTOMATIC — the real production event is a Telegram photo arriving at the live runtime; acceptance therefore may not rest on a manual invocation of any delivered function.
 # guidance: one sentence — what is TRUE when this is done. If AUTOMATIC, acceptance must exercise the real production event; if manual, say so. See work-order template § intended-automatic.
-acceptance_property: AUTHOR REQUIRED — acceptance_property
+acceptance_property: Given a terminal shop already occupying the date-derived ref, a DIFFERENT inbound message on that date yields a distinct shop row in a live status whose telegram_message_id is the NEW message, and that row survives every downstream shop_ref pin (listDateOf, execution packet, browser handoff) — while a retry of that SAME message yields no second shop. Observable from the durable store and from executed pipeline calls, never from a return value alone.
 # guidance: the ONE property whose truth decides this WP, checkable without being told the answer. "Tests pass" is not one.
 integration_owner: larry
-veritas_gate: AUTHOR REQUIRED — veritas_gate
+veritas_gate: 1
 # guidance: 1 = integrated WP · 2 = phase/vertical slice · 3 = documentation and Git truth
-document_impact: AUTHOR REQUIRED — document_impact
+document_impact: [services/asdair/shop/README.md and services/asdair/pipeline/README.md — both document the date-only ref convention and are stale-by-consequence; REPORT-ONLY, outside file_surface, Larry's to place. Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md — owner Larry, NOT the worker's to edit.]
 # guidance: every affected active document with its owner, or [] with the check actually run. IDENTIFIES; never AUTHORISES.
 
 file_surface:
@@ -116,13 +116,13 @@ contract_basis:
   - surface: services/asdair/intake/shopperIntake.test.js
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
 
-contract_conflicts: AUTHOR REQUIRED — contract_conflicts
+contract_conflicts: none
 # guidance: bare value only — `none` OR the conflict list. `none` is EARNED, never a default placeholder. Never glue prose to the value.
 
 capability_evidence:
-  source: AUTHOR REQUIRED — capability_evidence.source
+  source: executed probe
   # guidance: authoritative live inventory | executed probe | unknown
-  result: AUTHOR REQUIRED — capability_evidence.result
+  result: Larry executed read-only SELECTs as asdair_ro against the live store and ran services/asdair/pipeline-runtime/asdair-status.mjs; confirmed SHOP-2026-08-10 exists in status CANCELLED and no row exists for telegram_message_id 63. Larry also read the four downstream shop_ref pins and 006_shop_control_surface.sql at the governance head, confirming no CHECK constraint on shop_ref and therefore no migration. Keel measured the three suite baselines at 386/91/34 pass. The pipeline suite runs offline against test/fakePg.js — no live DB is needed by this order.
   # guidance: capabilities actually OBSERVED. unknown is honest but is NOT permission
 
 # --- authority ---
@@ -142,17 +142,17 @@ worktree: C:/Fusion247PKA-b1507
 branch: build-015/b15-07-terminal-shop-collision
 
 # --- inputs and handoffs ---
-schema_decision: AUTHOR REQUIRED — schema_decision
+schema_decision: n/a — verified: 006_shop_control_surface.sql:29 declares shop_ref as plain `text not null` with no format CHECK, so a widened ref needs no migration
 # guidance: link to Silas's decision, or bare n/a
-security_inputs: AUTHOR REQUIRED — security_inputs
+security_inputs: n/a
 # guidance: link to Vex's findings, or bare n/a
-operational_handoff: AUTHOR REQUIRED — operational_handoff
+operational_handoff: none
 # guidance: bare value only — mack | none. The worker READS this field and never infers it.
 # runbook_path: REQUIRED when operational_handoff is `mack`. Must be a SERVICE-LOCAL path the
 #   implementer may actually write. A runbook under Builds/** is not writable by the implementer.
 ---
 
-# AUTHOR REQUIRED — title
+# WO-2026-08-10-07 — A new list never dies in a terminal shop
 # guidance: WO-YYYY-MM-DD-nn — slice title
 
 ## Acceptance criteria
