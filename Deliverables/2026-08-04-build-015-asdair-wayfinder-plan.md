@@ -1535,6 +1535,32 @@ Then verify which 4E preparation assumptions survived: the seven-break classific
 CI-red row in §2, and the live-runtime row in §2 were all established 2026-08-08 and **each names
 its evidence so it can be re-established or falsified in minutes.**
 
+### 🔴 ROTATED 2026-08-10 ~21:00. **READ [[2026-08-10-rotation-handover]] FIRST — IT IS THE HANDOVER.**
+
+> **THE NEXT REAL ACTION IS ONE SENTENCE: ask Warwick for a fresh photograph, and do NOTHING before
+> it.** That is the acceptance event, it is the only thing that proves the journey, and it is the
+> one thing only he can do. **`SHOP-2026-08-10-M64` is PRESERVED EVIDENCE and must NOT be used as
+> the acceptance vehicle** — the journey must be clean.
+>
+> **Before asking:** read the Veritas Gate 1 and Gate 2 receipts at `fb58882` in
+> `Builds/BUILD-015-…/Assurance/`, and apply § "Current readiness is NOT capability" to that exact
+> action against the state that exists AT THAT MOMENT. The contract was amended THREE times on
+> 2026-08-10 (`65f7375`, `62aa2e8`, `0658290`) and those are the first gates under it.
+>
+> **Warwick's position, and do not soften it when reporting to him:** *"900k — a whole other session
+> this evening after being told this morning it was ready to shop. still dont know it works, still
+> no shop, more time, more expense."* Eleven work packages landed. **He still has no shop, and the
+> fixed journey has never been run.** Independent measurement: [[2026-08-10-pax-session-performance-report]].
+>
+> **Closing head `fb58882`**, pushed to `origin/build-015/durable/2026-08-10-live-shop-fixes`.
+> **`origin/main` is deliberately NOT updated** — that push and the merge are Warwick's
+> (`merge-decision`). Runtime PID 12204 on those bytes, restarted **via the scheduled task**.
+>
+> **Everything below this line is the record of how it got here.** The handover names the seven
+> things that are NOT done and the five traps that cost real time; do not re-derive them.
+
+---
+
 ### ⭐ ACTIVE SESSION WORK PACKAGE — RE-CUT 2026-08-10 EVENING. **WP-B15-3 IS NO LONGER THE FRONTIER.**
 
 > **⛔ READ THIS BLOCK BEFORE THE ONE BELOW IT. The WP-B15-3 section that follows describes work
