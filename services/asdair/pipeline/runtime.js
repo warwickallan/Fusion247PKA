@@ -46,6 +46,11 @@ import { intentToCommand, intentToCommands } from './telegramAdapter.js';
 // it statically does not break this file's "importable on a box with no pg"
 // property - the same reasoning as the three bot imports below.
 import * as shopDecisions from './shopDecisions.js';
+// WP-B15-15. stages.js is PURE - no I/O, no pg - so the board can read the
+// authority on what parks a shop instead of restating it. STEPS names the park
+// the board reports; everIssued is the same latch predicate the gate itself
+// uses for the interpretation confirmation.
+import { STEPS, everIssued } from './stages.js';
 import { COMMANDS } from './commandNames.js';
 import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
 // The bot folder is PURE and zero-dependency (it opens no connection; a test in
@@ -1065,6 +1070,99 @@ async function handbackAlreadySpent(deps, shop, contract) {
 /** The outbox kind of THE BOARD - the one surface (WP-B15-09). */
 export const BOARD_KIND = 'question_board';
 
+/** The reason the board gives when the shop's own open questions are the
+ *  blocker. Unchanged from WP-B15-09 - an open question is the one blocker the
+ *  board can see for itself. */
+const BLOCKED_BY_QUESTIONS = 'READY_TO_SHOP cannot be reached while a question is open.';
+
+/**
+ * PURE. Which of `planOutcome`'s PARKS this shop is sitting in, from DURABLE
+ * evidence only. (WP-B15-15)
+ *
+ * ── THE ENUMERATION, AND WHY IT IS THE WHOLE SCOPE ──────────────────────────
+ * `planOutcome` (stages.js:337-356) has four exits. A park is an exit carrying
+ * `to: null`; `stepPlan` then writes NO transition and the shop STAYS where it
+ * is. There are exactly two:
+ *
+ *   E0      openQuestions > 0                       -> NEEDS_DECISION  (moves)
+ *   PARK-1  needsReview && !interpretationConfirmed  -> to:null  wait:interpretation_confirmation
+ *   PARK-2  unresolvedLines > 0                      -> to:null  wait:line_resolution
+ *   E3      else                                     -> READY_TO_SHOP  (moves)
+ *
+ * BOTH are structurally unreachable unless `openQuestions === 0`, because the
+ * first branch returns before either is evaluated. That is exactly the state in
+ * which the board's `outstanding` array is empty - so before this function the
+ * board answered "nothing is blocking" in precisely the two states where
+ * something was.
+ *
+ * ── WHY `PROCESSING` IS THE WHOLE WINDOW ────────────────────────────────────
+ * `planOutcome` is called from `stepPlan`, which only runs at `PROCESSING`, and
+ * a park writes no transition. So a parked shop is a PROCESSING shop with no
+ * open question, and no other status can be holding one of these two parks.
+ *
+ * ── WHY THE THIRD STATE EXISTS RATHER THAN A GUESS ──────────────────────────
+ * PARK-2's condition is `unresolvedLines`, which is computed by the PLANNER
+ * inside runPipeline (catalogue + rulebook + Warwick's decisions). It is not
+ * durable state and this module cannot re-derive it without re-running the
+ * planner. Re-implementing it here would create a SECOND authority that can
+ * drift from stages.js - which is the very class of defect this closes. So the
+ * board reads the durable trace the park itself leaves, and where there is no
+ * trace it STOPS CLAIMING rather than guessing.
+ *
+ * @returns {null|{parked:true|null, step:string|null, reason:string|null}}
+ *   `null`   - outside the park window entirely; questions alone decide.
+ *   `parked:true`  - a park is EVIDENCED, with the authority's own step.
+ *   `parked:null`  - inside the window with no evidence either way. The board
+ *                    must say so and must never say `false`.
+ */
+export function parkStateOf(evidence = {}) {
+  const status = evidence.status || null;
+  const openQuestions = Number(evidence.openQuestions) || 0;
+  if (status !== 'PROCESSING' || openQuestions > 0) return null;
+
+  // THE ORDER IS THE AUTHORITY'S ORDER, NOT A CHOICE. planOutcome evaluates the
+  // interpretation gate BEFORE the line gate, so a shop holding both reports
+  // the interpretation - and flips to the lines the moment Warwick confirms the
+  // reading. Picking the other one would make the board disagree with the
+  // reason the shop is actually stopped.
+  if (evidence.needsReview === true && evidence.interpretationConfirmed !== true) {
+    return {
+      parked: true,
+      step: STEPS.AWAIT_INTERPRETATION_CONFIRMATION,
+      reason: 'The list needed review and nobody has confirmed the interpretation yet. '
+        + 'READY_TO_SHOP cannot be reached until you confirm I read it correctly.',
+    };
+  }
+
+  // The durable trace of PARK-2. `lines_unresolved` is queued by stepPlan on
+  // the pass that parks the shop, at most once ever - so this row IS the park's
+  // durable evidence, and that is why retiring the card would blind the board.
+  if (evidence.linesUnresolvedAnnounced === true) {
+    return {
+      parked: true,
+      step: STEPS.AWAIT_LINE_RESOLUTION,
+      reason: 'Some lines have no structured decision and no open question to settle them. '
+        + 'READY_TO_SHOP cannot be reached until those lines are resolved.',
+    };
+  }
+
+  return { parked: null, step: null, reason: null };
+}
+
+/** PURE. Tri-state `blocked`, and the reason that goes with it. */
+function blockedFrom(outstandingCount, park) {
+  // An OPEN question wins outright: it is the one blocker the board can see for
+  // itself, and it is a fact rather than an inference.
+  if (outstandingCount > 0) return { blocked: true, blockedReason: BLOCKED_BY_QUESTIONS };
+  if (!park || park.parked === false) return { blocked: false, blockedReason: null };
+  if (park.parked === true) return { blocked: true, blockedReason: park.reason };
+  // The third state. renderMessages has shipped it since WP-B15-09 - "I cannot
+  // tell you whether anything is blocking this shop" - and nothing had ever
+  // produced it. `null` is strictly more honest than `false` in the one window
+  // where the board cannot see.
+  return { blocked: null, blockedReason: null };
+}
+
 /** The ledger family one shop's board occupies. ONE family for the life of the
  *  shop: every rewrite is the next GENERATION of the same family, which is what
  *  makes the previous one addressable by arithmetic rather than by a new column. */
@@ -1093,7 +1191,7 @@ function boardFamily(shop) {
  * bytes, so the board is neither re-sent nor rewritten. That is what stops this
  * becoming an eight-card storm with extra steps.
  */
-export function boardStateOf(questionRows) {
+export function boardStateOf(questionRows, park = null) {
   const rows = Array.isArray(questionRows) ? questionRows : [];
   const outstanding = [];
   const answered = [];
@@ -1120,14 +1218,24 @@ export function boardStateOf(questionRows) {
     }
   });
 
+  const { blocked, blockedReason } = blockedFrom(outstanding.length, park);
+
   return {
     total: rows.length,
     outstanding,
     answered,
     byOrdinal,
-    blocked: outstanding.length > 0,
+    blocked,
+    blockedReason,
+    // WP-B15-15: THE PARK IS PART OF WHAT THE BOARD SAYS, SO IT IS PART OF WHAT
+    // "SOMETHING CHANGED" MEANS. Without this a shop that BECOMES parked keeps
+    // the board it had before - the question rows have not moved, so the
+    // fingerprint would not either, and the corrected board would be computed
+    // and then silently discarded as `unchanged`. The fix would exist and never
+    // reach his phone.
     fingerprint: rows
       .map((q) => `${q.question_key}~${q.status}~${q.answer_text || ''}`)
+      .concat(`park~${String(blocked)}~${(park && park.step) || ''}`)
       .join('|'),
   };
 }
@@ -1141,10 +1249,12 @@ function boardPayload(shop, state, delivery) {
     total: state.total,
     outstanding: state.outstanding.map((q) => ({ n: q.n, item: q.item, candidates: q.candidates })),
     answered: state.answered.map((q) => ({ n: q.n, item: q.item, answer: q.answer })),
+    // Tri-state since WP-B15-15: true | false | null. The renderer already
+    // distinguishes all three, and `null` is never dressed up as either of the
+    // other two. The REASON is carried rather than re-derived here, so the
+    // board's verdict and its explanation cannot disagree.
     blocked: state.blocked,
-    blockedReason: state.blocked
-      ? 'READY_TO_SHOP cannot be reached while a question is open.'
-      : null,
+    blockedReason: state.blockedReason,
     // WHAT THIS BOARD IS REPLACING. Carried ON THE ROW so drainOutbox needs no
     // second read, and so "why did this go out as an edit" is answered by
     // reading the row rather than by re-deriving anything.
@@ -1160,11 +1270,50 @@ function boardPayload(shop, state, delivery) {
  * Returns `{queued, reason}`; `queued:false` with reason `unchanged` is the
  * ordinary quiet case and is not a failure.
  */
+/**
+ * The park evidence for one shop, read from durable state. (WP-B15-15)
+ *
+ * Two extra reads, and only in the window where a park can exist - a shop with
+ * an open question, or at any status other than PROCESSING, costs nothing.
+ */
+async function parkEvidenceFor(deps, shop, questionRows) {
+  const openQuestions = questionRows.filter((q) => q.status === 'open').length;
+  const outside = parkStateOf({ status: shop.status, openQuestions });
+  if (outside === null) return null;
+
+  const [issued, linesUnresolvedAnnounced] = await Promise.all([
+    store.listIssuedCommandNames(deps, shop.id),
+    store.outboxEverQueued(deps, shop.id, 'lines_unresolved'),
+  ]);
+  return parkStateOf({
+    status: shop.status,
+    openQuestions,
+    needsReview: shop.needs_review === true,
+    // stages.everIssued is the SAME latch predicate stepPlan uses to decide the
+    // interpretation gate, called here rather than re-written, so the board and
+    // the gate cannot disagree about whether he has confirmed the reading.
+    interpretationConfirmed: everIssued({ issuedCommands: issued }, COMMANDS.CONFIRM_INTERPRETATION),
+    linesUnresolvedAnnounced,
+  });
+}
+
 async function queueBoard(deps, shop, { force = false, log = () => {} } = {}) {
   const rows = await store.listQuestions(deps, shop.id);
-  if (rows.length === 0) return { queued: false, reason: 'no questions' };
+  const park = await parkEvidenceFor(deps, shop, rows);
 
-  const state = boardStateOf(rows);
+  // ── SILENCE IS NOT AN ACCEPTABLE ANSWER EITHER (WP-B15-15 AC2) ────────────
+  // A shop with no question rows used to get no board at all - leaving Warwick
+  // with NOTHING in exactly the state he most needs telling. A shop with an
+  // EVIDENCED park now gets one regardless.
+  //
+  // The unknown state deliberately does NOT queue a board of its own: an
+  // "I cannot tell" card for every question-less PROCESSING shop is the storm
+  // WP-B15-09 removed, and it would say nothing actionable.
+  if (rows.length === 0 && !(park && park.parked === true)) {
+    return { queued: false, reason: 'no questions' };
+  }
+
+  const state = boardStateOf(rows, park);
   const family = boardFamily(shop);
   const spent = await store.spentLedgerGenerations(deps, family);
   // The generation that has already been through the outbox, if any. It carries

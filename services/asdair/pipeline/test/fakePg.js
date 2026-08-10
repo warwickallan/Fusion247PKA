@@ -141,6 +141,67 @@ export function selectProjection(sql) {
 }
 
 /**
+ * Read the FOREIGN-CLAIMS predicate out of the statement's own text.
+ *
+ * WHY THIS EXISTS - WP-B15-15 AC4. This fake had NO handler for
+ * `shopLines.SELECT_FOREIGN_CLAIMS_SQL`, so runPipeline.test.js answered it
+ * from a closure that matched the EXPORTED CONSTANT and then applied its own
+ * hardcoded `shop_id !==` semantics. When WP-B15-10 mutation-tested itself by
+ * inverting the statement to `shop_id = $1` - the ALLOWLIST direction, the very
+ * bug it had just reverted - the constant changed on BOTH sides of that
+ * equality check, the closure carried on excluding other shops' rows, and EVERY
+ * BEHAVIOURAL TEST STAYED GREEN. Only a statement-shape test went red.
+ *
+ * The harness modelled what the query was MEANT to do. This reads what it SAYS.
+ *
+ * THE DIRECTION IS THE WHOLE POINT. `shop_id <> $1` is an EXCLUSION: rows that
+ * are provably another shop's. `shop_id = $1` is an ALLOWLIST: rows this shop
+ * claims - which, used as an exclusion, deletes Warwick's own week and keeps
+ * the dead one. Reading the operator is what makes that inversion detectable.
+ *
+ * This is selectProjection() above pointed at a WHERE clause instead of a
+ * select list, and it is the same deal: no SQL parser, no schema registry, and
+ * it THROWS on anything it cannot read rather than guessing. A handler that
+ * silently tolerated an unrecognised predicate would recreate the exact
+ * blindness it exists to close.
+ *
+ * @returns {{foreign:boolean}} `foreign:true` for `<>`/`!=`, `false` for `=`.
+ */
+export function foreignClaimPredicate(sql) {
+  const text = String(sql).replace(/\s+/g, ' ').trim();
+  if (!/^SELECT DISTINCT list_item_id FROM asdair\.shop_line WHERE /i.test(text)) {
+    throw new Error(`fakePg: not a foreign-claims statement: ${text}`);
+  }
+  const parts = text.replace(/^.* WHERE /i, '').split(/ AND /i).map((p) => p.trim());
+
+  const shopPart = parts.find((p) => /^shop_id\b/i.test(p));
+  if (!shopPart) {
+    throw new Error(`fakePg: the foreign-claims statement carries no shop_id predicate: ${text}`);
+  }
+  const op = /^shop_id\s*(<>|!=|=)\s*\$1$/i.exec(shopPart);
+  if (!op) {
+    throw new Error(`fakePg: could not read the shop_id operator out of "${shopPart}" in: ${text}`);
+  }
+
+  // The membership half is read too. Without it a statement could drop its
+  // `list_item_id = ANY($2)` bound entirely and this fake would happily answer
+  // a whole-table scan as though it were the same question.
+  const idPart = parts.find((p) => /^list_item_id\b/i.test(p));
+  if (!idPart) {
+    throw new Error(`fakePg: the foreign-claims statement carries no list_item_id membership predicate: ${text}`);
+  }
+  if (!/^list_item_id\s*=\s*ANY\(\s*\$2(::bigint\[\])?\s*\)$/i.test(idPart)) {
+    throw new Error(`fakePg: could not read the list_item_id membership out of "${idPart}" in: ${text}`);
+  }
+
+  return { foreign: op[1] !== '=' };
+}
+
+/** Test-support internals, exposed so the reader above can be proven directly
+ *  as well as through the statements it answers. */
+export const _internal = { foreignClaimPredicate };
+
+/**
  * The asdair.shop_question columns this fake knows how to SOURCE.
  *
  * Read the role of this list carefully, because it looks like the literal that
@@ -950,6 +1011,23 @@ export function createFakeClient(store, options = {}) {
       if (!target) return none();
       target.corrected = true; target.confirmed_by = p[2]; target.confirmed_at = nowIso(); target.updated_at = nowIso();
       return rows([target]);
+    }],
+    // WHICH OF THESE LIST ITEMS ARE CLAIMED BY ANOTHER SHOP? (WP-B15-15 AC4)
+    // The direction is READ OUT OF THE STATEMENT rather than assumed, so
+    // inverting `shop_id <> $1` to `shop_id = $1` changes what this returns and
+    // the behavioural tests standing on it go red. Matched on the statement's
+    // opening shape only; the predicate itself is parsed, never pattern-matched.
+    [/^SELECT DISTINCT list_item_id FROM asdair\.shop_line WHERE shop_id/i, (sql, p) => {
+      const { foreign } = foreignClaimPredicate(sql);
+      const want = new Set((p[1] || []).map(String));
+      const hits = [...new Set(db.shop_line
+        .filter((l) => (foreign
+          ? String(l.shop_id) !== String(p[0])
+          : String(l.shop_id) === String(p[0]))
+          && l.list_item_id !== null && l.list_item_id !== undefined
+          && want.has(String(l.list_item_id)))
+        .map((l) => String(l.list_item_id)))];
+      return rows(hits.map((v) => ({ list_item_id: v })));
     }],
     [/FROM asdair\.shop_line WHERE shop_id = \$1 AND line_no = \$2/i, (sql, p) =>
       rows(db.shop_line.filter((l) => String(l.shop_id) === String(p[0]) && Number(l.line_no) === Number(p[1])))],
