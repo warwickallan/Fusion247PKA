@@ -46,6 +46,12 @@ export const STEPS = Object.freeze({
   REPLAN: 'act:replan',
   QUEUE_BROWSER_BUILD: 'act:queue_browser_build',
   PAUSE_BUILD: 'act:pause_build',
+  // THE SUPERVISED STEP'S RETURN LEG (WP-B15-14). Neither of these shops for
+  // anything. They RECORD what the durable browser request already says a
+  // supervised operator did - which is the only trace of that work the pipeline
+  // ever sees, and the only thing it is entitled to act on.
+  RECORD_BUILD_STARTED: 'act:record_build_started',
+  RECORD_BASKET_READY: 'act:record_basket_ready',
   RECORD_CONFIRMATION: 'act:record_confirmation',
   RECONCILE: 'act:reconcile',
 
@@ -87,8 +93,8 @@ export const STAGE_TABLE = Object.freeze([
   { status: 'PROCESSING', step: 'plan', gate: `interpretation review needs ${COMMANDS.CONFIRM_INTERPRETATION}`, to: 'NEEDS_DECISION | READY_TO_SHOP', waitsFor: 'Warwick confirming a reviewed interpretation' },
   { status: 'NEEDS_DECISION', step: 'replan once every question is settled', gate: 'no open questions', to: 'PROCESSING', waitsFor: 'Warwick answering the open questions' },
   { status: 'READY_TO_SHOP', step: 'queue the browser build', gate: `${COMMANDS.REQUEST_BASKET_BUILD} command`, to: 'WAITING_FOR_BROWSER', waitsFor: 'Warwick tapping "Build ASDA basket"' },
-  { status: 'WAITING_FOR_BROWSER', step: 'none - a SUPERVISED runner claims the request', gate: 'n/a', to: 'SHOPPING', waitsFor: 'the supervised browser runner (Larry, at the keyboard)' },
-  { status: 'SHOPPING', step: 'none - the supervised runner reports progress', gate: 'n/a', to: 'BASKET_READY | NEEDS_DECISION', waitsFor: 'the supervised browser runner' },
+  { status: 'WAITING_FOR_BROWSER', step: 'record that a SUPERVISED operator has picked the request up', gate: 'the durable request is claimed, running or complete', to: 'SHOPPING', waitsFor: 'the supervised browser operator claiming the request' },
+  { status: 'SHOPPING', step: 'record the basket the supervised operator reported', gate: 'the request is complete AND carries a report', to: 'BASKET_READY | NEEDS_DECISION', waitsFor: 'the supervised browser operator reporting the basket' },
   { status: 'BASKET_READY', step: 'record the order confirmation', gate: `${COMMANDS.SUBMIT_CONFIRMATION} command`, to: 'ORDER_CONFIRMATION_RECEIVED', waitsFor: 'Warwick checking out HIMSELF and forwarding the ASDA confirmation' },
   { status: 'ORDER_CONFIRMATION_RECEIVED', step: 'reconcile and learn', gate: 'none', to: 'RECONCILED', waitsFor: null },
   { status: 'RECONCILED', step: 'none - terminal', gate: 'n/a', to: null, waitsFor: null },
@@ -110,6 +116,40 @@ export function pendingCommand(snapshot, name) {
 export function pendingCommands(snapshot, name) {
   const list = (snapshot && snapshot.pendingCommands) || [];
   return list.filter((c) => c.command === name);
+}
+
+/**
+ * The durable request statuses that mean a SUPERVISED OPERATOR HAS THE WORK.
+ *
+ * `complete` is in this list on purpose. A supervised step is human-paced and
+ * the advancer is not watching it: an operator can perfectly well claim, shop
+ * and report between two passes, so the pipeline may never observe `claimed` at
+ * all. Leaving `complete` out would strand exactly the shop that went well.
+ *
+ * It still only earns WAITING_FOR_BROWSER -> SHOPPING. shopState permits no
+ * WAITING_FOR_BROWSER -> BASKET_READY edge and this must never invent one; the
+ * advancer takes the second hop on its next pass, from SHOPPING, where the
+ * report is actually examined.
+ */
+const OPERATOR_HAS_THE_WORK = Object.freeze(['claimed', 'running', 'complete']);
+
+/**
+ * PURE. The completion report a supervised operator recorded, or null.
+ *
+ * `handoff/claim.js` `completeHandoff` writes it to
+ * `browser_build_request.progress.report`, and `store.js readSnapshot` already
+ * carries that column into the snapshot. So this is a READ of state the estate
+ * already keeps - no new table, no new command, no new artefact.
+ *
+ * NULL IS THE IMPORTANT RETURN. A request can finish carrying no report at all
+ * (a release, a cancelled session, an operator who stopped). "No capture was
+ * recorded" and "the trolley was empty" are completely different facts, and
+ * only the first one is silence. Nothing may be inferred from it.
+ */
+export function completionReport(snapshot) {
+  const progress = snapshot && snapshot.browser && snapshot.browser.progress;
+  if (!progress || typeof progress !== 'object') return null;
+  return progress.report || null;
 }
 
 /**
@@ -264,14 +304,48 @@ export function decideNextStep(snapshot) {
       });
     }
 
-    case 'WAITING_FOR_BROWSER':
+    case 'WAITING_FOR_BROWSER': {
       // NOTHING AUTONOMOUS EVER CLAIMS THIS. The browser build is a supervised
       // act performed by a human at the keyboard; the pipeline only records that
-      // it was asked for and reports what the runner says it did.
+      // it was asked for and reports what the operator says it did.
+      //
+      // ── WP-B15-14: THE HOP THAT DID NOT EXIST ───────────────────────────────
+      // Until now the ONLY writer of this transition in the entire estate was
+      // browser-runner/runner.js:504, and that arm is off the live route and
+      // refuses a supervised handoff by design. So a real shop arrived here and
+      // stopped, for ever - a manual step inside a journey nobody declared
+      // manual. Reading the durable request the product itself opened is what
+      // closes it, and it requires nothing new of the operator.
+      const req = snapshot.browser;
+      if (req && OPERATOR_HAS_THE_WORK.includes(req.status)) {
+        return decision(STEPS.RECORD_BUILD_STARTED,
+          'a supervised operator has picked up the browser build request', { to: 'SHOPPING' });
+      }
       return decision(STEPS.AWAIT_RUNNER, 'a supervised browser runner has been asked to build the basket');
+    }
 
-    case 'SHOPPING':
+    case 'SHOPPING': {
+      // The second half of the same gap: browser-runner/runner.js:570 was the
+      // only writer of SHOPPING -> BASKET_READY anywhere.
+      //
+      // TWO CONDITIONS, AND BOTH ARE LOAD-BEARING. The request must be COMPLETE
+      // (a live request is still being shopped) and it must actually CARRY a
+      // report. A complete request with no report is an operator who stopped
+      // without reporting - there is nothing to advance on, and manufacturing a
+      // basket from silence is precisely the defect WP-B15-12 closed in the
+      // other arm.
+      //
+      // WHETHER THE REPORTED BASKET IS REAL IS NOT DECIDED HERE. This module is
+      // pure and holds no opinion about a trolley; it says only that a report
+      // exists and is due to be recorded. runPipeline's step function applies
+      // handoff/completion.js's evidence and refuses an empty one loudly.
+      const req = snapshot.browser;
+      if (req && req.status === 'complete' && completionReport(snapshot)) {
+        return decision(STEPS.RECORD_BASKET_READY,
+          'the supervised operator reported the basket back', { to: 'BASKET_READY' });
+      }
       return decision(STEPS.AWAIT_BASKET, 'the supervised runner is building the basket');
+    }
 
     case 'BASKET_READY': {
       const sub = pendingCommand(snapshot, COMMANDS.SUBMIT_CONFIRMATION);

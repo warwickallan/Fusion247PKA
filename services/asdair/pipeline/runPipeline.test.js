@@ -326,6 +326,201 @@ test('IDEMPOTENCY: repeated basket requests RESUME one browser request - they ne
   assert.equal(h.db.browser_build_request.length, 1);
 });
 
+// =====================================================================
+// WP-B15-14 - THE SUPERVISED STEP'S RETURN LEG
+//
+// Before this, BOTH supervised transitions had exactly one writer in the whole
+// estate - browser-runner/runner.js:504 and :570 - and that arm is off the live
+// route and refuses a supervised handoff by design. So Warwick tapped "Build
+// ASDA basket" and his shop stopped at WAITING_FOR_BROWSER for ever. It had
+// never been noticed because no shop had ever got that far.
+//
+// Nothing here claims a trolley, opens a browser or talks to ASDA. Asdair
+// remains the sole writer against the live ASDA session. These tests drive the
+// DURABLE ROWS a supervised operator's own claim/complete writes leave behind,
+// which is the only thing the pipeline ever sees of that work.
+// =====================================================================
+
+/** Drive the shop to WAITING_FOR_BROWSER with a real durable request. */
+async function toWaitingForBrowser(h) {
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await drain(h);
+  assert.equal(shopStatus(h), 'READY_TO_SHOP');
+  await commands.requestBasketBuild({ shopRef: REF, actor: ACTOR }, h.deps);
+  const queued = await runPipeline(HANDLE, h.deps);
+  assert.equal(queued.to, 'WAITING_FOR_BROWSER');
+  assert.equal(h.db.browser_build_request.length, 1);
+  return h.db.browser_build_request[0];
+}
+
+/**
+ * The operator's report, built from the handoff THE PRODUCT ITSELF wrote onto
+ * the durable request. Nothing in it is invented by the test: the seqs and the
+ * quantities are the packet's own.
+ */
+function supervisedReport(h, statusFor = () => 'added') {
+  const { handoff } = h.db.browser_build_request[0].progress;
+  return {
+    packet_fingerprint: handoff.packet_fingerprint,
+    shop_ref: handoff.shop_ref,
+    lines: handoff.lines.map((l) => {
+      const status = statusFor(l);
+      const entry = { seq: l.seq, status };
+      // `added` and `out_of_stock` must carry a real quantity - what went in, or
+      // what was sought. completion.js refuses to default it and so does this.
+      if (status === 'added' || status === 'out_of_stock') entry.quantity = l.required_quantity;
+      return entry;
+    }),
+  };
+}
+
+/** What claim.js claimHandoff leaves behind when a human picks the work up. */
+function operatorPicksUp(h) {
+  Object.assign(h.db.browser_build_request[0], { status: 'claimed', claimed_by: 'supervised:warwick' });
+}
+
+/** What claim.js completeHandoff leaves behind when the operator reports back. */
+function operatorReports(h, report) {
+  const row = h.db.browser_build_request[0];
+  Object.assign(row, {
+    status: 'complete', claimed_by: null, finished_at: '2026-08-03T12:00:00.000Z',
+    progress: { ...row.progress, report },
+  });
+}
+
+const failureEvents = (h) => h.db.shop_event.filter((e) => e.event_type === 'failure');
+
+test('WP-B15-14: a completed SUPERVISED build carries the shop through to BASKET_READY', async () => {
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+
+  // THE DEAD END, as it was: nobody has picked the work up, so the shop waits.
+  assert.equal((await runPipeline(HANDLE, h.deps)).step, STEPS.AWAIT_RUNNER);
+  assert.equal(shopStatus(h), 'WAITING_FOR_BROWSER');
+
+  // A supervised operator claims it. The shop must now say it is being shopped.
+  operatorPicksUp(h);
+  const started = await runPipeline(HANDLE, h.deps);
+  assert.equal(started.step, STEPS.RECORD_BUILD_STARTED);
+  assert.equal(started.to, 'SHOPPING');
+  assert.equal(shopStatus(h), 'SHOPPING');
+
+  // The operator finishes and reports the basket, line by line.
+  operatorReports(h, supervisedReport(h));
+
+  // A BRAND NEW deps container over the SAME database - nothing carried in
+  // memory. This is the property that makes the leg real rather than a
+  // side effect of one process staying alive.
+  const restarted = makeHarness({ seed: h.db });
+  const ready = await runPipeline(HANDLE, restarted.deps);
+  assert.equal(ready.step, STEPS.RECORD_BASKET_READY);
+  assert.equal(ready.to, 'BASKET_READY');
+  assert.equal(restarted.db.shop[0].status, 'BASKET_READY',
+    'this is the whole work package: a completed supervised build reaches the basket Warwick can check');
+
+  // AC5. THE CHECKOUT BOUNDARY HAS NOT MOVED BY A MILLIMETRE.
+  const after = await runPipeline(HANDLE, restarted.deps);
+  assert.equal(after.step, STEPS.AWAIT_CONFIRMATION);
+  assert.equal(restarted.db.order_confirmation.length, 0, 'nothing may be ordered, paid for or checked out here');
+  assert.equal(failureEvents(restarted).length, 0);
+});
+
+test('WP-B15-14/AC2: a completion reporting an EMPTY trolley never reaches BASKET_READY', async () => {
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+  operatorPicksUp(h);
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(shopStatus(h), 'SHOPPING');
+
+  // Every line reported as not found: the plan intended products and NOTHING
+  // went in. Zero products is not a small basket - it is the absence of the
+  // thing being claimed. Same rule WP-B15-12 installed in the CDP arm.
+  operatorReports(h, supervisedReport(h, () => 'not_found'));
+
+  const refused = await runPipeline(HANDLE, h.deps);
+  assert.equal(refused.ok, false, 'the refusal must be LOUD, not a quiet park');
+  assert.notEqual(shopStatus(h), 'BASKET_READY',
+    'a basket that was not built is NEVER reported as built');
+
+  // AND THE REASON IS DURABLE, where Warwick looks - not only in a log.
+  assert.match(String(h.db.shop[0].last_error), /never built|trolley/i);
+  assert.equal(failureEvents(h).length, 1);
+  assert.equal(failureEvents(h)[0].from_status, 'SHOPPING',
+    'the shop must be resumable to exactly where it was when the report was refused');
+  assert.equal(refused.resume_from, 'SHOPPING');
+
+  // And Warwick is TOLD. A supervised shop that silently stalls is worse than
+  // one that fails loudly, because he would keep waiting for a basket that is
+  // never coming.
+  const cards = await listOutbox(h.deps, { shopId: h.db.shop[0].id });
+  assert.ok(cards.some((c) => c.kind === 'failure'), 'the refusal must reach the phone, not only the database');
+});
+
+test('WP-B15-14/AC2: "ASDA had none of it" is a DIFFERENT refusal from a broken report', async () => {
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+  operatorPicksUp(h);
+  await runPipeline(HANDLE, h.deps);
+
+  operatorReports(h, supervisedReport(h, () => 'out_of_stock'));
+  const refused = await runPipeline(HANDLE, h.deps);
+
+  assert.equal(refused.ok, false);
+  assert.notEqual(shopStatus(h), 'BASKET_READY');
+  assert.match(String(h.db.shop[0].last_error), /ASDA had none of it|unavailable/i,
+    '"ASDA had none of it" and "the runner is broken" are the same empty trolley and completely different problems');
+});
+
+test('WP-B15-14: a SHORTFALL still reaches BASKET_READY - no fill-rate threshold is invented', async () => {
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+  operatorPicksUp(h);
+  await runPipeline(HANDLE, h.deps);
+
+  // One line in the trolley, one not found. Short, but a real basket exists and
+  // Warwick can go and check it.
+  operatorReports(h, supervisedReport(h, (l) => (l.seq === 1 ? 'added' : 'not_found')));
+  const ready = await runPipeline(HANDLE, h.deps);
+
+  assert.equal(ready.to, 'BASKET_READY');
+  assert.equal(shopStatus(h), 'BASKET_READY',
+    'items go out of stock; stranding a good trolley behind a number nobody chose would be the defect');
+});
+
+test('WP-B15-14: a SILENT completion advances nothing - a basket is never inferred from silence', async () => {
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+  operatorPicksUp(h);
+  await runPipeline(HANDLE, h.deps);
+
+  // The request finished carrying no report at all.
+  const row = h.db.browser_build_request[0];
+  Object.assign(row, { status: 'complete', claimed_by: null });
+
+  const parked = await runPipeline(HANDLE, h.deps);
+  assert.equal(parked.step, STEPS.AWAIT_BASKET);
+  assert.equal(parked.stepped, false);
+  assert.equal(shopStatus(h), 'SHOPPING');
+});
+
+test('WP-B15-14: the return leg is IDEMPOTENT - re-running it cannot double-advance', async () => {
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+  operatorPicksUp(h);
+  await runPipeline(HANDLE, h.deps);
+  operatorReports(h, supervisedReport(h));
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(shopStatus(h), 'BASKET_READY');
+
+  const before = JSON.stringify(h.db.shop[0]);
+  for (let i = 0; i < 3; i += 1) {
+    const r = await runPipeline(HANDLE, h.deps);
+    assert.equal(r.stepped, false, 'a shop at BASKET_READY waits for a human; it must not step again');
+  }
+  assert.equal(JSON.stringify(h.db.shop[0]), before);
+});
+
 test('IDEMPOTENCY: calling runPipeline repeatedly on a parked shop changes nothing at all', async () => {
   const h = makeHarness();
   await receiveText(h);

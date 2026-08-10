@@ -13,7 +13,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { buildHandoff } = require('./buildHandoff');
-const { ingestCompletion, toBasketObservation, CompletionContractError } = require('./completion');
+const { ingestCompletion, toBasketObservation, basketEvidence, CompletionContractError } = require('./completion');
 const { basePacket, goodReport } = require('./test/fixtures');
 
 const handoffOf = () => buildHandoff(basePacket());
@@ -306,4 +306,113 @@ test('DETERMINISTIC: the same handoff and report always produce the same structu
   const a = ingestCompletion(h, goodReport(h.packet_fingerprint));
   const b = ingestCompletion(handoffOf(), goodReport(h.packet_fingerprint));
   assert.equal(JSON.stringify(a), JSON.stringify(b));
+});
+
+// ---------------------------------------------------------------------
+// WP-B15-14 - basketEvidence: THE FACTS A CALLER NEEDS TO REFUSE AN EMPTY BASKET
+//
+// WP-B15-12 installed the rule in the CDP arm (browser-runner/runner.js
+// finishBasketReady + EmptyBasketError): a basket that was not built is never
+// reported as built. The supervised arm needs the SAME rule, and it needs it
+// from the only evidence a supervised operator produces - the validated line
+// report this module already ingests.
+//
+// This function stays inside this module's charter: it emits FACTS, never a
+// verdict. It does not decide whether Warwick should be told the basket is
+// ready - the caller does, exactly as browser-runner's runner does. What it
+// removes is the caller's need to re-derive counts this module already owns.
+// ---------------------------------------------------------------------
+
+const evidenceFor = (h, over) => basketEvidence(ingestCompletion(h, goodReport(h.packet_fingerprint, over)));
+
+test('basketEvidence: a fully reported basket is not empty and not short', () => {
+  const h = handoffOf();
+  const e = evidenceFor(h);
+  assert.equal(e.intended, 4);
+  assert.equal(e.observed, 4);
+  assert.equal(e.empty, false);
+  assert.equal(e.short, false);
+  assert.equal(e.shortfall, 0);
+  assert.equal(e.unavailable, 0);
+});
+
+test('basketEvidence: NOTHING in the trolley is EMPTY - the absence of the thing being claimed', () => {
+  const h = handoffOf();
+  const e = evidenceFor(h, { lines: h.lines.map((l) => ({ seq: l.seq, status: 'not_found' })) });
+  assert.equal(e.intended, 4);
+  assert.equal(e.observed, 0);
+  assert.equal(e.empty, true, 'zero products against four intended is the defect WP-B15-12 closed in the other arm');
+});
+
+test('basketEvidence: ALL UNAVAILABLE is a DIFFERENT empty from a broken report', () => {
+  const h = handoffOf();
+  // out_of_stock still requires a real quantity - what was SOUGHT. Nothing is defaulted.
+  const e = evidenceFor(h, { lines: h.lines.map((l) => ({ seq: l.seq, status: 'out_of_stock', quantity: l.required_quantity })) });
+  assert.equal(e.observed, 0);
+  assert.equal(e.empty, true);
+  assert.equal(e.unavailable, 4);
+  assert.equal(e.all_unavailable, true,
+    '"ASDA had none of it" and "the report says nothing went in" are the same empty trolley and completely different problems');
+
+  const broken = evidenceFor(h, { lines: h.lines.map((l) => ({ seq: l.seq, status: 'not_found' })) });
+  assert.equal(broken.all_unavailable, false);
+});
+
+test('basketEvidence: a SHORTFALL is recorded and NEVER refused - there is no fill-rate threshold', () => {
+  const h = handoffOf();
+  const e = evidenceFor(h, {
+    lines: [
+      { seq: 1, status: 'added', quantity: 2 },
+      { seq: 2, status: 'out_of_stock', quantity: 3 },
+      { seq: 3, status: 'not_found' },
+      { seq: 4, status: 'added', quantity: 1 },
+    ],
+  });
+  assert.equal(e.observed, 2);
+  assert.equal(e.intended, 4);
+  assert.equal(e.shortfall, 2);
+  assert.equal(e.short, true);
+  assert.equal(e.empty, false,
+    'items go out of stock; inventing a threshold here would strand a perfectly good trolley behind a number nobody chose');
+});
+
+test('basketEvidence: intending NOTHING cannot be an empty-basket failure', () => {
+  // Mirrors runner.js `sf.intended > 0 &&` exactly: the guard is about a basket
+  // that was supposed to be built, not about a packet that asked for nothing.
+  //
+  // The input is built directly because THE ESTATE CANNOT PRODUCE IT - asserted
+  // below rather than assumed. buildHandoff refuses a zero-line packet, so this
+  // branch is unreachable from a real handoff and the guard is belt-and-braces.
+  // Pinning it here means a future packet change that permits an empty list
+  // cannot quietly turn "nothing was asked for" into "the basket is missing".
+  const e = basketEvidence({
+    expected: { distinct_products: 0, total_units: 0 },
+    observed: { distinct_products: 0, total_units: 0 },
+    not_in_basket: [],
+  });
+  assert.equal(e.intended, 0);
+  assert.equal(e.observed, 0);
+  assert.equal(e.empty, false, 'intended 0 is not the absence of a claimed basket');
+  assert.equal(e.all_unavailable, false);
+
+  assert.throws(
+    () => buildHandoff(basePacket({ lines: [], expected_distinct_products: 0, expected_total_units: 0, held: [] })),
+    /nothing to shop/,
+    'if a zero-line packet ever becomes buildable, the guard above is the thing standing between it and a false BASKET_READY',
+  );
+});
+
+test('basketEvidence refuses anything that is not an ingestCompletion result', () => {
+  for (const bad of [null, undefined, 'nope', 42, [], {}, { expected: {}, observed: {} }]) {
+    assert.throws(() => basketEvidence(bad), (err) => err instanceof CompletionContractError && err.code === 'NO_INGEST',
+      `basketEvidence accepted ${JSON.stringify(bad)} and would have read counts off nothing`);
+  }
+});
+
+test('basketEvidence emits FACTS ONLY - no verdict field creeps in', () => {
+  const h = handoffOf();
+  const e = evidenceFor(h);
+  for (const k of ['verified', 'passed', 'ok', 'basket_ready', 'blocking', 'reason', 'refused']) {
+    assert.equal(k in e, false, `basketEvidence emitted a verdict field '${k}' - the decision belongs to the caller`);
+  }
 });

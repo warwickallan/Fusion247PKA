@@ -50,7 +50,7 @@
 // =====================================================================
 
 import { COMMANDS, COMMAND_SPECS, CONSUMPTION } from './commandNames.js';
-import { STEPS, decideNextStep, planOutcome, everIssued, pendingCommands } from './stages.js';
+import { STEPS, decideNextStep, planOutcome, everIssued, pendingCommands, completionReport } from './stages.js';
 import {
   questionKeyFor, intentKeyFor, sourceIdFor, outboxKeyFor, normaliseTerm,
   ledgerFamilyKey, LEDGER_KINDS,
@@ -82,6 +82,13 @@ import { createRequire } from 'node:module';
 const requireCjs = createRequire(import.meta.url);
 const { buildHandoff } = requireCjs('../handoff/buildHandoff.js');
 const { openHandoff } = requireCjs('../handoff/claim.js');
+
+// THE SUPERVISED STEP'S RETURN LEG (WP-B15-14). `ingestCompletion` validates
+// the operator's line report against the packet it was issued for - including
+// the supersession guard, which is what stops last week's report being recorded
+// against this week's basket. `basketEvidence` reduces that record to the
+// counts the empty-basket rule is decided on. Both are pure.
+const { ingestCompletion, basketEvidence } = requireCjs('../handoff/completion.js');
 
 // ── THE HOUSEHOLD'S PROSE RULEBOOK, ON THE LIVE ROUTE (WP-B15-3) ───────────
 //
@@ -1977,6 +1984,126 @@ async function stepPauseBuild(deps, snapshot, to) {
 }
 
 /**
+ * A supervised operator has picked the browser build up. Say so.
+ *
+ * This is bookkeeping about a HUMAN's work, not work of its own: nothing here
+ * opens a browser, claims a trolley or talks to ASDA. Asdair remains the sole
+ * writer against the live ASDA session. All this does is stop Warwick's shop
+ * saying "waiting for a runner" while a runner is demonstrably on it - and,
+ * more importantly, put the shop into the one state from which the basket can
+ * legally come back.
+ */
+async function stepRecordBuildStarted(deps, snapshot) {
+  const shop = snapshot.shop;
+  const moved = await deps.shopStore.transition(
+    shop.id, 'SHOPPING',
+    `a supervised operator holds browser build request ${snapshot.browser.id}`,
+  );
+  return { stepped: moved.changed, from: shop.status, to: 'SHOPPING', browser_request_id: snapshot.browser.id };
+}
+
+/**
+ * THE BASKET COMES BACK. The last mile of the accepted journey.
+ *
+ * ── THE RULE THIS INHERITS, AND WHY IT IS NOT RE-INVENTED HERE ──────────────
+ * WP-B15-12 established it in the CDP arm: A BASKET THAT WAS NOT BUILT IS NEVER
+ * REPORTED AS BUILT. `BASKET_READY` means, in shopStatus.js's own wording,
+ * "basket ready for you to check", so the words have to be earned before they
+ * are written. Zero products is not a small basket; it is the absence of the
+ * thing being claimed, and every explanation for it is a fault rather than an
+ * outcome.
+ *
+ * The two arms reach that rule from different evidence and must not drift:
+ * browser-runner reads the trolley through CDP, this one reads the operator's
+ * validated line report. `handoff/completion.js` owns the report shape and
+ * hands back the counts; the refusal, its wording and its consequence live here,
+ * exactly as `emptyBasketReason` lives in the runner rather than in a pure
+ * module.
+ *
+ * ── A NON-ZERO SHORTFALL IS NOT REFUSED ─────────────────────────────────────
+ * Deliberate, and copied from runner.js:526 rather than re-decided. Items go out
+ * of stock; this estate treats a shortfall as a reported per-line outcome and
+ * sets no fill-rate threshold anywhere. Inventing one here would strand a
+ * perfectly good trolley behind a number nobody chose. What it does instead is
+ * make the difference VISIBLE, in the transition's own description, which lands
+ * in the shop_event ledger the Cockpit already reads.
+ *
+ * ── HOW THE REFUSAL BECOMES DURABLE ─────────────────────────────────────────
+ * By throwing. `runPipeline`'s catch hands this to `failShop`, whose
+ * `recordFailure` writes the reason to `shop.last_error`, parks the shop FAILED
+ * with a failure event whose `from_status` is SHOPPING - so `retryStage` puts it
+ * back exactly where it was once the operator has re-reported - and queues a
+ * failure card so Warwick is TOLD.
+ *
+ * That is deliberately NOT a hand-written shop_event of the kind runner.js:549
+ * writes before its own throw. The runner needs one because its throw escapes to
+ * a CLI with no durable handler; here the durable handler is the whole point of
+ * failShop, and `shopStore` exposes no bare event writer anyway - emitting SQL
+ * of our own would break its guarantee that applyTransition is the only writer
+ * of asdair.shop.status. Same property, through this module's own mechanism:
+ * loud, durable, visible where Warwick looks, and resumable.
+ */
+async function stepRecordBasketReady(deps, snapshot) {
+  const shop = snapshot.shop;
+  const progress = snapshot.browser.progress || {};
+  const report = completionReport(snapshot);
+  const handoff = progress.handoff || null;
+
+  // A report with no handoff beside it cannot be checked against anything. It
+  // is not evidence of a basket, and it is certainly not evidence of an empty
+  // one - refuse rather than guess which.
+  if (!handoff) {
+    throw new Error(
+      `browser build request ${snapshot.browser.id} carries a completion report but no handoff to check it against. `
+      + 'Nothing can be reconciled against a packet that is not there, so this is not BASKET_READY.',
+    );
+  }
+
+  // ingestCompletion is the supersession guard as well as the validator: a
+  // report carrying a different packet_fingerprint throws here rather than
+  // reconciling this week's basket against last week's expectation.
+  const evidence = basketEvidence(ingestCompletion(handoff, report));
+
+  if (evidence.empty) {
+    throw new Error(emptyBasketRefusal(evidence));
+  }
+
+  const note = evidence.short
+    ? `supervised basket reported: ${evidence.observed} of ${evidence.intended} intended product(s) in the trolley, `
+      + `${evidence.shortfall} missing (${evidence.unavailable} unavailable). Reported, not smoothed away - nothing was swapped.`
+    : `supervised basket reported: all ${evidence.intended} intended product(s) in the trolley`;
+
+  const moved = await deps.shopStore.transition(shop.id, 'BASKET_READY', note);
+  return {
+    stepped: moved.changed,
+    from: shop.status,
+    to: 'BASKET_READY',
+    basket_products: evidence.observed,
+    basket_shortfall: evidence.shortfall,
+    basket_unavailable: evidence.unavailable,
+  };
+}
+
+/**
+ * WHY the basket was refused, in words a human can act on.
+ *
+ * The all-unavailable case gets its own sentence on purpose, and the reason is
+ * runner.js's, unchanged: "ASDA had none of it" and "the report says nothing
+ * went in" are the same empty trolley and completely different problems, and a
+ * reason that cannot tell them apart sends Warwick looking in the wrong place.
+ */
+function emptyBasketRefusal(e) {
+  const tail = ` No item was swapped and nothing was ordered. Reported: ${e.observed} product(s) in the trolley, `
+    + `${e.unavailable} unavailable, against ${e.intended} intended.`;
+  if (e.all_unavailable) {
+    return `the trolley is EMPTY because ASDA had none of it - all ${e.intended} intended product(s) came `
+      + 'back unavailable. There is no basket to check, so this is not BASKET_READY.' + tail;
+  }
+  return `the supervised report records an EMPTY trolley (0 products) after intending ${e.intended} `
+    + 'product add(s). Refusing to report a basket that was never built.' + tail;
+}
+
+/**
  * RECORD THE CONFIRMATION. Parse what Warwick forwarded, reconcile it against
  * the plan, and persist both.
  *
@@ -2272,6 +2399,10 @@ async function dispatchStep(deps, snapshot, next) {
       return stepQueueBrowserBuild(deps, snapshot, next.command);
     case STEPS.PAUSE_BUILD:
       return stepPauseBuild(deps, snapshot, next.to);
+    case STEPS.RECORD_BUILD_STARTED:
+      return stepRecordBuildStarted(deps, snapshot);
+    case STEPS.RECORD_BASKET_READY:
+      return stepRecordBasketReady(deps, snapshot);
     case STEPS.RECORD_CONFIRMATION:
       return stepRecordConfirmation(deps, snapshot, next.command);
     case STEPS.RECONCILE:
