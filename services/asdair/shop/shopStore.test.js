@@ -123,6 +123,98 @@ test('createOrResumeShop refuses to guess when nothing matches, and rolls back',
   assert.equal(statements(client)[statements(client).length - 1], 'ROLLBACK');
 });
 
+// ── THE TERMINAL COLLISION (WP-B15-07) ────────────────────────────────────
+//
+// The 2026-08-10 lost list: the date's shop was CANCELLED, the ref matched it,
+// ON CONFLICT DO NOTHING wrote nothing, and this function reported a successful
+// RESUME of a shop that can never move again.
+
+test('a new list colliding with a TERMINAL shop gets a FRESH shop, not a resume of the dead one', async function () {
+  const dead = shopRow({ shop_ref: 'SHOP-2026-07-27', status: 'CANCELLED', telegram_message_id: '11' });
+  const fresh = shopRow({ id: 77, shop_ref: 'SHOP-2026-07-27-M55' });
+  const client = makeClient([
+    { match: 'INSERT INTO asdair.shop (', rows: [] },                  // collides on the ref
+    { match: 'WHERE telegram_chat_id = $1', rows: [] },                // this message is new
+    { match: 'WHERE household_id = $1 AND shop_ref = $2', rows: [dead] },
+    { match: 'INSERT INTO asdair.shop (', rows: [fresh] },             // the retry, insert-first again
+    { match: 'INSERT INTO asdair.shop_event', rows: [{ id: 2, occurred_at: 'now' }] }
+  ]);
+
+  const result = await store.createOrResumeShop(CREATE_INTENT, { client: client });
+
+  assert.equal(result.created, true, 'the list was absorbed into a terminal shop instead of starting a fresh one');
+  assert.equal(result.resumed, false);
+  assert.equal(result.matched_by, 'insert', 'matched_by keeps its three existing values');
+  assert.equal(result.superseded_terminal_ref, 'SHOP-2026-07-27',
+    'the collision must be reported, not left to be inferred from a ref suffix');
+  assert.equal(result.shop.shop_ref, 'SHOP-2026-07-27-M55');
+
+  // THE DEAD ROW IS NEVER WRITTEN TO. Not revived, not updated, not renamed.
+  assert.equal(countMatching(client, 'UPDATE asdair.shop'), 0,
+    'the terminal shop was mutated - it must be left exactly as it was');
+
+  // STILL INSERT-FIRST on the retry: the second attempt is an INSERT, not a
+  // SELECT-then-INSERT, so two concurrent deliveries cannot both believe they won.
+  const inserts = statements(client).filter(function (s) { return /^INSERT INTO asdair\.shop \(/.test(s); });
+  assert.equal(inserts.length, 2);
+  assert.match(inserts[1], /ON CONFLICT DO NOTHING/);
+  assert.equal(/DO UPDATE/.test(inserts[1]), false);
+});
+
+test('the terminal-collision retry is reported in the audit trail', async function () {
+  const dead = shopRow({ status: 'RECONCILED', telegram_message_id: '11' });
+  const client = makeClient([
+    { match: 'INSERT INTO asdair.shop (', rows: [] },
+    { match: 'WHERE telegram_chat_id = $1', rows: [] },
+    { match: 'WHERE household_id = $1 AND shop_ref = $2', rows: [dead] },
+    { match: 'INSERT INTO asdair.shop (', rows: [shopRow({ id: 77, shop_ref: 'SHOP-2026-07-27-M55' })] },
+    { match: 'INSERT INTO asdair.shop_event', rows: [{ id: 2, occurred_at: 'now' }] }
+  ]);
+
+  await store.createOrResumeShop(CREATE_INTENT, { client: client });
+
+  // RECONCILED is terminal too - this is not a CANCELLED special case.
+  const event = client.log.find(function (e) { return e.sql.indexOf('INSERT INTO asdair.shop_event') !== -1; });
+  assert.ok(event, 'a fresh shop must still record its creation milestone');
+  assert.match(String(event.params[4]), /SHOP-2026-07-27 is terminal and was left untouched/,
+    'the audit trail must say WHY this date has two shops');
+});
+
+test('a redelivery whose shop was LATER cancelled resumes - it must NOT wedge the poller', async function () {
+  // The message IS already durably captured; the shop was cancelled afterwards.
+  // Refusing here would hold the Telegram offset and make the same message
+  // redeliver forever, which is a worse outage than the defect being fixed.
+  const captured = shopRow({ status: 'CANCELLED' });
+  const client = makeClient([
+    { match: 'INSERT INTO asdair.shop (', rows: [] },
+    { match: 'WHERE telegram_chat_id = $1', rows: [captured] }
+  ]);
+
+  const result = await store.createOrResumeShop(CREATE_INTENT, { client: client });
+
+  assert.equal(result.matched_by, 'telegram_message',
+    'the INBOUND key must be tested before the ref - it is what proves this message was captured');
+  assert.equal(result.resumed, true);
+  assert.equal(result.superseded_terminal_ref, null);
+  assert.equal(countMatching(client, 'INSERT INTO asdair.shop ('), 1, 'a redelivery must write nothing');
+});
+
+test('a terminal collision with NO inbound message id REFUSES rather than inventing an identity', async function () {
+  const dead = shopRow({ status: 'CANCELLED', telegram_message_id: null, telegram_chat_id: null });
+  const client = makeClient([
+    { match: 'INSERT INTO asdair.shop (', rows: [] },
+    { match: 'WHERE household_id = $1 AND shop_ref = $2', rows: [dead] }
+  ]);
+
+  await assert.rejects(function () {
+    return store.createOrResumeShop({
+      household_id: HH, shop_ref: 'SHOP-2026-07-27', source_kind: 'text', raw_text: 'milk'
+    }, { client: client });
+  }, /inbound Telegram message id/);
+
+  assert.equal(statements(client)[statements(client).length - 1], 'ROLLBACK', 'nothing may be half-written');
+});
+
 test('pure validation happens BEFORE any statement is issued', async function () {
   const client = makeClient([]);
   await assert.rejects(function () {

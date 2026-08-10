@@ -380,9 +380,16 @@ async function rememberIfAuthorised(deps, shop, question, decision) {
 }
 
 /** The list_date a shop belongs to, taken from its ref. NO CLOCK: a retry that
- *  crossed midnight must not put this week's items on next week's list. */
+ *  crossed midnight must not put this week's items on next week's list.
+ *
+ *  The optional `-M<message id>` suffix (WP-B15-07) marks a shop that had to
+ *  start fresh because a terminal one already owned the date. It is NOT part of
+ *  the date and is deliberately discarded here: the capture group returns the
+ *  DATE PART ONLY, exactly as it always has. This function runs on every
+ *  advancing pass, so refusing the suffix would leave a fresh shop unable to
+ *  take a single step - the original lost-list bug moved rather than fixed. */
 export function listDateOf(shopRef) {
-  const m = /^SHOP-(\d{4}-\d{2}-\d{2})$/.exec(String(shopRef || ''));
+  const m = /^SHOP-(\d{4}-\d{2}-\d{2})(?:-M\d+)?$/.exec(String(shopRef || ''));
   if (!m) throw new Error(`runPipeline: shop_ref "${shopRef}" is not SHOP-YYYY-MM-DD, so its list date cannot be derived`);
   return m[1];
 }

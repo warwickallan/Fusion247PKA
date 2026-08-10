@@ -71,7 +71,11 @@ const SORT_CONTRACT = 'brand_az_then_product_az';
 const METHOD_STEP_COUNT = 18;
 const PROHIBITED_ACTION_COUNT = 5;
 
-const SHOP_REF_RE = /^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+// The optional `-M<message id>` suffix (WP-B15-07) identifies a shop that had to
+// start fresh because a terminal shop already owned the date. It still scopes
+// every write back to ONE shop - more precisely than the date alone did, since a
+// date can now legitimately carry more than one.
+const SHOP_REF_RE = /^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-M[0-9]+)?$/;
 const ASDA_REF_RE = /^[0-9]{3,12}$/;
 const SOURCE_VIEWS = ['regulars', 'favourites', 'search'];
 const ORIGINS = ['known', 'new_approved'];

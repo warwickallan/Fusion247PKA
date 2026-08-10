@@ -191,6 +191,36 @@ export async function receiveList(spec, deps) {
     needs_review: spec.needsReview === true,
   });
 
+  // ── THE VACUOUS-SUCCESS GUARD (WP-B15-07 AC4) ─────────────────────────────
+  //
+  // receiveList runs INSIDE intake's onRecord, before the Telegram offset moves.
+  // So "this function returned" is what the receiver reads as "the list is
+  // durably captured, it is safe to let Telegram forget the message". On
+  // 2026-08-10 that reading was false: the list had been absorbed into a
+  // CANCELLED shop, nothing was written, and the message was acknowledged and
+  // lost forever. A returned receipt must MEAN capture, or this must throw.
+  //
+  // THE TEST IS DURABLE CAPTURE OF THIS MESSAGE, NOT THE SHOP'S LIVENESS, and
+  // that distinction is load-bearing. A redelivery of a message whose shop
+  // Warwick later cancelled matches on the INBOUND key: that content did reach a
+  // shop, nothing was lost, and raising there would hold the offset and make
+  // Telegram redeliver the same message forever - a permanently wedged poller,
+  // which is a worse outage than the defect being fixed here.
+  //
+  // So exactly one case loses a list: the REF matched a terminal shop, meaning
+  // this message was never captured. shopStore now creates a fresh shop instead,
+  // so this branch is unreachable through the store - it stands as defence in
+  // depth, because the cost of being wrong is a silently lost shopping list.
+  if (created.matched_by === 'shop_ref'
+      && deps.shopState.TERMINAL_STATUSES.includes(created.shop.status)) {
+    throw new Error(
+      `commands: receiveList refuses to report success - shop ${created.shop.shop_ref} is `
+      + `${created.shop.status} (terminal) and this inbound message `
+      + `(${telegramMessageId ?? 'no message id'}) was never captured. A terminal shop never advances, so `
+      + 'acknowledging this to Telegram would lose the list permanently. Hold the offset and redeliver.'
+    );
+  }
+
   const shop = created.shop;
   const sourceId = spec.sourceId || sourceIdFor(shop);
 
@@ -228,6 +258,11 @@ export async function receiveList(spec, deps) {
     resumed: created.resumed,
     matched_by: created.matched_by,
     source_id: sourceId,
+    // Non-null ONLY when this list had to start a fresh shop because a terminal
+    // one already owned the date. Carried out so a card, the Cockpit or an
+    // operator can say WHY the week has two shops rather than leaving it to be
+    // inferred from a ref suffix.
+    superseded_terminal_ref: created.superseded_terminal_ref ?? null,
     // A redelivery is a duplicate of the MESSAGE even when the command row is new.
     duplicate: created.created === false,
   });

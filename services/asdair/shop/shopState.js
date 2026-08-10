@@ -164,7 +164,35 @@ const PENDING_ACTION_INSERT_COLUMNS = [
   'payload'
 ];
 
-const SHOP_REF_PATTERN = /^SHOP-\d{4}-\d{2}-\d{2}$/;
+// THE SHOP REF, AND WHY IT IS NO LONGER JUST A DATE (WP-B15-07).
+//
+// It was `SHOP-YYYY-MM-DD` and nothing else. That made the date the whole
+// identity, and on 2026-08-10 a real shopping list was lost because of it: the
+// date's shop had been CANCELLED, a new photograph computed the DEAD row's ref,
+// the INSERT hit shop_ref_uniq, ON CONFLICT DO NOTHING wrote nothing, and the
+// list was acknowledged to Telegram as consumed. A terminal shop never moves
+// again, so no card was ever sent.
+//
+// A date can therefore legitimately carry MORE THAN ONE shop, and the ref must
+// be able to say which. The suffix is `-M<telegram message id>`:
+//
+//   DETERMINISTIC  the same message always computes the same ref, so a Telegram
+//                  redelivery still resolves to the same shop. No counter, no
+//                  clock, no randomness - this module has none of those on
+//                  purpose, and inventing one here would let a retry that
+//                  crossed midnight produce a second shop.
+//   GROUNDED       the identity comes from the actual inbound event, which is
+//                  what makes "same message" and "different message" a fact
+//                  about the world rather than about our own bookkeeping.
+//   READABLE       Warwick reads these refs. `SHOP-2026-08-10-M63` is still a
+//                  date he recognises, with a message he can look up.
+//
+// The plain date form is UNCHANGED and stays what an ordinary week gets: the
+// suffix appears ONLY when a terminal shop already owns the date. No existing
+// ref changes meaning, and the date part stays extractable by everything
+// downstream - runPipeline.listDateOf, the execution packet and the browser
+// handoff all accept the optional suffix and keep reading the date.
+const SHOP_REF_PATTERN = /^SHOP-\d{4}-\d{2}-\d{2}(?:-M\d+)?$/;
 
 // ---------------------------------------------------------------------
 // Small pure helpers
@@ -271,6 +299,43 @@ function toDatePart(dateISO) {
 
 function nextShopRef(dateISO) {
   return 'SHOP-' + toDatePart(dateISO);
+}
+
+// ---------------------------------------------------------------------
+// collisionShopRef - the ref for a genuinely NEW list arriving on a date whose
+// shop is already TERMINAL.
+//
+// PURE and DETERMINISTIC, like everything else here: same date + same message
+// always gives the same ref, so a Telegram redelivery cannot produce a second
+// shop. The identity is GROUNDED IN THE INBOUND EVENT, which is what makes
+// "the same list again" and "a different list" distinguishable at all.
+//
+// IT THROWS WHEN THERE IS NO INBOUND MESSAGE, and that is deliberate (ruled
+// 2026-08-10). A shop-cli entry or a pasted text carries no message id, so
+// there is nothing to ground an identity on. The honest answers were: refuse,
+// or invent one. An invented identity - a counter, a timestamp, a random
+// suffix - would either need a clock this module refuses to have, or would make
+// a retry create a second shop, which is the very failure this exists to end.
+// A loud refusal on an edge path is recoverable; a fabricated identity is not.
+// ---------------------------------------------------------------------
+function collisionShopRef(collidingRef, telegramMessageId) {
+  const base = requireText(collidingRef, 'collisionShopRef: collidingRef');
+  const m = /^SHOP-(\d{4}-\d{2}-\d{2})$/.exec(base);
+  if (!m) {
+    fail('collisionShopRef: the colliding ref must be the plain date form SHOP-YYYY-MM-DD, got "' + base +
+      '". A collision ref is never derived from another collision ref - the inbound message id already makes ' +
+      'the first one unique, so a second suffix could only mean the first one was wrong.');
+  }
+  const date = toDatePart(m[1]);
+  const raw = telegramMessageId === null || telegramMessageId === undefined
+    ? '' : String(telegramMessageId).trim();
+  if (!/^[1-9][0-9]*$/.test(raw)) {
+    fail('collisionShopRef: a fresh shop for ' + date + ' needs the inbound Telegram message id to ground its ' +
+      'identity on, and got ' + (raw === '' ? 'nothing' : '"' + raw + '"') + '. That date already belongs to a ' +
+      'terminal shop, so the date alone cannot identify this list - and no counter, clock or invented suffix is ' +
+      'substituted for a real inbound event.');
+  }
+  return 'SHOP-' + date + '-M' + raw;
 }
 
 function isShopRef(value) {
@@ -402,7 +467,8 @@ function buildShopCreate(intent) {
   const sourceKind = requireOneOf(intent.source_kind, SOURCE_KINDS, 'buildShopCreate: source_kind');
   const shopRef = requireText(intent.shop_ref, 'buildShopCreate: shop_ref');
   if (!SHOP_REF_PATTERN.test(shopRef)) {
-    fail('buildShopCreate: shop_ref must look like SHOP-YYYY-MM-DD (see nextShopRef), got "' + shopRef + '".');
+    fail('buildShopCreate: shop_ref must look like SHOP-YYYY-MM-DD, optionally with a -M<message id> ' +
+      'suffix when a terminal shop already owns the date (see nextShopRef / collisionShopRef), got "' + shopRef + '".');
   }
 
   const chatId = optionalText(intent.telegram_chat_id, 'buildShopCreate: telegram_chat_id');
@@ -696,6 +762,7 @@ module.exports = {
 
   // refs
   nextShopRef: nextShopRef,
+  collisionShopRef: collisionShopRef,
   isShopRef: isShopRef,
   SHOP_REF_PATTERN: SHOP_REF_PATTERN,
 

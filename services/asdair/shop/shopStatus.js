@@ -216,8 +216,13 @@ async function resolveShop(client, handle, householdId) {
   }
 
   const ref = handle.trim();
+  // isShopRef owns the format (shopState.SHOP_REF_PATTERN), which since
+  // WP-B15-07 also accepts the `-M<message id>` suffix a fresh shop carries when
+  // a terminal one already owned its date. Those refs must be lookupable by
+  // handle like any other, or the shop exists and nobody can ask about it.
   if (!isShopRef(ref)) {
-    fail('"' + ref + '" is neither a shop id nor a shop_ref of the form SHOP-YYYY-MM-DD.');
+    fail('"' + ref + '" is neither a shop id nor a shop_ref of the form SHOP-YYYY-MM-DD ' +
+      '(optionally with a -M<message id> suffix).');
   }
   const rows = allRows(await client.query(SHOP_BY_REF_SQL, [ref]));
   if (rows.length === 0) fail('no shop with shop_ref ' + ref + '.');

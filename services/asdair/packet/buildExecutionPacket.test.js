@@ -508,12 +508,58 @@ test('generated_at is REQUIRED - the module has no clock and never invents a tim
 });
 
 test('a malformed shop_ref is REJECTED', () => {
-  for (const bad of ['SHOP-26-08-03', 'shop-2026-08-03', '2026-08-03', '', undefined]) {
+  for (const bad of [
+    'SHOP-26-08-03', 'shop-2026-08-03', '2026-08-03', '', undefined,
+    // The WP-B15-07 suffix is NARROW. These near-misses must stay refused, or
+    // the relaxation that admits a fresh shop quietly admits anything.
+    'SHOP-2026-08-03-M', 'SHOP-2026-08-03-63', 'SHOP-2026-08-03-MX', 'SHOP-2026-08-03-M6-M7',
+  ]) {
     assert.throws(
       () => buildExecutionPacket({ shop_ref: bad, generated_at: GENERATED_AT, lines: [known()] }),
-      (err) => err instanceof PacketError && /shop_ref/.test(err.message)
+      (err) => err instanceof PacketError && /shop_ref/.test(err.message),
+      `${String(bad)} must be refused`
     );
   }
+});
+
+test('WP-B15-07: a FRESH shop can be shopped - its collision ref is accepted and preserved', () => {
+  // A shop that had to start fresh because a terminal one already owned its date
+  // carries a `-M<message id>` suffix. Refusing it here would mean the shop
+  // exists and can never be shopped - the lost-list defect moved one step
+  // downstream rather than fixed.
+  const packet = buildExecutionPacket({
+    shop_ref: 'SHOP-2026-08-10-M63', generated_at: GENERATED_AT, household_id: 1, lines: [known()],
+  });
+  assert.equal(packet.shop_ref, 'SHOP-2026-08-10-M63', 'the ref must survive verbatim, suffix included');
+
+  // ── THE COMMITTED SCHEMA STILL REFUSES THIS REF, AND THAT IS RECORDED HERE
+  //    RATHER THAN HIDDEN (WP-B15-07 residual) ──────────────────────────────
+  //
+  // Builds/BUILD-015-.../SONNET-BROWSER-EXECUTION-PACKET.schema.json pins
+  // shop_ref to `^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}$`. That file is a build
+  // record, owned by Larry, and is OUTSIDE this Work Order's file_surface - so
+  // it is reported, never edited here.
+  //
+  // Nothing on the production path validates against it (committedSchema.js is
+  // imported only by this suite and schemaAssert.test.js), so a fresh shop is
+  // built and handed off correctly today. What is untrue is the CONTRACT
+  // DOCUMENT, which is now narrower than the product it describes.
+  //
+  // Asserting `errors.length === 1` rather than skipping the check is the point:
+  // every other part of a fresh shop's packet is proven schema-valid, the single
+  // residual is isolated by name, and the moment that schema is widened THIS
+  // TEST GOES RED and forces the reconciliation rather than letting it be
+  // forgotten.
+  const { valid, errors } = validate(SCHEMA, packet);
+  assert.equal(valid, false, 'the committed schema now accepts the collision ref - widen this test and delete the residual');
+  assert.equal(errors.length, 1, 'a fresh shop packet must differ from the committed contract in EXACTLY one way');
+  assert.match(errors[0], /shop_ref/, 'the only permitted divergence is the shop_ref pattern');
+
+  // The same packet with an ordinary date-only ref is fully valid, which proves
+  // the divergence is the ref alone and nothing this change did to the shape.
+  assertValid(SCHEMA, buildExecutionPacket({
+    shop_ref: SHOP_REF, generated_at: GENERATED_AT, household_id: 1, lines: [known()],
+  }), 'packet');
 });
 
 // ---------------------------------------------------------------------

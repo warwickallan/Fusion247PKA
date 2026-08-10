@@ -348,6 +348,19 @@ test('An empty packet and a bad shop_ref are refused', () => {
   assert.equal(codeOf(() => buildHandoff(basePacket({ lines: [] }))), 'EMPTY_PACKET');
   assert.equal(codeOf(() => buildHandoff(basePacket({ shop_ref: 'shop-2026-08-09' }))), 'BAD_SHOP_REF');
   assert.equal(codeOf(() => buildHandoff(basePacket({ packet_version: 2 }))), 'BAD_PACKET_VERSION');
+  // The WP-B15-07 suffix is NARROW - these near-misses stay refused.
+  for (const bad of ['SHOP-2026-08-09-M', 'SHOP-2026-08-09-9', 'SHOP-2026-08-09-MX', 'SHOP-2026-08-09-M6-M7']) {
+    assert.equal(codeOf(() => buildHandoff(basePacket({ shop_ref: bad }))), 'BAD_SHOP_REF', `${bad} must be refused`);
+  }
+});
+
+test('WP-B15-07: a FRESH shop reaches the browser handoff - its collision ref is accepted', () => {
+  // A shop that started fresh because a terminal one owned its date still scopes
+  // every write back to ONE shop - more precisely than the date alone did, since
+  // a date can now legitimately carry more than one. Refusing it here would mean
+  // the basket for that list could never be built.
+  const artefact = buildHandoff(basePacket({ shop_ref: 'SHOP-2026-08-10-M63' }));
+  assert.equal(artefact.shop_ref, 'SHOP-2026-08-10-M63');
 });
 
 // ---------------------------------------------------------------------
