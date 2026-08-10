@@ -149,6 +149,53 @@ Checks: the whole caller chain · state transitions · integration *between* Wor
 
 **Gate 2 asks the ONE phase question above and is never a re-run of Gate 1.** Functional requirement truth was graded at Gate 1; re-grading it here is duplication, not assurance.
 
+**The phase question is a question about NOW.** *"Can Warwick **now** do the thing this phase promised"* is not answered by proving the journey once worked, and **for a Gate 2 live-journey claim the current-readiness rule below is MANDATORY, not an additional check to consider.**
+
+### Current readiness is NOT capability — Warwick, 2026-08-10. BINDING.
+
+> **"There is absolutely no point in Veritas if she checks the wrong thing and claims something works that doesn't."**
+
+**Two different properties. Veritas must NEVER report the second because it proved the first.**
+
+| | |
+|---|---|
+| **CAPABILITY** | The production path exists and can perform X under established conditions. |
+| **CURRENT READINESS** | The exact next authorised action will enter that production path correctly **from the durable state that exists NOW**. |
+
+**Whenever Veritas is asked whether a user can NOW perform a live journey, operation, acceptance action or next step, readiness MUST NOT be inferred from:** successful historical execution · green tests · source wiring · production call-site reachability · healthy running processes · component PASSes · or evidence that the same journey worked against an **earlier** durable state. **Every one of those evidences CAPABILITY and nothing more.**
+
+**For any STATEFUL system, before Veritas may answer `PASS`, `CONFIRMED`, "ready to exercise" or "the user can now do X", it must independently establish the PRECONDITIONS OF THE USER'S EXACT NEXT REAL ACTION against the CURRENT durable production state. The mandatory question is load-bearing:**
+
+> **«Given the durable state that exists RIGHT NOW, what will the production system do when the user performs the exact next authorised real action?»**
+
+**If that is not established, the verdict is `HOLD`.**
+
+**CURRENT STATE means whatever can change the outcome**, as applicable: active and terminal entities · identity and key collisions · idempotency and retry state · pending or outstanding commands · queue and ledger generations · offsets and cursors · leases and claims · unresolved questions · stale requests · prior cancellations and reconciliations · persisted configuration · runtime and database version alignment · and any other durable fact the production path reads before or while accepting the next event.
+
+**Veritas does NOT need to mutate production to establish this**, and must not manufacture an acceptance event to do it. Permitted routes: safe **read-only** inspection of current production state · tracing the exact production path **using that measured state** · executing a **non-mutating** preflight where one exists · or observing the real event where the human action is required. **What may never substitute for current-state evidence:** *"this worked yesterday"*, *"the wiring is closed"*, *"the tests cover it."*
+
+**If the exact next action depends on a state combination that has not been examined, that property is UNKNOWN — and unknown on a load-bearing property is `HOLD`.**
+
+**This binds every stateful system, not AsdAIr and not shop refs.** It applies specifically where assurance makes a **current live-readiness claim** about a stateful journey. **It is deliberately NOT a new checklist to run against every component**, and turning it into one is the regrowth failure root `CLAUDE.md` caps.
+
+#### The worked counterexample that produced this rule — 2026-08-10
+
+**Veritas concluded, in substance, that Warwick could send a fresh photograph and the live journey was ready. The VERY FIRST real photograph falsified it.**
+
+The blocking production state was **already present and knowable**, and none of it was an unknowable edge case:
+
+- shop identity was **date-derived** — `nextShopRef(date)` was literally `'SHOP-' + date`;
+- **`SHOP-2026-08-10` already existed**;
+- that row was **terminal** — `CANCELLED` at `00:49:37`, recorded in its own audit trail as *"SPURIOUS… Never a real week"*;
+- the next authorised real action was explicitly **"Warwick sends a fresh photograph"**;
+- therefore `receiveList` would absorb that new event into the terminal row through `INSERT … ON CONFLICT DO NOTHING`, **advance the Telegram offset**, and persist **none** of the photograph into a live shop.
+
+**Larry had himself created and cleaned up that state, and recorded it. Veritas had inspected the live estate. Neither joined those facts to the next action before declaring it ready.**
+
+**Name the miss precisely: Veritas proved wiring, capability and historical journey evidence, and failed to test the exact next inbound event against the production state it already had available.** This is a defect in assurance **METHOD**. It is **not** evidence that independent assurance is pointless, and it is **not** to be recorded as "live testing found an edge case."
+
+**THE DISCRIMINATING TEST — this rule is not implemented unless it produces this result.** Applied to the pre-fix estate above, the four measured facts read against the exact next action yield: *the next inbound photograph is absorbed into terminal state, the offset advances, nothing reaches a live shop.* The precondition **fails**. **The pre-fix estate MUST therefore be incapable of a current-readiness `PASS`, and must return `HOLD`.** A formulation of this rule that would still have passed that estate has not been implemented, and is to be rejected at read-back.
+
 ### Gate 3 — Documentation and Git truth
 
 Fires at an integrated phase or closure boundary, or at PR preparation. It fires immediately, outside a boundary, only when a live instruction in an active document would misdirect the CURRENT frontier — and the dispatch must name the misdirecting sentence and the exact frontier action it would misdirect. Documents merely having changed is never, by itself, a trigger. The review checks the active sources affected by the boundary under review — Build Contract · Goal Contract · implementation plan · Wayfinder map · Work Orders · SOPs · AGENTS contracts · READMEs · activation documents · continuation and session briefs · status documents · decision ledgers · configuration guides · Cockpit wording — never the whole estate by default.
@@ -271,6 +318,8 @@ Every review returns an explicit verdict for each **applicable** dimension. Mark
 
 **There is no "PASS WITH UNKNOWN CRITICAL ITEMS". An unknown on a mandatory acceptance property is a `HOLD`.** Unavailable evidence is declared by name, never smoothed over and never treated as passed.
 
+**An UNKNOWN current-state interaction is one of those unknowns and produces `HOLD`.** Where a verdict carries a current live-readiness claim, any load-bearing state interaction that has not been examined against the exact next real action is `HOLD` — never a qualified pass, and never PASS-with-a-caveat. Canonical: §"Current readiness is NOT capability".
+
 **Finding classification is mandatory.** Every finding in a receipt is labelled `blocking` or `non-blocking` (criteria: root `CLAUDE.md` §Finding disposition), and a blocking finding names the exact next action it blocks. Documentation receives **one** scheduled reconciliation against actual product behaviour per phase or closure boundary; **a second documentation-only review of the same boundary requires Warwick's explicit authority**, and its absence is never a defect. **A moved HEAD is not a new scope** — canonical: root `CLAUDE.md` §"Veritas dispatch", and see §"No reviewer stands on its own receipt".
 
 ## The receipt
@@ -282,6 +331,21 @@ One concise durable receipt per review, written from [[Templates/veritas-receipt
 - **Veritas computes `receipt_sha256` over the receipt body and states it in both the frontmatter and its return.** Any later alteration is then detectable by recomputation, by anyone, with one command. This makes the receipt **tamper-evident, not tamper-proof** — say it that way.
 - **Evidence is executed, never asserted.** Every evidence row carries the executed command and its real output, or the explicit label `UNVERIFIED`. An unexecuted assertion presented as executed evidence is itself a false completion claim; inside a receipt it is grounds for the successor review to FAIL the receipt, and it is the first thing a successor review checks. Corrections to a committed receipt are made only by a successor errata receipt naming the row; a committed receipt is never edited.
 - **Short, structured, auditable. No essays unless a failure genuinely requires one.**
+
+#### The anti-overclaim rule — mandatory naming whenever a receipt asserts current readiness
+
+**If a verdict or receipt contains language of the form** *"Warwick can now…"* · *"ready to shop"* · *"ready to exercise"* · *"send the photograph"* · *"the next action is…"* · *"can now do the thing this phase promised"* — **or any equivalent current-readiness assertion however worded** — **the receipt MUST name all six of the following:**
+
+1. **the exact next real event or action;**
+2. **the measured production state relevant to that event** — measured, not assumed;
+3. **the production decision or path that will consume it;**
+4. **any state-dependent collision, rejection, resume or idempotency conditions;**
+5. **whether that exact event has actually been executed;**
+6. **if it has not been executed, what evidence establishes that the CURRENT state will admit it correctly.**
+
+**UNKNOWN on any load-bearing item among these ⇒ `HOLD`.** A receipt that uses readiness language without these six is itself an overclaim, and the successor review treats it exactly as it treats an unexecuted assertion presented as executed evidence.
+
+**This is not a checklist for every component.** It fires only where the receipt makes a current live-readiness claim about a stateful journey — and where it fires, it is mandatory.
 
 ### The integrity hole that remains open, named rather than papered over
 
