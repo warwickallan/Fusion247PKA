@@ -38,7 +38,18 @@ interesting places.
 - **`WO-2026-08-10-B15-05`** — found the CDP arm was marking a shop **`BASKET_READY` with an empty
   trolley** (silent false success), and that **`renderChecklist` had zero production callers** — the
   checklist Warwick would shop from was never rendered anywhere.
-- **`WO-2026-08-10-B15-06`** — the last mile: the card emits a path with no Cockpit proxy behind it.
+- **`WO-2026-08-10-B15-06`** — the last mile. The card emitted a path with **no Cockpit proxy behind
+  it**, and the read service `JSON.stringify`'d **every** routed response, so the checklist went out as
+  a quoted one-liner with literal `
+`. **Larry curled that exact response earlier and did not register
+  it as a defect; the worker's preflight did**, and correctly refused to compensate in the proxy.
+  **Closed and verified live:** `node services/cockpit/asdair-checklist-check.mjs` → 22 assertions, 0
+  failed, `DEPLOYMENT MATCHES SOURCE`; and
+  `https://warwick-yoga.tailbc1fe3.ts.net:8443/api/asdair/checklist?shop=SHOP-2026-08-09` → **HTTP 200**.
+  **A control defect disclosed:** the first version of that gate asserted *"one line names both
+  symbols"* — the **import** line names both, so deleting the dispatch left it green. Caught by the
+  builder's mutation. **Larry had already merged the broken gate**, having integrated while the worker
+  was still running.
 
 **Veritas** — one dispatch, two receipts. **Gate 1 HOLD** (6 of 8 ACs PASS; holds on B15-04 AC4 and
 B15-05 AC7) and **Gate 2 HOLD** (Q1 *yes*, Q2 *"not yet, and it should not be presented to him as
@@ -115,14 +126,21 @@ PowerShell quoting failure, and the port-number archaeology.
 - Schema drift: `asdair_rw` holds `SELECT` on two tables no committed migration grants.
 - **Tailscale Funnel is ON**, publicly exposing `127.0.0.1:8787` (a CareerAIR email server, not in this
   repo). **Not established as accidental — for Warwick to confirm.**
+- **No basket has ever been built by the ruled supervised route**, and none can be without fresh
+  live-account authority from Warwick. **A limit to declare, not work to dispatch.**
 - The read-service logon task is **configured** identically to one proven to fire tonight, but **no
   reboot was performed**, so reboot survival is inferred rather than proven (Veritas named this).
 - **`origin/main` is far behind local `main`. The main push and the merge remain Warwick's gate.**
 
 ## Resumption point
 
-`main` carries both integrated Work Packages; both runtimes are live on it; `SHOP-2026-08-09` sits at
-`READY_TO_SHOP`, idling at `wait:basket_request`. **The next real action is Warwick's** — send a photo,
-or ask for the basket build on the existing shop.
+`main` carries **three** integrated Work Packages; the runtime, the read service and the Cockpit are all
+live on it; `SHOP-2026-08-09` sits at `READY_TO_SHOP`, idling at `wait:basket_request`.
+**Convergence: ONE main, ONE working folder** — sixteen worktrees removed, all three build branches
+merged with zero unique commits, everything mirrored to `origin/backup/2026-08-10-local-main-safety`.
+
+**The next real action is Warwick's** — send a photo, or ask for the basket build on the existing shop.
+The card will carry a tappable
+`https://warwick-yoga.tailbc1fe3.ts.net:8443/api/asdair/checklist?shop=<ref>`.
 
 **The Build is NOT closed. Only the session is.**
