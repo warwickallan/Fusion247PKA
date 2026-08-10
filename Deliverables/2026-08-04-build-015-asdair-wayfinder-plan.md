@@ -1561,6 +1561,37 @@ its evidence so it can be re-established or falsified in minutes.**
 
 ---
 
+### 🔴 STOP — RE-CUT 2026-08-11. THE FRONTIER IS SOURCE TRUTH, NOT THE WORK PACKAGES BELOW.
+
+> **Everything in the ACTIVE SESSION WORK PACKAGE block below is SUPERSEDED as the frontier.** It is
+> retained for its detail. It no longer directs the next action.
+>
+> **READ FIRST, IN THIS ORDER:**
+> 1. `Deliverables/2026-08-11-rotation-handover.md` — product truth and the full state census.
+> 2. `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md` — **the top blocker.**
+> 3. `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md` § 4 STOP block — **mandatory before
+>    any browser mutation.**
+>
+> **WHAT CHANGED ON 2026-08-11.** Warwick's photograph was real. The durable transcript for
+> `SHOP-2026-08-10-M64` was **EMPTY** — no text, no provider, no model, no confidence — yet ~35
+> plausible `shop_line` rows existed that **did not represent his photograph**: ~17 of his items
+> missing, 7 products he never asked for present. The browser then faithfully built the wrong
+> trolley. **Warwick caught it by noticing the price was too low.**
+>
+> **Tonight's groceries were rescued MANUALLY** from the photograph: 41 products, 58 units,
+> £140.97, no slot, no checkout. **Browser capability is PROVEN. The photo→list pipeline is NOT.**
+>
+> **THE NEXT ACTION IS NOT A WORK PACKAGE.** It is: establish why the transcript is empty and where
+> those 35 lines came from. **No photograph acceptance journey may be attempted until input truth is
+> proven (Gate Zero).**
+>
+> **B15-18, B15-19, B15-20, B15-21 are all BUILT and PUSHED and NONE ARE INTEGRATED OR LIVE.**
+> Migration 019 IS live — but the write path that supplies `shop_id` is NOT, so shop ownership is
+> **not** fixed end to end. The runtime still runs pre-change bytes (PID 12204, 2026-08-10 21:40:57).
+> Both Veritas gates remain **HOLD**.
+
+---
+
 ### ⭐ ACTIVE SESSION WORK PACKAGE — RE-CUT 2026-08-10 EVENING. **WP-B15-3 IS NO LONGER THE FRONTIER.**
 
 > **⛔ READ THIS BLOCK BEFORE THE ONE BELOW IT. The WP-B15-3 section that follows describes work

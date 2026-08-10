@@ -207,6 +207,86 @@ password** (hard rule).
 > Not Larry, not a Claude Code subagent, not `services/asdair/browser-runner/`. Canonical:
 > `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`.
 
+> ## ⛔ STOP. READ THIS SECTION BEFORE ANY BROWSER MUTATION. (Added 2026-08-11 — EXECUTED EVIDENCE.)
+>
+> **On 2026-08-11 a real ASDA trolley was successfully built by browser for the first time: 41
+> products, 58 units, £140.97, reconciled line by line against Warwick's photograph.** The mechanics
+> below are what actually worked, measured, not theorised. **Larry began that session by NOT reading
+> this SOP and improvising the superseded bulk-checkbox approach; it wasted an hour and Warwick had
+> to intervene.** Do not repeat that.
+>
+> **The 20 operating facts, all established by execution on 2026-08-11:**
+>
+> **Order and route**
+> 1. **Read this SOP before touching ASDA.** Acknowledge the SOP and the head you read it at.
+> 2. Use the **persistent approved ASDA Chrome profile/session**. Confirm authentication by a real
+>    signal (the page greets Warwick by name); never assume.
+> 3. **Regulars / Favourites FIRST.** Search only for what is genuinely not available there.
+> 4. **Sort Regulars A–Z** before traversing. The control is a button labelled `A-Z`; confirm the
+>    sort label reads `SortA-Z` afterwards, because the click silently no-ops if fired before the
+>    grid hydrates. Wait ~3s after load, then click, then wait ~8s.
+> 5. **Ordered sequential traversal.** The speed is in the deterministic ordering. **Do NOT resurrect
+>    the bulk-checkbox method as the strategy** (superseded, see below).
+>
+> **The grid's quirks — all cost real time**
+> 6. The A–Z re-render **can freeze the renderer past a 45s tool timeout and still succeed.** A
+>    timeout is not a failure. **Wait, then re-read state. Do not hammer it.**
+> 7. Wheel and keyboard scrolling on that grid are unreliable; screenshots of it can come out blank.
+>    **Verify on the trolley page**, which renders fine.
+> 8. Each add/remove triggers a server round-trip that blocks the JS runtime, so **a loop with awaits
+>    will time out mid-run having done part of the work.** Prefer one mutation per call, then verify.
+> 9. **Rapid-fire synchronous clicks get swallowed** — each mutation re-renders and invalidates the
+>    other element handles. Expect to repeat and verify.
+>
+> **⚠️ 10. ASDA'S SAVED QUANTITIES CANNOT BE TRUSTED — this is the most expensive new fact.**
+> Products carry a **saved per-product quantity that survives a full page reload** and **silently
+> overrides the quantity the list asked for.** On 2026-08-11 seven lines arrived at the wrong
+> quantity for this reason alone (roast topside 2 not 1, Lucozade orange 2 not 1, Princes 2 not 1,
+> Warburtons 2 not 1, both Yazoos 2 not 1, milk 3 not 4) — **every product correct, every quantity
+> wrong, and completely invisible.** Therefore: **explicitly set every requested quantity**, never
+> accept the tile default.
+> 11. **Use the `+` / `−` steppers.** Typing into the quantity field does not persist server-side.
+> 12. **Never infer quantity from price** — multibuys distort it. Read the actual field.
+>
+> **Verification**
+> 13. **Verify the trolley itself after every batch**, reading each line's real quantity control
+>     (`Decrease <product> quantity` button, then the adjacent `input[type=number]`).
+> 14. **Reconcile four columns:** source line → ASDA product → requested qty → actual trolley qty.
+> 15. **An error response is NOT proof the add failed.** On 2026-08-11 a Dettol add returned an error
+>     and had actually landed, creating a duplicate. **The trolley read-back is the only truth.**
+> 16. **Price-band sanity check (rule 7).** Roughly £120–150 for this household. A materially low
+>     basket is a signal to investigate **before** reporting completion — on 2026-08-11 a £74.30
+>     basket was reported as a success and was in fact built from a false list.
+> 17. **⭐ BEFORE DECLARING SUCCESS, RE-READ THE ORIGINAL SOURCE PHOTOGRAPH and diff it line by line
+>     against the trolley.** This step, and only this step, caught a missing 6-pint semi-skimmed milk
+>     that both the pipeline and Larry had missed. **It is mandatory, not optional.**
+>
+> **Searched items**
+> 18. For anything added by search: **capture the real ASDA product ID** (it is the last path segment
+>     of `/groceries/product/<cat>/<slug>/<id>`) and **favourite it on ASDA**. The favourite control
+>     is on the **product page**, `data-testid="favourite-button"`, aria-label
+>     `Add <product> to favourites`. **Search result tiles do NOT expose it** — you must open the
+>     product page.
+> 19. Then reconcile `asdair.regulars` through the **ruled writer** `outcome/update-regulars.js`,
+>     `--dry-run` first, every time. It de-duplicates by normalised name and **adopts** an existing
+>     row rather than duplicating it — but adoption **changes nothing**, so an adopted row still needs
+>     an explicit `enrichRegular` to gain its product id, brand, typical qty and aliases.
+>
+> **Boundaries**
+> 20. **Zero invented substitutions.** Unavailable or ambiguous → stop and flag. On 2026-08-11 Larry
+>     nearly substituted honey-roast ham for "ham on the bone" and Warwick caught it. Where the
+>     household's own regular is out of stock (Bloo Spa Moments Vitality), **drop and flag — never
+>     swap the scent or variant.** Never book a slot, never check out, never pay.
+>
+> **⛔ 21. THE OPERATOR RECONCILIATION IN STEP 19 IS NOT PROOF THAT DURABLE LEARNING WORKS.** The
+> 2026-08-11 `asdair.regulars` writes were an **operator rescue action performed by hand**. They are
+> **not** evidence that AsdAIr's automated learning path learned anything. Do not cite them as such.
+>
+> **⛔ 22. NONE OF THIS PROVES THE PIPELINE.** The 2026-08-11 trolley was built from Warwick's
+> photograph read directly by a human-equivalent reader, **because the pipeline's own derived list
+> was false** — see `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md`. Browser capability is
+> proven. **Photo-to-list truth is not.**
+
 **The proven add method — Brand A–Z ordered sequential traversal. Follow it, this was expensive to learn:**
 
 1. Open the appropriate ASDA **Regulars / Favourites** view.
