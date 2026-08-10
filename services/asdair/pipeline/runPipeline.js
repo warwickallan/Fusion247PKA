@@ -791,7 +791,9 @@ async function stepInterpret(deps, snapshot) {
   // already confirmed refuses the re-read, and the list must follow the stored
   // truth rather than the fresh guess.
   const stored = shopLines.withCanonicalNames(lineWrites.map((w) => w.line), catalogue);
-  const intents = buildGroundedIntents(stored, { sourceId, listDate, requestedBy: 'asdair:pipeline' });
+  const intents = buildGroundedIntents(stored, {
+    sourceId, listDate, requestedBy: 'asdair:pipeline', shopId: shop.id,
+  });
   deps.assertAllowedIntents(intents);
 
   // Materialise the real list rows. add_list_item upserts on (list_id,
@@ -845,7 +847,7 @@ async function stepInterpret(deps, snapshot) {
  * When the line did not resolve, the raw reading is used and the item is stored
  * `needs_decision` - never dropped, never guessed at.
  */
-export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy }) {
+export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy, shopId = null }) {
   return lines.map((l, i) => {
     const matched = l.matched_regular_id !== null && l.matched_regular_id !== undefined;
     const readable = String(l.raw_reading || '').trim();
@@ -887,6 +889,13 @@ export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy })
       args: {
         context: 'shopping',
         list_date: listDate,
+        // THE OWNING SHOP (migration 019, applied 2026-08-10). Without this the
+        // insert takes findOrCreateDraftList's DATE-keyed lane and a second shop
+        // on one date silently lands on the first shop's list - which is how a
+        // CANCELLED week's item reached Warwick's real shop on 2026-08-10.
+        // `listDateOf` strips the -M<n> suffix by design, so the date CANNOT
+        // distinguish two shops of the same day; only this can.
+        shop_id: shopId,
         item_name: name,
         requested_qty: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : null,
         note: notes.length ? notes.join('; ') : null,
@@ -1740,6 +1749,9 @@ async function stepApplyCorrections(deps, snapshot) {
       args: {
         context: 'shopping',
         list_date: listDate,
+        // Same reason as buildGroundedIntents: a correction must land on THIS
+        // shop's list, not on whichever list happens to share the date.
+        shop_id: shop.id,
         item_name: c.payload.item_name,
         requested_qty: c.payload.requested_qty ?? null,
         note: c.payload.note ?? `corrected by ${c.payload.actor}`,
