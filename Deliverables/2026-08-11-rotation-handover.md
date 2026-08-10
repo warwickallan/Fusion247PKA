@@ -105,6 +105,18 @@ Full method now canonical in **SOP-021 § 4**, in the STOP block. Result:
 
 **41 products · 58 units · £140.97 · no slot · no checkout · nothing paid.**
 
+**The itemised 41-line reconciliation is at
+`Deliverables/2026-08-11-trolley-reconciliation-41-lines.md`** — every product, every quantity, the
+step-by-step arithmetic, and the judgement calls. It exists because the cold-start reader correctly
+flagged that "41/41 correct" was asserted with no itemised record anywhere in the repository.
+
+> **⚠️ TWO SOP-021 § 5 STEPS WERE NOT PERFORMED, AND ONE OF THEM COULD CHANGE WHAT ARRIVES.**
+> **"Allow substitutions for all" is still TICKED** on the trolley and every line shows "Allow
+> substitutes" — **standing rule 6 is never auto-substitute**, and under the supervised adapter there
+> is no mechanical enforcement of that toggle. **No `asdair.orders` row was written** via
+> `recordShopOutcome.js` either. Neither affects what is currently in the basket; **the substitution
+> toggle should be closed before Warwick checks out.**
+
 **Corrections made during the rescue:** 10 wrong products removed (Mars, TRESemme ×2, Andrex, Wall's
 sausage rolls, Smart Litter, Viakal, Lucozade raspberry, Hovis, Birds Eye classic burgers) · ~20
 missing products restored · **the 6-pint ASDA semi-skimmed milk caught only after Warwick challenged

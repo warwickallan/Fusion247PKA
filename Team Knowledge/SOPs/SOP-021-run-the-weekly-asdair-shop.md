@@ -215,7 +215,7 @@ password** (hard rule).
 > this SOP and improvising the superseded bulk-checkbox approach; it wasted an hour and Warwick had
 > to intervene.** Do not repeat that.
 >
-> **The 20 operating facts, all established by execution on 2026-08-11:**
+> **The 22 operating facts, all established by execution on 2026-08-11 — READ ALL 22. Facts 21 and 22 are the two most important prohibitions in this block:**
 >
 > **Order and route**
 > 1. **Read this SOP before touching ASDA.** Acknowledge the SOP and the head you read it at.

@@ -691,7 +691,12 @@ begins only after the prepared sequence below reaches Warwick's decision at step
 catalogue-grounded interpretation with no Larry in the execution path — and what, from executable
 evidence, is the earliest link in the journey that still cannot happen in production?*
 
-### 🎯 THE ONE CURRENT NEXT ACTION — merge-first EXECUTED; shop 6 recovered live 2026-08-09 00:41:55. **Veritas Gate 2 = HOLD.** Next action: Warwick rules on §11 row 7, then D1-corrected branch converges; the §12 handback proceeds regardless.
+### ⛔ SUPERSEDED 2026-08-11 — this heading is HISTORY. It is NOT the current next action.
+
+> **The 2026-08-09 text that stood here named "Warwick rules on §11 row 7" as the next action. That is
+> dead.** The current frontier is **SOURCE TRUTH** — see the ⭐ STOP block above the ACTIVE SESSION WORK
+> PACKAGE, and `Deliverables/2026-08-11-rotation-handover.md` § THE NEXT ACTIONS.
+> **Everything below in §10 is retained as evidence of the 2026-08-09 event and directs nothing.**
 
 > **⚠️ COMPLETION IS NOT CLAIMED, AND VERITAS GATE 2 RETURNED `HOLD`.** Larry does not grade his own
 > work. What follows is the acceptance EVIDENCE from the real production event; the grading is
@@ -2348,7 +2353,39 @@ exists.**
 > enforced. **If the response to anything in this map is to build a mechanism, the diagnosis was
 > rejected.** No new specialist, service, registry, validator, state machine or control plane.
 
-## 12. RESUMABLE STATE AFTER `/clear` OR A FRESH SESSION
+## 12. RESUMABLE STATE AFTER `/clear` OR A FRESH SESSION — **RE-CUT 2026-08-11**
+
+> ### 🔴 THE FOUR THINGS TO SAY, CURRENT AS AT 2026-08-11
+>
+> **1. Recovered map** — this file.
+>
+> **2. Goal** — `BUILD-015-END-TO-END-RECOVERY`: photograph → ShopperBot → checkout-ready basket, every
+> gap closed, integrated, run and proven, with Larry outside the weekly operating path.
+>
+> **3. Phase and gate** — **INPUT TRUTH IS THE FRONTIER. Veritas Gate 1 and Gate 2 are BOTH `HOLD`** at
+> `fb58882` (receipts `f22bfa5`). A new **GATE ZERO (input truth)** now precedes both. **The runtime is
+> NOT on the converged bytes** — PID 12204, started 2026-08-10 21:40:57, pre-change code.
+> **B15-18/19/20/21 are BUILT and PUSHED and NONE are integrated or live.** Migration 019 IS applied
+> live, but the `shop_id` write path is NOT, so shop ownership is **not** fixed end to end.
+>
+> **4. Exact next action** — 🔴 **RESOLVE SOURCE TRUTH.** Read
+> `Deliverables/2026-08-11-rotation-handover.md`, then
+> `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md`. Establish **why** `asdair.shop` id 14 has an
+> empty transcript while 35 `shop_line` rows exist that do not match the photograph, and **where those
+> rows came from.**
+>
+> ## ⛔ DO NOT ASK WARWICK FOR A PHOTOGRAPH.
+>
+> **The block below used to say "WAIT FOR WARWICK'S FRESH PHOTOGRAPH — nothing precedes it". That is now
+> the one action Gate Zero PROHIBITS.** No photograph journey until input truth is proven.
+> **Everything from here to the end of §12 is HISTORY as at 2026-08-09 and directs nothing** — retained
+> because its convergence detail is still useful, and because deleting a superseded block loses the
+> record of what was believed.
+>
+> *(Re-cut in the same commit as the amendment that superseded it. This block had gone stale four times
+> before; the fifth was found by an independent cold-start reader on 2026-08-11, not by Larry.)*
+
+### ⛔ HISTORY — the 2026-08-09 resumable state. Superseded above. Directs nothing.
 
 **Say these four things before touching a tool:**
 
