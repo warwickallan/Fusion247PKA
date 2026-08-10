@@ -55,7 +55,7 @@ import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
 // question STORE remain injected, because those are the parts that touch a wire.
 import { normaliseStoredCandidates, questionLookupFrom } from '../bot/questionRender.js';
 import { resolveCandidateAnswer } from '../bot/resolveTap.js';
-import { ACTIONS } from '../bot/callbackProtocol.js';
+import { ACTIONS, CALLBACK_NAMESPACE, CALLBACK_SEPARATOR } from '../bot/callbackProtocol.js';
 
 // THE RETURN LEG. `handoff/claim.js`, `handoff/completion.js` and
 // `reconcile/verifyBasket.js` are CommonJS, pure, and open no connection of
@@ -459,6 +459,21 @@ function replyTargetOf(update) {
 }
 
 /**
+ * PURE. Is this update a callback button THIS product drew? (WP-B15-08 AC10)
+ *
+ * Decided on the NAMESPACE and nothing else. A list of action names would have
+ * to be edited every time an action is added, and the one that was missing from
+ * such a list is exactly the one nobody notices - `search` was declared,
+ * rendered on every question card, and handled nowhere.
+ */
+function isOurCallback(update) {
+  const data = update && update.callback_query && typeof update.callback_query.data === 'string'
+    ? update.callback_query.data
+    : '';
+  return data.startsWith(`${CALLBACK_NAMESPACE}${CALLBACK_SEPARATOR}`);
+}
+
+/**
  * PHASE 1b - route the taps and typed replies the receiver ignored.
  *
  * A tap becomes a command through the SAME surface the Cockpit uses. Nothing
@@ -566,7 +581,17 @@ export async function routeTaps(deps, {
       // refusals would make every pass look broken. So the trace goes to the
       // journal, where a dropped inbound can be found, and the report stays
       // about our own messages.
+      //
+      // ── BUT OUR OWN NAMESPACE IS NOT FOREIGN TRAFFIC (WP-B15-08 AC10) ─────
+      // That rule was being applied to EVERYTHING, including callbacks in our
+      // own `asd:` namespace that came off cards we drew ourselves. Warwick
+      // pressed a button we rendered and the only record was a journal line he
+      // will never read. The distinction is the NAMESPACE - never a list of
+      // action names, which would go stale the moment an action is added.
       log('inbound_refused', { updateId: update && update.update_id, reason: intent.reason });
+      if (isOurCallback(update)) {
+        refused.push({ action: null, reason: intent.reason, detail: null, refresh: false });
+      }
       continue;
     }
 
@@ -841,8 +866,12 @@ export async function queueShopCards(deps, {
         // reply to, because an index resolving to a label is the ambiguity the
         // render contract exists to remove.
         const { candidates, unidentified } = normaliseStoredCandidates(q.candidates);
+        // WP-B15-08 AC4. "Also suggested" reads as an addendum to a list of
+        // buttons. When NONE of the candidates carried a product id there are no
+        // buttons, the Note is the whole offer, and the card must say so in
+        // words that match what it is showing.
         const note = unidentified.length > 0
-          ? `Also suggested (no product id - reply with the one you want): ${unidentified.join('; ')}`
+          ? `${candidates.length > 0 ? 'Also suggested' : 'Suggested'} (no product id - reply with the one you want): ${unidentified.join('; ')}`
           : null;
 
         const queued = await store.enqueueMessage(deps, {
@@ -1083,6 +1112,12 @@ export async function runOnce(deps, wiring = {}) {
   const answers = [];
   const refusals = [];
 
+  // Resolved BEFORE the claim is built, because the claim now needs it: a reply
+  // is correlated through the card it replies to, and that lookup is the
+  // question store's. It was previously resolved after pollIntake, which is
+  // exactly why the reply branch had nothing to correlate with and gave up.
+  const questions = wiring.questions || (wiring.bot && wiring.bot.questions) || null;
+
   // NO OPEN QUESTION AND NOTHING DEFERRED, NO CLAIM. Warwick's guard, and the
   // reason a genuine new shopping list is never lost: with nothing to correlate
   // to, routing does not get a vote and intake behaves exactly as it always has.
@@ -1090,11 +1125,104 @@ export async function runOnce(deps, wiring = {}) {
     || !wiring.bot || typeof wiring.bot.routeAsdairUpdate !== 'function')
     ? null
     : async (verdict, update) => {
-      // A photo is a list. A reply already correlates through the card it
-      // replies to, and routeTaps handles it. Only bare text reaches here.
+      // A photo is ALWAYS a list. Only text can be an answer.
       if (!verdict || verdict.kind !== 'text') return false;
       const msg = update && update.message;
-      if (!msg || msg.reply_to_message) return false;
+      if (!msg) return false;
+
+      // ── HE REPLIED TO A CARD (WP-B15-08 AC1) ────────────────────────────
+      //
+      // THE LIVE DEFECT OF 2026-08-10, and the whole reason this branch exists.
+      // This used to read `if (msg.reply_to_message) return false;` - declining
+      // the claim on the grounds that "routeTaps handles it". routeTaps DOES
+      // handle it, and it runs LATER IN THE SAME PASS, by which time intake has
+      // already treated the same message as a shopping list and minted a shop.
+      // Warwick answered eight question cards and got four junk shopping lists
+      // (SHOP-2026-08-10-M76, M77, M79, M82) for his trouble. His answers landed
+      // AND his answers became lists: a DOUBLE effect, never a lost answer.
+      //
+      // ── WHY THIS RECORDS THE ANSWER RATHER THAN JUST CLAIMING ───────────
+      // routeTaps SKIPS every update in `claimedUpdateIds`. So claiming a reply
+      // here and leaving the answering to routeTaps would convert a visible
+      // double effect into a SILENT DROP - his words recorded nowhere, no card,
+      // no shop, nothing to notice. That is strictly worse than the defect. The
+      // claim is therefore taken ONLY after the answer is durably written, which
+      // is the same rule the bare-text branch below already follows.
+      if (msg.reply_to_message) {
+        const replyTo = replyTargetOf(update);
+        // No lookup wired, or nothing at that (chat, message): NOT ours. Falls
+        // through to intake exactly as before, so a genuine shopping list that
+        // happens to be a reply is never swallowed.
+        if (!questions || typeof questions.getQuestionByCard !== 'function' || !replyTo) return false;
+
+        let row = null;
+        try {
+          row = await questions.getQuestionByCard(replyTo);
+        } catch (err) {
+          // A lookup that cannot run must not become a WRONG correlation, and
+          // must not eat the message either.
+          log('question_lookup_failed', { detail: String(err && err.message ? err.message : err) });
+          return false;
+        }
+        if (!row) {
+          log('typed_reply_not_claimed', { updateId: verdict.updateId, reason: 'uncorrelated_reply' });
+          return false;
+        }
+
+        const replyIntent = wiring.bot.routeAsdairUpdate(update, {
+          resolveQuestionByMessage: questionLookupFrom([row]),
+        });
+        if (!replyIntent.ok) {
+          log('typed_reply_route_refused', { updateId: verdict.updateId, reason: replyIntent.reason });
+          return false;
+        }
+        const replyMapped = intentToCommand(replyIntent, { parseAnswerArg: wiring.bot.parseAnswerArg });
+        if (!replyMapped.ok) {
+          log('typed_reply_unmapped', { updateId: verdict.updateId, reason: replyMapped.reason });
+          return false;
+        }
+
+        let replyReceipt;
+        try {
+          replyReceipt = await commands.dispatch(replyMapped.command, replyMapped.spec, deps);
+        } catch (err) {
+          const detail = String(err && err.message ? err.message : err);
+          answers.push({ question_key: replyMapped.spec.questionKey, shop_ref: replyMapped.spec.shopRef, error: detail });
+          log('typed_reply_failed', { updateId: verdict.updateId, question_key: replyMapped.spec.questionKey, detail });
+          return false;
+        }
+
+        // THE SAME DUPLICATE DISCIPLINE AS THE BARE-TEXT BRANCH (B15-04).
+        // answerQuestion is a compare-and-set on status='open': a row already
+        // settled refuses the write and returns `duplicate: true`, and THESE
+        // words were stored nowhere. A redelivery of the same message must
+        // still be claimed (or it becomes a shopping list); a different reply
+        // to a settled card must not be, or it vanishes.
+        const duplicate = replyReceipt.duplicate === true;
+        let recorded = !duplicate;
+        if (duplicate) {
+          recorded = await recordedAnswerMatches(deps, {
+            open: openQuestions,
+            questionKey: replyMapped.spec.questionKey,
+            words: replyMapped.spec.answerText,
+            log,
+          });
+        }
+        if (!recorded) {
+          answers.push({
+            question_key: replyMapped.spec.questionKey,
+            shop_ref: replyMapped.spec.shopRef,
+            error: 'not recorded - the question was already answered with different words',
+          });
+          log('typed_reply_not_recorded', { updateId: verdict.updateId, question_key: replyMapped.spec.questionKey });
+          return false;
+        }
+
+        answers.push({ question_key: replyMapped.spec.questionKey, shop_ref: replyMapped.spec.shopRef, duplicate });
+        claimedUpdateIds.add(verdict.updateId);
+        log('typed_reply_claimed', { updateId: verdict.updateId, question_key: replyMapped.spec.questionKey });
+        return true;
+      }
 
       // ── HE TYPED INTO THE DEFERRED WINDOW ───────────────────────────────
       //
@@ -1250,7 +1378,6 @@ export async function runOnce(deps, wiring = {}) {
   const intakeReport = await pollIntake(deps, {
     intake, householdId: wiring.householdId, now: wiring.now, claim, log,
   });
-  const questions = wiring.questions || (wiring.bot && wiring.bot.questions) || null;
 
   const tapReport = await routeTaps(deps, {
     updates: capturing ? capturing.captured : [],

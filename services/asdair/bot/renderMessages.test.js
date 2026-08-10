@@ -227,17 +227,21 @@ test('a question card lists its candidates, offers one button each, and invites 
   assert.match(out.text, /2\. Arla Skyr 450g/);
   assert.match(out.text, /reply to this message/i);
   const buttons = everyButton(out);
-  assert.deepEqual(buttons.map((b) => b.text), ['Yeo Valley Natural 500g', 'Arla Skyr 450g', 'Search ASDA', 'Skip this week']);
+  // 'Search ASDA' was WITHDRAWN by WP-B15-08 AC10: the runtime has no handler
+  // for it and refuses it when pressed. This expectation changed because the
+  // REQUIREMENT changed - not to make a failing assertion pass.
+  assert.deepEqual(buttons.map((b) => b.text), ['Yeo Valley Natural 500g', 'Arla Skyr 450g', 'Skip this week']);
   assert.equal(parseCallbackData(buttons[0].callback_data).arg, 'q7.0');
   assert.equal(parseCallbackData(buttons[1].callback_data).arg, 'q7.1');
   assert.equal(parseCallbackData(buttons[2].callback_data).arg, 'q7');
-  assert.equal(parseCallbackData(buttons[3].callback_data).arg, 'q7');
 });
 
-test('a question with no candidates still asks, and still offers search / skip', () => {
+test('a question with no candidates still asks, and still offers skip', () => {
   const out = renderQuestionCard({ shopRef: REF, questionKey: 'q9', item: 'that blue tin' });
   assert.match(out.text, /No candidate products found\./);
-  assert.deepEqual(everyButton(out).map((b) => b.text), ['Search ASDA', 'Skip this week']);
+  // Search withdrawn by WP-B15-08 AC10. Skip and a typed reply are the surface.
+  assert.deepEqual(everyButton(out).map((b) => b.text), ['Skip this week']);
+  assert.match(out.text, /reply to this message/i, 'with no buttons, the invitation to type is the only way to answer');
 });
 
 test('an absurdly long product name shortens the LABEL only — callback_data is still valid and under 64 bytes', () => {
@@ -525,4 +529,95 @@ test('humanTime: deterministic UTC rendering, and anything unparseable is unknow
   for (const bad of [null, undefined, '', '   ', 'not-a-date', 42]) {
     assert.equal(humanTime(bad), UNKNOWN, `humanTime(${String(bad)})`);
   }
+});
+
+// =====================================================================
+// WP-B15-08 AC4 - A CARD MUST NOT CONTRADICT ITSELF
+//
+// Warwick received cards that printed "No candidate products found." with a
+// Note listing suggested products directly above it. Both halves are generated
+// from the SAME question row: the planner's candidates split into the ones
+// carrying a trustworthy product id (which become buttons) and the ones that do
+// not (which become the Note). When every candidate lands in the second bucket
+// the button list is empty and the card announces there are none - while
+// printing them.
+// =====================================================================
+
+test('AC4 a card with a suggestion NOTE never claims it has no candidates', () => {
+  const out = renderQuestionCard({
+    shopRef: REF,
+    questionKey: 'q9',
+    item: 'that blue tin',
+    note: 'Suggested (reply with the one you want): Heinz Baked Beans 415g; Branston Beans 410g',
+    candidates: [],
+  });
+  assert.doesNotMatch(out.text, /No candidate products found/,
+    'the card lists candidates in the Note and denies having any in the same breath');
+  assert.match(out.text, /Heinz Baked Beans 415g/, 'the suggestions must still reach him');
+  assert.match(out.text, /reply to this message/i, 'he must still be told how to answer');
+});
+
+test('AC4 a card with NEITHER buttons NOR a note still says so, honestly', () => {
+  const out = renderQuestionCard({ shopRef: REF, questionKey: 'q9', item: 'that blue tin' });
+  assert.match(out.text, /No candidate products found\./,
+    'a genuinely empty card must still tell him there is nothing to choose from');
+});
+
+test('AC4 buttons and the "none" line can never both be absent-and-present', () => {
+  // The invariant, checked over every combination rather than reasoned about:
+  // the "none found" line appears if and only if the card offers NOTHING -
+  // no candidate buttons and no suggestion note.
+  const cases = [
+    { candidates: ['Yeo Valley Natural 500g'], note: null },
+    { candidates: ['Yeo Valley Natural 500g'], note: 'Suggested: Arla Skyr 450g' },
+    { candidates: [], note: 'Suggested: Arla Skyr 450g' },
+    { candidates: [], note: null },
+  ];
+  for (const c of cases) {
+    const out = renderQuestionCard({ shopRef: REF, questionKey: 'q7', item: 'yoghurt', ...c });
+    const offersSomething = c.candidates.length > 0 || Boolean(c.note);
+    const saysNone = /No candidate products found\./.test(out.text);
+    assert.equal(saysNone, !offersSomething,
+      `card contradicts itself for ${JSON.stringify(c)}`);
+  }
+});
+
+// =====================================================================
+// WP-B15-08 AC10 - A CONTROL THE SYSTEM REFUSES MUST NOT BE DRAWN
+//
+// Warwick tapped "Search ASDA" on 2026-08-10. From the live runtime log:
+//   {"event":"inbound_refused","updateId":171031159,"action":"search",
+//    "reason":"that button is not a command - it is answered by the runner or
+//    by a human"}
+// The button was rendered on EVERY question card and no handler for it exists
+// anywhere in the runtime. A control the product refuses when pressed must not
+// be drawn. This does NOT implement ASDA search - it withdraws a dead control.
+// ACTIONS.SEARCH stays in the protocol; nothing renders it.
+// =====================================================================
+
+test('AC10 no question card draws a control the runtime has no handler for', () => {
+  const withCandidates = renderQuestionCard(SAMPLES.question);
+  const without = renderQuestionCard({ shopRef: REF, questionKey: 'q9', item: 'that blue tin' });
+  for (const out of [withCandidates, without]) {
+    const labels = everyButton(out).map((b) => b.text);
+    assert.ok(!labels.includes('Search ASDA'),
+      'the card still offers Search ASDA, which the runtime refuses when pressed');
+    const actions = everyButton(out).map((b) => parseCallbackData(b.callback_data).action);
+    assert.ok(!actions.includes('search'),
+      'a search callback is still reachable from a card');
+  }
+});
+
+test('AC10 withdrawing search leaves every card still answerable', () => {
+  const withCandidates = everyButton(renderQuestionCard(SAMPLES.question)).map((b) => b.text);
+  assert.deepEqual(withCandidates, ['Yeo Valley Natural 500g', 'Arla Skyr 450g', 'Skip this week']);
+
+  // The line Warwick is blocked on RIGHT NOW - "1 PKT HAM ON THE BONE" - has no
+  // candidate buttons at all. With search withdrawn, Skip and a typed reply are
+  // the whole of the surface, so the invitation to type is what makes the card
+  // answerable and it must always be there.
+  const bare = renderQuestionCard({ shopRef: REF, questionKey: 'q9', item: '1 PKT HAM ON THE BONE' });
+  assert.deepEqual(everyButton(bare).map((b) => b.text), ['Skip this week']);
+  assert.match(bare.text, /reply to this message/i,
+    'a card with no buttons and no invitation to type is unanswerable');
 });

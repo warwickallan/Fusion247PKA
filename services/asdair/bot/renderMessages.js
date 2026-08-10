@@ -202,18 +202,36 @@ export function renderQuestionCard({ shopRef, questionKey, item, note, candidate
     lines.push('');
     lines.push('Candidates:');
     labels.forEach((l, i) => lines.push(`  ${i + 1}. ${l}`));
-  } else {
+  } else if (!note) {
+    // ── WP-B15-08 AC4: THE CARD MUST SAY ONE TRUE THING ────────────────────
+    // This line used to depend on the BUTTON list alone. The planner's
+    // candidates are split by whether they carry a trustworthy product id: the
+    // ones that do become buttons, the ones that do not become the Note above.
+    // So a card whose candidates ALL landed in the second bucket printed its
+    // suggestions and then announced, directly underneath them, that there were
+    // none. Both halves are generated from the SAME question row and cannot be
+    // allowed to disagree. "None found" is now said only when the card is
+    // genuinely offering nothing - no buttons AND no note.
     lines.push('');
     lines.push('No candidate products found.');
   }
   lines.push('');
-  lines.push('Tap a candidate, or reply to this message with the product you want.');
+  lines.push(labels.length > 0
+    ? 'Tap a candidate, or reply to this message with the product you want.'
+    : 'Reply to this message with the product you want.');
 
   const rows = labels.map((l, i) => [button(l, ACTIONS.ANSWER, shopRef, buildAnswerArg(questionKey, i))]);
-  rows.push([
-    button('Search ASDA', ACTIONS.SEARCH, shopRef, questionKey),
-    button('Skip this week', ACTIONS.SKIP, shopRef, questionKey),
-  ]);
+  // ── WP-B15-08 AC10: A CONTROL THE SYSTEM REFUSES MUST NOT BE DRAWN ────────
+  // 'Search ASDA' (ACTIONS.SEARCH) was rendered here on EVERY question card and
+  // handled NOWHERE: telegramAdapter refuses it as NOT_A_COMMAND, because
+  // searching ASDA is a supervised browser step and nothing in this pipeline
+  // drives a browser. Warwick pressed it on 2026-08-10 and nothing happened -
+  //   {"event":"inbound_refused","updateId":171031159,"action":"search", ...}
+  // Withdrawing the button is the honest fix. ACTIONS.SEARCH stays in the
+  // protocol (other surfaces declare it); what is removed is the DRAWING of a
+  // control this runtime will refuse. This deliberately does NOT implement an
+  // ASDA search - that is unscoped product work.
+  rows.push([button('Skip this week', ACTIONS.SKIP, shopRef, questionKey)]);
 
   return { text: block(lines), reply_markup: keyboard(rows) };
 }
