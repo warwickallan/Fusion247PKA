@@ -254,9 +254,27 @@ export function splitBashSegments(command) {
   if (typeof command !== 'string') return [];
   return command
     .replace(/\\\n/g, ' ')
+    // ── LOOP-BODY FIX, 2026-08-10 ────────────────────────────────────────────
+    // Shell control keywords separate commands exactly as `;` and `&&` do, and
+    // omitting them meant a loop body was never surfaced as a segment at all.
+    // `for b in …; do git push … --delete "$b"; done` produced NO push segment,
+    // so the destructive deny never fired and eight branches went with it.
+    // Treating the keywords as separators is the precise fix: the push inside
+    // the body becomes an ordinary segment and is classified like any other.
+    .replace(/(^|[\s;])(?:do|done|then|else|elif|fi)(?=[\s;]|$)/g, '$1;')
     .split(/\s*(?:\|\||&&|;|\||\n)\s*/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+// A heredoc body is DATA, not commands. Stripping it before classification is
+// what lets a commit message describe a destructive push — as this fix's own
+// message must — without the guard denying the commit that documents it.
+export function stripHeredocBodies(command) {
+  return String(command ?? '').replace(
+    /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1[\s\S]*?^\s*\2\s*$/gm,
+    ' <<heredoc> ',
+  );
 }
 
 export function classifyBashSegment(segment) {
@@ -444,7 +462,7 @@ export function classifyPushSegment(segment) {
 }
 
 export function classifyPushCommand(command) {
-  const raw = String(command ?? '');
+  const raw = stripHeredocBodies(command);
   if (!/\bpush\b/.test(raw)) return null;
 
   // ── D-B FIX, 2026-08-09 ───────────────────────────────────────────────────
@@ -461,6 +479,29 @@ export function classifyPushCommand(command) {
   // asks, because the substitution is in the push's own arguments. A substitution
   // in a sibling segment cannot change this push's destination and no longer
   // gates it.
+  // ── LOOP-EVASION FIX, 2026-08-10. Found by accident, in production. ───────
+  // `splitBashSegments` does not descend into a `for … do … done` body, so a
+  // destructive push wrapped in a loop produced NO push segment at all and the
+  // deny never fired. Demonstrated live:
+  //
+  //   git push origin --delete foo                        -> deny   (correct)
+  //   for b in a b; do git push -q origin --delete "$b"; done -> NOTHING
+  //
+  // Larry deleted eight branches through that hole while tidying. They were all
+  // fully merged so nothing was lost — but the control failed silently and the
+  // person it exists to stop was the one who benefited.
+  //
+  // So the destructive test now runs over the RAW COMMAND TEXT as well as the
+  // segments. Segmentation is an optimisation for classifying DESTINATION; it
+  // must never be the only thing standing between a `--delete` and the remote.
+  // A false positive here costs one prompt. A false negative costs a branch.
+  if (/\bgit(\.exe)?\b[^\n;|&]*\bpush\b/.test(raw)) {
+    const destructiveAnywhere =
+      /\bpush\b[^\n;|&]*\s(--force\b|-f\b|--force-with-lease\b|--force-if-includes\b|--mirror\b|--delete\b|-d\b|--prune\b)/.test(raw)
+      || /\bpush\b[^\n;|&]*\s[+:][A-Za-z0-9._/-]/.test(raw);
+    if (destructiveAnywhere) return 'destructive';
+  }
+
   const kinds = splitBashSegments(raw).map(classifyPushSegment);
   if (kinds.includes('destructive')) return 'destructive';
   if (kinds.includes('main')) return 'main';

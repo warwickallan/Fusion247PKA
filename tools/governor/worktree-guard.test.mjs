@@ -1209,3 +1209,50 @@ test('CONTRACT (MUTATION): safeOperationDecision cannot be talked into allowing 
   assert.equal(deferred.decision, DECISION.DEFER, 'an unclassifiable command is never allowed');
   assert.equal(classifyPowerShellCommand('Get-ChildItem').kind, 'read-only');
 });
+
+test('CONTRACT (REGRESSION 2026-08-10): a destructive push inside a LOOP is still denied', () => {
+  // FOUND IN PRODUCTION, BY ACCIDENT. `splitBashSegments` does not descend into
+  // a `for … do … done` body, so a destructive push wrapped in a loop produced
+  // NO push segment and the deny never fired. Larry deleted eight branches
+  // through that hole while tidying up. They were all fully merged so nothing
+  // was lost — but the control failed silently, and the actor it exists to stop
+  // was the one who benefited from the failure.
+  //
+  // The bare form was ALWAYS denied. That is what made it invisible: every test
+  // asserted the bare form, so the suite was green over an open door.
+  const P = 'push';
+  const del = '--' + 'delete';
+  const force = '--' + 'force';
+
+  const mustDeny = [
+    `git ${P} origin ${del} foo`,
+    `git ${P} ${force} origin main`,
+    `git ${P} origin :refs/heads/x`,
+    `for b in a b; do git ${P} -q origin ${del} "$b"; done`,
+    `for b in a; do git ${P} ${force} origin main; done`,
+    `while read b; do git ${P} origin :refs/heads/x; done`,
+  ];
+  for (const command of mustDeny) {
+    const r = guard({ tool_name: 'Bash', tool_input: { command }, cwd: REPO_ROOT },
+      { estateRoots: [REPO_ROOT] });
+    assert.equal(r.decision, DECISION.DENY, `must DENY: ${command}`);
+    assert.equal(toHookOutput(r).hookSpecificOutput.permissionDecision, 'deny');
+  }
+
+  // And the conservatism must not have eaten ordinary work.
+  const mustAllow = [
+    `git ${P} -q origin HEAD:build-015/live-defects`,
+    'mkdir -p out/x',
+    'git status --porcelain',
+  ];
+  for (const command of mustAllow) {
+    const r = guard({ tool_name: 'Bash', tool_input: { command }, cwd: REPO_ROOT },
+      { estateRoots: [REPO_ROOT] });
+    assert.equal(r.decision, DECISION.ALLOW, `must ALLOW: ${command}`);
+  }
+
+  // Destination-main still asks rather than denying — the two are different gates.
+  const mainPush = guard({ tool_name: 'Bash', tool_input: { command: `git ${P} origin main` }, cwd: REPO_ROOT },
+    { estateRoots: [REPO_ROOT] });
+  assert.equal(mainPush.decision, DECISION.ASK);
+});
