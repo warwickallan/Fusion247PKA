@@ -341,7 +341,44 @@ export function classifyUpdate(update, { allowedSenderIds } = {}) {
 
   // voice / document / sticker / empty — resolvePayload can take voice, but this
   // receiver deliberately handles only the two shapes the weekly list arrives in.
-  return { ok: false, reason: IGNORE_REASONS.UNSUPPORTED_CONTENT_TYPE, senderId, updateId };
+  //
+  // WP-B15-11 AC5. This refusal is TERMINAL and the caller advances the offset
+  // past it, which is correct — otherwise one unsupported message wedges the
+  // queue forever. But it is also the one refusal shape that can be REAL DATA
+  // LOSS: an allowed sender's genuine weekly list, sent as a document or a voice
+  // note, is refused and consumed with no trace of what it was. So the verdict
+  // now carries the KINDS of content the message held — kinds only, never
+  // content, never a filename, never a file id (see contentKindsOf). Offset
+  // semantics are UNCHANGED; only the visibility of the refusal is.
+  return {
+    ok: false,
+    reason: IGNORE_REASONS.UNSUPPORTED_CONTENT_TYPE,
+    senderId,
+    updateId,
+    contentKinds: contentKindsOf(message),
+  };
+}
+
+/**
+ * PURE. Which CONTENT-BEARING fields a Telegram message carried, by NAME.
+ *
+ * Names only, taken from a CLOSED allowlist of Telegram field names. No value
+ * from the message is ever read, so no message text, caption body, filename,
+ * mime type, file id or duration can leak through this into a log line. The
+ * allowlist being closed is the mechanism: an unknown future field is reported
+ * as nothing rather than by echoing its key.
+ *
+ * Only ever computed for a sender who has ALREADY passed the allowlist — a
+ * stranger never gets a content-type oracle, the same posture as the
+ * allowlist-first check order in classifyUpdate.
+ */
+export function contentKindsOf(message) {
+  const KNOWN = [
+    'text', 'photo', 'document', 'voice', 'audio', 'video', 'video_note',
+    'sticker', 'animation', 'location', 'contact', 'poll', 'caption',
+  ];
+  if (!message || typeof message !== 'object') return [];
+  return KNOWN.filter((k) => message[k] !== undefined && message[k] !== null);
 }
 
 /**
@@ -656,6 +693,31 @@ export async function runIntake({
   if (!telegram || typeof telegram.getUpdates !== 'function') throw new Error('runIntake: telegram client required (injected)');
   if (!state || typeof state.read !== 'function' || typeof state.write !== 'function') throw new Error('runIntake: state store required (injected)');
   if (!dryRun && (!media || typeof media.save !== 'function')) throw new Error('runIntake: media store required (injected) unless dryRun');
+  // ── THE FAIL-CLOSED DURABLE-CAPTURE GUARD (WP-B15-11 AC3/AC4) ──────────────
+  //
+  // A LIVE run advances the shared Telegram offset, and advancing it is
+  // DESTRUCTIVE: Telegram then forgets the update permanently. Without somewhere
+  // durable to put the record first, a live run therefore consumes a real
+  // shopping list and loses it - silently, with no error and nothing to recover
+  // from. `fetch-shopper-list.js` did exactly that, because `onRecord` was
+  // OPTIONAL and its absence simply skipped the persistence step.
+  //
+  // The requirement is not "remember to pass onRecord". It is that an unsafe
+  // live run cannot START. So the hook is REQUIRED in live mode, here at the
+  // seam, where every caller - present, future, the CLI, `npm run fetch` - has
+  // to come through. It is deliberately the same shape as the media guard above
+  // it: a missing collaborator that would make the run unsafe is a refusal, not
+  // a branch to skip.
+  //
+  // There is intentionally NO opt-out flag. An escape hatch would re-open this
+  // hole for the first caller that found the guard inconvenient.
+  if (!dryRun && typeof onRecord !== 'function') {
+    throw new Error(
+      'runIntake: onRecord (durable capture) required unless dryRun - a live run advances the Telegram '
+      + 'offset, which permanently consumes the message, so the record must be persisted first. '
+      + 'Use dryRun to inspect without consuming, or supply a durable onRecord (see pollIntake).',
+    );
+  }
 
   const { lastUpdateId } = await state.read();
   const offsetBefore = lastUpdateId;
@@ -679,7 +741,16 @@ export async function runIntake({
     if (!verdict.ok) {
       // Terminal decision — logged as ignored, never processed. No content is
       // logged (a stranger's message body never reaches a log line).
-      const entry = { updateId: verdict.updateId, senderId: verdict.senderId, reason: verdict.reason };
+      // `contentKinds` is present only where classifyUpdate computed it (an
+      // allowed sender whose content type this receiver does not handle). It is
+      // field NAMES only - see contentKindsOf - so no content is logged here,
+      // and a stranger's message still produces nothing but a reason.
+      const entry = {
+        updateId: verdict.updateId,
+        senderId: verdict.senderId,
+        reason: verdict.reason,
+        ...(verdict.contentKinds ? { contentKinds: verdict.contentKinds } : {}),
+      };
       ignored.push(entry);
       log('ignored', entry);
       if (verdict.updateId !== null) offsetAfter = verdict.updateId;
@@ -754,6 +825,12 @@ export async function runIntake({
     // second delivery resume the same shop instead of creating another. Given a
     // choice between "might process twice" and "might lose it forever", the
     // duplicate is the safe failure - and here it is not even a duplicate.
+    //
+    // WP-B15-11: in LIVE mode this branch is now UNCONDITIONAL - the guard at
+    // the top of this function refuses to start without `onRecord`, so there is
+    // no live path in which the offset advances without a durable capture
+    // having resolved first. The condition remains only because `dryRun` legally
+    // has no sink, and a dry run advances nothing.
     if (typeof onRecord === 'function') {
       try {
         await onRecord(record);
@@ -859,7 +936,21 @@ async function buildRecord(verdict, { telegram, media, dryRun, now }) {
  * run the receiver. Still fully injectable (fetchImpl) so nothing here forces a
  * network call. Used by fetch-shopper-list.js.
  */
-export async function runIntakeFromConfig(config, { fetchImpl, dryRun = false, now = Date.now, log } = {}) {
+export async function runIntakeFromConfig(config, { fetchImpl, dryRun = false, now = Date.now, log, onRecord = null } = {}) {
+  // WP-B15-11. Refuse a live run with no durable sink BEFORE constructing a
+  // client or touching the state file, so a refusal costs no network call and
+  // cannot acknowledge anything away. This layer deliberately does NOT supply a
+  // sink of its own: a silent no-op onRecord would satisfy the seam guard while
+  // re-opening the exact hole it exists to close. A caller that genuinely has
+  // somewhere durable to put the record passes it in; the shipped CLI has no
+  // database by design (see the header of fetch-shopper-list.js) and so has no
+  // live mode.
+  if (!dryRun && typeof onRecord !== 'function') {
+    throw new Error(
+      'runIntakeFromConfig: a live run requires onRecord (durable capture) - without it the Telegram '
+      + 'offset would advance and permanently consume the message. Pass dryRun to inspect safely.',
+    );
+  }
   const telegram = createShopperTelegramClient({
     botToken: config.botToken,
     apiBase: config.apiBase,
@@ -870,7 +961,7 @@ export async function runIntakeFromConfig(config, { fetchImpl, dryRun = false, n
     ? createMemoryStateStore((await createFileStateStore(config.stateFile).read().catch(() => ({ lastUpdateId: null }))).lastUpdateId)
     : createFileStateStore(config.stateFile);
   const media = dryRun ? undefined : createFileMediaStore(config.mediaDir);
-  return runIntake({ config, telegram, state, media, dryRun, now, log });
+  return runIntake({ config, telegram, state, media, dryRun, now, log, ...(onRecord ? { onRecord } : {}) });
 }
 
 /** True when a path exists — small helper for the CLI's status line. */

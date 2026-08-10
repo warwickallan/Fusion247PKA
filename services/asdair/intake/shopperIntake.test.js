@@ -36,6 +36,7 @@ import {
   createFileMediaStore,
   createMemoryStateStore,
   runIntake,
+  runIntakeFromConfig,
   defaultStateFile,
   defaultMediaDir,
 } from './shopperIntake.js';
@@ -43,7 +44,10 @@ import {
 // The REAL downstream consumer — the proof that this receiver's output fits.
 import { shopperRoute } from '../../hub/shopper/shopperRoute.mjs';
 
-import { parseArgs, summarise } from './fetch-shopper-list.js';
+// `main` is what `node fetch-shopper-list.js` and `npm run fetch` actually
+// execute, so the landmine tests below drive the SHIPPED entry point rather
+// than a reimplementation of it.
+import { parseArgs, summarise, main } from './fetch-shopper-list.js';
 
 // An obviously fake token. NEVER a real credential.
 const FAKE_TOKEN = '000000:FAKE-TEST-TOKEN-NOT-REAL';
@@ -110,6 +114,16 @@ function fakeTelegram({ updates = [], filePath = 'photos/file_7.jpg', bytes = Bu
     },
   };
 }
+
+// WP-B15-11. A LIVE runIntake now REFUSES to start without a durable capture
+// hook, because advancing the Telegram offset without one permanently consumes
+// the message. The tests below are about classification, download, secret
+// hygiene and offset behaviour rather than about persistence, so they pass a
+// no-op sink - but they pass it EXPLICITLY at every call site. There is
+// deliberately no default: a live run getting a sink by accident is precisely
+// the failure the guard exists to prevent, and a test helper that supplied one
+// silently would hide the guard from every test that uses it.
+const NOOP_SINK = async () => {};
 
 function fakeMedia() {
   const saved = [];
@@ -206,7 +220,7 @@ test('non-private chats and unsupported content types are refused, in the proven
 test('TEXT message → a resolvePayload-shaped text payload + a sourceId, offset advanced', async () => {
   const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 4001, messageId: 77 })] });
   const state = createMemoryStateStore(null);
-  const r = await runIntake({ config: testConfig(), telegram, state, media: fakeMedia(), now: () => 1_700_000_000_000 });
+  const r = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state, media: fakeMedia(), now: () => 1_700_000_000_000 });
 
   assert.equal(r.emitted.length, 1);
   const rec = r.emitted[0];
@@ -223,7 +237,7 @@ test('TEXT message → a resolvePayload-shaped text payload + a sourceId, offset
 test('PHOTO message → highest-res file resolved + downloaded, payload carries the local path (NOT a transcript)', async () => {
   const telegram = fakeTelegram({ updates: [photoUpdate({ updateId: 4002, messageId: 78, caption: 'this week' })] });
   const media = fakeMedia();
-  const r = await runIntake({ config: testConfig(), telegram, state: createMemoryStateStore(null), media, now: () => 1_700_000_000_000 });
+  const r = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state: createMemoryStateStore(null), media, now: () => 1_700_000_000_000 });
 
   assert.equal(r.emitted.length, 1);
   const rec = r.emitted[0];
@@ -247,7 +261,7 @@ test('an unauthorised sender is ignored and logged, and nothing is downloaded fo
   });
   const media = fakeMedia();
   const events = [];
-  const r = await runIntake({
+  const r = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(), telegram, state: createMemoryStateStore(null), media,
     now: () => 1, log: (event, detail) => events.push({ event, ...detail }),
   });
@@ -273,7 +287,7 @@ test('the offset is NOT advanced for a message that failed to process, and the b
     failDownload: true,
   });
   const state = createMemoryStateStore(null);
-  const r = await runIntake({ config: testConfig(), telegram, state, media: fakeMedia(), now: () => 1 });
+  const r = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state, media: fakeMedia(), now: () => 1 });
 
   assert.equal(r.emitted.length, 1, 'only the message BEFORE the failure was emitted');
   assert.equal(r.failed.length, 1);
@@ -284,14 +298,14 @@ test('the offset is NOT advanced for a message that failed to process, and the b
 
   // Re-running asks Telegram for 5002 onward: nothing was lost.
   const telegram2 = fakeTelegram({ updates: [] });
-  await runIntake({ config: testConfig(), telegram: telegram2, state, media: fakeMedia(), now: () => 1 });
+  await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram: telegram2, state, media: fakeMedia(), now: () => 1 });
   assert.equal(telegram2.calls.getUpdates[0].offset, 5002);
 });
 
 test('a token never leaks into a failure message', async () => {
   const telegram = fakeTelegram({ updates: [photoUpdate({ updateId: 6001, messageId: 20 })] });
   telegram.downloadFile = async () => { throw new Error(`boom while fetching https://api.telegram.org/file/bot${FAKE_TOKEN}/x.jpg`); };
-  const r = await runIntake({ config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1 });
+  const r = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1 });
   assert.equal(r.failed.length, 1);
   assert.ok(!r.failed[0].error.includes(FAKE_TOKEN), 'the token is masked out of the reported error');
   assert.ok(r.failed[0].error.includes(maskToken(FAKE_TOKEN)));
@@ -304,7 +318,7 @@ test('sourceId is unique across two different messages (shopperRoute keys never 
       textUpdate({ updateId: 7002, messageId: 32, text: 'bread\njam' }),
     ],
   });
-  const r = await runIntake({ config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1 });
+  const r = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1 });
   assert.equal(r.emitted.length, 2);
   const [a, b] = r.emitted;
   assert.notEqual(a.sourceId, b.sourceId);
@@ -328,7 +342,7 @@ test('PROOF: the emitted payloads are accepted by the REAL services/hub/shopper/
       photoUpdate({ updateId: 8002, messageId: 42 }),
     ],
   });
-  const r = await runIntake({ config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1 });
+  const r = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1 });
   const [textRec, photoRec] = r.emitted;
 
   // TEXT — straight through, no transcriber needed.
@@ -396,7 +410,7 @@ test('the file state store persists the offset atomically and survives a restart
   assert.deepEqual(await store.read(), { lastUpdateId: null }, 'missing file = nothing processed yet');
 
   const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 12345, messageId: 60 })] });
-  await runIntake({ config: testConfig(), telegram, state: store, media: fakeMedia(), now: () => 1_700_000_000_000 });
+  await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state: store, media: fakeMedia(), now: () => 1_700_000_000_000 });
 
   assert.deepEqual(await createFileStateStore(stateFile).read(), { lastUpdateId: 12345 }, 'a fresh process reads it back');
   assert.equal(fs.existsSync(`${stateFile}.tmp`), false, 'the atomic temp file is renamed away');
@@ -406,7 +420,7 @@ test('the file state store persists the offset atomically and survives a restart
 
   // Re-running does NOT reprocess the same message.
   const telegram2 = fakeTelegram({ updates: [] });
-  const again = await runIntake({ config: testConfig(), telegram: telegram2, state: createFileStateStore(stateFile), media: fakeMedia(), now: () => 1 });
+  const again = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram: telegram2, state: createFileStateStore(stateFile), media: fakeMedia(), now: () => 1 });
   assert.equal(telegram2.calls.getUpdates[0].offset, 12346);
   assert.equal(again.emitted.length, 0);
 
@@ -546,7 +560,7 @@ test('FINGERPRINT: a downloaded photo carries the sha256 of the EXACT saved byte
   const bytes = Buffer.from('FAKEJPEGBYTES');
   const telegram = fakeTelegram({ updates: [photoUpdate({ updateId: 9001, messageId: 200 })], bytes });
   const media = fakeMedia();
-  const r = await runIntake({ config: testConfig(), telegram, state: createMemoryStateStore(null), media, now: () => 1_700_000_000_000 });
+  const r = await runIntake({ onRecord: NOOP_SINK, config: testConfig(), telegram, state: createMemoryStateStore(null), media, now: () => 1_700_000_000_000 });
 
   assert.equal(r.emitted.length, 1);
   const rec = r.emitted[0];
@@ -563,17 +577,17 @@ test('FINGERPRINT: a downloaded photo carries the sha256 of the EXACT saved byte
 });
 
 test('FINGERPRINT: same bytes same fingerprint, different bytes different fingerprint - it is content identity', async () => {
-  const a = await runIntake({
+  const a = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram: fakeTelegram({ updates: [photoUpdate({ updateId: 9101, messageId: 201 })], bytes: Buffer.from('WEEK-A-PHOTO') }),
     state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
   });
-  const aAgain = await runIntake({
+  const aAgain = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram: fakeTelegram({ updates: [photoUpdate({ updateId: 9102, messageId: 202 })], bytes: Buffer.from('WEEK-A-PHOTO') }),
     state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
   });
-  const b = await runIntake({
+  const b = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram: fakeTelegram({ updates: [photoUpdate({ updateId: 9103, messageId: 203 })], bytes: Buffer.from('WEEK-B-PHOTO') }),
     state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
@@ -593,7 +607,7 @@ test('FINGERPRINT: a dry run downloads nothing, so it honestly carries no finger
 });
 
 test('FINGERPRINT: a text message carries none - there is no image to bind', async () => {
-  const r = await runIntake({
+  const r = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram: fakeTelegram({ updates: [textUpdate({ updateId: 9301, messageId: 205 })] }),
     state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1_700_000_000_000,
@@ -620,7 +634,7 @@ test('A1 CLAIMED: a claimed message is never built, never downloaded, never emit
   const state = createMemoryStateStore(null);
 
   const seen = [];
-  const r = await runIntake({
+  const r = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram,
     state,
@@ -643,7 +657,7 @@ test('A1 THE CLAIM SEES THE CLASSIFIED VERDICT AND THE RAW UPDATE', async () => 
   const telegram = fakeTelegram({ updates: [update] });
 
   let got = null;
-  await runIntake({
+  await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram,
     state: createMemoryStateStore(null),
@@ -661,7 +675,7 @@ test('A1 THE CLAIM SEES THE CLASSIFIED VERDICT AND THE RAW UPDATE', async () => 
 
 test('A1 NOT CLAIMED: the message goes to intake exactly as it always has', async () => {
   const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 5003, messageId: 93 })] });
-  const r = await runIntake({
+  const r = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram,
     state: createMemoryStateStore(null),
@@ -678,7 +692,7 @@ test('A1 NOT CLAIMED: the message goes to intake exactly as it always has', asyn
 test('A1 A CLAIM THAT THROWS NEVER EATS THE MESSAGE', async () => {
   const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 5004, messageId: 94 })] });
   const events = [];
-  const r = await runIntake({
+  const r = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram,
     state: createMemoryStateStore(null),
@@ -698,7 +712,7 @@ test('A1 A CLAIM THAT THROWS NEVER EATS THE MESSAGE', async () => {
 
 test('A1 NO CLAIM HOOK AT ALL: behaviour is byte-for-byte what it was', async () => {
   const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 5005, messageId: 95 })] });
-  const r = await runIntake({
+  const r = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(), telegram, state: createMemoryStateStore(null), media: fakeMedia(), now: () => 1,
   });
 
@@ -712,7 +726,7 @@ test('A1 AN UNAUTHORISED SENDER IS NEVER OFFERED TO THE CLAIM', async () => {
   const telegram = fakeTelegram({ updates: [stranger] });
 
   let offered = 0;
-  const r = await runIntake({
+  const r = await runIntake({ onRecord: NOOP_SINK,
     config: testConfig(),
     telegram,
     state: createMemoryStateStore(null),
@@ -727,4 +741,253 @@ test('A1 AN UNAUTHORISED SENDER IS NEVER OFFERED TO THE CLAIM', async () => {
   assert.equal(r.claimed.length, 0);
   assert.equal(r.ignored.length, 1);
   assert.equal(r.ignored[0].reason, IGNORE_REASONS.UNAUTHORISED_SENDER);
+});
+
+// =====================================================================
+// WP-B15-11 — THE LANDMINE: A SHIPPED COMMAND THAT COULD EAT A REAL LIST
+//
+// `fetch-shopper-list.js` in live mode called `runIntakeFromConfig`, which
+// supplied NO `onRecord`. `runIntake` only awaited durable capture
+// `if (typeof onRecord === 'function')`, so a live run downloaded the photo,
+// ADVANCED THE SHARED TELEGRAM OFFSET, and persisted nothing. That offset is the
+// same state file the live runtime depends on, so ONE live run permanently
+// consumed a pending list and Telegram forgot it.
+//
+// Warwick: "Do not leave a known command capable of permanently eating a pending
+// real list simply because the scheduled task does not currently call it. Either
+// repair it correctly or make it impossible to invoke unsafely."
+//
+// The fix is one fail-closed guard at the SEAM, which does both: the conditional
+// that let a live run acknowledge without persisting becomes unconditional, and
+// no caller — present, future, or `npm run fetch` — can start a live run without
+// a durable sink. A guard bound to the seam survives; a warning decays.
+// =====================================================================
+
+test('THE LANDMINE: a live runIntake with no durable sink REFUSES, and eats nothing', async () => {
+  let getUpdatesCalls = 0;
+  const telegram = {
+    getUpdates: async () => { getUpdatesCalls += 1; return [textUpdate({ updateId: 7001, messageId: 71 })]; },
+    getFile: async () => ({ file_path: 'photos/x.jpg' }),
+    downloadFile: async () => Buffer.from('x'),
+  };
+  let writes = 0;
+  const state = {
+    path: '(spy)',
+    async read() { return { lastUpdateId: null }; },
+    async write(id) { writes += 1; return id; },
+  };
+
+  await assert.rejects(
+    // NO onRecord, deliberately. This is the unsafe invocation itself.
+    () => runIntake({ config: testConfig(), telegram, state, media: fakeMedia(), now: () => 1 }),
+    /onRecord/,
+    'a live run with no durable capture hook must refuse, naming what is missing',
+  );
+
+  // The refusal happens BEFORE anything is fetched or acknowledged. Nothing was
+  // asked of Telegram, so nothing could be acknowledged away.
+  assert.equal(getUpdatesCalls, 0, 'a refused run must not fetch');
+  assert.equal(writes, 0, 'a refused run must not touch the offset');
+});
+
+test('THE LANDMINE: the guard is on LIVE mode only — --dry-run needs no sink and stays safe', async () => {
+  const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 7002, messageId: 72 })] });
+  const r = await runIntake({
+    config: testConfig(), telegram, state: createMemoryStateStore(null), dryRun: true, now: () => 1,
+  });
+  assert.equal(r.dryRun, true);
+  assert.equal(r.emitted.length, 1, 'dry-run still reports what WOULD be emitted');
+});
+
+test('THE LANDMINE: with a sink, durable capture happens BEFORE the offset moves', async () => {
+  // The ordering is the whole point, so it is asserted as an ORDER of events,
+  // not merely as "both happened".
+  const order = [];
+  const telegram = fakeTelegram({ updates: [textUpdate({ updateId: 7003, messageId: 73 })] });
+  const state = {
+    path: '(spy)',
+    async read() { return { lastUpdateId: null }; },
+    async write(id) { order.push(`offset:${id}`); return id; },
+  };
+  await runIntake({
+    config: testConfig(),
+    telegram,
+    state,
+    media: fakeMedia(),
+    now: () => 1,
+    onRecord: async (rec) => { order.push(`persist:${rec.sourceId}`); },
+  });
+  assert.deepEqual(order, ['persist:tg:shopper:chat:111222333:msg:73', 'offset:7003'],
+    'the record must be durably captured before Telegram is told to forget it');
+});
+
+test('THE LANDMINE: a sink that throws HOLDS the offset and stops the batch', async () => {
+  // Already true before this Work Package; asserted here because the guard makes
+  // this path unconditional, so it is now the ONLY live path there is.
+  const telegram = fakeTelegram({
+    updates: [textUpdate({ updateId: 7004, messageId: 74 }), textUpdate({ updateId: 7005, messageId: 75 })],
+  });
+  let writes = 0;
+  const state = {
+    path: '(spy)',
+    async read() { return { lastUpdateId: null }; },
+    async write(id) { writes += 1; return id; },
+  };
+  const r = await runIntake({
+    config: testConfig(),
+    telegram,
+    state,
+    media: fakeMedia(),
+    now: () => 1,
+    onRecord: async () => { throw new Error('database unavailable'); },
+  });
+  assert.equal(writes, 0, 'a failed capture must never advance the offset');
+  assert.equal(r.failed.length, 1);
+  assert.equal(r.emitted.length, 0);
+  assert.equal(r.offsetAfter, null, 'the batch stops, so the later message is redelivered too');
+});
+
+test('THE LANDMINE: runIntakeFromConfig cannot start a live run without a sink either', async () => {
+  // The wiring layer must not satisfy the guard on the caller's behalf — a
+  // silent no-op sink would pass the check and re-open the exact hole.
+  const stateFile = path.join(os.tmpdir(), 'wp-b15-11-never-written.json');
+  const config = loadIntakeConfig({
+    [SHOPPER_INTAKE_ENV.SHOPPER_BOT_TOKEN]: FAKE_TOKEN,
+    [SHOPPER_INTAKE_ENV.SHOPPER_ALLOWED_SENDER_IDS]: ALLOWED,
+    [SHOPPER_INTAKE_ENV.SHOPPER_INTAKE_STATE_FILE]: stateFile,
+    [SHOPPER_INTAKE_ENV.SHOPPER_INTAKE_MEDIA_DIR]: path.join(os.tmpdir(), 'wp-b15-11-never-written'),
+  });
+  let fetches = 0;
+  await assert.rejects(
+    () => runIntakeFromConfig(config, { fetchImpl: async () => { fetches += 1; throw new Error('network reached'); } }),
+    /onRecord/,
+  );
+  assert.equal(fetches, 0, 'the refusal must precede any network call');
+  assert.equal(fs.existsSync(stateFile), false);
+});
+
+test('THE LANDMINE: the shipped CLI refuses a live run, and never reaches Telegram', async () => {
+  // `main()` is what `node fetch-shopper-list.js` and `npm run fetch` execute.
+  // It must refuse BEFORE building a client, because building one and calling
+  // getUpdates is the action that acknowledges a pending list away.
+  const stateFile = path.join(os.tmpdir(), 'wp-b15-11-cli-never-written.json');
+  const lines = [];
+  const errs = [];
+  const code = await main([], {
+    env: {
+      [SHOPPER_INTAKE_ENV.SHOPPER_BOT_TOKEN]: FAKE_TOKEN,
+      [SHOPPER_INTAKE_ENV.SHOPPER_ALLOWED_SENDER_IDS]: ALLOWED,
+      [SHOPPER_INTAKE_ENV.SHOPPER_INTAKE_STATE_FILE]: stateFile,
+      [SHOPPER_INTAKE_ENV.SHOPPER_INTAKE_MEDIA_DIR]: path.join(os.tmpdir(), 'wp-b15-11-cli-never-written'),
+    },
+    out: { log: (m) => lines.push(String(m)), error: (m) => errs.push(String(m)) },
+  });
+
+  assert.equal(code, 2, 'a refused live run is a non-zero exit a wrapper can notice');
+  const all = errs.join('\n');
+  assert.match(all, /--dry-run/, 'the refusal must name the safe route');
+  assert.equal(/runtime\.js/.test(all), true, 'the refusal must name where real intake actually happens');
+  assert.equal(fs.existsSync(stateFile), false, 'a refused CLI run must write no state');
+});
+
+test('THE LANDMINE: --dry-run through the CLI is still fully usable', async () => {
+  const stateFile = path.join(os.tmpdir(), 'wp-b15-11-dry-never-written.json');
+  const lines = [];
+  const code = await main(['--dry-run', '--json'], {
+    env: {
+      [SHOPPER_INTAKE_ENV.SHOPPER_BOT_TOKEN]: FAKE_TOKEN,
+      [SHOPPER_INTAKE_ENV.SHOPPER_ALLOWED_SENDER_IDS]: ALLOWED,
+      [SHOPPER_INTAKE_ENV.SHOPPER_INTAKE_STATE_FILE]: stateFile,
+      [SHOPPER_INTAKE_ENV.SHOPPER_INTAKE_MEDIA_DIR]: path.join(os.tmpdir(), 'wp-b15-11-dry-never-written'),
+      [SHOPPER_INTAKE_ENV.SHOPPER_TELEGRAM_API_BASE]: 'https://example.invalid',
+    },
+    out: { log: (m) => lines.push(String(m)), error: (m) => lines.push(String(m)) },
+    // Injected so this test NEVER touches a network. --dry-run is the one live
+    // fetch shape that stays legal, so the injection seam has to exist.
+    fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true, result: [] }) }),
+  });
+  assert.equal(code, 0, '--dry-run must remain a working, safe command');
+  assert.equal(fs.existsSync(stateFile), false, '--dry-run writes no state at all');
+});
+
+// =====================================================================
+// WP-B15-11 AC5 — OFFSET DISCIPLINE ON THE `ignored` PATH
+//
+// An ignored message advances the offset, which is right: otherwise one
+// stranger's message wedges the queue forever. But the log recorded only a
+// reason, so the one shape that IS data loss — Warwick sending his real list as
+// a DOCUMENT or a VOICE NOTE, which this receiver does not handle — was refused
+// and consumed with nothing to show anyone what had been thrown away.
+//
+// The offset semantics are UNCHANGED. What changes is that the refusal is now
+// visible: the KINDS of content present, never the content itself.
+// =====================================================================
+
+test('AC5 an allowed sender unsupported message reports WHICH KINDS were present', async () => {
+  const update = {
+    update_id: 7101,
+    message: {
+      message_id: 81,
+      from: { id: Number(ALLOWED), is_bot: false, first_name: 'Test' },
+      chat: { id: Number(ALLOWED), type: 'private' },
+      date: 1_800_000_000,
+      document: { file_id: 'DOC', file_name: 'shopping list.pdf', mime_type: 'application/pdf' },
+    },
+  };
+  const verdict = classifyUpdate(update, { allowedSenderIds: [ALLOWED] });
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.reason, IGNORE_REASONS.UNSUPPORTED_CONTENT_TYPE);
+  assert.deepEqual(verdict.contentKinds, ['document']);
+
+  const events = [];
+  const r = await runIntake({
+    config: testConfig(),
+    telegram: fakeTelegram({ updates: [update] }),
+    state: createMemoryStateStore(null),
+    media: fakeMedia(),
+    now: () => 1,
+    onRecord: async () => {},
+    log: (event, detail) => events.push({ event, detail }),
+  });
+
+  assert.equal(r.ignored.length, 1);
+  assert.deepEqual(r.ignored[0].contentKinds, ['document']);
+  assert.equal(r.offsetAfter, 7101, 'offset semantics on the ignored path are UNCHANGED');
+  const ignoredLog = events.find((e) => e.event === 'ignored');
+  assert.deepEqual(ignoredLog.detail.contentKinds, ['document']);
+});
+
+test('AC5 the kinds report NEVER carries content, a filename, or a stranger fields', async () => {
+  const voice = {
+    update_id: 7102,
+    message: {
+      message_id: 82,
+      from: { id: Number(ALLOWED), is_bot: false, first_name: 'Test' },
+      chat: { id: Number(ALLOWED), type: 'private' },
+      date: 1_800_000_000,
+      voice: { file_id: 'VOICE', duration: 12 },
+      caption: 'this weeks list, sorry about the noise',
+    },
+  };
+  const v = classifyUpdate(voice, { allowedSenderIds: [ALLOWED] });
+  assert.deepEqual(v.contentKinds, ['voice', 'caption']);
+  const asText = JSON.stringify(v);
+  assert.equal(asText.includes('sorry about the noise'), false, 'no message content may reach the verdict');
+  assert.equal(asText.includes('VOICE'), false, 'no file id may reach the verdict');
+
+  // A STRANGER is refused by the allowlist FIRST and is never content-inspected:
+  // routing must not become a content-type oracle for someone not allowed here.
+  const stranger = classifyUpdate(
+    {
+      update_id: 7103,
+      message: {
+        ...voice.message,
+        from: { id: Number(STRANGER), is_bot: false, first_name: 'Nope' },
+        chat: { id: Number(STRANGER), type: 'private' },
+      },
+    },
+    { allowedSenderIds: [ALLOWED] },
+  );
+  assert.equal(stranger.reason, IGNORE_REASONS.UNAUTHORISED_SENDER);
+  assert.equal(stranger.contentKinds, undefined, 'a stranger is never content-inspected');
 });
