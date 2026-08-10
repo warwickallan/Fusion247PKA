@@ -429,34 +429,83 @@ const FIXTURES = [
     name: 'not malformed: in-name integer "omega 3" stays an item at qty 1',
     raw: 'omega 3',
     expected: {
-      items: [{ item_name: 'omega 3', requested_qty: 1, note: '' }],
+      // Qty 1 is UNCHANGED. What changed is WHY: "omega 3" used to need a hand-
+      // curated entry in TRAILING_NUMBER_COLLISIONS to survive; it is now the
+      // ordinary outcome of the general pack-size rule, so the curated list is
+      // gone and no future product has to be added to one by hand.
+      items: [{
+        item_name: 'omega 3',
+        requested_qty: 1,
+        note: 'pack size 3 read from the product name, not as an order quantity - asking for 1'
+      }],
       needs_review: []
     }
   },
-  // ---- TRAILING BARE QUANTITY (defect A) ----
-  // The commonest hand-written form. Previously welded into the name at qty 1
-  // ("milk 2" -> 1 x "milk 2"), which silently under-ordered every such line.
+  // ---- TRAILING BARE NUMBER = PACK SIZE, NOT AN ORDER QUANTITY (WP-B15-11) ----
+  //
+  // REQUIREMENT CHANGE, not a weakened assertion (Warwick, 2026-08-10, via
+  // WO-2026-08-10-11): "fix the shared semantic rule/class wherever necessary so
+  // money-risk behaviour cannot survive on another input path."
+  //
+  // The three fixtures below previously asserted the OPPOSITE - that a trailing
+  // bare integer IS an order quantity. That rule cost roughly GBP 350 on the
+  // photographed path ("ARIEL 4in1 PODS 33" ordered 33 boxes of laundry pods),
+  // was corrected there by WP-B15-08, and survived here on the typed path. The
+  // number at the end of a product name is print on a box - a pod count, an SPF,
+  // a 4in1 - and on a hand-written list the quantity is written BEFORE the item
+  // ("9 ROLLS", "16 CAPSULES", "4 x 500ml"). It is now pack-size evidence on
+  // EVERY input path: the line asks for 1, and the number STAYS in the name as
+  // the evidence of what was actually written.
+  //
+  // Direction of every inversion here: the ordered quantity moves DOWN to 1, or
+  // is unchanged. Nothing below makes the parser order MORE than it did before.
   {
-    name: 'quantity form: trailing bare number ("milk 2")',
+    name: 'requirement change: a trailing bare number is a PACK SIZE, not a quantity ("milk 2")',
     raw: 'milk 2',
     expected: {
-      items: [{ item_name: 'milk', requested_qty: 2, note: '' }],
+      items: [{
+        item_name: 'milk 2',
+        requested_qty: 1,
+        note: 'pack size 2 read from the product name, not as an order quantity - asking for 1'
+      }],
       needs_review: []
     }
   },
   {
-    name: 'quantity form: trailing bare number after a multi-word name ("yazoo strawberry 4")',
+    name: 'requirement change: pack size after a multi-word name ("yazoo strawberry 4")',
     raw: 'yazoo strawberry 4',
     expected: {
-      items: [{ item_name: 'yazoo strawberry', requested_qty: 4, note: '' }],
+      items: [{
+        item_name: 'yazoo strawberry 4',
+        requested_qty: 1,
+        note: 'pack size 4 read from the product name, not as an order quantity - asking for 1'
+      }],
       needs_review: []
     }
   },
   {
-    name: 'trailing bare qty alongside a parenthetical note ("bread 3 (thick sliced)")',
+    name: 'requirement change: pack size alongside a parenthetical note ("bread 3 (thick sliced)")',
     raw: 'bread 3 (thick sliced)',
     expected: {
-      items: [{ item_name: 'bread', requested_qty: 3, note: 'thick sliced' }],
+      // The human's own note comes FIRST; the parser's annotation rides after it.
+      items: [{
+        item_name: 'bread 3',
+        requested_qty: 1,
+        note: 'thick sliced; pack size 3 read from the product name, not as an order quantity - asking for 1'
+      }],
+      needs_review: []
+    }
+  },
+  {
+    // THE LIVE DEFECT, on the typed path, in Warwick's own words.
+    name: 'THE MONEY DEFECT, typed: "ARIEL 4in1 PODS 33" is ONE box, not thirty-three',
+    raw: 'ARIEL 4in1 PODS 33',
+    expected: {
+      items: [{
+        item_name: 'ariel 4in1 pods 33',
+        requested_qty: 1,
+        note: 'pack size 33 read from the product name, not as an order quantity - asking for 1'
+      }],
       needs_review: []
     }
   },
@@ -494,18 +543,26 @@ const FIXTURES = [
     }
   },
   {
-    name: 'over-match guard: curated identity collision "factor 50" stays qty 1',
+    name: 'over-match guard: identity number "factor 50" stays qty 1 (no curated list needed)',
     raw: 'factor 50',
     expected: {
-      items: [{ item_name: 'factor 50', requested_qty: 1, note: '' }],
+      items: [{
+        item_name: 'factor 50',
+        requested_qty: 1,
+        note: 'pack size 50 read from the product name, not as an order quantity - asking for 1'
+      }],
       needs_review: []
     }
   },
   {
-    name: 'over-match guard: curated identity collision "wd 40" stays qty 1',
+    name: 'over-match guard: identity number "wd 40" stays qty 1 (no curated list needed)',
     raw: 'wd 40',
     expected: {
-      items: [{ item_name: 'wd 40', requested_qty: 1, note: '' }],
+      items: [{
+        item_name: 'wd 40',
+        requested_qty: 1,
+        note: 'pack size 40 read from the product name, not as an order quantity - asking for 1'
+      }],
       needs_review: []
     }
   },
@@ -525,37 +582,63 @@ const FIXTURES = [
       needs_review: []
     }
   },
-  // ---- NEVER GUESS: a trailing bare qty that CONFLICTS routes to review ----
+  // ---- AN EXPLICIT QUANTITY BESIDE A PACK SIZE IS A GENUINE REQUEST ----
+  //
+  // REQUIREMENT CHANGE (WP-B15-11). These two were conflicts only because the
+  // trailing number was being read as a second, competing quantity. Now that it
+  // is pack-size evidence there is no conflict to have, and the line means
+  // exactly what it says. This is the SAME rule runPipeline.js applies to the
+  // photographed path: "a reading whose quantity is something else ('ARIEL 4in1
+  // PODS 33', quantity 2) is a genuine request for two boxes and is left exactly
+  // alone - destroying that would be worse than the bug."
+  //
+  // No pack-size note here: an explicit quantity was written, nothing was
+  // corrected, and there is nothing to tell the reader about.
   {
-    name: 'trailing bare qty conflicting with a trailing xN -> review, never a guess',
+    name: 'requirement change: explicit xN beside a pack size is a real request ("milk 2 x3")',
     raw: 'milk 2 x3',
     expected: {
-      items: [],
-      needs_review: [{ raw: 'milk 2 x3', reason: 'conflicting quantities: 3 vs 2' }]
+      items: [{ item_name: 'milk 2', requested_qty: 3, note: '' }],
+      needs_review: []
     }
   },
   {
-    name: 'trailing bare qty conflicting with a leading qty -> review, never a guess',
+    name: 'requirement change: leading quantity beside a pack size is a real request ("2 milk 3")',
     raw: '2 milk 3',
     expected: {
-      items: [],
-      needs_review: [{ raw: '2 milk 3', reason: 'conflicting quantities: 2 vs 3' }]
+      items: [{ item_name: 'milk 3', requested_qty: 2, note: '' }],
+      needs_review: []
     }
   },
   {
-    name: 'trailing bare qty over the sanity cap -> review ("milk 1000")',
+    name: 'requirement change: a large pack size asks for 1, it is not an implausible qty ("milk 1000")',
     raw: 'milk 1000',
     expected: {
-      items: [],
-      needs_review: [{ raw: 'milk 1000', reason: 'implausible quantity: 1000' }]
+      // Previously review ("implausible quantity: 1000"), because 1000 was being
+      // read as an order. As a pack size it is unremarkable and the order is 1.
+      items: [{
+        item_name: 'milk 1000',
+        requested_qty: 1,
+        note: 'pack size 1000 read from the product name, not as an order quantity - asking for 1'
+      }],
+      needs_review: []
     }
   },
+  // ---- NEVER GUESS: a trailing number that is NEITHER a quantity NOR a pack size ----
   {
-    name: 'trailing bare qty of zero -> review ("milk 0")',
+    name: 'trailing bare zero is not a pack size and not a quantity -> review ("milk 0")',
     raw: 'milk 0',
     expected: {
       items: [],
       needs_review: [{ raw: 'milk 0', reason: 'non-positive quantity: 0' }]
+    }
+  },
+  {
+    name: 'trailing bare number past integer precision -> review, never a silent name',
+    raw: 'milk 999999999999999999999',
+    expected: {
+      items: [],
+      needs_review: [{ raw: 'milk 999999999999999999999', reason: 'implausible quantity: 999999999999999999999' }]
     }
   },
   {
@@ -762,9 +845,13 @@ test('helper extractQuantities finds each leading/trailing form', function () {
   assert.deepEqual(_internal.extractQuantities('milk'), { qtys: [], rest: 'milk' });
 });
 
-test('helper extractQuantities reads a TRAILING BARE integer as a quantity', function () {
-  assert.deepEqual(_internal.extractQuantities('milk 2'), { qtys: [2], rest: 'milk' });
-  assert.deepEqual(_internal.extractQuantities('yazoo strawberry 4'), { qtys: [4], rest: 'yazoo strawberry' });
+test('helper extractQuantities NEVER reads a trailing bare integer as a quantity', function () {
+  // REQUIREMENT CHANGE (WP-B15-11): this helper previously returned
+  // { qtys: [2], rest: 'milk' } for "milk 2". The number is pack-size evidence,
+  // so it is neither consumed nor stripped - it stays in the name.
+  assert.deepEqual(_internal.extractQuantities('milk 2'), { qtys: [], rest: 'milk 2' });
+  assert.deepEqual(_internal.extractQuantities('yazoo strawberry 4'), { qtys: [], rest: 'yazoo strawberry 4' });
+  assert.deepEqual(_internal.extractQuantities('ARIEL 4in1 PODS 33'), { qtys: [], rest: 'ARIEL 4in1 PODS 33' });
 });
 
 test('helper extractQuantities does NOT strip a trailing UNIT/SIZE or glued number', function () {
@@ -777,24 +864,30 @@ test('helper extractQuantities does NOT strip a trailing UNIT/SIZE or glued numb
   assert.deepEqual(_internal.extractQuantities('tuna 4 pack'), { qtys: [], rest: 'tuna 4 pack' });
 });
 
-test('helper extractQuantities honours the TRAILING_NUMBER_COLLISIONS identity list', function () {
-  // A product whose IDENTITY ends in a bare number keeps it in the name...
+test('the curated TRAILING_NUMBER_COLLISIONS list is GONE, not merely unused', function () {
+  // REQUIREMENT CHANGE (WP-B15-11). The list existed because "milk 2" and
+  // "omega 3" are syntactically identical, so a curated exception was the only
+  // way to protect a product whose identity ends in a number. Once NO trailing
+  // bare number is a quantity, every one of them is protected by the general
+  // rule and the list has nothing left to do. Asserted as ABSENT so it cannot
+  // quietly come back as a second place where this decision is made.
+  assert.equal(_internal.TRAILING_NUMBER_COLLISIONS, undefined,
+    'the curated collision list must not exist alongside the general rule');
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, 'listNormaliser.js'), 'utf8');
+  assert.equal(src.includes('TRAILING_NUMBER_COLLISIONS'), false,
+    'no dead curated collision list may remain in the source');
+  // The names it used to carry are handled by the general rule instead.
   assert.deepEqual(_internal.extractQuantities('omega 3'), { qtys: [], rest: 'omega 3' });
   assert.deepEqual(_internal.extractQuantities('factor 50'), { qtys: [], rest: 'factor 50' });
   assert.deepEqual(_internal.extractQuantities('wd 40'), { qtys: [], rest: 'wd 40' });
-  // ...but an explicit quantity in another form is still read, because the
-  // collision check runs against the CURRENT working string each iteration.
+  // ...and an explicit quantity in another form is still read.
   assert.deepEqual(_internal.extractQuantities('omega 3 x2'), { qtys: [2], rest: 'omega 3' });
   assert.deepEqual(_internal.extractQuantities('2x omega 3'), { qtys: [2], rest: 'omega 3' });
-  // the list is exported so the boundary is inspectable, not implicit
-  assert.equal(_internal.TRAILING_NUMBER_COLLISIONS['omega 3'], true);
-  assert.equal(Object.prototype.hasOwnProperty.call(_internal.TRAILING_NUMBER_COLLISIONS, 'milk 2'), false);
 });
 
-test('helper extractQuantities LOOPS the trailing bare form (doubled -> two qtys)', function () {
-  // Symmetric with the trailing-xN loop: both values surface so the caller
-  // can call a conflict instead of welding one into the name.
-  assert.deepEqual(_internal.extractQuantities('milk 2 3'), { qtys: [3, 2], rest: 'milk' });
+test('a doubled trailing bare form is no longer two competing quantities', function () {
+  // REQUIREMENT CHANGE (WP-B15-11): was { qtys: [3, 2], rest: 'milk' }.
+  assert.deepEqual(_internal.extractQuantities('milk 2 3'), { qtys: [], rest: 'milk 2 3' });
 });
 
 test('helper extractQuantities LOOPS trailing xN (doubled form -> two qtys)', function () {
@@ -849,4 +942,125 @@ test('helper isMalformedNumericToken does NOT flag clean/legit tokens', function
   assert.equal(_internal.isMalformedNumericToken('b12'), false); // vitamin name
   assert.equal(_internal.isMalformedNumericToken('milk'), false);
   assert.equal(_internal.isMalformedNumericToken(''), false);
+});
+
+// =====================================================================
+// WP-B15-11 - THE SHARED PACK-SIZE RULE, AND THE FORMS IT MUST NOT BREAK
+//
+// AC1: one rule, exported, so the photographed and typed paths cannot drift.
+// AC2: a fix that breaks leading quantities is worse than the bug.
+// =====================================================================
+
+test('AC1 the pack-size rule is EXPORTED from this module, so one rule can serve every path', function () {
+  // The rule must be reachable by the pipeline's photographed path as well.
+  // services/asdair/skill is CommonJS and services/asdair/pipeline is ESM, so a
+  // shared rule can ONLY live on this side of the boundary: CJS cannot
+  // synchronously require an ESM module, while ESM imports this one already
+  // (services/fusion-capture-gateway/src/transcription/transcriptionStage.js).
+  const mod = require('./listNormaliser');
+  assert.equal(typeof mod.trailingPackSize, 'function',
+    'trailingPackSize must be a public export, not a private helper');
+  assert.equal(typeof _internal.trailingPackSize, 'function');
+});
+
+test('AC1 the shared rule draws the four boundaries the photographed path documents', function () {
+  const { trailingPackSize } = require('./listNormaliser');
+  // These four boundaries are the contract runPipeline.js states for the
+  // photographed path. They are pinned here as VALUES, not by importing that
+  // module: it belongs to a parallel work package, and a test that reaches into
+  // another branch's file would fail for reasons that are not about this rule.
+  //
+  // 1. whitespace before the digits is REQUIRED - a glued form is untouched
+  assert.equal(trailingPackSize('7up'), null);
+  assert.equal(trailingPackSize('2x4'), null);
+  assert.equal(trailingPackSize('b12'), null);
+  // 2. pure ASCII digits to end of line - a size or unit token is untouched
+  assert.equal(trailingPackSize('yazoo 400ml'), null);
+  assert.equal(trailingPackSize('milk 2L'), null);
+  assert.equal(trailingPackSize('tuna 500g'), null);
+  assert.equal(trailingPackSize('milk 2.'), null);
+  assert.equal(trailingPackSize('milk +2'), null);
+  assert.equal(trailingPackSize('milk \uFF12'), null); // fullwidth digit
+  // 3. at least one NON-NUMERIC token must precede it - a bare number has no
+  //    name for a pack size to belong to
+  assert.equal(trailingPackSize('33'), null);
+  assert.equal(trailingPackSize('2 33'), null);
+  assert.equal(trailingPackSize(''), null);
+  assert.equal(trailingPackSize('   '), null);
+  // 4. a safe positive integer, or nothing
+  assert.equal(trailingPackSize('milk 0'), null);
+  assert.equal(trailingPackSize('milk 999999999999999999999'), null);
+  // ...and the cases it DOES fire on
+  assert.equal(trailingPackSize('ARIEL 4in1 PODS 33'), 33);
+  assert.equal(trailingPackSize('milk 2'), 2);
+  assert.equal(trailingPackSize('omega 3'), 3);
+  assert.equal(trailingPackSize('yazoo strawberry 4'), 4);
+  assert.equal(trailingPackSize('  ariel pods 33  '), 33);
+  // non-string input is not a crash
+  assert.equal(trailingPackSize(null), null);
+  assert.equal(trailingPackSize(undefined), null);
+  assert.equal(trailingPackSize(33), null);
+});
+
+test('AC2 every LEADING quantity form Warwick writes is untouched', function () {
+  // Warwick's own examples, from the Work Order. On a hand-written list the
+  // quantity is written BEFORE the item - that asymmetry is the whole reason
+  // the trailing rule is safe, so breaking these would be worse than the bug.
+  const cases = [
+    ['4 x 4pts ARLA', { item_name: '4pts arla', requested_qty: 4, note: '' }],
+    ['9 ROLLS', { item_name: 'rolls', requested_qty: 9, note: '' }],
+    ['16 CAPSULES', { item_name: 'capsules', requested_qty: 16, note: '' }],
+    ['4 x 500ml', { item_name: '500ml', requested_qty: 4, note: '' }],
+    ['2x milk', { item_name: 'milk', requested_qty: 2, note: '' }],
+    ['x2 milk', { item_name: 'milk', requested_qty: 2, note: '' }],
+    ['two milk', { item_name: 'milk', requested_qty: 2, note: '' }],
+    ['milk x2', { item_name: 'milk', requested_qty: 2, note: '' }],
+    ['milk (2)', { item_name: 'milk', requested_qty: 2, note: '' }],
+  ];
+  for (const [raw, expected] of cases) {
+    const out = normaliseRawList(raw);
+    assert.deepEqual(out.needs_review, [], `"${raw}" must not become a review line`);
+    assert.deepEqual(out.items, [expected], `"${raw}" must keep its leading quantity`);
+  }
+});
+
+test('AC2 "2pkts TWIX" is PINNED at its current behaviour, and the gap is recorded here', function () {
+  // MEASURED, not assumed (preflight, governance head 9b11ea8): the glued form
+  // "2pkts" yields qty 1 TODAY, because no leading-quantity form matches a digit
+  // with no whitespace after it. The Work Order originally asserted this was 2;
+  // it is not, and Larry corrected the criterion to no-regression rather than
+  // have a glued leading-quantity rule invented here.
+  //
+  // WHY NOT FIX IT: the naive rule "digits glued to letters at the start are a
+  // quantity" turns "7up" into 7 x "up" and "4in1" into 4 x "in1". Making it
+  // safe needs a curated unit-token allowlist (pkt/pkts/pt/pts/...), which is a
+  // separate piece of work with its own fixtures. It UNDER-orders, which is the
+  // money-safe direction. Reported for Warwick's queue; pinned here so that if
+  // anyone does build that rule, this test tells them it changed.
+  const out = normaliseRawList('2pkts TWIX');
+  assert.deepEqual(out.items, [{ item_name: '2pkts twix', requested_qty: 1, note: '' }]);
+  assert.deepEqual(out.needs_review, []);
+});
+
+test('AC1 the money defect cannot be reached through the public entry point', function () {
+  // The one assertion that decides this Work Package on the typed path.
+  const out = normaliseRawList('ARIEL 4in1 PODS 33');
+  assert.equal(out.items.length, 1);
+  assert.equal(out.items[0].requested_qty, 1,
+    'a trailing pack size must NEVER become an order quantity - this line cost GBP 350');
+  assert.equal(out.items[0].item_name, 'ariel 4in1 pods 33',
+    'the number stays in the name: it is the evidence of what was written');
+  assert.match(out.items[0].note, /^pack size 33 read from the product name/);
+});
+
+test('the pack-size annotation is attached ONLY where the parser actually corrected something', function () {
+  // Mirrors runPipeline.js: the note rides on a line whose quantity was taken
+  // from the pack size. Where an explicit quantity was written, nothing was
+  // corrected and there is nothing to tell the reader.
+  assert.equal(normaliseRawList('milk 2').items[0].note,
+    'pack size 2 read from the product name, not as an order quantity - asking for 1');
+  assert.equal(normaliseRawList('milk 2 x3').items[0].note, '');
+  assert.equal(normaliseRawList('2 milk 3').items[0].note, '');
+  assert.equal(normaliseRawList('milk').items[0].note, '');
+  assert.equal(normaliseRawList('milk 2L').items[0].note, '');
 });

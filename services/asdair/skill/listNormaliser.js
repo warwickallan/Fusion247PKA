@@ -40,17 +40,14 @@
 //     SINGLE token follows ("two milk" -> 2). Followed by MULTIPLE tokens
 //     ("four cheese pizza", "six pack beer") it is ambiguous -> review, never a
 //     silent guessed quantity. Digit forms ("4 cheese pizza") are exempt.
-//   * A TRAILING BARE INTEGER ("milk 2", "yazoo strawberry 4") IS a quantity:
-//     it is the commonest hand-written list form and was previously welded
-//     into the item name at qty 1. It is consumed ONLY when it is a clean,
-//     whitespace-separated, pure-ASCII integer at end of line -- so a SIZE /
-//     VOLUME / PACK token that carries a unit ("yazoo 400ml", "milk 2L",
-//     "tuna 4 pack") or a glued form ("7up", "2x4") is NEVER stripped. Product
-//     names whose IDENTITY ends in a bare number ("omega 3", "factor 50",
-//     "wd 40") are protected by an explicit curated exception list --
-//     TRAILING_NUMBER_COLLISIONS below -- exactly like the existing
-//     WORD_NUMBER_COLLISIONS guard, because no syntactic rule can separate
-//     "milk 2" from "omega 3".
+//   * A TRAILING BARE INTEGER ("ARIEL 4in1 PODS 33", "milk 2") is NEVER an
+//     ORDER QUANTITY. It is PACK-SIZE EVIDENCE: it STAYS in the item name, the
+//     line asks for 1, and the item carries a note saying exactly that. This is
+//     the same semantic rule the PHOTOGRAPHED path applies, and it is now the
+//     rule on every input path. See trailingPackSize below for the boundaries
+//     and for what it cost to learn. (WP-B15-11, 2026-08-10. This REVERSES the
+//     earlier "a trailing bare integer IS a quantity" rule, on Warwick's
+//     ruling; the number that got it reversed was GBP 350 of laundry capsules.)
 //   * A line with NO numeric-looking leading/trailing token at all defaults
 //     to requested_qty = 1. A bare in-name integer that is not a quantity
 //     form ("omega 3", "2x4 timber") stays part of the item name.
@@ -111,6 +108,91 @@ function isMalformedNumericToken(t) {
   return false;
 }
 
+// ---------------------------------------------------------------------
+// THE SHARED PACK-SIZE RULE. (WP-B15-11)
+//
+// PURE. The trailing bare integer of a line, when that number is part of the
+// product's NAME rather than a quantity someone asked for.
+//
+// -- THE LIVE DEFECT, 2026-08-10 -------------------------------------------
+// "ARIEL 4in1 PODS 33" was ordered as THIRTY-THREE boxes of laundry capsules,
+// roughly GBP 350. The 33 is printed on the box. Warwick did not write it.
+// WP-B15-08 corrected the PHOTOGRAPHED path. The same line TYPED still ordered
+// 33 until this rule landed here, because this module read the trailing integer
+// as a quantity -- and, worse, STRIPPED it from the name, so the photographed
+// path's guard could not see it either and could never fire on typed text.
+//
+// -- THE ASYMMETRY THIS RESTS ON, STATED SO IT CAN BE ARGUED WITH -----------
+// On a hand-written or typed shopping list the quantity is written BEFORE the
+// item, essentially always -- every example Warwick gave does it: "9 ROLLS",
+// "16 CAPSULES", "4 x 500ml", "4 x 4pts ARLA", "2pkts TWIX". A number at the
+// END of a product name is part of the name: a pod count, an SPF, WD-40,
+// omega 3, 4in1. So this fires ONLY on a trailing bare integer, and the caller
+// applies it only where no explicit quantity was written anywhere else.
+//
+// An earlier version of this module argued the opposite for typed text -- "a
+// typed digit is a deliberate keystroke, a photographed one is print on a box".
+// Warwick overruled it: "fix the shared semantic rule/class wherever necessary
+// so money-risk behaviour cannot survive on another input path." The cost of
+// the new rule is a typed "MILK 2" becoming one milk; the cost of the old one
+// was GBP 350. The note on the item is what keeps that cost visible.
+//
+// -- THE BOUNDARIES, ALL DELIBERATE, ALL PINNED BY TEST ---------------------
+//   * whitespace before the digits is REQUIRED, so a glued form is untouched:
+//     "7up", "2x4", "b12".
+//   * the token must be PURE ASCII DIGITS to end of line, so a size or unit
+//     token is untouched: "yazoo 400ml", "milk 2L", "tuna 500g", and a
+//     malformed look-alike ("milk 2.", "milk +2", a fullwidth digit) is left
+//     for isMalformedNumericToken to route to review.
+//   * at least one NON-NUMERIC token must precede it: a line that is only
+//     numbers has no name for a pack size to belong to.
+//   * a SAFE POSITIVE INTEGER, or nothing. "milk 0" and a value past integer
+//     precision are neither a pack size nor a quantity, so the caller sends
+//     them to review rather than guessing.
+//
+// -- WHY THIS LIVES HERE ----------------------------------------------------
+// services/asdair/skill is CommonJS; services/asdair/pipeline is ESM. CJS
+// cannot synchronously require ESM, and ESM already imports this module
+// (services/fusion-capture-gateway/src/transcription/transcriptionStage.js), so
+// a rule shared by both paths can only live on this side of the boundary. It is
+// EXPORTED for that reason. runPipeline.js currently carries its own copy for
+// the photographed path; re-pointing it at this export is a one-line change in
+// another work package's file and is NOT done here.
+//
+// @param {string} rawReading
+// @returns {number|null} the trailing pack size, or null
+function trailingPackSize(rawReading) {
+  const text = typeof rawReading === 'string' ? rawReading.trim() : '';
+  if (text === '') return null;
+  const m = /\s(\d+)\s*$/.exec(text);
+  if (m === null) return null;
+  // Everything before the trailing number must contain a non-numeric token,
+  // otherwise there is no product name here to carry a pack size.
+  const head = text.slice(0, m.index).trim();
+  if (head === '') return null;
+  if (!head.split(/\s+/).some(function (tok) { return !/^\d+$/.test(tok); })) return null;
+  const n = Number(m[1]);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+// PURE. The trailing bare integer of a line REGARDLESS of whether it is a
+// usable pack size. Used only to tell "this line ends in a number we decided
+// not to read as a quantity" from "this line does not end in a number at all",
+// so a trailing "0" or an overflowing value routes to review instead of being
+// silently welded into an item name.
+function trailingBareIntegerToken(text) {
+  const m = /\s(\d+)\s*$/.exec(typeof text === 'string' ? text.trim() : '');
+  return m === null ? null : m[1];
+}
+
+// The note attached to an item whose quantity was NOT taken from its trailing
+// number. Same words as the photographed path's, so a person reading a list
+// cannot tell -- and does not need to care -- which way the list arrived.
+function packSizeNote(packSize) {
+  return 'pack size ' + packSize
+    + ' read from the product name, not as an order quantity - asking for 1';
+}
+
 // Return the distinct numeric values in order of first appearance.
 function distinctNumbers(nums) {
   const out = [];
@@ -148,34 +230,20 @@ const WORD_NUMBER_COLLISIONS = {
   'five spice': true  // Chinese five-spice blend
 };
 
-// Known TRAILING-BARE-NUMBER COLLISIONS: product names whose own IDENTITY ends
-// in a bare integer, so the trailing-bare-quantity extractor must NOT strip it
-// ("omega 3" -> 3 x "omega"; "factor 50" -> 50 x "factor"; "wd 40" -> 40 x
-// "wd"). These are the exact mirror image of WORD_NUMBER_COLLISIONS above and
-// exist for the same reason: "milk 2" and "omega 3" are SYNTACTICALLY
-// IDENTICAL (<word(s)> <bare integer>), so no rule over the text alone can
-// separate a count from a designator. A curated, explicit list is therefore the
-// only honest mechanism; it is deliberately small and is extended by adding a
-// key, not by loosening the parser.
+// THE CURATED TRAILING-NUMBER COLLISION LIST IS GONE, DELIBERATELY (WP-B15-11).
 //
-// A hit here means the number STAYS PART OF THE NAME and the line parses at
-// qty 1 -- it does NOT route to review. That preserves the module's documented
-// "a bare in-name integer stays part of the item name" guarantee (and its
-// existing "omega 3" fixture), and it is the right answer: the line is not
-// ambiguous once we know the phrase, it simply has no explicit quantity.
+// It used to hold "omega 3", "factor 15/30/50" and "wd 40" -- product names whose
+// own identity ends in a bare integer -- because "milk 2" and "omega 3" are
+// SYNTACTICALLY IDENTICAL and, while a trailing bare integer was read as a
+// quantity, a hand-curated exception was the only way to protect them.
 //
-// The check is applied to the CURRENT working string at the moment the
-// trailing-bare extractor is about to fire, not to the whole raw line, so a
-// collision name that DOES carry an explicit quantity in another form still
-// parses correctly ("omega 3 x2" -> qty 2 x "omega 3", "2x omega 3" -> qty 2).
-// Keys are the fully normalised (lower-cased, single-spaced) phrase.
-const TRAILING_NUMBER_COLLISIONS = {
-  'omega 3': true,    // fish-oil supplement
-  'factor 15': true,  // sun cream SPF
-  'factor 30': true,
-  'factor 50': true,
-  'wd 40': true       // lubricant spray
-};
+// Its existence was also the evidence that this rule was wrong. Every entry was
+// a product that would otherwise have been mis-ordered, and the list could only
+// ever contain the ones somebody had already been bitten by. Now that NO
+// trailing bare integer is an order quantity, all of them are protected by the
+// general rule and nothing has to be added by hand again. Restoring the list
+// would re-create a SECOND place where this decision is made, which is exactly
+// the drift AC1 of WP-B15-11 forbids -- a test asserts it stays absent.
 
 // Upper sanity bound on an explicit quantity. A household shopping list will
 // never legitimately request more than this; a value above it (or one that
@@ -301,39 +369,23 @@ function extractQuantities(coreIn) {
     lead = extractLeadingQuantity(working);
   }
 
-  // TRAILING BARE INTEGER ("milk 2", "yazoo strawberry 4"). Runs LAST, after
-  // the xN and leading forms have been consumed, which is what keeps the
-  // existing behaviour intact:
-  //   * "x 2"  -> already consumed by the trailing-xN pass above, so this pass
-  //              never turns the marker "x" into an item name.
-  //   * "2 3"  -> the leading pass takes the 2 first, leaving "3", which has no
-  //              preceding whitespace and so is not consumed here (the line
-  //              still correctly ends up at "no item text").
-  //   * "milk 2 x3" -> xN gives 3, this pass gives 2 -> a CONFLICT surfaces to
-  //              review rather than a silently welded "milk 2" at qty 3.
+  // A TRAILING BARE INTEGER IS DELIBERATELY NOT CONSUMED HERE. (WP-B15-11)
   //
-  // OVER-MATCH BOUNDARY (deliberate, both directions are tested):
-  //   * `\s` before the digits is REQUIRED, so a glued form is untouched:
-  //     "7up", "2x4", "b12".
-  //   * the token must be PURE ASCII DIGITS to end of line, so a SIZE / VOLUME
-  //     / UNIT token is untouched: "yazoo 400ml", "milk 2L", "tuna 500g".
-  //     Malformed numeric look-alikes ("milk 2.", "milk +2", a fullwidth digit)
-  //     also fail this test and are caught later by isMalformedNumericToken.
-  //   * a bare number followed by ANY further token is untouched, because the
-  //     match is anchored to end of line: "tuna 4 pack" keeps its "4".
-  //   * a phrase in TRAILING_NUMBER_COLLISIONS keeps its number in the NAME.
-  //     Checked against the CURRENT working string each iteration, so
-  //     "omega 3" stays qty 1 while "omega 3 x2" is qty 2 x "omega 3".
-  // Looping matches the trailing-xN pass, so "milk 2 3" surfaces BOTH values as
-  // a conflict instead of welding one of them into the name.
-  let bare = working.match(/\s(\d+)\s*$/);
-  while (bare && !Object.prototype.hasOwnProperty.call(
-    TRAILING_NUMBER_COLLISIONS, normaliseItemName(working)
-  )) {
-    qtys.push(parseInt(bare[1], 10));
-    working = working.slice(0, bare.index).trim();
-    bare = working.match(/\s(\d+)\s*$/);
-  }
+  // There used to be a third pass at this point that read "milk 2" as a quantity
+  // of 2 and STRIPPED the number, leaving "milk" as the item name. That pass is
+  // what ordered thirty-three boxes of laundry capsules from "ARIEL 4in1 PODS
+  // 33", and removing it is the whole point of this change. A trailing bare
+  // integer now stays exactly where it was written; parseLine reads it as
+  // pack-size evidence via trailingPackSize and annotates the item.
+  //
+  // Consequences that are load-bearing and are pinned by test:
+  //   * "milk 2 x3"  -> xN gives 3 and the 2 stays in the name: 3 x "milk 2".
+  //                     A genuine request, no longer a manufactured conflict.
+  //   * "2 milk 3"   -> leading gives 2 and the 3 stays: 2 x "milk 3".
+  //   * "2 3"        -> the leading pass takes the 2, leaving "3", which has no
+  //                     item text and still routes to review.
+  //   * "omega 3"    -> unchanged at qty 1, now by the general rule rather than
+  //                     by a curated exception list.
 
   return { qtys: qtys, rest: working };
 }
@@ -431,8 +483,38 @@ function parseLine(line) {
     return { kind: 'review', reason: 'no item text' };
   }
 
+  // ── THE PACK-SIZE READING (WP-B15-11) ───────────────────────────────────
+  // The trailing bare integer was never consumed as a quantity, so it is still
+  // sitting in `quant.rest`. Decide what it was.
+  //
+  // Only when NO explicit quantity was written anywhere on the line: if one was
+  // ("milk 2 x3"), the request is unambiguous, nothing was corrected, and there
+  // is nothing to annotate. Mirrors runPipeline.js, which applies its correction
+  // only where the reported quantity IS the trailing number.
+  let annotated = note;
+  if (distinct.length === 0) {
+    const packSize = trailingPackSize(quant.rest);
+    if (packSize !== null) {
+      annotated = note ? note + '; ' + packSizeNote(packSize) : packSizeNote(packSize);
+    } else {
+      // The line ends in a bare integer that is NOT a usable pack size: a zero,
+      // or a value past integer precision. It is neither a count nor a
+      // designator, and the NEVER-GUESS rule applies -- it must not be welded
+      // silently into an item name. The reasons are the ones this module
+      // already used for these two shapes.
+      const bareTok = trailingBareIntegerToken(quant.rest);
+      if (bareTok !== null) {
+        const n = Number(bareTok);
+        if (Number.isSafeInteger(n) && n < 1) {
+          return { kind: 'review', reason: 'non-positive quantity: ' + n };
+        }
+        return { kind: 'review', reason: 'implausible quantity: ' + bareTok };
+      }
+    }
+  }
+
   const requested_qty = distinct.length === 1 ? distinct[0] : 1;
-  return { kind: 'item', item_name: item_name, requested_qty: requested_qty, note: note };
+  return { kind: 'item', item_name: item_name, requested_qty: requested_qty, note: annotated };
 }
 
 // ---------------------------------------------------------------------
@@ -483,6 +565,11 @@ function normaliseRawList(text) {
 
 module.exports = {
   normaliseRawList: normaliseRawList,
+  // THE SHARED PACK-SIZE RULE, exported as a first-class part of this module's
+  // public surface rather than a test hook: it is the one semantic rule both the
+  // typed and the photographed paths must agree on, and it can only live on this
+  // (CommonJS) side of the boundary. See trailingPackSize above.
+  trailingPackSize: trailingPackSize,
   // exported for unit tests of the pure helpers
   _internal: {
     collapseWs: collapseWs,
@@ -491,8 +578,10 @@ module.exports = {
     extractParentheticals: extractParentheticals,
     extractQuantities: extractQuantities,
     isMalformedNumericToken: isMalformedNumericToken,
+    trailingPackSize: trailingPackSize,
+    trailingBareIntegerToken: trailingBareIntegerToken,
+    packSizeNote: packSizeNote,
     parseLine: parseLine,
-    WORD_NUMBERS: WORD_NUMBERS,
-    TRAILING_NUMBER_COLLISIONS: TRAILING_NUMBER_COLLISIONS
+    WORD_NUMBERS: WORD_NUMBERS
   }
 };
