@@ -491,6 +491,74 @@ test('AC4: the PLAN guard does not regress - an empty plan with no handoff still
   assert.strictEqual(query.state.shops[0].status, 'WAITING_FOR_BROWSER');
 });
 
+// =====================================================================
+// A TERMINATION THAT REJECTS MUST BE PARKED, NOT DROPPED
+//
+// `return this.finishX()` inside run()'s try returns an UNAWAITED promise. The
+// finally runs and control leaves the try block before that promise settles, so
+// a rejection arrives with no handler attached: it skips the catch below and
+// escapes run() as an unhandled rejection. Nothing parks the request, nothing
+// records a reason, and the shop is left mid-run with no durable explanation.
+//
+// It bites hardest exactly where it is least visible - these are the ERROR and
+// handover paths, the ones a happy-path suite never exercises. `return await`
+// keeps the promise inside the try, which is the whole fix.
+//
+// ONE shared shape covers every site: make the LEASE RELEASE reject (each of
+// these terminations ends in one) and require the run to come back as a parked
+// FAILED request rather than throwing out of run().
+// =====================================================================
+
+/** A query that rejects the lease-release statement, and nothing else. */
+function releaseHostileQuery(query) {
+  const wrapped = async (t, p) => {
+    if (/set\s+status\s+= case when status in/.test(t)) throw new Error('database went away during release');
+    return query(t, p);
+  };
+  wrapped.state = query.state;
+  wrapped.end = query.end;
+  return wrapped;
+}
+
+const reauthSession = () => makeFakeSession({
+  open_groceries: async () => ({ url: 'https://login.asda.com/x', reauth_required: true }),
+  state: async () => ({ url: 'https://login.asda.com/x', reauth_required: true }),
+});
+
+for (const c of [
+  { site: 'releaseToHuman, on human takeover', args: () => ({ directive: 'takeover' }) },
+  { site: 'finishReauth, re-auth found on the landing page', args: () => ({ session: reauthSession() }) },
+  { site: 'finishReauth, request already flagged for re-auth', args: () => ({ session: reauthSession(), progress: { human_reauth_required: true } }) },
+  // The worst version, and the one that must be reached DELIBERATELY. A re-auth
+  // thrown by open_groceries never gets here - run() converts that one inline
+  // into st.reauth_required and takes the try-branch above. Only a re-auth
+  // raised MID-PLAN, from a step, reaches the catch, where no outer handler is
+  // left and `await` alone cannot park anything.
+  {
+    site: 'finishReauth, reached from inside the CATCH (re-auth raised mid-plan)',
+    args: () => ({
+      session: makeFakeSession({
+        add_known_product: async () => { throw new ReauthRequiredError('https://login.asda.com/shopper/authorise'); },
+      }),
+    }),
+  },
+]) {
+  test(`a REJECTING termination is parked FAILED rather than escaping run() - ${c.site}`, async () => {
+    const { runner, query } = scenario(c.args());
+    runner.query = releaseHostileQuery(query);
+
+    // Without the await this line REJECTS instead of resolving, and not one
+    // assertion below is ever reached.
+    const res = await runner.run({});
+
+    assert.strictEqual(res.outcome, 'failed', 'the rejection must be handled, not escape run()');
+    assert.match(res.error, /database went away during release/, 'and the real reason must survive');
+    assert.strictEqual(query.state.requests[0].status, 'failed', 'the request is parked FAILED, visibly');
+    assert.ok(/database went away/.test(String(query.state.requests[0].last_error)),
+      'with the reason durable on the row rather than lost to an unhandled rejection');
+  });
+}
+
 test('argument parsing carries only known switches', () => {
   const a = parseArgs(['--request', '7', '--lease-ms', '1000', '--dry-run', '--plan-file', 'p.json']);
   assert.strictEqual(a.requestId, '7');

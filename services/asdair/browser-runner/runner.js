@@ -234,6 +234,18 @@ class Runner {
       return { outcome: 'refused' };
     }
 
+    // ── EVERY `return await` BELOW IS LOAD-BEARING ──────────────────────────
+    // Do not "tidy" any of them into a bare `return this.finishX()`, and do not
+    // let a no-return-await lint rule do it for you. Returning the promise
+    // UNAWAITED resolves it after control has already left this try block, so a
+    // rejection from a termination path arrives with no handler attached: it
+    // skips the catch below and escapes run() entirely. Nothing parks the
+    // request, nothing records a reason, and the shop is left mid-run with no
+    // durable explanation.
+    //
+    // These are the error and handover paths - the ones least likely to be
+    // noticed and most likely to matter. Each site carries a short marker
+    // pointing back here.
     try {
       this.reconstruct({ planFile });
 
@@ -242,14 +254,16 @@ class Runner {
       // login page for ever.
       if (this.progress.human_reauth_required) {
         const still = await this.checkReauthStillBlocking(dryRun);
-        if (still) return this.finishReauth('re-authentication still required on start');
+        // `await` load-bearing - see the note above the try.
+        if (still) return await this.finishReauth('re-authentication still required on start');
       }
 
       if (!dryRun) {
         this.session = this.makeSession({ log: (m) => this.log(`[browser] ${m}`) });
         await this.session.open();
         const st = await this.session.open_groceries().catch((e) => { if (e instanceof ReauthRequiredError) return { reauth_required: true, url: e.url, reauth_reason: e.message }; throw e; });
-        if (st && st.reauth_required) return this.finishReauth(st.reauth_reason || `landed on an authentication surface (${st.url})`);
+        // `await` load-bearing - see the note above the try.
+        if (st && st.reauth_required) return await this.finishReauth(st.reauth_reason || `landed on an authentication surface (${st.url})`);
       }
 
       // A REHEARSAL MOVES NO REAL SHOP STATE. --dry-run issues no browser
@@ -265,26 +279,39 @@ class Runner {
 
       for (const step of this.remaining) {
         const gate = await this.gate();
-        if (gate === 'release') return this.releaseToHuman('human takeover requested');
+        // `await` load-bearing on both - see the note above the try.
+        if (gate === 'release') return await this.releaseToHuman('human takeover requested');
         if (gate === 'finish') break;
-        if (gate === 'cancelled') return this.finishCancelled();
+        if (gate === 'cancelled') return await this.finishCancelled();
         this.assertLease();
         await this.executeStep(step, dryRun);
         await sleep(this.opts.interStepMs);
       }
 
-      // THE `await` IS LOAD-BEARING - do not "tidy" it away as a redundant
-      // return-await. Returning the promise unawaited resolves it AFTER control
-      // has left this try block, so a rejection from the termination path skips
-      // the catch below entirely and escapes run(). That is how EmptyBasketError
-      // got past the handler that is supposed to park the request FAILED.
+      // `await` load-bearing - see the note above the try. This is the site
+      // that exposed the whole class: EmptyBasketError got past the handler
+      // meant to park the request FAILED.
       return await this.finishBasketReady(dryRun);
     } catch (e) {
       if (e instanceof lease.LeaseLostError) {
         this.log(`stopped: ${e.message}`);
         return { outcome: 'lease_lost' };
       }
-      if (e instanceof ReauthRequiredError) return this.finishReauth(e.reauth_reason || e.message);
+      if (e instanceof ReauthRequiredError) {
+        // THE ASYMMETRY MATTERS HERE. Inside the catch there is no outer
+        // handler left, so `await` alone would fix only the finally ordering -
+        // a rejection from finishReauth would still escape run() with nothing
+        // recorded anywhere. The inner try is what makes this branch safe:
+        // failing to REPORT re-authentication falls through to the generic park
+        // below, so the request is parked FAILED with the real reason instead
+        // of vanishing.
+        try {
+          return await this.finishReauth(e.reauth_reason || e.message);
+        } catch (e2) {
+          this.log(`FAILED while reporting re-authentication: ${e2.name}: ${e2.message}`);
+          e = e2;
+        }
+      }
       if (e instanceof RateLimitedError) {
         // Being throttled is not a failed request - it is a "come back later".
         // Marking it failed would need a human to re-queue work that is fine.
