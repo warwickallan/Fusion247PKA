@@ -238,6 +238,98 @@ export async function loadOpenQuestions(deps, { householdId = null, log = () => 
   return open;
 }
 
+/** PURE. The comparison form for "are these the same words?" - whitespace and
+ *  case only. NOT normaliseTerm: that flattens punctuation, and "no, the 60g"
+ *  and "no the 60g" are the same answer while "yes" and "yes!" being equal is
+ *  fine but "500g" and "500 g" must not silently become one. */
+function sameWords(a, b) {
+  return String(a == null ? '' : a).trim().replace(/\s+/g, ' ').toLowerCase()
+    === String(b == null ? '' : b).trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * Did the row actually end up carrying THESE words? (WO-2026-08-10-B15-04)
+ *
+ * Answers the one question a `duplicate: true` receipt leaves open: was this a
+ * redelivery of the same message (safe to claim) or a different message hitting
+ * a question somebody else already settled (must NOT be claimed and swallowed)?
+ *
+ * FAILS TOWARDS "NOT RECORDED". An unreadable row cannot evidence that his
+ * words landed, and the safe direction here is to not claim - the worst case is
+ * the pre-existing behaviour, never a silently discarded message.
+ */
+async function recordedAnswerMatches(deps, { open, questionKey, words, log = () => {} } = {}) {
+  const entry = (Array.isArray(open) ? open : []).find((q) => q.questionKey === questionKey);
+  if (!entry) return false;
+  try {
+    const rows = await store.listQuestions(deps, entry.shopId);
+    const row = rows.find((q) => q.question_key === questionKey);
+    return row ? sameWords(row.answer_text, words) : false;
+  } catch (err) {
+    log('recorded_answer_lookup_failed', {
+      question_key: questionKey, detail: String(err && err.message ? err.message : err),
+    });
+    return false;
+  }
+}
+
+/**
+ * Every shop AWAITING A DEFERRED CLARIFICATION. (WO-2026-08-10-B15-04 AC2)
+ *
+ * ── WHY THIS EXISTS SEPARATELY FROM loadOpenQuestions ───────────────────────
+ * These are questions AsdAIr OWES Warwick and has already TOLD him about, and
+ * which have deliberately NOT been opened as rows: runPipeline withholds the
+ * round-2 clarification until the photographed reading is confirmed, because
+ * asking "which variant of line 3?" before he agrees we read line 3 at all is
+ * asking the wrong question first. That gate is right and is not touched here.
+ *
+ * The consequence was not right. A card sat on his phone inviting a reply while
+ * `status = 'open'` matched nothing, so runOnce built no claim at all, intake
+ * was never asked whether the message belonged to anyone, and his answer became
+ * SHOP-2026-08-10 - a whole shopping list made out of one sentence.
+ *
+ * ── THE SIGNAL IS DURABLE AND ALREADY EXISTS ────────────────────────────────
+ * A `clarification_deferred` outbox row for an ACTIVE shop is exactly "AsdAIr
+ * told him a clarification is owed here". It survives restart, it is in the
+ * ledger the Cockpit already reads, and it needs no schema change and no new
+ * message kind. `outboxEverQueued` is deliberately per-KIND here: the question
+ * being asked is about the SHOP's state, not about one held line.
+ *
+ * A lookup that fails returns an EMPTY list, never a throw - same posture as
+ * loadOpenQuestions, and for the same reason: an unreadable ledger must degrade
+ * to today's behaviour, never to a pass that cannot run.
+ */
+export async function loadDeferredClarifications(deps, { householdId = null, log = () => {} } = {}) {
+  const waiting = [];
+  let shops = [];
+  try {
+    shops = await store.listActiveShops(deps, store.CONSUMABLE_COMMANDS);
+  } catch (err) {
+    log('deferred_clarifications_lookup_failed', { detail: String(err && err.message ? err.message : err) });
+    return waiting;
+  }
+
+  for (const shop of shops) {
+    if (householdId !== null && householdId !== undefined
+        && shop.household_id !== null && shop.household_id !== undefined
+        && String(shop.household_id) !== String(householdId)) continue;
+    try {
+      if (!(await store.outboxEverQueued(deps, shop.id, 'clarification_deferred'))) continue;
+      waiting.push({
+        shopRef: shop.shop_ref,
+        shopId: shop.id,
+        householdId: shop.household_id,
+      });
+    } catch (err) {
+      // One shop must not stop another - same posture as queueShopCards.
+      log('deferred_clarifications_lookup_failed', {
+        shop_ref: shop.shop_ref, detail: String(err && err.message ? err.message : err),
+      });
+    }
+  }
+  return waiting;
+}
+
 /**
  * WHICH open question(s) did this bare typed message answer? (WP-B15-A1)
  *
@@ -941,13 +1033,21 @@ export async function runOnce(deps, wiring = {}) {
   // its offset advances. Routing genuinely goes first; only the function call
   // order looks otherwise.
   const openQuestions = await loadOpenQuestions(deps, { householdId: wiring.householdId, log });
+  // ── THE DEFERRED WINDOW (WO-2026-08-10-B15-04 AC2) ────────────────────────
+  // Read ONLY when nothing is open, so the ordinary claim path is untouched in
+  // every other state.
+  const deferred = openQuestions.length === 0
+    ? await loadDeferredClarifications(deps, { householdId: wiring.householdId, log })
+    : [];
   const claimedUpdateIds = new Set();
   const answers = [];
+  const refusals = [];
 
-  // NO OPEN QUESTION, NO CLAIM. Warwick's guard, and the reason a genuine new
-  // shopping list is never lost: with nothing to correlate to, routing does not
-  // get a vote and intake behaves exactly as it always has.
-  const claim = (openQuestions.length === 0 || !wiring.bot || typeof wiring.bot.routeAsdairUpdate !== 'function')
+  // NO OPEN QUESTION AND NOTHING DEFERRED, NO CLAIM. Warwick's guard, and the
+  // reason a genuine new shopping list is never lost: with nothing to correlate
+  // to, routing does not get a vote and intake behaves exactly as it always has.
+  const claim = ((openQuestions.length === 0 && deferred.length === 0)
+    || !wiring.bot || typeof wiring.bot.routeAsdairUpdate !== 'function')
     ? null
     : async (verdict, update) => {
       // A photo is a list. A reply already correlates through the card it
@@ -955,6 +1055,72 @@ export async function runOnce(deps, wiring = {}) {
       if (!verdict || verdict.kind !== 'text') return false;
       const msg = update && update.message;
       if (!msg || msg.reply_to_message) return false;
+
+      // ── HE TYPED INTO THE DEFERRED WINDOW ───────────────────────────────
+      //
+      // A clarification is OWED and he has been TOLD about it, but no question
+      // row is open to receive an answer: the round-2 question is deliberately
+      // withheld until the reading is confirmed. He read that card and typed.
+      //
+      // Three things must all hold, and only the first is obvious:
+      //   * his words are NOT started as a new shopping list (the live defect,
+      //     SHOP-2026-08-10);
+      //   * his words are NOT written as an answer either - answerQuestion is a
+      //     compare-and-set on status='open', so the already-answered row
+      //     refuses the write and returns `duplicate: true`. Claiming on that
+      //     receipt records his words NOWHERE. Measured, not assumed;
+      //   * HE IS TOLD. A claim that returns true without telling him is a
+      //     SILENT DROP, which is strictly worse than the spurious shop because
+      //     he cannot see it and therefore cannot correct it.
+      //
+      // So the claim is taken only once the notice is durably queued. If the
+      // enqueue fails we return false and fall back to the old behaviour: a
+      // wrong shop he can see beats a message that vanished.
+      if (openQuestions.length === 0) {
+        const target = deferred[0];
+        const noticeKey = outboxKeyFor(target.shopRef, `clarification_deferred.refused.${verdict.updateId}`);
+        try {
+          // ONE NOTICE PER MESSAGE, EVER - the AC1 lesson applied directly. The
+          // family is keyed on the UPDATE ID and a spent generation of that
+          // family is the honest question. Without this, a message redelivered
+          // because the offset never advanced would mint a new generation every
+          // pass and rebuild the exact storm this Work Order just closed.
+          const family = ledgerFamilyKey({
+            kind: LEDGER_KINDS.OUTBOX,
+            householdId: target.householdId,
+            name: 'clarification_deferred',
+            key: noticeKey,
+          });
+          if ((await store.spentLedgerGenerations(deps, family)) === 0) {
+            await store.enqueueMessage(deps, {
+              householdId: target.householdId,
+              shopId: target.shopId,
+              kind: 'clarification_deferred',
+              key: noticeKey,
+              payload: {
+                shopRef: target.shopRef,
+                items: [],
+                reason: 'I am still waiting for you to confirm I read this list correctly, so I had nowhere to put that.',
+                messageNotAccepted: true,
+              },
+            });
+          }
+        } catch (err) {
+          // TOLD HIM NOTHING => DO NOT CLAIM. Never a silent drop.
+          log('deferred_window_notice_failed', {
+            updateId: verdict.updateId,
+            shop_ref: target.shopRef,
+            detail: String(err && err.message ? err.message : err),
+          });
+          return false;
+        }
+        refusals.push({ updateId: verdict.updateId, shop_ref: target.shopRef, reason: 'clarification_deferred' });
+        claimedUpdateIds.add(verdict.updateId);
+        log('typed_message_refused_deferred_window', {
+          updateId: verdict.updateId, shop_ref: target.shopRef, deferred_shops: deferred.length,
+        });
+        return true;
+      }
 
       const correlation = await correlateTypedAnswer(deps, {
         text: verdict.text, open: openQuestions, log,
@@ -988,7 +1154,37 @@ export async function runOnce(deps, wiring = {}) {
       for (const c of mapped.commands) {
         try {
           const receipt = await commands.dispatch(c.command, c.spec, deps);
-          answers.push({ question_key: c.spec.questionKey, shop_ref: c.spec.shopRef, duplicate: receipt.duplicate === true });
+          const duplicate = receipt.duplicate === true;
+          // ── A DUPLICATE RECEIPT IS NOT A RECORDED ANSWER (B15-04) ────────
+          //
+          // answerQuestion is a compare-and-set on status='open'. A row that is
+          // already answered REFUSES the write and comes back `duplicate: true`
+          // - and the words in THIS message were stored nowhere. Counting that
+          // as settled lets the claim return true and swallow a message it
+          // never recorded, telling him nothing. That is the silent-loss trap.
+          //
+          // A genuine redelivery of the SAME message must still be claimed,
+          // though, or it becomes a shopping list. So the two are separated by
+          // the only evidence that distinguishes them: whether what is on the
+          // row is what he just sent.
+          let recorded = !duplicate;
+          if (duplicate) {
+            recorded = await recordedAnswerMatches(deps, {
+              open: openQuestions, questionKey: c.spec.questionKey, words: c.spec.answerText, log,
+            });
+            if (!recorded) {
+              answers.push({
+                question_key: c.spec.questionKey,
+                shop_ref: c.spec.shopRef,
+                error: 'not recorded - the question was already answered with different words',
+              });
+              log('typed_answer_not_recorded', {
+                updateId: verdict.updateId, question_key: c.spec.questionKey,
+              });
+              continue;   // NOT settled => not claimed on this mapping.
+            }
+          }
+          answers.push({ question_key: c.spec.questionKey, shop_ref: c.spec.shopRef, duplicate });
           settled += 1;
         } catch (err) {
           // Reported, never swallowed.
@@ -1044,7 +1240,12 @@ export async function runOnce(deps, wiring = {}) {
     // Typed answers settled from plain messages this pass, with the question each
     // one settled. A pass that answered nothing shows an empty list, not silence.
     answers,
+    // Messages REFUSED into the deferred window - not a list, not an answer, and
+    // he was told. Reported so a refusal is visible in the pass result rather
+    // than only in the journal.
+    refusals,
     open_questions_seen: openQuestions.length,
+    deferred_clarifications_seen: deferred.length,
     taps: { routed: tapReport.routed.length, refused: tapReport.refused.length, detail: tapReport.refused },
     shops: advanced.map((r) => ({
       shop_ref: r.shop_ref, step: r.step, stepped: r.stepped,

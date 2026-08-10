@@ -19,7 +19,7 @@ import { createRequire } from 'node:module';
 import { makeHarness, makeCatalogue, HOUSEHOLD_ID, makeIntake, textUpdate } from './test/harness.js';
 import * as commands from './commands.js';
 import { runPipeline, listDateOf, buildGroundedIntents, planCandidates, assertCatalogueLoaded } from './runPipeline.js';
-import { runOnce, loadOpenQuestions } from './runtime.js';
+import { runOnce, loadOpenQuestions, loadDeferredClarifications } from './runtime.js';
 import { listQuestions, listOutbox, resolveCommand } from './store.js';
 import { STEPS } from './stages.js';
 import { questionKeyFor } from './keys.js';
@@ -1626,83 +1626,89 @@ async function makeRoutingBot() {
 /** Warwick's actual words, from the spurious shop's only line. */
 const HIS_ANSWER = "any gloves, i don't care want to rotate as soon as safe to do so!";
 
-// ⚠️ THE TWO TESTS BELOW ARE CHARACTERISATION WITNESSES, NOT APPROVALS.
+// ── THE FIX, AND THE THREE ROUTES IT DELIBERATELY DOES NOT TAKE ────────────
 //
-// They assert the CURRENT, WRONG behaviour exactly, so the defect cannot be lost
-// again and so the mechanism is pinned as a fact rather than an argument. They
-// are GREEN today and they are MEANT to go RED the moment anybody fixes this -
-// that failure is the signal, and the fixer replaces the assertion with the
-// correct one. Nothing here says the behaviour is acceptable.
-//
-// WHY NO FIX SHIPS IN THIS COMMIT. Every route to "his words are not lost AND no
-// shop is created" needs a decision that is not the implementer's:
-//   (a) record the pending answer on shop_question -> a MIGRATION, explicitly
-//       out of scope in this Work Order;
-//   (b) a new outbox kind telling him AsdAIr is still waiting -> new Telegram
-//       surface, explicitly out of scope in this Work Order;
+// Larry's decision, 2026-08-10. None of these was available:
+//   (a) record the pending answer on shop_question -> a MIGRATION, out of scope;
+//   (b) a new outbox kind -> new Telegram surface, out of scope;
 //   (c) open the round-2 question early -> changes the deferral gate that
-//       recovered shop 6 and suppresses the confirmation card (see the comment
-//       above stepPlan's gate, and B15-3 FIX1 / AC3);
-//   (d) claim it and log it -> a SILENT SWALLOW, the exact defect class the
-//       clarification_deferred card was added to close.
-// Picking one is a product decision. Guessing one would be a plausible-sounding
-// fix for a mechanism nobody demonstrated, which is what this order forbids.
+//       recovered shop 6 and suppresses the confirmation card.
+// And the fourth, claim-and-log, is a SILENT SWALLOW - the exact defect class
+// the clarification_deferred card exists to close.
 //
-// ⛔ AND THE OBVIOUS ONE-LINE FIX IS ACTIVELY HARMFUL - MEASURED, NOT ARGUED.
+// SO: the claim RECOGNISES the deferred window; the message is NOT ingested as
+// a list; it is NOT written as an answer; and HE IS TOLD, by re-issuing the
+// clarification_deferred notice already owed - same kind, same renderer, with
+// `messageNotAccepted: true`.
+//
+// ⛔ WHY THE OBVIOUS ONE-LINE FIX WAS REFUSED - MEASURED, NOT ARGUED.
 //
 // The tempting fix is to let loadOpenQuestions admit the `answered` round-1 row
-// so the claim seam becomes reachable. It was tried as a mutation and probed:
+// so the existing claim seam becomes reachable. It was tried as a mutation and
+// probed:
 //
 //   report.intake -> { received: 0, claimed: 1 }        <- no spurious shop
 //   answers       -> [{ ..., duplicate: true }]
 //   answer_text   -> UNCHANGED, still his ORIGINAL round-1 words
 //
 // answerQuestion is a compare-and-set on status='open', so the already-answered
-// row refuses the write and returns `duplicate: true`. runOnce's claim counts
-// that receipt toward `settled`, so it returns TRUE and the message is claimed -
-// meaning his new words were NEVER RECORDED ANYWHERE AND HE WAS NEVER TOLD.
+// row refuses the write and returns `duplicate: true`. runOnce counted that
+// receipt toward `settled`, returned TRUE and SWALLOWED the message - his new
+// words recorded NOWHERE and he told NOTHING. It converts a VISIBLE defect (a
+// spurious shop he can see and delete) into an INVISIBLE one. That latent
+// swallow is fixed too - see `recordedAnswerMatches` and the DUPLICATE test.
 //
-// So that fix does not close the defect. It converts a VISIBLE wrong answer (a
-// spurious shop he can see and delete) into an INVISIBLE one (a lost reply). Do
-// not ship it. The related in-scope hardening it exposes - a `duplicate: true`
-// receipt must not count as `settled` unless the recorded answer_text matches
-// the incoming words - is REPORTED, not fixed here, because under the current
-// code the claim is never built at all and the path cannot be reached.
+// A GENUINE NEW LIST TYPED IN THIS WINDOW IS REJECTED. Accepted knowingly: it
+// is an edge case, it is VISIBLE, and the card says so in as many words.
+// Fail-safe and loud beats convenient and wrong.
 
-test('B15-04 AC2 WITNESS: a deferred clarification leaves ZERO open questions, so NO claim is built', async () => {
-  const h = makeHarness({
-    modelLines: MODEL_LINES,
-    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
-  });
+/** A shop parked on a genuinely OPEN question - the ordinary claim path's state. */
+async function seedOpenQuestionShop() {
+  const h = makeHarness({ modelLines: MODEL_LINES });
+  await receiveText(h, '1 dreamies cheese\n2 gourmet cat food');
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await drain(h);
+  assert.ok(h.db.shop_question.some((row) => row.status === 'open'),
+    'the fixture must reach a real open question');
+  return h;
+}
+
+/** Drive a shop into the deferred window with its notice actually delivered. */
+async function toDeliveredDeferral(h) {
   await toDeferredClarification(h);
   await runPipeline(HANDLE, h.deps);
   await runPipeline(HANDLE, h.deps);
   await sendQueuedCards(h);
-
-  // The card that ASKS HIM SOMETHING has been delivered...
   assert.equal(DEFERRED_CARDS(h.db).length, 1, 'the soliciting card never went out - this proves nothing');
+}
 
-  // ...and there is nothing for him to answer. This IS the defect, in one line.
-  // runOnce reads: `openQuestions.length === 0 ? null : claim`, so a zero here
-  // means intake is never asked whether the message belongs to anyone.
+test('B15-04 AC2: the deferred window is RECOGNISED even though no question row is open', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  await toDeliveredDeferral(h);
+
+  // The state gap itself is unchanged and is NOT what was fixed: the round-2
+  // question is still withheld, so `status = 'open'` still matches nothing.
   const open = await loadOpenQuestions(h.deps, { householdId: HOUSEHOLD_ID });
-  assert.equal(open.length, 0,
-    'GOOD NEWS IF THIS FAILS: the deferred state now carries an answerable question, '
-    + 'so the claim seam is finally reachable. Replace this witness with the real assertion.');
+  assert.equal(open.length, 0, 'the deferral gate was weakened - that is not this fix');
+
+  // What changed is that the window is now VISIBLE to the claim decision.
+  const deferred = await loadDeferredClarifications(h.deps, { householdId: HOUSEHOLD_ID });
+  assert.equal(deferred.length, 1, 'a card was sent soliciting an answer and nothing knows he is owed one');
+  assert.equal(deferred[0].shopRef, REF);
 });
 
-test('B15-04 AC2 WITNESS: with no claim, his answer is consumed by intake as a shopping list', async () => {
+test('B15-04 AC2: HIS ANSWER IS NOT A SHOPPING LIST, NOT AN ANSWER, AND HE IS TOLD', async () => {
   const h = makeHarness({
     modelLines: MODEL_LINES,
     depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
   });
-  await toDeferredClarification(h);
-  await runPipeline(HANDLE, h.deps);
-  await runPipeline(HANDLE, h.deps);
-  await sendQueuedCards(h);
-  assert.equal(DEFERRED_CARDS(h.db).length, 1, 'the soliciting card never went out - this proves nothing');
+  await toDeliveredDeferral(h);
+  const answerBefore = h.db.shop_question[0].answer_text;
 
-  // He reads the card and types a bare (non-reply) answer, on a NEW message id -
+  // He reads the card and types a bare (non-reply) message on a NEW message id -
   // exactly the live message that became SHOP-2026-08-10.
   const bot = await makeRoutingBot();
   const report = await runOnce(h.deps, {
@@ -1711,20 +1717,156 @@ test('B15-04 AC2 WITNESS: with no claim, his answer is consumed by intake as a s
     intake: makeIntake([textUpdate({ updateId: 2, messageId: 901, text: HIS_ANSWER })]),
   });
 
-  // THE SYMPTOM. Received as a list; claimed by nobody.
-  assert.equal(report.intake.received, 1,
-    'GOOD NEWS IF THIS FAILS: his answer is no longer being eaten as a shopping list.');
-  assert.equal(report.intake.claimed, 0,
-    'GOOD NEWS IF THIS FAILS: something now owns the message. Replace this witness.');
+  // 1. NOT A LIST. This is the defect Warwick actually suffered.
+  assert.equal(report.intake.received, 0, 'his answer was received as a shopping list again');
+  assert.deepEqual(h.db.shop.map((s) => s.shop_ref), [REF], 'a second shop was created from his answer');
+  assert.ok(h.db.shopping_lists.length <= 1, 'a second shopping list was written from an answer');
 
-  // AND THE PART THE LIVE INCIDENT ADDED: whether it becomes a SECOND SHOP or is
-  // absorbed into the current one depends only on the arrival DATE, because the
-  // shop ref is derived from the day the message landed. Warwick's arrived at
-  // ~00:05, over the midnight boundary, so it minted SHOP-2026-08-10. Here the
-  // harness clock is fixed, so the same defect resumes the existing shop instead.
-  // The date is what varies; being consumed as a list is the constant.
-  assert.deepEqual(h.db.shop.map((s) => s.shop_ref), [REF],
-    'the fixture clock moved - the witness above no longer isolates the date effect');
+  // 2. NOT AN ANSWER. The compare-and-set would have refused it anyway; what
+  //    matters is that nothing pretended otherwise and his round-1 words stand.
+  assert.equal(h.db.shop_question[0].answer_text, answerBefore, 'his earlier answer was overwritten');
+  assert.equal(h.db.shop_question.length, 1, 'a question row was invented to receive the message');
+
+  // 3. HE IS TOLD. Claimed, and a notice queued and delivered saying so. This is
+  //    the whole reason this route was chosen over claim-and-log.
+  assert.equal(report.intake.claimed, 1, 'nobody owned the message');
+  assert.equal(report.refusals.length, 1, 'the refusal is invisible in the pass result');
+  assert.equal(report.refusals[0].reason, 'clarification_deferred');
+  assert.equal(DEFERRED_CARDS(h.db).length, 2, 'HE WAS NOT TOLD - this is the silent drop, and it is worse');
+
+  const notice = DEFERRED_CARDS(h.db)[1];
+  assert.equal(notice.args.messageNotAccepted, true);
+  assert.equal(notice.status, 'done', 'the notice was queued but never actually sent to him');
+
+  // And it must read correctly for BOTH readers - the one answering, and the one
+  // who genuinely was sending a list and must not think it landed.
+  const rendered = bot.messages.clarification_deferred(notice.args).text;
+  assert.match(rendered, /NOT started as a/,
+    'the card does not tell him his message was not taken as a list');
+  assert.match(rendered, /NEW shopping list/,
+    'someone who really was sending a list is left thinking it landed');
+  assert.match(rendered, /confirm I read this list correctly/,
+    'the card does not say what would actually unblock it');
+});
+
+test('B15-04 AC2: TWENTY passes with a REDELIVERED message produce ONE notice, not one per pass', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  await toDeliveredDeferral(h);
+  const bot = await makeRoutingBot();
+
+  // THE WORST CASE, and the one that rebuilt the storm last time: a state store
+  // that never advances, so Telegram redelivers the SAME message every pass.
+  // Delivering what each pass queued is what makes the generation SPENT - the
+  // exact trap that made the six-pass FIX1 test necessary.
+  const update = textUpdate({ updateId: 2, messageId: 901, text: HIS_ANSWER });
+  const stuck = makeIntake([update]);
+  stuck.state = { async read() { return { lastUpdateId: null }; }, async write() { return null; } };
+
+  const running = [];
+  for (let i = 0; i < 20; i += 1) {
+    await runOnce(h.deps, { householdId: HOUSEHOLD_ID, bot, intake: stuck });
+    await sendQueuedCards(h);
+    running.push(DEFERRED_CARDS(h.db).length);
+  }
+
+  assert.equal(DEFERRED_CARDS(h.db).length, 2,
+    'one deferral notice plus one refusal notice is the whole budget; got '
+    + `${DEFERRED_CARDS(h.db).length} (running total per pass: ${running.join(', ')})`);
+  assert.deepEqual(h.db.shop.map((s) => s.shop_ref), [REF], 'a redelivered refusal created a shop');
+});
+
+test('B15-04 AC2: a genuine new list typed in the window is REJECTED - visibly, not silently', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  await toDeliveredDeferral(h);
+  const bot = await makeRoutingBot();
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    intake: makeIntake([textUpdate({ updateId: 3, messageId: 902, text: '2 milk\n1 bread\n6 eggs' })]),
+  });
+
+  // The accepted trade, asserted so nobody discovers it in production: it does
+  // NOT become a shop, and he is TOLD rather than left guessing.
+  assert.equal(report.intake.received, 0);
+  assert.deepEqual(h.db.shop.map((s) => s.shop_ref), [REF]);
+  assert.equal(report.refusals.length, 1);
+  assert.equal(DEFERRED_CARDS(h.db).length, 2, 'a rejected shopping list was rejected SILENTLY');
+  assert.match(bot.messages.clarification_deferred(DEFERRED_CARDS(h.db)[1].args).text,
+    /please send it again once this shop is finished/,
+    'he is not told what to do with the list he just tried to send');
+});
+
+test('B15-04 DUPLICATE: a duplicate receipt with DIFFERENT words is not settled, so nothing is swallowed', async () => {
+  // The latent swallow found while proving AC2's cause. answerQuestion is a
+  // compare-and-set on status='open', so an already-answered row returns
+  // `duplicate: true` having stored nothing. Counting that as settled claims a
+  // message whose words were recorded nowhere.
+  // THE RACE IS REAL AND IS BUILT HERE, NOT SIMULATED. runOnce reads the open
+  // questions BEFORE the fetch. Answering the row from inside getUpdates puts
+  // the settle exactly in that window - open when loaded, closed by dispatch.
+  const h = await seedOpenQuestionShop();
+  const q = h.db.shop_question.find((row) => row.status === 'open');
+  assert.ok(q, 'the fixture needs a genuinely open question');
+
+  const bot = await makeRoutingBot();
+  const intake = makeIntake([textUpdate({ updateId: 4, messageId: 903, text: 'actually make it the big bag' })]);
+  const fetch = intake.telegram.getUpdates;
+  intake.telegram.getUpdates = async (args) => {
+    const updates = await fetch(args);
+    await commands.answerQuestion({
+      shopRef: REF, actor: ACTOR, questionKey: q.question_key,
+      answerText: 'the 60g one', answerSource: 'button',
+    }, h.deps);
+    return updates;
+  };
+
+  const report = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, bot, intake });
+
+  // His earlier answer stands, and the message was NOT claimed on a write that
+  // never happened - so it falls back to intake, which is visible and fixable.
+  assert.equal(h.db.shop_question.find((row) => row.question_key === q.question_key).answer_text, 'the 60g one',
+    'the compare-and-set was defeated and the recorded answer was overwritten');
+  assert.equal(report.intake.claimed, 0,
+    'a message whose words were recorded NOWHERE was claimed and swallowed');
+  const notRecorded = report.answers.filter((a) => typeof a.error === 'string');
+  assert.equal(notRecorded.length, 1, 'the dropped answer left no trace in the pass report');
+});
+
+test('B15-04 DUPLICATE: a genuine REDELIVERY of the SAME words is still claimed', async () => {
+  // The other half of the rule, and the reason it is a comparison rather than a
+  // blanket "never settle on a duplicate": a redelivered message answering the
+  // question it already answered must NOT fall through and become a shop.
+  const h = await seedOpenQuestionShop();
+  const q = h.db.shop_question.find((row) => row.status === 'open');
+  const WORDS = 'the 60g one';
+
+  const bot = await makeRoutingBot();
+  const intake = makeIntake([textUpdate({ updateId: 4, messageId: 903, text: WORDS })]);
+  const fetch = intake.telegram.getUpdates;
+  intake.telegram.getUpdates = async (args) => {
+    const updates = await fetch(args);
+    // The SAME words land first - the redelivery case exactly.
+    await commands.answerQuestion({
+      shopRef: REF, actor: ACTOR, questionKey: q.question_key,
+      answerText: WORDS, answerSource: 'typed',
+    }, h.deps);
+    return updates;
+  };
+
+  const report = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, bot, intake });
+
+  assert.equal(report.intake.claimed, 1,
+    'a redelivered answer was not claimed, so it will be eaten as a shopping list');
+  assert.equal(report.intake.received, 0, 'a redelivered answer became a shopping list');
+  assert.equal(report.answers.filter((a) => typeof a.error === 'string').length, 0,
+    'a genuine redelivery was reported as a dropped answer');
 });
 
 test('B15-04 AC1: a clarification round key is still `q`+8 hex - the round NEVER reaches the key', () => {
