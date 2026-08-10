@@ -401,6 +401,39 @@ export async function routeTaps(deps, {
   const routed = [];
   const refused = [];
 
+  // ── THE TOAST NEVER STOPS THE SHOP (WO-2026-08-10-B15-04 AC3) ─────────────
+  //
+  // answerCallbackQuery is a grey toast on a button. Telegram rejects it with
+  // "query is too old and response timeout expired or query ID is invalid"
+  // whenever the tap has been sitting for more than ~15 minutes - which is
+  // routine here, because a pass runs on an interval and a tap can easily be
+  // older than the pass that picks it up.
+  //
+  // Unguarded, that throw escaped routeTaps, escaped runOnce, and runWatch
+  // logged pass_failed - over and over on the evening of 2026-08-09. Everything
+  // after routeTaps in the pass (advanceAll, queueShopCards, drainOutbox) never
+  // ran, so nothing advanced and no card reached Warwick's phone.
+  //
+  // THE TAP ITSELF IS ALREADY DURABLE - every answer landed in Postgres despite
+  // this. So the only thing lost by swallowing the rejection is the toast, and
+  // the fix is to swallow it LOUDLY: logged as tap_ack_failed, never rethrown.
+  //
+  // NOT fixed by removing the acknowledgement. The missing confirmation is a
+  // real UX defect - Warwick tapped repeatedly because nothing came back - and
+  // it is REPORTED separately, not resolved by deleting the call.
+  const acknowledge = async (intent, text) => {
+    if (!bot.answerTap || !intent || !intent.raw || !intent.raw.callbackQueryId) return;
+    try {
+      await bot.answerTap(intent.raw.callbackQueryId, text);
+    } catch (err) {
+      log('tap_ack_failed', {
+        action: intent.action,
+        callbackQueryId: intent.raw.callbackQueryId,
+        detail: String(err && err.message ? err.message : err),
+      });
+    }
+  };
+
   for (const update of updates) {
     // ALREADY HANDLED. A message the route-first claim answered during intake is
     // durably settled; routing it a second time would try to answer the same
@@ -492,25 +525,25 @@ export async function routeTaps(deps, {
       // whoever reads the pass result; the log reaches whoever is reading the
       // journal at 7am wondering why an answer did nothing.
       log('inbound_refused', { updateId: update && update.update_id, action: intent.action, reason });
-      if (bot.answerTap && intent.raw && intent.raw.callbackQueryId) {
-        await bot.answerTap(intent.raw.callbackQueryId, detail || reason);
-      }
+      await acknowledge(intent, detail || reason);
       continue;
     }
+    // THE DISPATCH IS THE ONLY THING THIS try GUARDS. Acknowledging outside it
+    // is deliberate: a landed command whose toast failed used to be caught here
+    // and reported as `command failed`, which is a lie about a durable answer -
+    // and then the catch's OWN answerTap threw again and escaped the function.
+    let receipt = null;
     try {
-      const receipt = await commands.dispatch(mapped.command, mapped.spec, deps);
-      routed.push({ action: intent.action, command: mapped.command, receipt });
-      if (bot.answerTap && intent.raw && intent.raw.callbackQueryId) {
-        await bot.answerTap(intent.raw.callbackQueryId, receipt.duplicate ? 'Already asked for' : 'Got it');
-      }
+      receipt = await commands.dispatch(mapped.command, mapped.spec, deps);
     } catch (err) {
       const detail = String(err && err.message ? err.message : err);
       refused.push({ action: intent.action, reason: 'command failed', detail });
       log('tap_failed', { action: intent.action, detail });
-      if (bot.answerTap && intent.raw && intent.raw.callbackQueryId) {
-        await bot.answerTap(intent.raw.callbackQueryId, 'That did not work - check the status card');
-      }
+      await acknowledge(intent, 'That did not work - check the status card');
+      continue;
     }
+    routed.push({ action: intent.action, command: mapped.command, receipt });
+    await acknowledge(intent, receipt.duplicate ? 'Already asked for' : 'Got it');
   }
   return { routed, refused };
 }
