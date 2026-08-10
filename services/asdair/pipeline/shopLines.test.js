@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { makeHarness, makeCatalogue } from './test/harness.js';
 import {
   buildLine, upsertLine, upsertLines, listLines, linkListItem, markCorrected,
+  listForeignClaimedItemIds,
   withCanonicalNames, INTERPRETATION_COLUMNS, LINE_STATUSES, _internal as sql,
 } from './shopLines.js';
 
@@ -133,4 +134,84 @@ test('an upsert that writes nothing AND finds nothing fails loudly rather than p
   h.deps.writeQuery = async () => ({ rows: [], rowCount: 0 });
   h.deps.readQuery = async () => ({ rows: [], rowCount: 0 });
   await assert.rejects(() => upsertLine(h.deps, SHOP, line()), /wrote nothing.*and no such line exists/s);
+});
+
+// =====================================================================
+// WP-B15-10 - WHICH LIST ITEMS ANOTHER SHOP PROVABLY OWNS
+//
+// `asdair.shopping_lists` carries `unique (household_id, list_date)`
+// (001_asdair_schema.sql:251), so two shops on one calendar date SHARE one list
+// row. This statement is the only durable evidence that a row on that shared
+// list was put there by somebody else's shop.
+//
+// THE DIRECTION IS THE WHOLE DESIGN, and these tests exist to keep it. A row
+// that comes back is PROVABLY another shop's. A row that does not is NOT
+// thereby this shop's - stepInterpret is the only caller of linkListItem, so
+// corrections and cockpit additions carry no claim at all. Read as an allowlist
+// this silently drops what Warwick asked for; that version was built, the suite
+// killed it, and it must not come back.
+// =====================================================================
+
+/** A deps carrying only what this function uses, recording what it was asked. */
+function recordingDeps(rows) {
+  const asked = [];
+  return {
+    asked,
+    readQuery: async (text, params) => {
+      asked.push({ text, params });
+      return { rows, rowCount: rows.length };
+    },
+  };
+}
+
+test('B15-10: the statement asks for OTHER shops\' claims, and could not be read as an allowlist', () => {
+  const stmt = sql.SELECT_FOREIGN_CLAIMS_SQL;
+  assert.match(stmt, /FROM asdair\.shop_line/i, 'the claim evidence lives in shop_line');
+  assert.match(stmt, /shop_id <> \$1/i,
+    'the statement stopped excluding OTHER shops. `shop_id = $1` here would invert it into the '
+    + 'allowlist that silently drops corrections and cockpit additions');
+  assert.doesNotMatch(stmt, /shop_id\s*=\s*\$1/i, 'the statement was inverted into an allowlist');
+  assert.match(stmt, /SELECT DISTINCT list_item_id/i,
+    'a fan-out would make the caller count claims rather than name them');
+  assert.match(stmt, /list_item_id = ANY\(\$2::bigint\[\]\)/i,
+    'the question must be bounded to the rows actually on this list');
+});
+
+test('B15-10: it asks only about the ids it was given, and returns them as strings', async () => {
+  const deps = recordingDeps([{ list_item_id: 210 }, { list_item_id: '211' }]);
+  const out = await listForeignClaimedItemIds(deps, 7, [210, '211', 212]);
+
+  assert.equal(deps.asked.length, 1, 'exactly one read');
+  assert.equal(deps.asked[0].text, sql.SELECT_FOREIGN_CLAIMS_SQL, 'the named statement, not an ad-hoc one');
+  assert.deepEqual(deps.asked[0].params, [7, [210, 211, 212]], 'the shop and the bounded id set');
+  assert.deepEqual(out, ['210', '211'],
+    'ids must come back as strings - a bigint arrives from pg as either, and a claim that misses '
+    + 'its own row silently stops excluding anything');
+});
+
+test('B15-10: nothing to ask about means NO query at all', async () => {
+  const deps = recordingDeps([]);
+  assert.deepEqual(await listForeignClaimedItemIds(deps, 7, []), []);
+  assert.deepEqual(await listForeignClaimedItemIds(deps, 7, null), []);
+  assert.equal(deps.asked.length, 0, 'an empty list must never reach the database');
+});
+
+test('B15-10: junk ids are dropped before the query, never sent as junk', async () => {
+  const deps = recordingDeps([]);
+  await listForeignClaimedItemIds(deps, 7, [210, null, undefined, '', 'not-a-number', 0, -3]);
+  assert.deepEqual(deps.asked[0].params, [7, [210]]);
+});
+
+test('B15-10 FAIL OPEN: an unusable answer names NOTHING rather than guessing', async () => {
+  // Rows with no usable id must not become exclusions. Returning [] here means
+  // "nothing is provably foreign", which leaves the working set untouched.
+  const deps = recordingDeps([{ list_item_id: null }, {}, { list_item_id: '' }, null]);
+  assert.deepEqual(await listForeignClaimedItemIds(deps, 7, [210]), [],
+    'an unreadable claim row became an exclusion - a bad read must never remove a real item');
+});
+
+test('B15-10 FAIL OPEN: a read that THROWS propagates, so the caller can decide to keep everything', async () => {
+  const deps = { readQuery: async () => { throw new Error('connection reset'); } };
+  await assert.rejects(() => listForeignClaimedItemIds(deps, 7, [210]), /connection reset/,
+    'swallowing the failure here would hide it from the caller that has to fail OPEN on it');
 });

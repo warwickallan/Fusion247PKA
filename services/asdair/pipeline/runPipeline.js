@@ -283,6 +283,13 @@ async function resolveRememberedChoices(deps, shop, { plan, unresolved, regulars
       const term = normaliseTerm(entry.item_name);
       if (term === '') continue;
       const line = lineByKey.get(entry.question_key) || { item_name: entry.item_name, alternatives: [] };
+      // ⚠️ TWO ARGUMENTS, DELIBERATELY (WP-B15-10 AC4/AC5). The card widens its
+      // OFFER with exact-name catalogue matches; this set is what a stored
+      // memory is VALIDATED against, and widening it would let a planner
+      // suggestion revive a choice Warwick made - a resolution wearing an
+      // offer's clothes. Warwick's ruling on this path stands unchanged: "If
+      // the remembered product is unavailable or no longer a valid grounded
+      // candidate, behave honestly rather than fabricating a match."
       const ids = planCandidates(line, byReading.get(term) || null)
         .map((c) => c.regular_id)
         .filter((v) => v !== null && v !== undefined)
@@ -437,6 +444,116 @@ function regularsOf(catalogue) {
   if (catalogue.regularsById instanceof Map) return [...catalogue.regularsById.values()];
   if (Array.isArray(catalogue.regulars)) return catalogue.regulars;
   return catalogue.candidates || [];
+}
+
+// =====================================================================
+// A SHOP'S WORKING SET (WP-B15-10)
+//
+// ── THE LIVE FAILURE, 2026-08-10 ────────────────────────────────────────────
+// Warwick's real photograph minted a correct fresh shop, SHOP-2026-08-10-M64,
+// which then bound to list_id 20 - the list of the CANCELLED SHOP-2026-08-10 -
+// and item 210 from the dead week became an unanswerable question in his live
+// shop. `listDateOf` strips the -M<n> suffix by design (WP-B15-07 needs the
+// date part to survive every downstream pin), `buildGroundedIntents` puts that
+// bare date on every intent as `list_date`, and `findOrCreateDraftList` selects
+// on (household_id, status='next_week_draft', list_date) - so the fresh shop
+// selected the dead shop's list. Cancelling a SHOP never changed the LIST.
+//
+// ── EXCLUSION, NOT SELECTION. THE DIRECTION IS THE WHOLE DESIGN ─────────────
+// This removes ONLY what PROVABLY belongs to another shop. It never keeps only
+// what this shop can prove is its own.
+//
+// The allowlist was built first and the suite killed it: `stepInterpret` is the
+// ONLY caller of `shopLines.linkListItem`, so a line added by
+// `stepApplyCorrections` - Warwick correcting or adding one - and a line added
+// by the cockpit's `add_regular_to_next_week` - which has no shop context and
+// can never link - carry no claim at all, and an allowlist dropped both.
+// Warwick silently not getting what he asked for is the same harm as the
+// defect, and silent is worse. So: unclaimed items belong to nobody and STAY.
+//
+// ── FAIL OPEN, AND SAY SO ───────────────────────────────────────────────────
+// If the claim read fails, or comes back unusable, the working set is NOT
+// filtered and the failure is recorded through deps.log. Filtering on a failed
+// read would silently recreate the allowlist's defect at the worst moment - the
+// moment the database is already unhappy - so the degraded path is deliberately
+// the UNFILTERED one. Louder than a drop, and never wrong in Warwick's favour.
+//
+// ── MINE WINS OVER FOREIGN ──────────────────────────────────────────────────
+// add_list_item upserts on (list_id, lower(item_name)), so where two shops ask
+// for the same product there is ONE row and both interpretations claim it. Such
+// a row is THIS shop's too, and is kept. Only a row this shop has no claim on,
+// which another shop does claim, is removed.
+//
+// ⚠️ THE LIMIT, STATED HERE AND NOT SOFTENED ANYWHERE ELSE. Two live shops
+// still SHARE ONE LIST ROW. A product name present in both is one row, and the
+// later `add_list_item` write wins its quantity, status and note. This closes
+// the DEAD-SHOP case - Warwick is not asked about, and does not buy, an item
+// from a week that was cancelled. It is NOT AC1's literal wording, and it does
+// not give a fresh shop a list of its own. Silas's migration 019 is the durable
+// fix and is queued separately.
+// =====================================================================
+
+/**
+ * PURE. Drop the rows another shop provably owns, keep everything else.
+ *
+ * @param {Array} listItems  every row on the shared list
+ * @param {Array} foreignIds ids a DIFFERENT shop's interpretation claims
+ * @param {Array} ownIds     ids THIS shop's interpretation claims - these win
+ */
+export function excludeForeignListItems(listItems, foreignIds, ownIds) {
+  const items = Array.isArray(listItems) ? listItems : [];
+  const foreign = new Set(
+    (Array.isArray(foreignIds) ? foreignIds : [])
+      .filter((v) => v !== null && v !== undefined && v !== '')
+      .map(String),
+  );
+  if (foreign.size === 0) return items;
+  // A row this shop also claims is this shop's, whatever else claims it.
+  for (const id of (Array.isArray(ownIds) ? ownIds : [])) {
+    if (id === null || id === undefined || id === '') continue;
+    foreign.delete(String(id));
+  }
+  if (foreign.size === 0) return items;
+  return items.filter((i) => !foreign.has(String(i.id)));
+}
+
+/**
+ * The list rows this shop should plan, buy and reconcile against. Every site
+ * that used to read `store.listListItems(deps, shop.list_id)` raw goes through
+ * here. It returns the shop's own interpreted lines too, because it has just
+ * read them and the callers need them.
+ */
+async function workingListItems(deps, shop) {
+  const [allItems, lines] = await Promise.all([
+    store.listListItems(deps, shop.list_id),
+    shopLines.listLines(deps, shop.id),
+  ]);
+  if (allItems.length === 0) return { listItems: allItems, lines, foreign_claims_read: true };
+
+  let foreign = [];
+  try {
+    foreign = await shopLines.listForeignClaimedItemIds(deps, shop.id, allItems.map((i) => i.id));
+  } catch (err) {
+    // FAIL OPEN, LOUDLY. Nothing is removed on a read this code could not make.
+    if (typeof deps.log === 'function') {
+      deps.log('foreign_claim_read_failed', {
+        shop_ref: shop.shop_ref,
+        list_id: shop.list_id === null || shop.list_id === undefined ? null : String(shop.list_id),
+        items: allItems.length,
+        detail: String(err && err.message ? err.message : err),
+      });
+    }
+    return { listItems: allItems, lines, foreign_claims_read: false };
+  }
+
+  const ownIds = lines
+    .map((l) => l && l.list_item_id)
+    .filter((v) => v !== null && v !== undefined && v !== '');
+  return {
+    listItems: excludeForeignListItems(allItems, foreign, ownIds),
+    lines,
+    foreign_claims_read: true,
+  };
 }
 
 // =====================================================================
@@ -793,7 +910,10 @@ async function stepPlan(deps, snapshot) {
 
   // The catalogue is a planning INPUT too, not merely an interpretation one.
   const catalogue = assertCatalogueLoaded(await deps.loadCatalogue(shop.household_id), 'planning');
-  const listItems = await store.listListItems(deps, shop.list_id);
+  // NOT a dead shop's rows. `interpreted` is the same read the exclusion was
+  // drawn from, so the working set and the candidate lookup below cannot
+  // disagree about which lines this shop has.
+  const { listItems, lines: interpreted } = await workingListItems(deps, shop);
   const inputs = await deps.loadPlanningInputs(shop.household_id);
 
   // THE PLAN, WITH WARWICK'S CURRENT-SHOP DECISIONS ALREADY APPLIED. Not the
@@ -808,8 +928,8 @@ async function stepPlan(deps, snapshot) {
   } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
 
   // The interpretation is the ONLY source of regulars ids on a candidate. See
-  // planCandidates below for why that matters.
-  const interpreted = await shopLines.listLines(deps, shop.id);
+  // planCandidates below for why that matters. Read once, above, by
+  // workingListItems.
   const byReading = new Map(interpreted.map((l) => [normaliseTerm(l.raw_reading), l]));
 
   // ── THE DURABLE item_name CARRIER ─────────────────────────────────────────
@@ -962,7 +1082,11 @@ async function stepPlan(deps, snapshot) {
       // human with a degraded card, and is never dropped.
       list_item_id: listItemIdByTerm.get(term) ?? null,
       question_text: questionText,
-      candidates: planCandidates(line, byReading.get(term) || null),
+      // WP-B15-10 AC4. The catalogue is passed HERE, on the card, so a printed
+      // suggestion that exactly names a household regular becomes a real
+      // tappable candidate instead of text he has to retype. It offers; it
+      // resolves nothing. See planCandidates.
+      candidates: planCandidates(line, byReading.get(term) || null, regularsOf(catalogue)),
       // Absent on round 1, so that INSERT stays byte-for-byte what it was.
       ...(nextRound > 1
         ? { question_round: nextRound, parent_question_id: held.question_id }
@@ -1124,26 +1248,95 @@ async function stepPlan(deps, snapshot) {
  * `source`, so a downstream reader never has to guess which table an id is from
  * - and when there is no trustworthy id, the field is absent rather than
  * populated with something that merely looks like one.
+ *
+ * ── WP-B15-10 AC4: A SUGGESTION GOOD ENOUGH TO PRINT IS GOOD ENOUGH TO TAP ──
+ * Warwick was asked *"Which product is BATCHLORS MAC N CHEESE?"* on a card that
+ * PRINTED `Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g` as a
+ * suggestion he could not tap. His words: "its bloody obvious!". The reason is
+ * the split above - the button half is `asdair.regulars` and the suggestion half
+ * is `asdair.products`, two different tables - so a planner suggestion had no
+ * id and could not become a button however right it was.
+ *
+ * `regulars` closes exactly the half that closes WITHOUT GUESSING: where a
+ * suggestion's name is EXACTLY (after `normaliseTerm`) a household regular's own
+ * name or one of its recorded aliases, the identity is not in doubt and the
+ * suggestion becomes a real candidate carrying that regular's real id. The label
+ * becomes the REGULAR's name, because the row stores an id and the name comes
+ * from the id - never the other way round.
+ *
+ * ⚠️ THIS IS NOT A THRESHOLD AND MUST NEVER BE TURNED INTO ONE. It is exact
+ * equality after normalisation. Nothing here scores, ranks, takes a top-N or
+ * accepts a near miss - and rule 3 above is untouched: the id still comes from
+ * `asdair.regulars` and from nowhere else. The measured reason, from the same
+ * batch of cards Warwick received: this suggestion channel offered *Aquafresh
+ * toothpaste* and *Persil* for "any gloves, i don't care", *George Home Tea
+ * Towels* and *TRESemme shampoo* for "1 PKT HAM ON THE BONE", and *Calgon* and
+ * *Dreamies cat treats* on the Batchelors card itself. There is no rank or count
+ * over that channel that accepts the right one and refuses toothpaste, so
+ * resolving from it would have bought TOOTHPASTE for a glove request. Offering
+ * is safe; resolving is not. **This changes what he is OFFERED. It resolves
+ * nothing and it removes no question.**
+ *
+ * `regulars` DEFAULTS TO EMPTY, and the two-argument form is therefore exactly
+ * the behaviour it always had. `resolveRememberedChoices` calls it that way
+ * DELIBERATELY - see the note at its own call site.
  */
-export function planCandidates(planLine, interpretedLine) {
+export function planCandidates(planLine, interpretedLine, regulars = []) {
   const out = [];
+  const claimed = new Set();
   // (3) The catalogue resolver's alternatives - the ONLY trustworthy regulars ids.
   const resolverAlts = interpretedLine && Array.isArray(interpretedLine.alternatives)
     ? interpretedLine.alternatives : [];
   for (const a of resolverAlts) {
     const id = a.regular_id ?? null;
     if (id === null || id === undefined) continue;
+    if (claimed.has(Number(id))) continue;
+    claimed.add(Number(id));
     out.push({ label: a.name || null, regular_id: Number(id), source: 'asdair.regulars (resolveByCatalogue)' });
   }
-  // (1) The planner's ranked suggestions - NAMES ONLY. No id field is emitted,
-  // because the planner does not return one and inventing one would be a lie.
+  // (1) The planner's ranked suggestions - names only, UNLESS the name is
+  // exactly a regular we already hold, in which case the id is not a guess.
+  const byExactName = exactRegularsIndex(regulars);
   for (const a of (planLine.alternatives || [])) {
     const label = a.name || a.alternative_name || null;
     if (!label) continue;
+    const exact = byExactName.get(normaliseTerm(label)) || null;
+    if (exact) {
+      if (claimed.has(Number(exact.id))) continue;
+      claimed.add(Number(exact.id));
+      out.push({
+        label: exact.name,
+        regular_id: Number(exact.id),
+        source: 'planner suggestion, matched to asdair.regulars by exact name',
+      });
+      continue;
+    }
     if (out.some((c) => c.label === label)) continue;
     out.push({ label, source: 'planner suggestion (no product id)' });
   }
   return out.slice(0, 8);
+}
+
+/**
+ * PURE. normalised name/alias -> the regular row, for EXACT lookup only.
+ *
+ * First writer wins, so a later regular can never quietly take over a term an
+ * earlier one already owns. Nothing in here is fuzzy: the map is only ever
+ * queried with `normaliseTerm(label)` and a miss is a miss.
+ */
+function exactRegularsIndex(regulars) {
+  const byTerm = new Map();
+  for (const r of (Array.isArray(regulars) ? regulars : [])) {
+    if (!r || r.id === null || r.id === undefined) continue;
+    const names = [r.name, ...(Array.isArray(r.aka) ? r.aka : [])];
+    for (const n of names) {
+      if (typeof n !== 'string') continue;
+      const term = normaliseTerm(n);
+      if (term === '') continue;
+      if (!byTerm.has(term)) byTerm.set(term, r);
+    }
+  }
+  return byTerm;
 }
 
 /**
@@ -1695,7 +1888,9 @@ export async function buildBrowserHandoff(deps, shop) {
   // the same durable inputs. That is what lets the return leg rebuild exactly
   // what was handed over without a second copy of the truth to keep in step.
   const catalogue = assertCatalogueLoaded(await deps.loadCatalogue(shop.household_id), 'browser handoff');
-  const listItems = await store.listListItems(deps, shop.list_id);
+  // A dead week's item reaching the packet would not merely be asked about - it
+  // would be BOUGHT.
+  const { listItems } = await workingListItems(deps, shop);
   const inputs = await deps.loadPlanningInputs(shop.household_id);
   const { plan } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
 
@@ -1831,7 +2026,9 @@ async function stepPauseBuild(deps, snapshot, to) {
 async function stepRecordConfirmation(deps, snapshot, command) {
   const shop = snapshot.shop;
   const catalogue = assertCatalogueLoaded(await deps.loadCatalogue(shop.household_id), 'reconciliation');
-  const listItems = await store.listListItems(deps, shop.list_id);
+  // Reconciling against a dead week's item would record an outcome for
+  // something this shop never asked for, and teach the learning arc from it.
+  const { listItems } = await workingListItems(deps, shop);
   const inputs = await deps.loadPlanningInputs(shop.household_id);
   const { plan } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
 
