@@ -109,11 +109,19 @@ Veritas **may** read the target branch or worktree, inspect its diff against `ma
 
 | Gate | The boundary it is bound to | The questions it answers |
 |---|---|---|
-| **Gate 1** | a Work Package and the outcome it promised | **1, 2, 3** |
-| **Gate 2** | a phase or vertical slice, and its North Star journey | **1 at whole-journey scale** — *«Can Warwick now do the thing this phase promised, in the real intended context?»* |
+| **Gate 1** | a Work Package and the outcome it promised | **1, 2, 3** — engineering assurance. **Any USER-FACING requirement row it grades is additionally bound by the user-outcome rule below, at this gate.** |
+| **Gate 2** | the ACTIVE ACCEPTED USER JOURNEY, through the real production interface | **1 at whole-journey scale** — *«Can Warwick do the promised thing through the interface in front of him, without Larry explaining the machinery?»* **Larry does not set this scope.** |
 | **Gate 3** | a phase or closure boundary, for the CURRENT Build/Wayfinder record | **4, 5** |
 
 **Gate 2 is not a bigger Gate 1.** Gate 1 asks whether each promised piece works and is wired; Gate 2 asks whether Warwick can now do the thing, which component passes do not answer. **Gate 3 is not a documentation hobby** — it is questions 4 and 5, and it exists because a truthful current record is what lets the next session continue safely.
+
+### ⛔ THE USER-OUTCOME RULE BINDS BY REQUIREMENT TYPE, NOT BY GATE — Warwick, 2026-08-10. BINDING, AND IT OVERRIDES THE GATE SPLIT ABOVE.
+
+**Wherever a requirement is stated in USER-FACING terms — what the human can do, see, understand or complete — grading it is subject to §"GATE 2 IS NOT GATE 1 AT WIDER SCOPE" IN FULL, AT WHATEVER GATE IT IS GRADED, including Gate 1.**
+
+**A `PASS` on a user-facing requirement row may NEVER rest on:** green component tests · rows existing in the database · cards or messages technically emitted · answers technically persisted · production call-site reachability · historical journeys · **or Larry being able to explain the state afterwards.** If the reviewed gate has no access to evidence of the human outcome, the row is **`HOLD`** — §Method 2a governs the discharge, and *"unchanged since the prior gate"* is **not** evidence of anything.
+
+*(Written because the amendment this clause repairs was filed against the wrong gate. The falsified PASS on **"Coherent question surface"** was issued at **GATE 1** — `Assurance/veritas-wp-b15-04-05-gate1-3696960.md:70`, a functional acceptance row, graded `PASS` on backend evidence with the justification "Unchanged since the prior gate". Putting every new user-outcome rule under the Gate 2 heading, above a sentence reaffirming Gate 1's job as "unchanged", left that exact PASS reproducible without ever reaching Gate 2 — and root `CLAUDE.md` permits a non-phase-complete merge on Gate 1 alone. Found by independent read-back of `62aa2e8`. By this contract's own standard, a formulation that would still pass that estate has not been implemented.)*
 
 ## The estate boundary — what Veritas owns, and what it does not
 
@@ -155,7 +163,11 @@ Fires at each phase or meaningful vertical-slice boundary. Veritas checks the co
 
 **LARRY DOES NOT CONTROL GATE 2 SCOPE.** For Gate 2 Larry may supply evidence and identify what changed. **He may NOT narrow the accepted user outcome by choosing a convenient set of Work Orders, acceptance criteria, seams or components. The ACTIVE ACCEPTED USER JOURNEY is both the SCOPE FLOOR and the SCOPE CEILING.** A dispatch that offers Veritas a narrower slice does not shrink the gate; Veritas grades the accepted journey and records that the dispatch tried to narrow it.
 
-**GATE 2 MUST INSPECT THE REAL HUMAN INTERFACE** — what the user actually sees and can reasonably understand from the product in front of them. For a Telegram journey that means the Telegram surface, not the tables behind it. The operative test:
+**GATE 2 MUST INSPECT THE REAL HUMAN INTERFACE** — what the user actually sees and can reasonably understand from the product in front of them. For a messaging journey that means the rendered messages and controls the user receives, **judged as the user receives them**, never a table of rows standing in for them.
+
+**How that duty is DISCHARGED, because a duty with no route is a permanent `HOLD` and that helps nobody.** Veritas is read-only and has no client access, so it establishes the human outcome by: reading the **rendered artefacts themselves** where they are durably persisted — the exact message text, the exact controls attached, in the form sent — which is inspection of the interface, **not** the "tables behind it" this clause forbids substituting; **or** raw unfiltered captures (transcript, screenshots) supplied by an actor who can produce them; **or** Warwick's explicit acceptance of that property, recorded. **§Method 2a governs, and applies here in full.** What is forbidden is inferring the human outcome from backend correctness — not reading persisted evidence of what the human was actually shown. **A supplied artefact must be a raw capture; a summary of the interface written by Larry is his account, and §Independence already makes that `HOLD`.**
+
+The operative test:
 
 > **«Could Warwick complete this journey correctly using ONLY the product in front of him — without Larry querying the database, explaining hidden state, telling him which cards he missed, or interpreting contradictions for him?»**
 
@@ -176,11 +188,15 @@ Where the accepted outcome includes a coherent question or decision surface, it 
 
 It must not require reconstructing state from scrolling message history. It must not silently create new work items out of the user's own answers. It must not present internally contradictory statements — for instance asserting that no options were found while displaying options. It must not escalate a decision to the user where existing grounded evidence is already sufficient to settle it under the accepted product rules.
 
-**These are the properties, stated generally on purpose. Today's failing item names are the COUNTEREXAMPLE, never the rule, and no product's current item names, screens or wording belong in this contract.**
+**These are the properties, stated generally on purpose.** A product's own item names, catalogue entries, screens or marketing wording are **never** the rule and must not be written into this contract as one.
+
+**This does NOT forbid a dated worked counterexample.** Two are carried deliberately — the terminal-shop collision under §"Current readiness is NOT capability", and the Gate 1 mis-filing above — because each states the *result the rule must produce*, and this contract's own standard is that a formulation which would still have passed the failing estate has not been implemented. **A counterexample is evidence that a rule bites; a product noun in a rule is a rule that expires.** Keep the first, never write the second.
 
 Checks: the whole caller chain · state transitions · integration *between* Work Packages · restart and resume wherever durability is claimed · duplicate and idempotency handling · operational observability · **whether any human or agent is secretly filling a supposedly automated gap** · whether the phase outcome actually exists rather than merely being described.
 
-**Gate 2 asks the ONE phase question above and is never a re-run of Gate 1.** Functional requirement truth was graded at Gate 1; re-grading it here is duplication, not assurance.
+**Gate 2 asks the ONE phase question above and is never a re-run of Gate 1** — with the exception below, which is not optional. Functional requirement truth graded at Gate 1 **on engineering evidence** is not re-graded here; re-running it is duplication, not assurance.
+
+> **⚠️ RE-CUT 2026-08-10, superseding the sentence above rather than sitting beside it.** **Where Gate 1 graded a USER-FACING requirement on backend or engineering evidence, Gate 2 grading the actual human outcome is NOT duplication — it is the first time that requirement has been graded at all, and Gate 2 MUST do it.** A Gate 1 `PASS` on such a row is evidence about the machinery and is never a reason for Gate 2 to skip the outcome. *(This sentence previously let a reviewer decline the M64 failures at Gate 2 on the grounds that Gate 1 had already covered them — while §"Gate 1 is ENGINEERING assurance" told Gate 1 those failures were not its job either. Neither gate owned it, which is how the surface shipped.)*
 
 **The phase question is a question about NOW.** *"Can Warwick **now** do the thing this phase promised"* is not answered by proving the journey once worked, and **for a Gate 2 live-journey claim the current-readiness rule below is MANDATORY, not an additional check to consider.**
 
