@@ -48,9 +48,18 @@ const ok = (name, cond, detail = '') => {
 // ── The two SOURCE assertions, as functions, so --self-test can feed them a mutant ──────────────
 // CRLF: every split is /\r?\n/. A source scan that splits on '\n' alone has silently passed on this
 // estate before, on a file whose lines all ended \r.
+// AN IMPORT IS NOT A DISPATCH, and the first version of this function could not tell them apart.
+// Its rule was "one line mentions both names" — and server.mjs's IMPORT line mentions both names. A
+// mutation that deleted the dispatch line entirely left this assertion GREEN. It was caught by the
+// mutation run and by nothing else, which is the whole argument for doing one: the assertion was
+// applied, was reasonable-looking, and examined ground that could not fail.
+// So: the line must CALL the handler, and an import line is excluded explicitly.
 export function serverDispatchesChecklist(source) {
-  return source.split(/\r?\n/).some((l) =>
-    l.includes('ASDAIR_CHECKLIST_ROUTE') && l.includes('proxyAsdairChecklist'));
+  return source.split(/\r?\n/).some((l) => {
+    const t = l.trim();
+    if (t.startsWith('import ')) return false;
+    return t.includes('ASDAIR_CHECKLIST_ROUTE') && t.includes('proxyAsdairChecklist(');
+  });
 }
 export function pipelineEmitsRoute(source, route) {
   return source.split(/\r?\n/).some((l) => l.includes('checklistPath:') && l.includes(route + '?shop='));
@@ -82,6 +91,13 @@ if (process.argv.includes('--self-test')) {
     !serverDispatchesChecklist(goodServer.replace('proxyAsdairChecklist(a, b, c)', 'nothing()')));
   ok('SELF-TEST: it REJECTS the two halves split across separate lines',
     !serverDispatchesChecklist('ASDAIR_CHECKLIST_ROUTE\r\nproxyAsdairChecklist\r\n'));
+  // THE MUTANT THAT CAUGHT THE FIRST VERSION OF THIS FUNCTION. server.mjs's own import line names
+  // both symbols, so "both names on one line" was satisfied with the dispatch deleted.
+  ok('SELF-TEST: it REJECTS the IMPORT line, which names both symbols and dispatches nothing',
+    !serverDispatchesChecklist("import { ASDAIR_CHECKLIST_ROUTE, proxyAsdairChecklist } from './asdair-checklist.mjs';\r\n"));
+  ok('SELF-TEST: and REJECTS a file that imports but never dispatches',
+    !serverDispatchesChecklist("import { ASDAIR_CHECKLIST_ROUTE, proxyAsdairChecklist } from './x.mjs';\r\n"
+      + "if (req.url.startsWith('/api/asdair/nothing')) return;\r\n"));
   const goodPipe = '  checklistPath: `/api/asdair/checklist?shop=${shop.shop_ref}`,\r\n';
   ok('SELF-TEST: the pipeline assertion accepts the real shape', pipelineEmitsRoute(goodPipe, ASDAIR_CHECKLIST_ROUTE));
   ok('SELF-TEST: it REJECTS the read-service-only path this order removed',
