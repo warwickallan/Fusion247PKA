@@ -141,6 +141,70 @@ operational_handoff: none
 
 # WO-2026-08-11-02 — The supervised operator can report the basket back, and the shop moves
 
+## AMENDMENT 1 — Larry, 2026-08-10, answering Keel's read-back CLARIFY
+
+> **Attribution note.** Warwick authorised the outcome ("finish every remaining accepted requirement
+> already recorded in the handover"). Everything in this amendment is **Larry's** engineering ruling,
+> taken on Keel's evidence. None of it is a Warwick decision and none may be reported as one.
+
+Keel returned **CLARIFY**, verified both load-bearing assertions by execution, and found four things
+the order left open. All four are settled here.
+
+**Clerical corrections to my line numbers — Keel is right, the order was wrong:**
+
+| Order said | Actually |
+|---|---|
+| `shopStore.js:729` | function at **`:713`**, the `SET progress = $1::jsonb` statement at **`:730`** |
+| `shop-cli.js:232` | **`:238`** |
+| `claimHandoff` `claim.js:294` | **`:285`** |
+
+The substance was right in both cases: `updateBrowserProgress` really does whole-object-replace, and
+`completeHandoff` really is the only writer of `progress.report`, has zero production callers, and
+preserves `handoff` by construction via `progress = (progress - '_lease') || jsonb_build_object(...)`
+— which is precisely why it is the correct route.
+
+**RULING 1 — the AC3/AC4 end-to-end proof takes the IN-SURFACE route. Surface is NOT widened.**
+Approved: a CJS test under `handoff/` may dynamically `import()` the ESM pipeline harness, and
+claim.js-aware statement handling may be added to `handoff/test/fakeRequestStore.js`, which is in
+your surface. The resulting test-only dependency on `../pipeline/test/harness.js` is accepted and
+must be stated in your return.
+
+**Widening to `pipeline/test/fakePg.js` is REFUSED, and for a reason beyond preference: another
+worker holds that exact file this session** (WP-B15-18, worktree `C:/Fusion247PKA-b1518`). Two
+workers in one file is corruption, and preventing that is my job, not yours. Do not touch it.
+
+**RULING 2 — approved: `handoffCli.js` takes its client from `shopStore._internal.inTransaction` on
+`ASDAIR_WRITE_DB_URL`.** `pg` genuinely does not resolve from `handoff/`, `handoff/package.json` is
+out of surface, and `dependency_policy: no-new-runtime-deps` forbids adding it — so an existing seam
+with existing precedent (`pipeline/test/harness.js:95`) is the right answer rather than a new
+dependency. **Assumption 1 is CONFIRMED**: `ASDAIR_WRITE_DB_URL` (role `asdair_rw`) is the write
+variable; `ASDAIR_DB_URL` is contractually SELECT-only and a writer on it would be the exact W02
+defect SOP-022 was written after. Validate at startup and fail loudly. Record the
+`handoff → shop` coupling in your return so it is visible at the gate rather than discovered later.
+
+**RULING 3 — AC6 lands as a FENCE, not a merge.** Your reasoning is correct and better than the
+order's "either/or": a merge stops `pipeline/test/fakePg.js:806`'s deliberate
+`/^UPDATE asdair\.browser_build_request SET progress = \$1::jsonb/i` pin matching, and that file is
+out of your surface **and held by another worker**, so you would be knowingly stranding a stale fake
+you are forbidden to repair. Keep the `SET progress = $1::jsonb` prefix and add the `WHERE`
+predicate. **Report the residual** — that the fake does not model the new predicate, so a future
+pipeline test could pass where real Postgres refuses. Reported, not fixed, and not by you.
+
+**RULING 4 — the filenames are FIXED**: `services/asdair/handoff/handoffCli.js` and
+`services/asdair/handoff/handoffCli.test.js`. The required-evidence secret-scan command names them
+literally and the scanner fails closed on a missing target, so any other name pins that command at
+exit 2 permanently. Your measurement of exit 2 today on the not-yet-created files is the scanner
+working correctly, not a defect — it must reach exit 0 once both files exist.
+
+**RULING 5 — Contradiction 3 is accepted AS A LIMIT, and the limit is the point.** Proving through
+`decideNextStep → runPipeline → stepRecordBasketReady` rather than through `runtime.js`'s real poll
+loop is the correct call — `runtime.js` is out of scope and another worker is live in it. **But say
+so plainly and do not let it be read as more than it is.** Under root `CLAUDE.md` § "Nothing may live
+only in Larry's head", an outcome intended to be automatic stays on the frontier until the real
+production event has run. **This work package will therefore NOT be reported as proven-automatic on
+your evidence, and that is Larry's problem to carry to the gate, not a defect in your work.** State
+the limit in your return in one line; do not attempt to close it.
+
 ## The gap, established by execution before this order was written
 
 WP-B15-14 already built **both** supervised stage transitions and they are correct:
@@ -207,11 +271,15 @@ not built"; this must not put a hole in it.
 lease has gone. The route must surface that as a clear operator-visible failure and write nothing —
 never a silent no-op, and never a partial write.
 
-**AC6 — `updateBrowserProgress` can no longer silently destroy a handoff.** Either fence it so a
-write that would drop an existing `progress.handoff` is refused, or make it merge rather than
-replace. Whichever you choose, prove the old destructive behaviour is gone with a test that fails
-against the unmodified source. If you judge a fence is the wrong call, say so with evidence in your
-return rather than leaving the footgun undocumented.
+**AC6 — `updateBrowserProgress` can no longer silently destroy a handoff.** *(RE-CUT by AMENDMENT 1
+— the original offered "fence or merge"; merge is now REFUSED. Superseded, not appended to.)*
+
+**Fence it.** Keep the `SET progress = $1::jsonb` statement prefix intact — `pipeline/test/fakePg.js:806`
+pins that exact shape deliberately and that file is out of your surface and held by another worker —
+and add a `WHERE` predicate that refuses the write when the row carries `progress->'handoff'` and the
+incoming object does not. Prove the old destructive behaviour is gone with a test that fails against
+the unmodified source. **Report, do not fix:** the fake does not model the new predicate, so a future
+pipeline test could pass where real Postgres refuses.
 
 **AC7 — Mutation proof, both directions, with the source proven to have changed.** For AC2 and AC4
 separately: mutate the delivered guard, prove the test goes RED, restore, prove GREEN. **Assert the
