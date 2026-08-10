@@ -50,6 +50,30 @@ class NoExecutablePlanError extends Error {
   }
 }
 
+/**
+ * THE PLAN RAN AND THE TROLLEY IS STILL EMPTY.
+ *
+ * The sibling of NoExecutablePlanError, one layer further on, and the two are
+ * not interchangeable. That one guards the PLAN: nothing executable arrived, so
+ * nothing was attempted. This one guards the OUTCOME: everything was attempted
+ * and the trolley has nothing in it.
+ *
+ * The plan guard cannot see this case, which is why it needed its own. A plan
+ * can run to its last step with every add rejected, every item out of stock, or
+ * the session never on the trolley it believed it was on. Only the read-back
+ * knows - and until this guard existed, nothing compared it to anything.
+ *
+ * `run()`'s catch parks the request FAILED with this reason durable on the row,
+ * exactly as it does for an unexecutable plan.
+ */
+class EmptyBasketError extends Error {
+  constructor(msg, detail = {}) {
+    super(msg);
+    this.name = 'EmptyBasketError';
+    this.detail = detail;
+  }
+}
+
 const DEFAULTS = Object.freeze({
   leaseMs: lease.DEFAULT_LEASE_MS,
   heartbeatMs: lease.DEFAULT_HEARTBEAT_MS,
@@ -210,6 +234,18 @@ class Runner {
       return { outcome: 'refused' };
     }
 
+    // ── EVERY `return await` BELOW IS LOAD-BEARING ──────────────────────────
+    // Do not "tidy" any of them into a bare `return this.finishX()`, and do not
+    // let a no-return-await lint rule do it for you. Returning the promise
+    // UNAWAITED resolves it after control has already left this try block, so a
+    // rejection from a termination path arrives with no handler attached: it
+    // skips the catch below and escapes run() entirely. Nothing parks the
+    // request, nothing records a reason, and the shop is left mid-run with no
+    // durable explanation.
+    //
+    // These are the error and handover paths - the ones least likely to be
+    // noticed and most likely to matter. Each site carries a short marker
+    // pointing back here.
     try {
       this.reconstruct({ planFile });
 
@@ -218,17 +254,22 @@ class Runner {
       // login page for ever.
       if (this.progress.human_reauth_required) {
         const still = await this.checkReauthStillBlocking(dryRun);
-        if (still) return this.finishReauth('re-authentication still required on start');
+        // `await` load-bearing - see the note above the try.
+        if (still) return await this.finishReauth('re-authentication still required on start');
       }
 
       if (!dryRun) {
         this.session = this.makeSession({ log: (m) => this.log(`[browser] ${m}`) });
         await this.session.open();
         const st = await this.session.open_groceries().catch((e) => { if (e instanceof ReauthRequiredError) return { reauth_required: true, url: e.url, reauth_reason: e.message }; throw e; });
-        if (st && st.reauth_required) return this.finishReauth(st.reauth_reason || `landed on an authentication surface (${st.url})`);
+        // `await` load-bearing - see the note above the try.
+        if (st && st.reauth_required) return await this.finishReauth(st.reauth_reason || `landed on an authentication surface (${st.url})`);
       }
 
-      await this.markShopShopping();
+      // A REHEARSAL MOVES NO REAL SHOP STATE. --dry-run issues no browser
+      // command, so it has no business advancing the shop Warwick is actually
+      // shopping for - in either direction. See finishDryRun().
+      if (!dryRun) await this.markShopShopping();
       this.progress = P.setRunnerState(this.progress, 'running');
       await this.save('running');
 
@@ -238,21 +279,39 @@ class Runner {
 
       for (const step of this.remaining) {
         const gate = await this.gate();
-        if (gate === 'release') return this.releaseToHuman('human takeover requested');
+        // `await` load-bearing on both - see the note above the try.
+        if (gate === 'release') return await this.releaseToHuman('human takeover requested');
         if (gate === 'finish') break;
-        if (gate === 'cancelled') return this.finishCancelled();
+        if (gate === 'cancelled') return await this.finishCancelled();
         this.assertLease();
         await this.executeStep(step, dryRun);
         await sleep(this.opts.interStepMs);
       }
 
-      return this.finishBasketReady(dryRun);
+      // `await` load-bearing - see the note above the try. This is the site
+      // that exposed the whole class: EmptyBasketError got past the handler
+      // meant to park the request FAILED.
+      return await this.finishBasketReady(dryRun);
     } catch (e) {
       if (e instanceof lease.LeaseLostError) {
         this.log(`stopped: ${e.message}`);
         return { outcome: 'lease_lost' };
       }
-      if (e instanceof ReauthRequiredError) return this.finishReauth(e.reauth_reason || e.message);
+      if (e instanceof ReauthRequiredError) {
+        // THE ASYMMETRY MATTERS HERE. Inside the catch there is no outer
+        // handler left, so `await` alone would fix only the finally ordering -
+        // a rejection from finishReauth would still escape run() with nothing
+        // recorded anywhere. The inner try is what makes this branch safe:
+        // failing to REPORT re-authentication falls through to the generic park
+        // below, so the request is parked FAILED with the real reason instead
+        // of vanishing.
+        try {
+          return await this.finishReauth(e.reauth_reason || e.message);
+        } catch (e2) {
+          this.log(`FAILED while reporting re-authentication: ${e2.name}: ${e2.message}`);
+          e = e2;
+        }
+      }
       if (e instanceof RateLimitedError) {
         // Being throttled is not a failed request - it is a "come back later".
         // Marking it failed would need a human to re-queue work that is fine.
@@ -448,18 +507,115 @@ class Runner {
 
   // ---- terminations --------------------------------------------------
 
-  /** Stop at BASKET_READY, leaving the browser open on the trolley. */
+  /**
+   * Stop at BASKET_READY, leaving the browser open on the trolley.
+   *
+   * ── THE RUNNER MUST EARN THESE WORDS ────────────────────────────────────────
+   * `BASKET_READY` means, in shopStatus.js's own wording, "basket ready for you
+   * to check". This method is the ONLY place in the estate that moves a shop
+   * into that state, so it is the only place the claim can be checked - and it
+   * used to read the trolley, log the number, record it, and then announce
+   * success without once comparing it to anything.
+   *
+   * Zero products is not a small basket. It is the absence of the thing being
+   * claimed, and every explanation for it - every add rejected, the wrong
+   * trolley read, a session that had lost the basket - is a fault rather than an
+   * outcome. So an empty trolley after a plan that intended adds is refused
+   * loudly, in the same shape as an unexecutable plan.
+   *
+   * A NON-ZERO SHORTFALL IS NOT REFUSED, and that line is deliberate. Items go
+   * out of stock; this estate already treats a shortfall as a reported per-line
+   * outcome and sets no fill-rate threshold anywhere. Inventing one here would
+   * strand a perfectly good trolley behind a number nobody chose. What it does
+   * instead is make the difference VISIBLE - durable in progress, and one line
+   * in the shop_event ledger the Cockpit already reads, so Warwick learns his
+   * trolley is short without anyone reading a runner log.
+   */
   async finishBasketReady(dryRun) {
-    if (!dryRun) {
-      const basket = await this.session.read_basket();
-      this.progress = P.applyBasketRead(this.progress, basket);
-      this.log(`basket read back: ${basket.product_count} product(s), total ${basket.order_total}`);
+    if (dryRun) return this.finishDryRun();
+
+    const basket = await this.session.read_basket();
+    this.progress = P.applyBasketRead(this.progress, basket);
+    this.progress = P.applyShortfall(this.progress, this.plan || []);
+    const sf = this.progress.basket_shortfall;
+    this.log(`basket read back: ${basket.product_count} product(s), total ${basket.order_total}`);
+
+    if (sf.intended > 0 && this.progress.basket_product_count === 0) {
+      const reason = this.emptyBasketReason(sf);
+      this.log(`REFUSING to report BASKET_READY: ${reason}`);
+      // Written before the throw so the refusal is visible where Warwick looks,
+      // not only in this process's stdout.
+      try {
+        await store.noteShopEvent(this.query, {
+          shopId: this.request.shop_id, eventType: 'failure',
+          description: `browser runner: ${reason}`,
+        });
+      } catch { /* the durable request row still carries the reason */ }
+      throw new EmptyBasketError(reason, {
+        requestId: this.request.id, shopId: this.request.shop_id, shortfall: sf,
+      });
     }
+
+    if (sf.missing > 0) {
+      const note = `basket is SHORT: ${sf.added} of ${sf.intended} intended product(s) in the trolley, `
+        + `${sf.missing} missing (${sf.unavailable} unavailable, ${sf.held} held, ${sf.failed} failed action(s)). `
+        + 'Reported, not smoothed away - the runner never swaps an item.';
+      this.log(note);
+      try { await store.noteShopEvent(this.query, { shopId: this.request.shop_id, eventType: 'note', description: `browser runner: ${note}` }); }
+      catch { /* the shortfall is durable in progress either way */ }
+    }
+
     this.progress = P.setRunnerState(this.progress, 'basket_ready');
     await lease.finish(this.query, { requestId: this.request.id, runnerId: this.runnerId, status: 'complete', progress: this.progress });
     try { await store.setShopStatus(this.query, { shopId: this.request.shop_id, from: 'SHOPPING', to: 'BASKET_READY', description: 'browser runner stopped at basket-ready; browser left open on the trolley' }); } catch { /* recorded in the request either way */ }
     this.log('BASKET_READY - stopping here. The browser stays open on the trolley. Nothing is ordered, nothing is paid for.');
     return { outcome: 'basket_ready', summary: P.summary(this.progress) };
+  }
+
+  /**
+   * WHY the basket was refused, in words a human can act on.
+   *
+   * The all-unavailable case gets its own sentence on purpose. "ASDA had none of
+   * it" and "the runner is broken" are the same empty trolley and completely
+   * different problems, and a reason that cannot tell them apart sends Warwick
+   * looking in the wrong place.
+   */
+  emptyBasketReason(sf) {
+    const tail = ` No item was swapped and nothing was ordered. Recorded: ${sf.added} add(s) succeeded, `
+      + `${sf.unavailable} unavailable, ${sf.held} held, ${sf.failed} failed action(s).`;
+    if (sf.intended > 0 && sf.unavailable >= sf.intended) {
+      return `the trolley is EMPTY because ASDA had none of it - all ${sf.intended} intended product(s) came `
+        + 'back unavailable. There is no basket to check, so this is not BASKET_READY.' + tail;
+    }
+    return `the plan executed but the trolley read back EMPTY (0 products) after intending ${sf.intended} `
+      + 'product add(s). Refusing to report a basket that was never built.' + tail;
+  }
+
+  /**
+   * A REHEARSAL ENDS AS A REHEARSAL.
+   *
+   * --dry-run walks the whole durable path - claim, lease, heartbeat,
+   * checkpoint, pause, resume, release - and issues NOT ONE browser command. It
+   * therefore builds nothing and reads nothing, and it used to finish by marking
+   * the request `complete` and moving a real shop SHOPPING -> BASKET_READY. That
+   * is the purest form of the thing this build refuses: a basket claimed by a
+   * process that never touched a trolley.
+   *
+   * It is not a failure either - the rehearsal did exactly what it was asked.
+   * So it releases the lease and leaves the request QUEUED, which is the honest
+   * state of the world: the work still exists and has not been done yet.
+   */
+  async finishDryRun() {
+    this.progress = P.setRunnerState(this.progress, 'dry_run');
+    try { await this.save(); } catch { /* the release below still matters */ }
+    this.stopHeartbeat();
+    await lease.release(this.query, {
+      requestId: this.request.id, runnerId: this.runnerId,
+      reason: 'dry run - no browser command was issued, so nothing was built',
+    });
+    this.log('DRY RUN complete - not one browser command was issued, so nothing was built and nothing is claimed. '
+      + 'The shop is untouched and the request stays queued for a real run.');
+    return { outcome: 'dry_run', summary: P.summary(this.progress) };
   }
 
   /** Release the writing lease so a human can drive without racing an automated click. */
@@ -543,7 +699,7 @@ async function main() {
   return res.outcome === 'basket_ready' || res.outcome === 'human_takeover' ? 0 : (res.outcome === 'failed' ? 1 : 0);
 }
 
-module.exports = { Runner, parseArgs, DEFAULTS, NoExecutablePlanError };
+module.exports = { Runner, parseArgs, DEFAULTS, NoExecutablePlanError, EmptyBasketError };
 
 if (require.main === module) {
   main().then((c) => process.exit(c)).catch((e) => { console.error('FATAL', e); process.exit(1); });

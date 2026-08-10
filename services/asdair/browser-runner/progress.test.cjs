@@ -102,9 +102,62 @@ test('an unknown runner state is refused rather than stored', () => {
   assert.throws(() => P.setRunnerState(P.normalise({}), 'checkout'), /unknown runner state/);
 });
 
+test('intended adds are counted from the plan, by DISTINCT product, ignoring reads and controls', () => {
+  const plan = validatePlan([
+    { step_id: 'a', command: 'add_known_product', product_ref: '489747', origin: 'regular' },
+    { step_id: 'b', command: 'select_search_result', term: 'mixed herbs', product_ref: '544334' },
+    { step_id: 'c', command: 'set_quantity', product_ref: '544334', qty: 2 },
+    { step_id: 'd', command: 'read_basket_line_count' },
+    { step_id: 'e', command: 'open_trolley' },
+    { step_id: 'f', command: 'add_to_favourites', product_ref: '489747' },
+  ]);
+  assert.strictEqual(P.intendedAdds(plan), 2,
+    'only the two commands that PUT a product in the trolley count, and each product once');
+  assert.strictEqual(P.intendedAdds([]), 0);
+  assert.strictEqual(P.intendedAdds(undefined), 0, 'an absent plan intends nothing rather than throwing');
+});
+
+test('the shortfall is the SUBTRACTION nothing was doing: intended minus added, with the reasons beside it', () => {
+  const plan = validatePlan([
+    { step_id: 'a', command: 'add_known_product', product_ref: '489747', origin: 'regular' },
+    { step_id: 'b', command: 'add_known_product', product_ref: '544334', origin: 'regular' },
+    { step_id: 'c', command: 'add_known_product', product_ref: '111222', origin: 'regular' },
+  ]);
+  let p = P.normalise({});
+  p = P.markCompleted(p, plan[0]);
+  p = P.markUnavailable(p, plan[1], 'Out of stock');
+  p = P.markFailed(p, plan[2], 'the add control never appeared');
+  p = P.applyBasketRead(p, { product_count: '1', order_total: '2.25' });
+  p = P.applyShortfall(p, plan);
+
+  const sf = p.basket_shortfall;
+  assert.strictEqual(sf.intended, 3);
+  assert.strictEqual(sf.added, 1);
+  assert.strictEqual(sf.missing, 2);
+  assert.strictEqual(sf.unavailable, 1);
+  assert.strictEqual(sf.failed, 1);
+  assert.strictEqual(sf.basket_product_count, 1);
+});
+
+test('an uncomputed shortfall reads as null, never as a clean zero', () => {
+  assert.strictEqual(P.normalise({}).basket_shortfall, null,
+    '"nobody measured" and "nothing was missing" must never look the same');
+  assert.strictEqual(P.normalise({ basket_shortfall: [1, 2] }).basket_shortfall, null,
+    'and a malformed value is not trusted into looking like a measurement');
+  assert.strictEqual(P.applyShortfall(P.normalise({}), []).basket_shortfall.missing, 0,
+    'a measured zero IS an object');
+});
+
+test('the four-key contract with Telegram and the Cockpit was NOT widened by this change', () => {
+  assert.deepStrictEqual([...P.REPORTED_KEYS],
+    ['regulars_added', 'searched_added', 'basket_product_count', 'estimated_total'],
+    'basket_shortfall is reported through summary(), never by changing a contract owned outside this folder');
+});
+
 test('summary reports every key the control surface promises', () => {
   const s = P.summary(P.normalise({}));
   for (const k of ['regulars_added', 'searched_added', 'basket_product_count', 'estimated_total',
+    'basket_shortfall',
     'held_items', 'unavailable_items', 'failed_actions', 'pending_favourite_actions',
     'last_successful_browser_step', 'human_reauth_required']) {
     assert.ok(Object.prototype.hasOwnProperty.call(s, k), `summary must report ${k}`);
