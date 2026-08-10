@@ -298,10 +298,23 @@ test('certain lines feed listNormaliser.js unmodified', async () => {
   // THE PROOF - one line, no adaptation, the normaliser as it already ships:
   const normalised = normaliseRawList(certainLinesText(transcript));
 
+  // WP-B15-11, 2026-08-10 — REQUIREMENT CHANGE, not a weakened assertion.
+  // A bare trailing number in a product name is PACK SIZE, not an order
+  // quantity. Warwick's real list carried "ARIEL 4in1 PODS 33" and the old
+  // rule turned it into 33 packs of laundry capsules, about £350. So
+  // "yazoo strawberry 4" is now one 4-pack, not four of them, and the note
+  // makes the reading visible rather than silently under-ordering.
+  // The LEADING quantity on "2 milk" is untouched and must stay untouched —
+  // that is the form Mum actually writes, and it is pinned in
+  // listNormaliser.test.js alongside "4 x 4pts ARLA" and "2pkts TWIX".
   assert.deepEqual(normalised.items, [
     { item_name: 'milk', requested_qty: 2, note: '' },
     { item_name: 'bread', requested_qty: 1, note: '' },
-    { item_name: 'yazoo strawberry', requested_qty: 4, note: '' },
+    {
+      item_name: 'yazoo strawberry 4',
+      requested_qty: 1,
+      note: 'pack size 4 read from the product name, not as an order quantity - asking for 1',
+    },
   ]);
   assert.deepEqual(normalised.needs_review, []);
 });
