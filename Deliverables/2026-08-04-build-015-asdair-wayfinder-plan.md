@@ -1785,31 +1785,46 @@ exists.**
 1. **Recovered map** — `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` (this file).
 2. **Goal** — `BUILD-015-END-TO-END-RECOVERY`: photograph → ShopperBot → checkout-ready basket, every
    gap closed, integrated, run and proven, with Larry outside the weekly operating path.
-3. **Phase and gate** — **GROUNDED RECOGNITION (§10), IN PROGRESS, now executing SUB-PHASE B15-3.**
-   Decision spine merged to `main` (PRs #102, #103, #104), Veritas Gate 1 **PASS** on the WP-B15-2
-   boundary. **Migration 017 is APPLIED and V1–V7 verified. The runtime IS restarted on merged bytes.**
-   **What is NOT done: the merged decision path has still never executed, and the live acceptance
-   FAILED on the human-interaction layer** — see B15-3's four proven defects. The historical Gate 3
-   thread ended in a third HOLD whose receipt is historical evidence — **enumerate `Assurance/` and
-   read the newest receipt rather than naming a head from here.**
-   *(Re-cut 2026-08-09 (second time today): the earlier text said "migration 017 is unapplied, the
-   runtime is stale" — **both were made false within the hour** and are corrected here rather than
-   left standing under a later amendment. Re-cut earlier 2026-08-09 from "NOT STARTED"; re-cut
-   2026-08-08 from a "phase 0 / Gate 3 / two receipts" text whose three claims had all gone stale.)*
-4. **Exact next action** — **§10 → SUB-PHASE B15-3, "NATURAL ANSWERING AND AN EXECUTABLE RULEBOOK".**
-   ACTIVE, authorised with execution approval on 2026-08-09. ⚠️ **Do NOT bring Warwick another
-   Wayfinder or a design plan for it — his word was the approval to execute.**
-   *(Re-cut 2026-08-09 (third time today, and each re-cut is recorded rather than appended over):
-   it first pointed at §10's execution-based bootstrap — discharged; then at the migration/runtime
-   sequencing amendment — **also now discharged**: 017 IS applied and verified
-   ([[Deliverables/2026-08-09-migration-017-production-apply-evidence]]) and the runtime IS restarted
-   on merged bytes ([[Deliverables/2026-08-09-runtime-cutover-evidence]]). Both of that amendment's
-   warnings are spent and are NOT reinstated here.)*
+3. **Phase and gate** — **GROUNDED RECOGNITION (§10), IN PROGRESS. SUB-PHASE B15-3 IS BUILT AND
+   CONVERGED; IT IS NOT ACCEPTED.** Decision spine merged (PRs #102, #103, #104), Veritas Gate 1
+   **PASS** on the WP-B15-2 boundary. **Migrations 017 AND 018 are APPLIED and verified. The runtime
+   IS restarted on the converged bytes.**
+   **What is NOT done: no real shop has completed the journey.** B15-3's implementation — free text
+   as a production input, the prose rulebook wired, rule 37 executable with its companion line, the
+   remembered-choice store — is on ONE head, **`c4d74d2`**, with 1,265 tests green. **Its ACCEPTANCE
+   is live and outstanding.** Evidence: [[Deliverables/2026-08-10-convergence-migration-cutover-evidence]].
+   The historical Gate 3 thread ended in a HOLD whose receipt is historical evidence — **enumerate
+   `Assurance/` and read the newest receipt rather than naming a head from here.**
+   *(Re-cut 2026-08-10 — Veritas pre-rotation assurance found this paragraph naming 017 only, with no
+   mention of 018 or of convergence. Re-cut twice on 2026-08-09 before that; each recorded, none
+   appended over.)*
+4. **Exact next action** — ⏸️ **WAIT FOR WARWICK'S FRESH PHOTOGRAPH.** It is the convergence target
+   and **nothing precedes it.** `CONVERGE ✅ → MIGRATE ✅ → CUT OVER ✅ → VERIFY ✅ → PHOTO ⬅`.
+   Larry told him to send it (FusionDevBot 469). **From the photo onward, product execution is
+   SERIAL — no parallel mutation of the executable path while the live journey runs.**
+   ⚠️ **Do NOT bring Warwick another Wayfinder, design plan, review cycle or readiness ceremony**
+   — *"unless execution exposes a genuine blocker"* (Warwick, 2026-08-10). His word was the approval
+   to execute.
+   *(Re-cut 2026-08-10, four times now on this map and each recorded: §10's bootstrap — discharged;
+   the migration/runtime sequencing amendment — discharged; "execute B15-3" — **discharged, B15-3 is
+   built and converged**; now the photograph.)*
 
-   ⚠️ **What a fresh Larry must NOT conclude:** that the fresh-photo acceptance is the remaining step.
-   **It ran on 2026-08-09 and it FAILED on the human-interaction layer, not the spine** — shop 7 exists
-   with all three lines transcribed and its image fingerprint bound, but a typed reply could not be
-   accepted at all. **The acceptance is blocked behind B15-3, not behind Warwick taking a photograph.**
+   > ⚠️ **A KNOWN BLOCKER MAY BE OPEN — CHECK IT BEFORE READING THE LINE ABOVE AS "GO".**
+   > On 2026-08-09 the restarted runtime sent Warwick **18 identical deferred-clarification cards in
+   > 17 minutes** on shop 7 — the outbox idempotency key carried a per-pass counter, so the dedupe
+   > never fired. **The runtime was STOPPED and `WO-B15-FIX1` raised.** Before telling Warwick to
+   > photograph anything, confirm that fix landed and **the runtime is running again**:
+   > `node services/asdair/pipeline-runtime/ensure-asdair-runtime.mjs --status --no-db`.
+   > **A stopped runtime means no photograph can be processed at all.**
+
+   ⚠️ **What a fresh Larry must NOT conclude:**
+   - ~~that the fresh-photo acceptance is the remaining step~~ — **STRUCK 2026-08-10. It IS the
+     remaining step.** The 2026-08-09 attempt failed on the human-interaction layer *because* free
+     text was not a production input; **that is exactly what B15-3 built and converged.**
+   - that B15-3 being converged means BUILD-015 is closed, or that **live acceptance** is done. **No
+     real shop has run.** This is live B15-3 acceptance, **NOT BUILD-015 closure.**
+   - that rules-CRUD, rule 39's two `map` rows, the governor/WO guard branch or untracked migration
+     011 block the photograph. **None of them do** (Warwick, 2026-08-10).
 
 **Then verify by execution, not belief:**
 
