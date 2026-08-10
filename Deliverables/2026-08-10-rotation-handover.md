@@ -67,6 +67,46 @@ over it.
    different spelling. See [[2026-08-10-finding-remembered-choice-normaliser-mismatch]].
 7. **WP-B15-13's worker never returned.** Its work is integrated on MY evidence, not a self-report.
 
+## ⚖️ THE VERDICTS — both gates HOLD at `fb58882`
+
+**Veritas Gate 1: HOLD. Gate 2: HOLD.** Receipts committed verbatim at `f22bfa5`.
+
+### The good half, established from MEASURED state and not from capability
+
+**If Warwick sends a photograph it will NOT be lost, and it WILL create a live shop.**
+`SHOP-2026-08-10` is CANCELLED, so `createOrResumeShop` takes the terminal branch and inserts a
+genuinely new `SHOP-2026-08-10-M<msgid>`; and a photo is never eaten as an answer because
+`verdict.kind !== 'text'` returns false before the claim path. **This morning's exact failure will
+not recur.**
+
+### 🔴 THE BLOCKER — a defect Larry did NOT find, live right now
+
+`loadOpenQuestions` (`runtime.js:228`) flattens open questions across **all** active shops while
+computing `ordinal` **per shop**. `correlateTypedAnswer:464` then builds
+`new Map(open.map((q) => [q.ordinal, q]))` — **duplicate ordinals silently keep the last.**
+
+So once a second shop asks its own questions 1 and 2, **a numbered board reply can be recorded
+against the WRONG shop's question** — logged `board_reply_correlated`, update claimed, no error,
+nothing Warwick can see. **That is this morning's failure class — an answer going somewhere
+invisible — on the very surface built to fix it.**
+
+**It is armed by a PRESERVATION DECISION, not by code.** Keeping `M64` as evidence is right; leaving
+it **ACTIVE with two open questions** is what creates the collision. Those are separable, and
+separating them is the cheapest thing that changes the verdict.
+
+**Third:** with 019 unapplied, whether a second shop on one date can acquire its own
+`shopping_lists` row is **unmeasured**. Unknown on a load-bearing precondition → HOLD.
+
+### Also corrected by Veritas, and both are mine
+
+- **I carried the 019 limit only half way.** The map records it UNAPPLIED but NOT that **nothing
+  supplies `shop_id`** — every production insert into `asdair.shopping_lists` was searched and only
+  test files were found. A fresh session reads *one gated action away* when it is **two pieces of
+  work** away.
+- **`WO-B15-FIX1` was in the series and absent from my dispatch**, so it went ungraded.
+- Veritas could not read `C:\.fusion247\**` (no `private_surface` declared), so it could not confirm
+  the runtime is completing polling passes. **Declare that surface next time.**
+
 ## The next real action
 
 **Ask Warwick for a fresh photograph — and NOTHING before it.** That is the acceptance event, it is
