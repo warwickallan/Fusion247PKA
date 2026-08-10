@@ -64,6 +64,14 @@ file_surface:
   - services/cockpit
   - services/asdair/pipeline
   - services/asdair/bot
+  - services/asdair/cockpit-api
+# AMENDMENT 1, 2026-08-10 - Larry. Granted on the worker's preflight finding, which is correct:
+#   services/asdair/cockpit-api/server.js:136 JSON.stringify()s EVERY routed response, including the
+#   markdown one, so the live body is a quoted string with literal 
+. A faithful proxy would hand
+#   Warwick exactly the JSON blob AC1 forbids. The worker was right to refuse to paper over it in the
+#   proxy - that hides an upstream bug and breaks when it is fixed. Fix it at the source instead.
+#   Larry looked at that exact response earlier and did not register it as a defect.
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -145,6 +153,26 @@ operational_handoff: none
 **AC2 — the card must emit the path that exists.** Change what `runPipeline.js` supplies so the rendered link matches the Cockpit route. **Do not hard-code a host.** The existing reasoning is right and stays: the pipeline has no business knowing the Cockpit's host, and an absent path must render **nothing** rather than a dead link on a card someone is holding in a supermarket.
 
 **AC3 — a real end-to-end reach, not a unit test.** Both services are running on `3696960`. **Prove it by executing:** `curl` the Cockpit route on `127.0.0.1:8090` for `SHOP-2026-08-09` and paste the status and first lines. It will legitimately answer the `not_handed_over` state — **that is a PASS**, because it proves the route resolves and the proxy reaches the read service. **A 404 is the defect this order exists to remove.**
+
+> ### ⛔ AMENDMENT 1 — 2026-08-10, Larry. Surface widened; AC3 relaxed; AC6 added.
+>
+> **Both preflight findings are accepted. They are defects in my order, not in your work.**
+>
+> **AC6 — fix the markdown response at source.** `services/asdair/cockpit-api/server.js:136` applies
+> `JSON.stringify` to every routed response. **`services/asdair/cockpit-api` is now in your surface.**
+> Make the markdown route emit markdown with real newlines and its declared content-type, without
+> changing the shape of any JSON route. **Do not compensate in the proxy** — your reasoning is right.
+>
+> **AC3 is relaxed, because you proved it unexecutable as written.** The live Cockpit runs `main`'s
+> bytes and I will not restart it onto a worktree, pin a daemon to one, or move code under Veritas;
+> and a second instance cannot boot from a fresh worktree because `../control-plane/node_modules` and
+> the live credential directory do not exist, which `credential_scope: none` forbids you supplying.
+> **Execute what you CAN honestly execute** — the real handler over real HTTP against the live read
+> service — and state precisely what it proves and what it does not. **Larry restarts the Cockpit
+> after integration; that acceptance is mine, not yours.**
+>
+> **My error, recorded:** I stopped you mid-run believing you had stalled, because your output file
+> was still empty five minutes in. You were working. The preflight above is exactly what I needed.
 
 **AC4 — do not widen exposure.** The Cockpit is tailnet-only and stays that way. **No Funnel, no new public route, no auth change.** If you believe exposure must change, STOP and say so.
 
