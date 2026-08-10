@@ -1637,17 +1637,40 @@ written to Postgres.**
 
 | # | Pax's break (2026-08-04) | Classification 2026-08-08 | Evidence |
 |---|---|---|---|
-| 1 | Nothing sends a question card to Telegram — `sendQuestionCard()` had zero production callers | **SOURCE FIXED — NOT LIVE** | Wired into `pipeline/runtime.js` (commit `996a838`, suites recovered green at `24a731f`); enumerated caller verified 2026-08-08. Never exercised by a live shop |
-| 2 | A button answer cannot be captured — live wiring passed `resolveCandidate: () => null` | **SOURCE FIXED — NOT LIVE** | `runtime.js:211–233` now hands real resolvers via `bot/resolveTap.js` (read 2026-08-08). Same live caveat |
+| 1 | Nothing sends a question card to Telegram — `sendQuestionCard()` had zero production callers | **✅ CLOSED BY EXECUTION — 2026-08-10** | Wired at `996a838`. **Exercised by a real shop on 2026-08-09/10:** `SHOP-2026-08-09` queued `question.q8f8d3866#0` and `question.q549c765f#0` at **17:36:04**, and `question.qe1c7008a#0` at **00:07:51** (round 2), **every one `status=done`** in `asdair.pipeline_command`. Warwick received and answered them on his phone |
+| 2 | A button answer cannot be captured — live wiring passed `resolveCandidate: () => null` | **✅ CLOSED BY EXECUTION — 2026-08-10** | `runtime.js:211–233` hands real resolvers via `bot/resolveTap.js`. **A real tap became a durable decision:** `asdair.shop_decision` id 1 — `decision_kind=existing_regular`, `interpreted_by=human`, `interpreted_model=null`, i.e. **resolved with ZERO model calls**, which is the property the button exists for |
 | 3 | The execution packet does not exist | **OPEN** | The producer now exists (`packet/buildExecutionPacket.js`) and `handoff/buildHandoff.js` calls it — but **`handoff/` has zero non-test importers in all of `services/asdair/`** (enumerated 2026-08-08); `runtime.js` names `buildHandoff()` only in a comment. The production journey still cannot produce a packet. A tested module with no caller is not delivered |
 | 4 | No basket writer | **OPEN** | The ruled writer is supervised Sonnet in Claude for Chrome (`RUNTIME-DECISION.md`); the handoff artefact it would consume is unreachable (row 3); no programmatic invocation surface exists, **deliberately** (`996a838`: "none was invented"). The CDP runner remains experimental and prohibited from live-account testing. No basket has ever been built by the ruled route |
 | 5 | No basket-ready handback — nothing enqueues kind `basket_ready` | **SOURCE FIXED — NOT LIVE** | `basket_ready` is enqueued from `pipeline/runtime.js` at source (enumerated 2026-08-08) — but it sits downstream of rows 3–4, so it has never fired, and the live process predates it |
 | 6 | The rulebook is not consumed — `info` rules discarded, exact-string matching, `rule_qa_log` never read | **SOURCE FIXED — NOT LIVE**, with a red flag | Rule-consumption workstream landed (`996a838`); tolerant matching in `skill/termMatch.js`; skill suite recovered green at `24a731f`. **Caveat that must not be dropped: `asdair-tests.yml`'s `integration` job — clean Postgres → schema → seed → `data.js` → `planner.js` — FAILED (AssertionError) at `eb03696`, 2026-08-08, the newest run on `main`. The full-path proof is red; root cause unestablished** |
-| 7 | Answers do not survive the week — `promoteDecision` deliberately not wired | **SOURCE FIXED — NOT LIVE** | `promoteDecision` is driven from the outcome writers (`buildAnswerLearning.js`, `recordAnswerLearning.js`, `record-shop.js` — enumerated 2026-08-08); the learning-loop tests assert an answer this week prevents the question next week against the real planner. Never exercised by a real shop |
+| 7 | Answers do not survive the week — `promoteDecision` deliberately not wired | **SOURCE FIXED — FIRED LIVE, EFFECT UNPROVEN** | `promoteDecision` is driven from the outcome writers (enumerated 2026-08-08). **The loop fired for the first time on 2026-08-09/10:** three `answerLearning` commands, all `status=done` (22:23:23, 22:23:27, 00:15:25). **What is NOT proven is the thing the row is about** — that an answer given this week suppresses the question next week. That needs a SECOND real shop and cannot be established from one. Recorded as fired, not as closed |
 
-| **8** | **The interpretation-confirmation gate has no production surface** *(found by the Step-2 investigation, 2026-08-08 — absent from Pax's original seven because the 2026-08-04 audit enumerated module-caller wiring and this gate is correctly wired in code; the missing thing is the HUMAN surface)* | **OPEN** | Every photo shop is created `needs_review=true`; `planOutcome` refuses READY_TO_SHOP without `confirmInterpretation`; the Telegram adapter has no confirm action, live Cockpit proxies are read-only, and the only confirm UI is the non-running Directus `wp-d-proof` extension; the park writes no event and queues no card. **Verified live: shop 6 `needs_review=true`; zero confirm commands in `pipeline_command`'s entire history** |
+| **8** | **The interpretation-confirmation gate has no production surface** *(found by the Step-2 investigation, 2026-08-08 — absent from Pax's original seven because the 2026-08-04 audit enumerated module-caller wiring and this gate is correctly wired in code; the missing thing is the HUMAN surface)* | **OPEN** | Every photo shop is created `needs_review=true`; `planOutcome` refuses READY_TO_SHOP without `confirmInterpretation`; the Telegram adapter has no confirm action, live Cockpit proxies are read-only, and the only confirm UI is the non-running Directus `wp-d-proof` extension; the park writes no event and queues no card. ~~**Verified live: shop 6 `needs_review=true`; zero confirm commands in `pipeline_command`'s entire history**~~ **✅ SUPERSEDED BY EXECUTION, 2026-08-10.** The gate now has a working human surface and **has been used twice**: `confirmInterpretation` command rows at **2026-08-08 23:40:51** and **2026-08-10 00:06:45**, with the `confirm_interpretation` card delivered `done` at 22:24:34. `SHOP-2026-08-09` passed the gate and reached `READY_TO_SHOP` at **00:18:02**. **Residual, observed not chased:** both `confirmInterpretation` rows and all three `answerQuestion` rows still read `status=pending` while `answerLearning` reads `done`. The shop advanced regardless, so this may be the outstanding-command model working as designed — but `store.js` warns that a command left outstanding quietly holds that generation open so the next legitimate issue can never be minted. **Flagged for assurance; not diagnosed here** |
 
-**The honest summary a fresh session should carry** *(re-cut 2026-08-08 after Step 2)*: **zero of
+> ### ⛔ RE-CUT 2026-08-10 by Larry, on executed evidence — the 2026-08-08 summary below is SUPERSEDED.
+>
+> **It read that ZERO of the eight are closed by executable product evidence. That is no longer true.**
+> On 2026-08-09/10 a real photo from Warwick travelled the whole chain on his real household data:
+> **rows 1, 2 and 8 are CLOSED BY EXECUTION**, and **row 7 fired for the first time** (its effect
+> across weeks is still unproven, and is deliberately not claimed).
+>
+> **Rows 3, 4 and 5 remain OPEN, and row 3's stated evidence is itself now wrong.** It says
+> *"`handoff/` has zero non-test importers"* — Lane C wired `buildBrowserHandoff`
+> (`runPipeline.js:1588`), which row 5 of the WP-B15-3 table already records, so **this table has
+> been contradicting itself.** The real defect is one layer further out, found 2026-08-10:
+> **the stored handoff is a RECEIPT, not a payload** (fingerprint, versions and counts — no lines,
+> no method, no prohibitions), and **`renderChecklist` appears only in `handoff/README.md` and its
+> own test.** The README documents exactly how to wire it and nothing does. **So the checklist
+> Warwick would actually shop from is never rendered anywhere.**
+>
+> **Rows 3 and 4 are therefore NOT re-cut here** — work is in flight against them
+> (`WO-2026-08-10-B15-05`, AC7), and re-cutting them now would replace one false row with another.
+> **Evidence:** [[2026-08-10-asdair-live-readiness-evidence]].
+>
+> **This is a factual correction on executed evidence, NOT a gate verdict.** No phase is marked PASS
+> here; Larry does not grade his own work.
+
+**The honest summary a fresh session should carry** *(re-cut 2026-08-08 after Step 2 — SUPERSEDED above)*: **zero of
 the eight are closed by executable product evidence.** Five are fixed at source and (since the
 bootstrap runtime alignment) now run in a live process for the first time — still unexercised by a
 real shop; three (the confirmation gate, the packet chain and the basket writer) remain OPEN in
