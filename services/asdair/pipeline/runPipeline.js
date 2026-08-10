@@ -51,7 +51,10 @@
 
 import { COMMANDS, COMMAND_SPECS, CONSUMPTION } from './commandNames.js';
 import { STEPS, decideNextStep, planOutcome, everIssued, pendingCommands } from './stages.js';
-import { questionKeyFor, intentKeyFor, sourceIdFor, outboxKeyFor, normaliseTerm } from './keys.js';
+import {
+  questionKeyFor, intentKeyFor, sourceIdFor, outboxKeyFor, normaliseTerm,
+  ledgerFamilyKey, LEDGER_KINDS,
+} from './keys.js';
 import * as store from './store.js';
 import * as shopLines from './shopLines.js';
 import * as shopDecisions from './shopDecisions.js';
@@ -793,21 +796,39 @@ async function stepPlan(deps, snapshot) {
       // or is not clear!" So the round-2 question still waits for the reading
       // confirmation, and he is told NOW, durably, through the ordinary outbox.
       //
-      // IDEMPOTENT BY OUTBOX KEY: one notice per question per shop, however many
-      // passes run while the reading stays unconfirmed. A stuck shop must not
-      // become a stream of identical cards.
+      // ONCE PER HELD LINE, EVER - AND THE OUTBOX KEY ALONE NEVER GAVE THAT.
+      // This comment used to claim idempotency by outbox key. It was false, and
+      // Warwick received EIGHTEEN identical cards in seventeen minutes proving
+      // it. recordLedgerEntry mints a NEW generation once the previous one is
+      // TERMINAL - deliberately, because "ask for the basket again after a
+      // pause" must be new work - so the key stopped a duplicate only while the
+      // card sat unsent, and re-issued it the moment the card was delivered.
+      // A spent generation of THIS family is therefore the honest question, and
+      // it is asked PER FAMILY, exactly as runtime.handbackAlreadySpent asks it:
+      // per-KIND (outboxEverQueued) would silence every held line but the first.
       try {
-        await store.enqueueMessage(deps, {
+        const noticeFamily = ledgerFamilyKey({
+          kind: LEDGER_KINDS.OUTBOX,
           householdId: shop.household_id,
-          shopId: shop.id,
-          kind: 'clarification_deferred',
+          name: 'clarification_deferred',
           key: outboxKeyFor(shop.shop_ref, `clarification_deferred.${held.question_key}`),
-          payload: {
-            shopRef: shop.shop_ref,
-            items: [held.item_name].filter((i) => typeof i === 'string' && i !== ''),
-            reason: held.clarification_reason || null,
-          },
         });
+        // A PENDING row is deliberately not counted: re-enqueueing computes the
+        // same family and recordLedgerEntry adopts it, so the database closes
+        // that window without this code reading first and writing second.
+        if ((await store.spentLedgerGenerations(deps, noticeFamily)) === 0) {
+          await store.enqueueMessage(deps, {
+            householdId: shop.household_id,
+            shopId: shop.id,
+            kind: 'clarification_deferred',
+            key: outboxKeyFor(shop.shop_ref, `clarification_deferred.${held.question_key}`),
+            payload: {
+              shopRef: shop.shop_ref,
+              items: [held.item_name].filter((i) => typeof i === 'string' && i !== ''),
+              reason: held.clarification_reason || null,
+            },
+          });
+        }
       } catch (err) {
         // Telling him matters; it does not matter more than the rest of the
         // pass. Logged, never thrown - one undeliverable notice must not stop

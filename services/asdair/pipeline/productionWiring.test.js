@@ -619,11 +619,30 @@ test('A1: the deferred clarification is TOLD, and the reading gate is untouched'
   assert.ok(runPipelineSrc.includes('wantsClarification && !readingConfirmed'),
     'the reading-confirmation gate has been weakened - it is load-bearing and predates this change');
   const at = runPipelineSrc.indexOf('wantsClarification && !readingConfirmed');
-  const body = runPipelineSrc.slice(at, at + 1200);
+  // THE WINDOW IS THE BRANCH, NOT A BYTE COUNT. This slice was `at + 1200`, and
+  // 1200 is a number about the length of a comment rather than about the code:
+  // B15-3 FIX1 added a guard and the branch's own `continue` fell out of the
+  // window, failing a test whose property was untouched. The branch ends where
+  // the ordinary round-opening code resumes, so that is where the window ends -
+  // it cannot drift, and it cannot silently swallow the next branch either.
+  const endsAt = runPipelineSrc.indexOf('const nextRound', at);
+  assert.ok(endsAt > at, 'the deferral branch no longer runs into the round-opening code - re-read this test');
+  const body = runPipelineSrc.slice(at, endsAt);
   assert.ok(body.includes('clarification_deferred'),
     'a deferred clarification is silent again - Warwick is not told what could not be read');
   assert.ok(body.includes('continue'),
     'the deferral itself must remain: the question card still waits for the reading confirmation');
+
+  // ── B15-3 FIX1: AND IT IS TOLD ONCE ────────────────────────────────────────
+  // The same shape as the lines_unresolved guard asserted above, and for the
+  // same reason: an unguarded enqueue re-queues on every pass, which is not a
+  // theoretical risk here - it put eighteen identical cards on Warwick's phone
+  // in seventeen minutes. Asserted on the SOURCE so the guard cannot be dropped
+  // while the behavioural proofs in runPipeline.test.js still describe it.
+  assert.match(body, /spentLedgerGenerations\(deps, noticeFamily\)/,
+    'the once-per-held-line guard is gone - a stuck shop becomes a stream of identical cards again');
+  assert.ok(!/outboxEverQueued\(deps, shop\.id, 'clarification_deferred'\)/.test(body),
+    'a per-KIND guard here would silence every held line but the first - it must be per FAMILY');
 });
 
 // =====================================================================

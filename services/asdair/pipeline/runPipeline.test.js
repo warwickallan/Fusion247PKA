@@ -19,7 +19,7 @@ import { createRequire } from 'node:module';
 import { makeHarness, makeCatalogue, HOUSEHOLD_ID } from './test/harness.js';
 import * as commands from './commands.js';
 import { runPipeline, listDateOf, buildGroundedIntents, planCandidates, assertCatalogueLoaded } from './runPipeline.js';
-import { listQuestions } from './store.js';
+import { listQuestions, listOutbox, resolveCommand } from './store.js';
 import { STEPS } from './stages.js';
 import { questionKeyFor } from './keys.js';
 
@@ -1262,4 +1262,244 @@ test('THE CONFIRMATION CARD: a TEXT shop never gets one - it was typed, not read
   await drain(h);
   assert.equal(shopStatus(h), 'READY_TO_SHOP');
   assert.equal(CONFIRM_CARDS(h.db).length, 0);
+});
+
+// =====================================================================
+// B15-3 FIX1 - THE DEFERRED-CLARIFICATION CARD IS SENT ONCE, NOT ONCE A MINUTE
+//
+// THE LIVE DEFECT. One stuck shop put EIGHTEEN identical "I could not read
+// that" cards on Warwick's phone in seventeen minutes, one every ~65 seconds -
+// the runtime's poll interval. The enqueue carried a comment claiming
+// "IDEMPOTENT BY OUTBOX KEY ... a stuck shop must not become a stream of
+// identical cards", and a stream of identical cards is precisely what it was.
+//
+// ── WHY THE OUTBOX KEY WAS NEVER THAT GUARANTEE ────────────────────────────
+// The live idempotency keys ran
+//   outbox:1:clarification_deferred:SHOP-2026-08-09:clarification_deferred.q8f8d3866#3
+// through `#17`. The trailing `#N` is NOT a suffix on the question key:
+// `ledgerFamilyKey` runs `requireKeyComponent` over every component and THROWS
+// on a `#`, so eighteen rows could not exist if the key carried one. It is the
+// LEDGER GENERATION appended by `ledgerIdempotencyKey`, and store.js derives it
+// from how many rows of that family are already TERMINAL.
+//
+// So the family was CONSTANT and the generation moved: while the card sat
+// unsent the family was adopted (one row), and the moment it was SENT its
+// generation was spent, so the next pass minted the next generation and queued
+// a genuinely new row. That re-issue is deliberate and load-bearing for
+// COMMANDS - "ask for the basket again after a pause" - and it is simply not
+// the once-ever property a milestone card needs.
+//
+// ── THE TRAP EVERY TEST OF THIS MUST AVOID ─────────────────────────────────
+// A multi-pass test that never RESOLVES what it queued goes GREEN against the
+// broken code, because a still-pending row is adopted and no duplicate appears.
+// The duplicate exists only once the card has been SENT. Every loop below
+// therefore sends what the pass queued - exactly what runtime.drainOutbox does -
+// and asserts a ROW COUNT, never an exit code and never a single re-run.
+// =====================================================================
+
+const DEFERRED_CARDS = (db) => db.pipeline_command.filter(
+  (c) => c.kind === 'outbox' && c.command === 'clarification_deferred',
+);
+
+/** The item each deferred card is about, in queue order. */
+const DEFERRED_ITEMS = (db) => DEFERRED_CARDS(db).map((c) => (c.args.items || [])[0]);
+
+/**
+ * Send everything the pass queued, the way runtime.drainOutbox does: a
+ * delivered row is resolved to `done`, which is TERMINAL.
+ *
+ * This is the whole difference between a test that reproduces the defect and
+ * one that passes over it. Nothing here is a shortcut - `resolveCommand(id,
+ * 'done', 'sent')` is the literal call drainOutbox makes after bot.send.
+ */
+async function sendQueuedCards(h) {
+  const queued = await listOutbox(h.deps);
+  for (const row of queued) await resolveCommand(h.deps, row.id, 'done', 'sent');
+  return queued.length;
+}
+
+/** A recording stub for the bounded answer interpreter. No model, no spend. */
+function scriptedInterpreter(returns) {
+  const calls = [];
+  const fn = async (grounding) => {
+    calls.push(grounding);
+    return typeof returns === 'function' ? returns(grounding) : returns;
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+const CLARIFY = (reason) => ({ decision_kind: 'clarification_required', clarification_reason: reason });
+
+/** Two readings the household catalogue cannot name, so two lines are held.
+ *  `oven gloves` is the live line from shop 7 that produced the eighteen cards. */
+const TWO_UNREADABLE_LINES = [
+  { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+  { line_no: 2, raw_reading: 'fruit splits', quantity: null },
+  { line_no: 3, raw_reading: 'oven gloves', quantity: null },
+];
+
+/**
+ * A PHOTO shop - needs_review true, the reading NEVER confirmed - in which
+ * every unreadable line has been answered with `clarification_required`.
+ *
+ * That is the exact live shape: the round-2 question is OWED but the reading
+ * gate defers it, so the shop parks and every subsequent pass re-runs stepPlan.
+ */
+async function toDeferredClarification(h) {
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await drain(h);
+  assert.equal(shopStatus(h), 'NEEDS_DECISION', 'the fixture must reach a real open question');
+  const open = h.db.shop_question.filter((q) => q.status === 'open');
+  assert.ok(open.length > 0, 'no question opened - this fixture would be proving nothing');
+  for (const q of open) {
+    await commands.answerQuestion({
+      shopRef: REF, actor: ACTOR, questionKey: q.question_key,
+      answerText: 'the usual', answerSource: 'typed',
+    }, h.deps);
+  }
+  return open;
+}
+
+test('B15-3 FIX1 / AC1: SIX planning passes over one stuck shop queue exactly ONE deferred-clarification card', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  await toDeferredClarification(h);
+
+  // A LOOP, not copy-pasted calls. The live defect needed eighteen passes to
+  // become undeniable; a two-pass test would have gone green while broken.
+  const PASSES = 6;
+  const seen = [];
+  for (let i = 0; i < PASSES; i += 1) {
+    await runPipeline(HANDLE, h.deps);
+    await sendQueuedCards(h);                 // the runtime delivers what was queued
+    seen.push(DEFERRED_CARDS(h.db).length);
+  }
+
+  assert.equal(DEFERRED_CARDS(h.db).length, 1,
+    `a stuck shop queued ${DEFERRED_CARDS(h.db).length} deferred-clarification cards over ${PASSES} passes `
+    + `(running total per pass: ${seen.join(', ')}). Warwick got eighteen of these.`);
+
+  // And the shop really was stuck for the whole loop - so the count above is
+  // one card over six live passes, not one pass that quietly stopped running.
+  assert.equal(shopStatus(h), 'PROCESSING',
+    'the shop must still be parked behind the unconfirmed reading, or the loop proved nothing');
+});
+
+test('B15-3 FIX1 / AC1: the same shop stays quiet across a RESTART, not merely within one process', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  await toDeferredClarification(h);
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  await sendQueuedCards(h);
+  assert.equal(DEFERRED_CARDS(h.db).length, 1, 'the first pass must still tell him once');
+
+  // A brand-new process pointed at the SAME durable database - a deploy, a
+  // reboot, or Larry restarting the runtime on a shop that is still stuck.
+  const restarted = makeHarness({
+    modelLines: MODEL_LINES, seed: h.db,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  for (let i = 0; i < 5; i += 1) {
+    await runPipeline(HANDLE, restarted.deps);
+    await sendQueuedCards(restarted);
+  }
+  assert.equal(DEFERRED_CARDS(restarted.db).length, 1,
+    'restarting the runtime on a stuck shop restarted the stream of cards');
+});
+
+test('B15-3 FIX1 / AC2: TWO held lines get TWO cards - one per line, not one per shop', async () => {
+  const h = makeHarness({
+    modelLines: TWO_UNREADABLE_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('ambiguous')) },
+  });
+  const open = await toDeferredClarification(h);
+  assert.equal(open.length, 2, 'the fixture needs two genuinely unreadable lines');
+
+  for (let i = 0; i < 6; i += 1) {
+    await runPipeline(HANDLE, h.deps);
+    await sendQueuedCards(h);
+  }
+
+  assert.equal(DEFERRED_CARDS(h.db).length, 2,
+    'one-per-line is the property: suppressing repeats must not suppress the second line');
+  assert.deepEqual(DEFERRED_ITEMS(h.db).sort(), ['fruit splits', 'oven gloves'],
+    'both held lines must be named - a card about only one of them is a silent line');
+});
+
+test('B15-3 FIX1 / AC3: the deferral and its honest content are UNCHANGED - the fix is in delivery only', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('I could not tell which you meant')) },
+  });
+  await toDeferredClarification(h);
+  for (let i = 0; i < 4; i += 1) {
+    await runPipeline(HANDLE, h.deps);
+    await sendQueuedCards(h);
+  }
+
+  // THE GATE STILL DEFERS. The round-2 question is owed and is NOT opened while
+  // the reading is unconfirmed - that gate recovered a real shop and is not this
+  // Work Order's to touch.
+  assert.equal(h.db.shop_question.filter((q) => Number(q.question_round) === 2).length, 0,
+    'a clarification round was opened before the reading was confirmed - the gate has been weakened');
+
+  // NOTHING WAS GUESSED AND NOTHING REACHED A BASKET.
+  assert.notEqual(shopStatus(h), 'READY_TO_SHOP', 'a shop with an undecided line must never be ready');
+  const held = h.db.shop_line.find((l) => l.raw_reading === 'fruit splits');
+  assert.ok(held, 'the held line must still exist');
+  assert.notEqual(held.status, 'matched', 'the held line must not have been quietly matched to something');
+
+  // THE CARD STILL SAYS WHAT IT COULD NOT READ, AND WHY.
+  const card = DEFERRED_CARDS(h.db)[0];
+  assert.ok(card, 'he must still be told - a silent deferral is the defect this card was added to close');
+  assert.deepEqual(card.args.items, ['fruit splits']);
+  assert.equal(card.args.reason, 'I could not tell which you meant');
+  assert.equal(card.args.shopRef, REF);
+});
+
+test('B15-3 FIX1 / AC4: a genuinely NEW held line still notifies - repeats are suppressed, news is not', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  await toDeferredClarification(h);
+  for (let i = 0; i < 5; i += 1) {
+    await runPipeline(HANDLE, h.deps);
+    await sendQueuedCards(h);
+  }
+  assert.equal(DEFERRED_CARDS(h.db).length, 1, 'the first line must have settled to one card');
+
+  // A SECOND LINE BECOMES HELD, LATER. Warwick corrects the list with a line the
+  // catalogue cannot name; it opens its own question, he answers it, and the
+  // interpreter says it needs clarifying too. That is NEWS, not a repeat.
+  await commands.correctLine({
+    shopRef: REF, actor: ACTOR, itemName: 'silver polish', status: 'needs_decision',
+  }, h.deps);
+  for (let i = 0; i < 4; i += 1) {
+    await runPipeline(HANDLE, h.deps);
+    await sendQueuedCards(h);
+  }
+  const fresh = h.db.shop_question.find((q) => q.status === 'open');
+  assert.ok(fresh, 'the corrected line must open its own round-1 question');
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: fresh.question_key,
+    answerText: 'the usual', answerSource: 'typed',
+  }, h.deps);
+
+  for (let i = 0; i < 5; i += 1) {
+    await runPipeline(HANDLE, h.deps);
+    await sendQueuedCards(h);
+  }
+
+  assert.equal(DEFERRED_CARDS(h.db).length, 2,
+    'a NEW held line was suppressed - a fix that silences repeats by silencing everything is the worse defect');
+  assert.deepEqual(DEFERRED_ITEMS(h.db), ['fruit splits', 'silver polish'],
+    'the second card must be about the NEW line, and the first must not have repeated');
 });
