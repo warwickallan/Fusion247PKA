@@ -1561,14 +1561,28 @@ its evidence so it can be re-established or falsified in minutes.**
 > was NOT retired** — the worker refused my instruction with evidence and was right: it is the only
 > voice for the stuck state).
 >
-> **IN FLIGHT** — `B15-13` (grounding: `VANISH PRETREAT GEL` must find `Vanish Pre-Treat Gel`) ·
-> `B15-14` (the supervised browser step can finish — surface widened to `runPipeline.js` after the
-> worker falsified my hypothesis that stage decisions execute generically; a new step without its
-> dispatch case would FAIL the shop) · `B15-15` (**the board can currently say `blocked: false`
-> about a shop that cannot move**, plus a `fakePg` handler so the exclusion tests become sensitive
-> to their own SQL) · `B15-16` (**migration 019** — the shop owns the list, not the date;
-> written and proven against real Postgres, **NOT applied to the live store**, which is a gated
-> action).
+> **ALSO LANDED** — `B15-14` (**both** supervised hops: `WAITING_FOR_BROWSER → SHOPPING →
+> BASKET_READY`; my hypothesis that stage decisions execute generically was FALSE — `dispatchStep`
+> is a closed switch whose `default:` throws into `failShop`, so a step without its case would have
+> FAILED the shop) · `B15-15` (`blocked` is now `true | null | false`, producing the renderer's
+> already-shipped *"I cannot tell"* state that nothing had ever produced; it found a **second** park
+> — `needsReview && !interpretationConfirmed`, the recorded shape of shop 6) · `B15-16`
+> (**migration 019**, all seven of Silas's assertions PASS on real PostgreSQL 17.4, regression
+> proven first — **and it is UNAPPLIED; applying it to the live store is a gated action**).
+>
+> **Larry's own integration tasks, both DONE and both proven by mutation:** the blinding
+> `withForeignClaimStatement` harness is deleted (the SQL inversion now drives three named
+> behavioural tests RED where it previously left them 90/90 green), and the blocked board no longer
+> hardcodes *"until the questions above are answered"* on parks that have no open questions.
+>
+> **IN FLIGHT — ONE** — `B15-13` (grounding: `VANISH PRETREAT GEL` must find `Vanish Pre-Treat Gel`,
+> measured for new false positives against the real 205-name catalogue).
+>
+> **⚠️ WORKTREE HAZARD, DEFUSED BUT WORTH KNOWING.** WP-B15-16 created `node_modules` **junctions**
+> pointing at the PRIMARY checkout. A recursive delete of such a worktree would destroy the primary's
+> dependencies through the link. Remove junctions with a NON-RECURSING delete first, then the
+> worktree — and verify the target's contents before and after. Done for `b1516`; watch for it if
+> any future worktree needs one.
 >
 > **KNOWN AND QUEUED, NOT FORGOTTEN** — each has a durable record under `Deliverables/`:
 > **migration 019** (Silas: the shop owns the list, not the date) · **durable household learning**
