@@ -116,6 +116,53 @@ operational_handoff: none
 
 # WO-2026-08-11-03 — A choice he has already made is found under a different spelling
 
+## AMENDMENT 1 — Larry, 2026-08-10, answering Keel's read-back CLARIFY
+
+> **Attribution note.** Warwick authorised the outcome. Everything here is **Larry's** engineering
+> ruling on Keel's evidence. None of it is a Warwick decision.
+
+**RULING 1 — importing `pipeline/test/harness.js` is IN BOUNDS. Editing it is NOT.** My dispatch note
+said you should not need the harness; you established that `rememberedChoice.test.js:54` **already
+imports it at HEAD** and that AC2 is unreachable without it. You are right and my note was wrong.
+Import freely, edit nothing. **Integration risk, mine not yours:** another worker holds that file in
+a different worktree, so a semantic change there could redden your suite at integration. Recorded.
+
+**RULING 2 — squash-collision precedence: inherit, do not invent.** Newest `chosen_at`, then highest
+`id` — exactly the `DISTINCT ON` ordering the statement already uses. Confirmed as you proposed.
+
+**RULING 3 — take the design in your Contradiction 1: key the returned Map on the REQUESTED term.**
+Better than the order. You found that "the lookup" is in **two** places — the SQL, and
+`applyRememberedToPlan`'s `memories.get(term)` / `memories.has(term)` (`:579`/`:588`) keyed on the
+**stored** spelling via `row.choice_term` (`:440`) — so fixing only the SQL fetches the row and then
+still misses on the Map. Keying on the requested term leaves `applyRememberedToPlan` untouched and
+pure, confines the whole squash concern to the impure half, and **makes AC6 fall out for free**.
+Build it that way.
+
+**RULING 4 — AC5 in-process route CONFIRMED, no DDL, and your reason is the right one.** The
+digit-to-digit guard is not expressible in SQL without a third copy of the rule, which AC1 forbids.
+Write the growth bound into the code and the return, as you proposed.
+
+**Accepted corrections and findings, no action needed from you:**
+
+- **You found a SECOND gate and it matters.** `runPipeline.js:317` short-circuits on
+  `memoriesByTerm.size === 0`, so with the memory filed under the other spelling
+  `applyRememberedToPlan` is **never called at all** — `:588` is the second gate and today's failure
+  never reaches it. The order described only the inner one. This makes AC6 more important, not less.
+- **My label on `rememberedChoice.test.js:739` was wrong.** It pins `isNormalisedTerm` against
+  `keys.normaliseTerm` (a fixed-point pin); `stages.test.js:369` is the genuine cross-normaliser pin.
+  The substance — both sample-based, neither containing an intra-word hyphen — stands.
+- **`runPipeline.js:250` and `:367` are stale** ("MIGRATION 018 IS AUTHORED, NOT APPLIED"). 018 is
+  applied. Out of your surface. **PARKED** for the scheduled reconciliation — not a Work Order, and
+  not tonight.
+- **Your residual is accepted and will be carried honestly:** AC2 drives the real production entry
+  point against a *modelled* Postgres, so its green is not a live proof. That limit goes to the gate
+  in those words.
+
+**⏱ Timebox, added by Warwick 2026-08-10 22:44:** this session converges by ~23:44 or stops cleanly.
+**The safety bar is unchanged** — do not skip mutation or regression evidence to make a clock. If you
+cannot finish properly, return what is genuinely done with its evidence and say plainly what is not.
+A partial with honest evidence is worth more to me tonight than a rushed green.
+
 ## The defect
 
 WP-B15-13 (`051050f`) made product MATCHING separator-blind via `squashMatchText`
