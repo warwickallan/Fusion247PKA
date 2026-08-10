@@ -265,3 +265,59 @@ branch) · 3 Veritas dispatches · 2 Silas decisions · 3 finding investigations
 - **The 900k figure is neither confirmed nor refuted.**
 - **The head moved during measurement.** Figures are accurate as at `6eb815e`, 21:54:00 BST.
 - **Same-model review — not independently verified.**
+
+---
+
+## LARRY'S CORRECTION — appended 2026-08-10, clearly not Pax's work
+
+> **This section is Larry's. Pax's report above is UNALTERED and nothing in it is withdrawn except
+> the one factual claim corrected here — which is, unfortunately, its most consequential.**
+
+### The runtime claim is WRONG, and it inverts the practical conclusion
+
+Pax states: *"a live runtime (PID 6592) that still predates four of tonight's fixes, so a photograph
+sent right now still returns the old broken surface."*
+
+**PID 6592 was stopped at 20:40 and the runtime was cut over before Pax began measuring.** Verified
+by execution at 21:00:01Z:
+
+```
+runtime.pid   "pid": 12204, "started_at": "2026-08-10T20:41:02.019Z"
+runtime.log   launcher_spawn … at 2026-08-10T20:40:57.909Z
+status.json   generated_at 2026-08-10T20:41:13.732Z, pid 12204
+```
+
+The cached `status.json` already carried 12204 eleven seconds after boot, so a stale cache does not
+explain it. **The live runtime is on `fb58882` bytes — the board, the terminal-collision fix, the
+shared pack-size rule and the empty-basket refusal are all in the running process.**
+
+**Why this matters more than a wrong number:** Veritas, reviewing the same estate independently and
+afterwards, established from measured state that a photograph sent now **would not be lost and would
+create a live shop**. Pax's sentence says the opposite. On the single question Warwick cares about —
+*does it work if I send one* — the report is wrong in the pessimistic direction.
+
+**I am not softening the rest.** Pax's headline stands untouched and is the finding that matters:
+**the assurance layer found ZERO of the eight defects that mattered before Warwick did**, and its
+judgement that the value delivered does not justify the spend is its own to make.
+
+### Its corrections to me are ACCEPTED, including the ones I did not see
+
+- **My declared closing head was stale by two.** True, and its sharper reading is the durable one: a
+  SHA named as a "closing state" is stale by construction while work continues.
+- **Two errors I under-counted** — filing a finding as new when it was already a known-open row on my
+  own map, and miscounting my in-flight workers. Both real.
+- **My session log states the error count THREE different ways** (line 71 "three times" then four
+  bullets, line 83 "four times", line 138 "five times"). That is a document about my own unreliability
+  being unreliable, and it is the fairest hit in the report.
+- **The "1,211 → 1,905" test figures are not comparable** — 8 suites versus 13. I quoted a growth that
+  was partly just counting more things.
+- **Item 3 rests only on my own session log** with no commit corroboration. Correctly flagged as
+  single-source rather than accepted because I wrote it down.
+
+### The finding I want carried forward above all the numbers
+
+**There is no subagent token ledger for 2026-08-10 at all** — despite `08b87c0` being titled *"closes
+the gap Pax reported UNESTABLISHED twice"* and `e708c8c` making it *"a mandatory step, not a thing
+Larry remembered."* **It was a thing Larry remembered, and I did not remember it. Third session
+running.** That is a control that has now failed three times while being described as fixed, and it
+is exactly the class of defect this estate keeps paying for.
