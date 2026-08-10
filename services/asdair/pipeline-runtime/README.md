@@ -145,3 +145,30 @@ never stop a start — `ok` still means "no blocking problem", exactly as before
 > **AC7 is the one Warwick named:** *"A default model name that the gateway does not provide
 > must never survive preflight again."* An **unset** `FUSION_MODEL_VISION` is therefore a
 > failure, not a default — the fallback `fusion.vision` is not served by this gateway.
+
+## `ASDAIR_COCKPIT_BASE_URL` — the one machine setting the checklist link depends on
+
+**Set 2026-08-10. Recorded here because a machine setting only Larry knows is exactly what
+`CLAUDE.md` § "Nothing may live only in Larry's head" prohibits.**
+
+When a shop is handed over for the browser step, the card carries a link to the rendered checklist —
+every line, the method, and the prohibitions. **The durable payload deliberately stores only a
+relative path** (`/api/asdair/checklist?shop=<ref>`): the pipeline has no business knowing the
+Cockpit's host, and a host baked into a durable row is wrong the moment it changes.
+
+`runtime.js` joins that path to a base at send time (`withChecklistUrl`, read from
+`process.env.ASDAIR_COCKPIT_BASE_URL` at `runtime.js:1452`).
+
+| | |
+|---|---|
+| **Value on this machine** | `https://warwick-yoga.tailbc1fe3.ts.net:8443` |
+| **Where it lives** | a **User** environment variable (`setx`), NOT an env file — deliberately, because the env files sit under `C:\.fusion247\**`, which GL-012 denies by default |
+| **Why that host** | the Cockpit binds `127.0.0.1:8090` and is exposed **tailnet-only** on `:8443` by `tailscale serve`. `127.0.0.1` is useless on Warwick's phone — there it is the *phone's* loopback |
+| **Verified 2026-08-10** | the joined URL returns **HTTP 200** over the real tailnet name |
+
+**If it is unset the card shows the bare path and nothing is invented** — no plausible-looking default
+host, no dead link. That is the honest degraded state, not a bug. **If Warwick's tailnet name ever
+changes, this is the single value to update**, and the symptom will be a card whose link 404s.
+
+**It is durable across reboots** (User scope, read from the registry by the logon task), but note:
+that inheritance has **not** been proven by an actual reboot.
