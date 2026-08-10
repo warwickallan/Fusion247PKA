@@ -239,3 +239,36 @@ What I am **not** doing on the back of that: no RLS work, no status ENUM, no aud
 - **Warwick decision required:** none. This is an ordinary schema choice with a safe default and a proof route.
 - **Not done here, deliberately:** the migration file, any service-code edit, any live-DB contact. This packet specifies `019`; it does not create it.
 - **Sequencing recommendation:** ship the interim now (it is doing real work on the damaged rows) → implement `019` + §7 write-path + `data.js:214` → extend the dbtest harness per §8 and require (a)–(g) green in the `cockpit-db` job → then retire the interim's *filtering* role only, keeping its provenance role.
+
+---
+
+## 12. LARRY'S CROSS-CHECK — appended 2026-08-10, and clearly not Silas's work
+
+> **This section is Larry's, not Silas's. Silas's analysis above is unaltered.** It is appended
+> because Silas could not have known the fact below — it lies outside the schema scope it was given
+> — and because a reader of §Handback alone would over-rate one severity claim.
+
+**Silas's worst case does not currently fire.** §Recommendation warns that a merged list would let
+`reconcile.js` / `promoteDecision.js` *"learn durable rules from a merged list that then re-fire
+every subsequent week"*. That is the correct reading of the schema — **but the learning path is not
+wired.**
+
+`services/asdair/pipeline/deps.js:317` states **`DELIBERATELY NOT WIRED HERE: promoteDecision`**,
+and `buildAnswerLearning` hard-errors on an absent `applies_going_forward` boolean precisely so
+nobody can infer it. Established independently and recorded at
+[[2026-08-10-finding-durable-learning-built-not-wired]].
+
+**Consequence, and it cuts both ways:**
+
+- **The interim mitigation is SAFER than §Recommendation assesses.** The durable-rule contamination
+  — the most serious harm named — cannot occur today, because nothing writes a rule at all.
+- **The urgency is therefore lower, and the deadline is real.** The moment the learning half is
+  wired (queued behind WP-B15-09), a merged list becomes exactly as dangerous as Silas describes.
+  **`019` must land before durable learning is switched on**, not before Warwick's next shop.
+
+The remaining harms Silas names — silent quantity clobber through the shared row, and spurious
+re-opened questions — are unaffected by this cross-check and stand as written.
+
+**Nothing in §§1-11 is withdrawn.** The recommendation, the rejected options, the proof route and
+the sequencing all stand; only the severity of one named consequence is corrected, and its timing
+made explicit.
