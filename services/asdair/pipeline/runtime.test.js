@@ -1500,3 +1500,87 @@ test('A CORRELATOR THAT THROWS never eats the message', async () => {
   assert.equal(report.intake.claimed, 0);
   assert.equal(report.intake.received, 1, 'a failed correlation lost the message entirely');
 });
+
+// =====================================================================
+// AC5 - THE ARTEFACT IS PRODUCED BY THE REAL PASS, ONCE
+//
+// Root CLAUDE.md, "Nothing may live only in Larry's head": a callable
+// buildHandoff(), a green unit test and a successful manual invocation prove
+// CAPABILITY only. So this test invokes nothing directly. It drives `runOnce` -
+// the exact function `runtime.js main()` calls on every `--once` and every tick
+// of `--watch` - and asserts on what the pass LEFT BEHIND in durable state.
+//
+// And it runs the pass MANY times, not once. The estate has shipped the
+// once-per-round defect twice: eighteen identical clarification cards in
+// seventeen minutes, keyed on a value that changed every round. A single pass
+// cannot distinguish "produced once" from "produced once per minute", so a
+// single pass is not the proof.
+// =====================================================================
+
+/** Drive the real pass until the shop stops moving, or `limit` passes elapse. */
+async function passUntilSettled(h, bot, limit = 8) {
+  let passes = 0;
+  for (; passes < limit; passes += 1) {
+    const report = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+    if (report.stepped === 0) break;
+  }
+  return passes;
+}
+
+test('AC5: the REAL PASS leaves a durable browser handoff, and TWELVE passes leave exactly ONE', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+
+  assert.equal(h.db.shop[0].status, 'READY_TO_SHOP');
+  // NOTHING IS HANDED OVER BEFORE WARWICK ASKS. The "Build ASDA basket" gate is
+  // deliberate (stages.js READY_TO_SHOP waitsFor), and this pins that closing
+  // the seam did not quietly remove it.
+  assert.equal(h.db.browser_build_request.length, 0,
+    'a shop must not be handed to a browser step nobody asked for');
+
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+
+  // THE PASS RUNS EVERY MINUTE. Twelve minutes of it.
+  for (let i = 0; i < 12; i += 1) {
+    await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  }
+
+  assert.equal(h.db.browser_build_request.length, 1,
+    'twelve passes must leave ONE browser build request, not twelve');
+
+  const request = h.db.browser_build_request[0];
+  assert.ok(request.progress && request.progress.handoff,
+    'the pass must leave a durable HANDOFF on the request - a bare "go and shop" row is the defect');
+  assert.ok(request.progress.handoff.packet_fingerprint,
+    'and it must be bound to the packet it was built from');
+  assert.equal(request.progress.handoff.opened_by, 'asdair:pipeline',
+    'PRODUCED BY THE PIPELINE. A handoff opened by anything else would prove capability, not automation.');
+  assert.ok(request.progress.handoff.instructions_version,
+    'the operating contract version travels with it - buildHandoff refuses to build without one');
+
+  assert.equal(h.db.shop[0].status, 'WAITING_FOR_BROWSER');
+});
+
+test('AC5: Warwick is told ONCE that the basket build was handed over, not once per pass', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+
+  for (let i = 0; i < 12; i += 1) {
+    await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  }
+
+  // The handover card, on the phone, exactly once across twelve passes.
+  const handover = bot.sent.filter((s) => /browser build requested/.test(s.message.text || ''));
+  assert.equal(handover.length, 1,
+    `Warwick received ${handover.length} handover cards. Twenty identical cards is the defect this build has `
+    + 'already shipped twice; the key must be stable for the life of the shop.');
+  assert.equal(ledger(h, 'outbox', 'progress').filter((c) => c.status === 'pending').length, 0,
+    'and nothing is left stuck in the outbox');
+});
