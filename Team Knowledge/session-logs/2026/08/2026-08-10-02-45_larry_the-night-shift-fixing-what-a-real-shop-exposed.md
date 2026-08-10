@@ -50,9 +50,28 @@ interesting places.
   builder's mutation. **Larry had already merged the broken gate**, having integrated while the worker
   was still running.
 
-**Veritas** — one dispatch, two receipts. **Gate 1 HOLD** (6 of 8 ACs PASS; holds on B15-04 AC4 and
-B15-05 AC7) and **Gate 2 HOLD** (Q1 *yes*, Q2 *"not yet, and it should not be presented to him as
-ready"*). **It discharged the long-standing D1 hold on the rulebook** — traced, no test-only hop.
+**Veritas — three rounds, the maximum Warwick authorised, all four receipts committed verbatim.**
+
+- **Round 1:** Gate 1 **HOLD** (6 of 8 ACs PASS; holds on B15-04 AC4 and B15-05 AC7) and Gate 2
+  **HOLD** (Q1 *yes*, Q2 *"not yet, and it should not be presented to him as ready"*). **It discharged
+  the long-standing D1 hold on the rulebook** — traced, no test-only hop — and caught a documentation
+  finding Larry had missed.
+- **Round 2:** AC4 and D-2 **CONFIRMED**. **D-1 STILL HELD**, on a finding better than Larry's own:
+  `setx` writes the User registry, which does not propagate into running processes, and children
+  inherit the parent's block. It **proved it by execution** — a freshly spawned node read `undefined`
+  — so the claim that the runtime held the value was unproven, and nothing exposed it.
+- **Round 3:** D-1 **CONFIRMED.** It verified the measurement was on the outcome-bearing value rather
+  than a correlated surface **by tracing the field instead of trusting the commit message**
+  (`runtime.js:1452` → `:1498` → `:1266` → `:1036` — same property, same object, same process), and
+  confirmed the logon task supplied it with Larry's shell nowhere in the process lineage.
+
+**It also endorsed the judgement Larry was least sure of** — declining to tap *Build ASDA basket* on
+Warwick's real shop to satisfy a reviewer: *"you were right, and I would have marked it against you
+the other way."*
+
+**What may and may not be said, in its words:** the base-URL defect **is discharged and the system is
+ready to be exercised**; it may **not** be said that the handover card is proven end-to-end, because
+no card has been emitted.
 
 **Larry, directly:** the governor guard hole; shop disposal; worktree convergence 16 → 1; both runtime
 restarts; the read-service logon task; the map re-cuts; the evidence record; and the independent
