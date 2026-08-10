@@ -20,6 +20,11 @@ on:
       - 'services/fusion-capture-gateway/**'
       - 'services/control-plane/db/mypka/**'
       - 'services/control-plane/wp-d-proof/**'
+      # Added 2026-08-10 (WP-B15-16 preflight). The cockpit-db job applies AsdAIr
+      # migrations against a real postgres and is the ONLY proof route for them —
+      # fakePg models no uniqueness. Without this line a migration-only change
+      # went green BY NEVER RUNNING, which is indistinguishable from passing.
+      - 'services/asdair/db/**'
       - '.github/workflows/build-002-tests.yml'
   pull_request:
     paths:
@@ -27,6 +32,11 @@ on:
       - 'services/fusion-capture-gateway/**'
       - 'services/control-plane/db/mypka/**'
       - 'services/control-plane/wp-d-proof/**'
+      # Added 2026-08-10 (WP-B15-16 preflight). The cockpit-db job applies AsdAIr
+      # migrations against a real postgres and is the ONLY proof route for them —
+      # fakePg models no uniqueness. Without this line a migration-only change
+      # went green BY NEVER RUNNING, which is indistinguishable from passing.
+      - 'services/asdair/db/**'
       - '.github/workflows/build-002-tests.yml'
 
 permissions:
