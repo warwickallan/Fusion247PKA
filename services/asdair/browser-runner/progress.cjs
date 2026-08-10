@@ -11,6 +11,11 @@
 // estimated_total. `normalise` guarantees they are always present, so a
 // consumer never has to guess whether a missing key means zero or unknown.
 //
+// `basket_shortfall` is a report too, and it is DELIBERATELY NOT in
+// REPORTED_KEYS. That list is a contract with consumers outside this folder;
+// widening it is their change to accept, not this file's to take. Nothing is
+// lost by its absence - `summary()` returns the key either way.
+//
 // Runner-internal bookkeeping is prefixed with `_` so a consumer can tell at a
 // glance what is a report and what is machinery.
 // =====================================================================
@@ -20,8 +25,12 @@ const REPORTED_KEYS = Object.freeze([
   'regulars_added', 'searched_added', 'basket_product_count', 'estimated_total',
 ]);
 
+// `dry_run` is its own terminal state and not a flavour of `basket_ready`. A
+// rehearsal issues no browser command, so it has built nothing and read
+// nothing; recording it as basket_ready would be the runner claiming an outcome
+// it never went and looked at. Nothing outside this folder reads this field.
 const RUNNER_STATES = Object.freeze([
-  'idle', 'running', 'paused', 'human_takeover', 'basket_ready', 'failed',
+  'idle', 'running', 'paused', 'human_takeover', 'basket_ready', 'dry_run', 'failed',
 ]);
 
 /** The shape every progress read is coerced to. Missing -> explicit zero/empty. */
@@ -37,6 +46,7 @@ function normalise(progress) {
   p.pending_favourite_actions = arr(p.pending_favourite_actions);
   p.last_successful_browser_step = p.last_successful_browser_step == null ? null : String(p.last_successful_browser_step);
   p.human_reauth_required = p.human_reauth_required === true;
+  p.basket_shortfall = obj(p.basket_shortfall);
   p._completed_steps = arr(p._completed_steps);
   p._runner_state = RUNNER_STATES.includes(p._runner_state) ? p._runner_state : 'idle';
   return p;
@@ -44,6 +54,65 @@ function normalise(progress) {
 
 const int = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.trunc(n) : 0; };
 const arr = (v) => (Array.isArray(v) ? v.slice() : []);
+// null, not {} - "no shortfall has been computed" and "a shortfall of zero" are
+// different facts, and collapsing them would let an unmeasured run read as a
+// clean one.
+const obj = (v) => ((v && typeof v === 'object' && !Array.isArray(v)) ? { ...v } : null);
+
+/**
+ * The commands that put a product in the trolley.
+ *
+ * Taken from commands.cjs's own `kind: 'write'` classification rather than
+ * invented here, and narrowed to the two that ADD: `set_quantity` and
+ * `add_to_favourites` are writes that change nothing about how many products
+ * the plan intended to place.
+ */
+const ADD_COMMANDS = Object.freeze(['add_known_product', 'select_search_result']);
+
+/** How many DISTINCT products the plan set out to put in the trolley. */
+function intendedAdds(plan) {
+  const refs = new Set();
+  for (const s of (Array.isArray(plan) ? plan : [])) {
+    if (s && ADD_COMMANDS.includes(s.command) && s.product_ref != null) refs.add(String(s.product_ref));
+  }
+  return refs.size;
+}
+
+/**
+ * THE DIFFERENCE BETWEEN WHAT WAS INTENDED AND WHAT THE TROLLEY GOT.
+ *
+ * A shortfall is NOT a failure. Items go out of stock; that is ordinary
+ * shopping, and this estate already treats a shortfall as a per-line reported
+ * outcome (`short: 'fewer than planned'`) rather than a threshold to fail on.
+ * What was missing was not a rule - it was the SUBTRACTION. Nothing anywhere
+ * compared the two numbers, so a trolley holding less than the list asked for
+ * was indistinguishable from one holding all of it.
+ *
+ * `missing` is deliberately the whole gap, with `unavailable`/`held`/`failed`
+ * beside it as the explanation. A gap larger than those three accounts for is
+ * itself the interesting signal: something went wrong that nobody recorded.
+ */
+function basketShortfall(plan, progress) {
+  const p = normalise(progress);
+  const intended = intendedAdds(plan);
+  const added = p.regulars_added + p.searched_added;
+  return {
+    intended,
+    added,
+    missing: Math.max(0, intended - added),
+    unavailable: p.unavailable_items.length,
+    held: p.held_items.length,
+    failed: p.failed_actions.length,
+    basket_product_count: p.basket_product_count,
+  };
+}
+
+/** Fold the shortfall into progress, where it is durable and reportable. */
+function applyShortfall(progress, plan) {
+  const p = normalise(progress);
+  p.basket_shortfall = basketShortfall(plan, p);
+  return p;
+}
 
 /** Ids of every step already durably recorded as done. */
 function completedStepIds(progress) {
@@ -182,6 +251,7 @@ function summary(progress) {
     searched_added: p.searched_added,
     basket_product_count: p.basket_product_count,
     estimated_total: p.estimated_total,
+    basket_shortfall: p.basket_shortfall,
     held_items: p.held_items.length,
     unavailable_items: p.unavailable_items.length,
     failed_actions: p.failed_actions.length,
@@ -194,8 +264,9 @@ function summary(progress) {
 }
 
 module.exports = {
-  REPORTED_KEYS, RUNNER_STATES,
+  REPORTED_KEYS, RUNNER_STATES, ADD_COMMANDS,
   normalise, completedStepIds, remainingPlan, inFlightStepId, markInFlight,
   markCompleted, markFailed, markUnavailable, markHeld, markPendingFavourite,
-  applyBasketRead, setRunnerState, setReauthRequired, summary,
+  applyBasketRead, intendedAdds, basketShortfall, applyShortfall,
+  setRunnerState, setReauthRequired, summary,
 };

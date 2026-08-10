@@ -360,6 +360,137 @@ test('AC6(f): --plan-file remains the explicit way to give this arm real work', 
   }
 });
 
+// =====================================================================
+// WP-B15-12 - A BASKET IS NEVER REPORTED BUILT WHEN IT IS EMPTY
+//
+// AC6(f) above put the guard at the PLAN layer: a request carrying nothing
+// executable is refused before a single click. This block puts it at the
+// OUTCOME layer, which had none at all - finishBasketReady() read the trolley,
+// logged the count, recorded it into progress, and then declared BASKET_READY
+// without ever comparing it to anything.
+//
+// The two failures are reached differently, which is why one guard cannot cover
+// both. A plan CAN execute in full and still leave an empty trolley: every add
+// rejected, every item out of stock, or a session that was never on the trolley
+// it thought it was. The plan guard cannot see any of that. Only the read-back
+// can, and only if something looks at it.
+// =====================================================================
+
+/** A trolley that reads back EMPTY - the outcome the plan guard cannot see. */
+const emptyBasketSession = (over = {}) => makeFakeSession({
+  read_basket: async () => ({ product_count: '0', order_total: '0.00', item_count: '0', products: [] }),
+  ...over,
+});
+
+test('AC1: a plan that EXECUTES but reads back an EMPTY trolley is refused, never reported BASKET_READY', async () => {
+  const session = emptyBasketSession();
+  const { runner, query } = scenario({ session });
+
+  const res = await runner.run({});
+
+  // THE PROPERTY. Before this guard existed, this exact scenario returned
+  // { outcome: 'basket_ready' }, marked the request complete, and moved the shop.
+  assert.strictEqual(res.outcome, 'failed', 'an empty trolley must fail loudly, not succeed quietly');
+  assert.match(res.error, /EmptyBasketError/);
+  assert.match(res.error, /empty/i, 'the reason must say what it found');
+
+  const row = query.state.requests[0];
+  assert.notStrictEqual(row.status, 'complete', 'the request must NOT be completed');
+  assert.strictEqual(row.status, 'failed', 'it is parked FAILED, visibly, with a reason');
+  assert.ok(/EmptyBasketError/.test(String(row.last_error)), 'and the reason is durable on the row');
+  assert.strictEqual(query.state.shops[0].status, 'SHOPPING',
+    'the SHOP must not reach BASKET_READY - that is the whole defect this closes');
+
+  // The evidence of what it attempted survives the refusal.
+  assert.strictEqual(row.progress.basket_product_count, 0, 'the read-back it refused on is durable');
+  assert.strictEqual(row.progress.basket_shortfall.intended, 2, 'and what it had intended to add');
+});
+
+/** The shop_event rows written by noteShopEvent (3 params) - not the transition rows (4). */
+const notes = (query) => query.state.events.filter((e) => e.length === 3).map((e) => String(e[2]));
+
+test('AC1: the all-unavailable trolley is refused too, and the reason says ASDA had none of it', async () => {
+  const session = emptyBasketSession({
+    add_known_product: async (r) => ({ product_ref: r, added: false, reason: 'unavailable', title: 'Out of stock' }),
+  });
+  const { runner, query } = scenario({ plan: [PLAN[0]], session });
+
+  const res = await runner.run({});
+
+  assert.strictEqual(res.outcome, 'failed', 'zero products is not a basket, whatever the reason');
+  assert.match(res.error, /ASDA had none of it/,
+    'it must read as "ASDA had none of it", never as "the runner broke"');
+  assert.strictEqual(query.state.shops[0].status, 'SHOPPING');
+  // Nothing is lost by refusing: the durable evidence is still on the row.
+  assert.strictEqual(query.state.requests[0].progress.unavailable_items.length, 1);
+});
+
+test('AC2: a SHORTFALL still reaches BASKET_READY, and is recorded where Warwick can see it', async () => {
+  const session = makeFakeSession({
+    select_search_result: async (r) => ({ product_ref: r, added: false, reason: 'unavailable', title: 'Out of stock' }),
+    read_basket: async () => ({ product_count: '1', order_total: '2.25', item_count: '1', products: [] }),
+  });
+  const { runner, query } = scenario({ plan: [PLAN[0], PLAN[1]], session });
+
+  const res = await runner.run({});
+
+  // Out of stock is ordinary shopping. It is NOT a refusal - no threshold exists.
+  assert.strictEqual(res.outcome, 'basket_ready');
+  assert.strictEqual(query.state.shops[0].status, 'BASKET_READY');
+
+  const sf = res.summary.basket_shortfall;
+  assert.strictEqual(sf.intended, 2);
+  assert.strictEqual(sf.added, 1);
+  assert.strictEqual(sf.missing, 1, 'the DIFFERENCE is computed, not smoothed away');
+  assert.strictEqual(sf.unavailable, 1, 'and explained');
+
+  // Visible WITHOUT reading a runner log: the shop_event ledger the Cockpit reads.
+  assert.ok(notes(query).some((d) => /basket is SHORT: 1 of 2/.test(d)),
+    'the shortfall must reach the shop_event ledger, not only stdout');
+  assert.strictEqual(query.state.requests[0].progress.basket_shortfall.missing, 1, 'and be durable on the row');
+});
+
+test('AC3: a plan that intended NO adds is not refused for an empty trolley - the guard must not fire on the honest case', async () => {
+  const session = emptyBasketSession();
+  const { runner, query } = scenario({ plan: [{ step_id: 'r1', command: 'read_basket_line_count' }], session });
+
+  const res = await runner.run({});
+
+  assert.strictEqual(res.outcome, 'basket_ready', 'a read-only plan legitimately leaves the trolley as it found it');
+  assert.strictEqual(query.state.shops[0].status, 'BASKET_READY');
+  assert.strictEqual(res.summary.basket_shortfall.intended, 0);
+});
+
+test('DRY RUN moves no real shop state and claims no basket - a rehearsal builds nothing', async () => {
+  const { runner, query, session } = scenario();
+
+  const res = await runner.run({ dryRun: true });
+
+  assert.strictEqual(res.outcome, 'dry_run', 'not basket_ready - it never went and looked at a trolley');
+  assert.deepStrictEqual(commandsIssued(session), [], 'not one browser command was issued');
+
+  const row = query.state.requests[0];
+  assert.notStrictEqual(row.status, 'complete', 'a rehearsal must not complete the request');
+  assert.strictEqual(row.status, 'queued', 'the work still exists and has not been done');
+  assert.strictEqual(row.claimed_by, null, 'and the lease is given back');
+  assert.strictEqual(query.state.shops[0].status, 'WAITING_FOR_BROWSER',
+    'the SHOP is untouched in BOTH directions - no SHOPPING, no BASKET_READY');
+  assert.strictEqual(row.progress._completed_steps.length, 3, 'while the rehearsal itself is still recorded');
+});
+
+test('AC4: the PLAN guard does not regress - an empty plan with no handoff still refuses', async () => {
+  const { runner, query, session } = scenario({ plan: [] });
+
+  const res = await runner.run({});
+
+  assert.strictEqual(res.outcome, 'failed');
+  assert.match(res.error, /NoExecutablePlanError/);
+  assert.match(res.error, /progress\.plan/, 'the reason names the key it could not find');
+  assert.deepStrictEqual(commandsIssued(session), []);
+  assert.strictEqual(query.state.requests[0].status, 'failed');
+  assert.strictEqual(query.state.shops[0].status, 'WAITING_FOR_BROWSER');
+});
+
 test('argument parsing carries only known switches', () => {
   const a = parseArgs(['--request', '7', '--lease-ms', '1000', '--dry-run', '--plan-file', 'p.json']);
   assert.strictEqual(a.requestId, '7');
