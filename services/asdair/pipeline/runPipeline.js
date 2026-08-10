@@ -283,6 +283,13 @@ async function resolveRememberedChoices(deps, shop, { plan, unresolved, regulars
       const term = normaliseTerm(entry.item_name);
       if (term === '') continue;
       const line = lineByKey.get(entry.question_key) || { item_name: entry.item_name, alternatives: [] };
+      // ⚠️ TWO ARGUMENTS, DELIBERATELY (WP-B15-10 AC4/AC5). The card widens its
+      // OFFER with exact-name catalogue matches; this set is what a stored
+      // memory is VALIDATED against, and widening it would let a planner
+      // suggestion revive a choice Warwick made - a resolution wearing an
+      // offer's clothes. Warwick's ruling on this path stands unchanged: "If
+      // the remembered product is unavailable or no longer a valid grounded
+      // candidate, behave honestly rather than fabricating a match."
       const ids = planCandidates(line, byReading.get(term) || null)
         .map((c) => c.regular_id)
         .filter((v) => v !== null && v !== undefined)
@@ -962,7 +969,11 @@ async function stepPlan(deps, snapshot) {
       // human with a degraded card, and is never dropped.
       list_item_id: listItemIdByTerm.get(term) ?? null,
       question_text: questionText,
-      candidates: planCandidates(line, byReading.get(term) || null),
+      // WP-B15-10 AC4. The catalogue is passed HERE, on the card, so a printed
+      // suggestion that exactly names a household regular becomes a real
+      // tappable candidate instead of text he has to retype. It offers; it
+      // resolves nothing. See planCandidates.
+      candidates: planCandidates(line, byReading.get(term) || null, regularsOf(catalogue)),
       // Absent on round 1, so that INSERT stays byte-for-byte what it was.
       ...(nextRound > 1
         ? { question_round: nextRound, parent_question_id: held.question_id }
@@ -1124,26 +1135,95 @@ async function stepPlan(deps, snapshot) {
  * `source`, so a downstream reader never has to guess which table an id is from
  * - and when there is no trustworthy id, the field is absent rather than
  * populated with something that merely looks like one.
+ *
+ * ── WP-B15-10 AC4: A SUGGESTION GOOD ENOUGH TO PRINT IS GOOD ENOUGH TO TAP ──
+ * Warwick was asked *"Which product is BATCHLORS MAC N CHEESE?"* on a card that
+ * PRINTED `Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g` as a
+ * suggestion he could not tap. His words: "its bloody obvious!". The reason is
+ * the split above - the button half is `asdair.regulars` and the suggestion half
+ * is `asdair.products`, two different tables - so a planner suggestion had no
+ * id and could not become a button however right it was.
+ *
+ * `regulars` closes exactly the half that closes WITHOUT GUESSING: where a
+ * suggestion's name is EXACTLY (after `normaliseTerm`) a household regular's own
+ * name or one of its recorded aliases, the identity is not in doubt and the
+ * suggestion becomes a real candidate carrying that regular's real id. The label
+ * becomes the REGULAR's name, because the row stores an id and the name comes
+ * from the id - never the other way round.
+ *
+ * ⚠️ THIS IS NOT A THRESHOLD AND MUST NEVER BE TURNED INTO ONE. It is exact
+ * equality after normalisation. Nothing here scores, ranks, takes a top-N or
+ * accepts a near miss - and rule 3 above is untouched: the id still comes from
+ * `asdair.regulars` and from nowhere else. The measured reason, from the same
+ * batch of cards Warwick received: this suggestion channel offered *Aquafresh
+ * toothpaste* and *Persil* for "any gloves, i don't care", *George Home Tea
+ * Towels* and *TRESemme shampoo* for "1 PKT HAM ON THE BONE", and *Calgon* and
+ * *Dreamies cat treats* on the Batchelors card itself. There is no rank or count
+ * over that channel that accepts the right one and refuses toothpaste, so
+ * resolving from it would have bought TOOTHPASTE for a glove request. Offering
+ * is safe; resolving is not. **This changes what he is OFFERED. It resolves
+ * nothing and it removes no question.**
+ *
+ * `regulars` DEFAULTS TO EMPTY, and the two-argument form is therefore exactly
+ * the behaviour it always had. `resolveRememberedChoices` calls it that way
+ * DELIBERATELY - see the note at its own call site.
  */
-export function planCandidates(planLine, interpretedLine) {
+export function planCandidates(planLine, interpretedLine, regulars = []) {
   const out = [];
+  const claimed = new Set();
   // (3) The catalogue resolver's alternatives - the ONLY trustworthy regulars ids.
   const resolverAlts = interpretedLine && Array.isArray(interpretedLine.alternatives)
     ? interpretedLine.alternatives : [];
   for (const a of resolverAlts) {
     const id = a.regular_id ?? null;
     if (id === null || id === undefined) continue;
+    if (claimed.has(Number(id))) continue;
+    claimed.add(Number(id));
     out.push({ label: a.name || null, regular_id: Number(id), source: 'asdair.regulars (resolveByCatalogue)' });
   }
-  // (1) The planner's ranked suggestions - NAMES ONLY. No id field is emitted,
-  // because the planner does not return one and inventing one would be a lie.
+  // (1) The planner's ranked suggestions - names only, UNLESS the name is
+  // exactly a regular we already hold, in which case the id is not a guess.
+  const byExactName = exactRegularsIndex(regulars);
   for (const a of (planLine.alternatives || [])) {
     const label = a.name || a.alternative_name || null;
     if (!label) continue;
+    const exact = byExactName.get(normaliseTerm(label)) || null;
+    if (exact) {
+      if (claimed.has(Number(exact.id))) continue;
+      claimed.add(Number(exact.id));
+      out.push({
+        label: exact.name,
+        regular_id: Number(exact.id),
+        source: 'planner suggestion, matched to asdair.regulars by exact name',
+      });
+      continue;
+    }
     if (out.some((c) => c.label === label)) continue;
     out.push({ label, source: 'planner suggestion (no product id)' });
   }
   return out.slice(0, 8);
+}
+
+/**
+ * PURE. normalised name/alias -> the regular row, for EXACT lookup only.
+ *
+ * First writer wins, so a later regular can never quietly take over a term an
+ * earlier one already owns. Nothing in here is fuzzy: the map is only ever
+ * queried with `normaliseTerm(label)` and a miss is a miss.
+ */
+function exactRegularsIndex(regulars) {
+  const byTerm = new Map();
+  for (const r of (Array.isArray(regulars) ? regulars : [])) {
+    if (!r || r.id === null || r.id === undefined) continue;
+    const names = [r.name, ...(Array.isArray(r.aka) ? r.aka : [])];
+    for (const n of names) {
+      if (typeof n !== 'string') continue;
+      const term = normaliseTerm(n);
+      if (term === '') continue;
+      if (!byTerm.has(term)) byTerm.set(term, r);
+    }
+  }
+  return byTerm;
 }
 
 /**

@@ -2003,3 +2003,261 @@ test('AC5 END TO END: a photographed pack size never reaches the list as a quant
   const cat = h.db.shop_line.find((l) => l.raw_reading === '3 gourmet cat food');
   assert.equal(cat.quantity, 3, 'a leading quantity was destroyed - worse than the bug');
 });
+
+// =====================================================================
+// WP-B15-10 - THE SHARED LIST, AND WHAT IS AND IS NOT FIXED HERE
+//
+// THE LIVE FAILURE, 2026-08-10. Warwick's real photograph minted a correct
+// fresh shop, SHOP-2026-08-10-M64, which then bound to list_id 20 - the list of
+// the CANCELLED SHOP-2026-08-10 - and item 210 from the dead week became an
+// unanswerable question in his live shop. `listDateOf` strips the -M<n> suffix
+// by design (WP-B15-07 needs the date part to survive every downstream pin),
+// `buildGroundedIntents` puts that bare date on every intent as `list_date`,
+// and `findOrCreateDraftList` selects on (household_id,
+// status='next_week_draft', list_date) - so the fresh shop selected the dead
+// shop's list. Cancelling a SHOP never changed the LIST.
+//
+// WHY NO SECOND LIST IS MINTED HERE. `asdair.shopping_lists` carries
+// `unique (household_id, list_date)` (services/asdair/db/001_asdair_schema.sql:251,
+// and NO later migration alters it). Two shops on one calendar date therefore
+// CANNOT hold two list rows - that is the schema, not a choice this code makes,
+// and changing it is a migration this Work Order may not write.
+//
+// The tests below pin what IS true at this head: the shared row is real, the
+// dead week's item is PRESERVED EVIDENCE and is never repaired, and a
+// redelivery of the same message still resolves to one list with one row per
+// item. They deliberately do NOT assert that the dead item is excluded from the
+// working set - it is not, at this head, and a test claiming otherwise would be
+// the false green this suite exists to prevent.
+// =====================================================================
+
+/** The dead week: a draft list on the same date, carrying one item nobody in
+ *  the new shop ever asked for. Synthetic; never real household data. */
+function deadWeekSeed() {
+  return {
+    shopping_lists: [{ id: 20, household_id: HOUSEHOLD_ID, status: 'next_week_draft', list_date: '2026-08-03' }],
+    shopping_list_items: [{
+      id: 210, list_id: 20, item_name: 'HAM ON THE BONE', matched_product_id: null,
+      requested_qty: 1, added_qty: null, status: 'needs_decision', price: null,
+      note: 'typed the night before, for the week that was cancelled',
+      one_week_only: false,
+    }],
+  };
+}
+
+/** Drive a fresh photo shop to the point where it has planned, recording every
+ *  listItems set the planner was handed. */
+async function planWithDeadWeek(seedOverride) {
+  const handed = [];
+  const h = makeHarness({
+    seed: seedOverride === undefined ? deadWeekSeed() : seedOverride,
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      { line_no: 2, raw_reading: 'fruit splits', quantity: null },
+    ],
+  });
+  h.deps.planBasket = (input) => {
+    handed.push(input.listItems.map((i) => String(i.item_name)));
+    return realPlanBasket(input);
+  };
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan
+  return { h, handed };
+}
+
+test('B15-10: the fresh shop binds the SHARED list row - unique (household_id, list_date) leaves no alternative', async () => {
+  const { h } = await planWithDeadWeek();
+  assert.equal(h.db.shopping_lists.length, 1,
+    'a second list row was minted for the same household and date. Real Postgres refuses that on '
+    + 'unique (household_id, list_date); only a double that does not model the constraint would pass');
+  assert.equal(String(h.db.shop[0].list_id), '20', 'the shop did not bind the list on its own date');
+});
+
+test('B15-10 AC7: the dead week item is PRESERVED EVIDENCE - never deleted, never mutated', async () => {
+  const { h } = await planWithDeadWeek();
+  const dead = h.db.shopping_list_items.find((i) => String(i.id) === '210');
+  assert.ok(dead, 'the dead week item was deleted - this order repairs no data');
+  assert.equal(dead.item_name, 'HAM ON THE BONE', 'the dead item was renamed');
+  assert.equal(dead.status, 'needs_decision', 'the dead item status was rewritten');
+  assert.equal(dead.requested_qty, 1, 'the dead item quantity was rewritten');
+  assert.equal(String(dead.list_id), '20', 'the dead item was moved to another list');
+});
+
+test('B15-10 AC2: a re-interpret of the SAME message mints no second list and no duplicate rows', async () => {
+  const { h, handed } = await planWithDeadWeek();
+  const listCount = h.db.shopping_lists.length;
+  const before = h.db.shopping_list_items.filter((i) => String(i.list_id) === '20').length;
+  const handedBefore = handed.length;
+
+  // The same inbound message, interpreted again - a crash retry, a reprocess.
+  // Nothing about the message changed, so nothing durable may be duplicated.
+  h.db.shop[0].status = 'TRANSCRIBING';
+  await runPipeline(HANDLE, h.deps);   // interpret again
+  await runPipeline(HANDLE, h.deps);   // plan again
+
+  assert.equal(h.db.shopping_lists.length, listCount,
+    'a second list was minted for a message that had already been consumed');
+  assert.equal(h.db.shopping_list_items.filter((i) => String(i.list_id) === '20').length, before,
+    'the re-run duplicated list items. What carries this is the UPSERT on '
+    + '(list_id, lower(item_name)) inside add_list_item - NOT the idempotency_key, which '
+    + 'asdairCommands.execute never reads');
+  assert.ok(handed.length > handedBefore, 'the re-run never reached the planner');
+  assert.ok(handed[handed.length - 1].some((n) => /gourmet/i.test(n)),
+    'the re-run lost this shop own items');
+});
+
+test('B15-10 AC2: the shop own items are all present exactly once after the re-run', async () => {
+  const { h } = await planWithDeadWeek();
+  h.db.shop[0].status = 'TRANSCRIBING';
+  await runPipeline(HANDLE, h.deps);
+  const names = h.db.shopping_list_items
+    .filter((i) => String(i.list_id) === '20')
+    .map((i) => String(i.item_name).toLowerCase());
+  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+  assert.deepEqual(dupes, [], `the same item exists twice on one list: ${JSON.stringify(dupes)}`);
+  assert.ok(names.some((n) => /gourmet/i.test(n)));
+  assert.ok(names.some((n) => /fruit splits/i.test(n)));
+});
+
+// =====================================================================
+// WP-B15-10 AC4 - A SUGGESTION GOOD ENOUGH TO PRINT IS GOOD ENOUGH TO TAP
+//
+// Warwick was asked "Which product is BATCHLORS MAC N CHEESE?" on a card that
+// PRINTED the answer as text he could not tap, because the two halves of the
+// card draw on different tables:
+//   buttons     <- interpret/resolveByCatalogue.js over asdair.regulars (ids)
+//   suggestions <- skill/planner.js over asdair.products (NAMES ONLY)
+// This closes the half that closes WITHOUT GUESSING: an EXACT normalised match
+// onto a household regular becomes a real candidate carrying a real id.
+//
+// IT IS NOT A THRESHOLD AND MUST NEVER BECOME ONE. The same suggestion channel
+// offered toothpaste for "any gloves" and tea towels for "ham on the bone".
+// Nothing here resolves a line, ranks a near-miss, or removes a question.
+// =====================================================================
+
+const B15_10_REGULARS = [
+  { id: 41, name: "Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g", aka: ['batchelors mac n cheese'] },
+  { id: 42, name: 'Vanish Pre-Treat Gel', aka: [] },
+];
+
+test('B15-10 AC4: a printed suggestion that EXACTLY names a household regular becomes a tappable candidate', () => {
+  const out = planCandidates(
+    { item_name: 'BATCHLORS MAC N CHEESE', alternatives: [{ name: "Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g" }] },
+    null,
+    B15_10_REGULARS,
+  );
+  const hit = out.find((c) => Number(c.regular_id) === 41);
+  assert.ok(hit, 'the answer was printed on the card and he still could not tap it');
+  assert.equal(hit.label, "Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g",
+    'the label must be the REGULAR own name - the row stores an id and the name comes from the id');
+  assert.match(String(hit.source), /planner suggestion/, 'the provenance of a candidate must stay honest');
+});
+
+test('B15-10 AC4: an exact match on a household ALIAS also counts - it is still exact, never fuzzy', () => {
+  const out = planCandidates(
+    { item_name: 'x', alternatives: [{ name: 'BATCHELORS MAC N CHEESE' }] },
+    null,
+    B15_10_REGULARS,
+  );
+  assert.ok(out.some((c) => Number(c.regular_id) === 41),
+    'a recorded household alias is an exact identity and must resolve like the name');
+});
+
+test('B15-10 AC4/AC5: a suggestion naming NOTHING in the catalogue NEVER acquires an id', () => {
+  const out = planCandidates(
+    { item_name: 'any gloves', alternatives: [{ name: 'Aquafresh Complete Care Whitening Toothpaste 75ml' }] },
+    null,
+    B15_10_REGULARS,
+  );
+  const toothpaste = out.find((c) => c.label === 'Aquafresh Complete Care Whitening Toothpaste 75ml');
+  assert.ok(toothpaste, 'the suggestion must still be shown - this change closes no information');
+  assert.equal(toothpaste.regular_id, undefined,
+    'a near miss acquired an id. This is the real card Warwick received: auto-resolving this '
+    + 'channel would have bought TOOTHPASTE for a glove request');
+  assert.match(String(toothpaste.source), /no product id/);
+});
+
+test('B15-10 AC4/AC5: nothing is ranked and nothing is invented - a partial name is NOT a match', () => {
+  const out = planCandidates(
+    { item_name: 'x', alternatives: [{ name: 'Batchelors Pasta' }, { name: 'Vanish Pre Treat Gel Extra' }] },
+    null,
+    B15_10_REGULARS,
+  );
+  assert.equal(out.filter((c) => c.regular_id !== undefined).length, 0,
+    'a substring was treated as an identity - that is the least-bad match this path forbids');
+  assert.equal(out.length, 2, 'the suggestions must still be shown as text');
+});
+
+test('B15-10 AC4: the resolver own candidates still come FIRST and are never duplicated', () => {
+  const out = planCandidates(
+    { item_name: 'x', alternatives: [{ name: 'Vanish Pre-Treat Gel' }] },
+    { alternatives: [{ regular_id: 42, name: 'Vanish Pre-Treat Gel' }] },
+    B15_10_REGULARS,
+  );
+  assert.equal(out.filter((c) => Number(c.regular_id) === 42).length, 1,
+    'the same product was offered twice under two provenances');
+  assert.match(String(out[0].source), /resolveByCatalogue/, 'the trustworthy channel must lead');
+});
+
+test('B15-10 AC4: the two-argument form is byte-for-byte the behaviour it always had', () => {
+  const planLine = { item_name: 'x', alternatives: [{ name: 'Vanish Pre-Treat Gel' }, { name: 'Something Else' }] };
+  const interpreted = { alternatives: [{ regular_id: 42, name: 'Vanish Pre-Treat Gel' }] };
+  assert.deepEqual(
+    planCandidates(planLine, interpreted),
+    planCandidates(planLine, interpreted, []),
+    'the default for `regulars` changed behaviour - every existing caller would have moved',
+  );
+});
+
+test('B15-10 AC4/AC5: the REMEMBERED-CHOICE validation set is deliberately NOT widened', () => {
+  // resolveRememberedChoices calls the two-argument form on purpose: the set a
+  // stored memory is VALIDATED against must stay the resolver's. Widening it
+  // would let a planner suggestion revive a choice Warwick made, which is a
+  // resolution wearing an offer's clothes.
+  const narrow = planCandidates(
+    { item_name: 'x', alternatives: [{ name: 'Vanish Pre-Treat Gel' }] },
+    null,
+  );
+  assert.equal(narrow.filter((c) => c.regular_id !== undefined).length, 0,
+    'the default widened the memory-validation set - a suggestion must never validate a memory');
+});
+
+test('B15-10 AC4 END TO END: the question card carries the id, so the printed answer is tappable', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      // Nothing in the catalogue reads as this, so it stays a real question -
+      // which is the point: the fix must not make the question disappear.
+      { line_no: 2, raw_reading: 'qqzz unreadable scrawl', quantity: null },
+    ],
+  });
+  // The planner suggests, by NAME ONLY, a product that IS a household regular -
+  // exactly the shape of the Batchelors line on Warwick's real card.
+  h.deps.planBasket = (input) => {
+    const out = realPlanBasket(input);
+    for (const item of out.items || []) {
+      if (/qqzz/i.test(String(item.item_name))) {
+        item.alternatives = [{ name: 'Gourmet cat food' }];
+      }
+    }
+    return out;
+  };
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan
+
+  const q = h.db.shop_question.find((row) => /qqzz/i.test(String(row.question_text)));
+  assert.ok(q, 'the unresolved line must still raise a real question - AC5, uncertainty is still spoken');
+  const cands = typeof q.candidates === 'string' ? JSON.parse(q.candidates) : (q.candidates || []);
+  const tappable = cands.find((c) => Number(c.regular_id) === 11);
+  assert.ok(tappable,
+    'the card printed the answer as untappable text. This is the exact defect Warwick hit: '
+    + '"its bloody obvious!"');
+  assert.equal(tappable.label, 'Gourmet cat food',
+    'the offered label must be the regular own name, looked up from the id');
+});
