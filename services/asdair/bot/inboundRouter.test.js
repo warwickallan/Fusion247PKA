@@ -281,3 +281,65 @@ test('A1: a whitespace-only message is never an answer', () => {
   });
   assert.equal(out.ok, false, 'blank words were treated as an answer');
 });
+
+// =====================================================================
+// WP-B15-09 - A REPLY TO THE BOARD IS NOT A REPLY TO A QUESTION CARD
+//
+// The board is ONE card carrying every outstanding question, so the per-question
+// (chat, message) lookup correctly finds nothing for it. Before this branch
+// existed that produced UNCORRELATED_REPLY, the pipeline's claim declined, and
+// intake turned his answer into next week's shopping list - which is exactly
+// how SHOP-2026-08-10-M76/M77/M79/M82 were minted out of four answers.
+// =====================================================================
+
+const replyTo = (messageId, text) => ({
+  message: {
+    message_id: 7777, from: { id: 42 }, chat: { id: 7 }, text,
+    reply_to_message: { message_id: messageId, chat: { id: 7 } },
+  },
+});
+
+test('B15-09 a reply whose card is unknown falls through to the grounded free-text path', () => {
+  const out = routeAsdairUpdate(replyTo(5150, '1: the 12 skinless ones'), {
+    // The board is not a question card, so this misses - as it should.
+    resolveQuestionByMessage: () => null,
+    resolveAnswersByText: () => ({
+      mappings: [{ questionKey: 'q-sausages', shopRef: REF, answerText: 'the 12 skinless ones' }],
+    }),
+  });
+
+  assert.equal(out.ok, true, 'a reply to the board was refused, so his answer goes to intake as a list');
+  assert.equal(out.action, ACTIONS.ANSWER);
+  assert.equal(out.arg, 'q-sausages');
+  assert.equal(out.raw.kind, 'text', 'it must take the free-text path, which carries every mapping');
+  assert.equal(out.raw.mappings.length, 1);
+});
+
+test('B15-09 the question-card lookup keeps PRECEDENCE - a real card is unchanged', () => {
+  const out = routeAsdairUpdate(replyTo(9001, 'the big one'), {
+    resolveQuestionByMessage: () => ({ questionKey: 'q-carded', shopRef: REF }),
+    // Present, and must NOT be consulted: the card already named the question.
+    resolveAnswersByText: () => { throw new Error('the text path stole a carded reply'); },
+  });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.arg, 'q-carded');
+  assert.equal(out.raw.kind, 'reply');
+});
+
+test('B15-09 a reply that grounds to NOTHING is still a list - the direction that must never flip', () => {
+  // A genuine new shopping list that happens to be sent as a reply. Claiming it
+  // would throw the week away, so it is refused and intake gets it.
+  const out = routeAsdairUpdate(replyTo(5150, '3 gourmet cat food\n2 weetabix'), {
+    resolveQuestionByMessage: () => null,
+    resolveAnswersByText: () => null,
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, REFUSALS.UNCORRELATED_TEXT);
+});
+
+test('B15-09 with NO text correlator wired, an unknown card refuses exactly as it always did', () => {
+  const out = routeAsdairUpdate(replyTo(5150, 'anything'), { resolveQuestionByMessage: () => null });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, REFUSALS.UNCORRELATED_REPLY, 'behaviour changed for a caller that wired nothing new');
+});

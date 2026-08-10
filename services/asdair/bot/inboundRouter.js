@@ -128,11 +128,29 @@ export function routeAsdairUpdate(update, { resolveQuestionByMessage, resolveAns
   // ── 2. Typed reply to a question card ──────────────────────────────────────
   const msg = update.message;
   if (msg && typeof msg === 'object' && msg.reply_to_message && typeof msg.reply_to_message === 'object') {
-    if (typeof resolveQuestionByMessage !== 'function') return { ok: false, reason: REFUSALS.NO_LOOKUP };
+    // ── A REPLY TO THE BOARD IS NOT A REPLY TO A QUESTION CARD (WP-B15-09) ──
+    //
+    // The board is ONE card carrying every outstanding question, so there is no
+    // per-question (chat, message) for the lookup below to hit: it is not a
+    // question card and `getQuestionByCard` correctly finds nothing. Before this
+    // fall-through that produced UNCORRELATED_REPLY, the claim declined, intake
+    // took the message, and his answer became next week's shopping list - the
+    // M76/M77/M79/M82 defect arriving through a new door.
+    //
+    // THE DIRECTION OF THE FALL-THROUGH IS WHAT MAKES IT SAFE. The free-text
+    // branch below refuses anything it cannot ground, so a genuine new list that
+    // happens to be a reply still reaches intake exactly as before. The card
+    // lookup keeps PRECEDENCE, so a reply to a real question card is unchanged.
+    const cardLookup = typeof resolveQuestionByMessage === 'function';
+    const textLookup = typeof resolveAnswersByText === 'function';
+    if (!cardLookup && !textLookup) return { ok: false, reason: REFUSALS.NO_LOOKUP };
     const chatId = msg.chat && msg.chat.id !== undefined ? msg.chat.id : null;
     const repliedTo = msg.reply_to_message.message_id;
-    const hit = resolveQuestionByMessage(chatId, repliedTo);
-    if (!hit) return { ok: false, reason: REFUSALS.UNCORRELATED_REPLY };
+    const hit = cardLookup ? resolveQuestionByMessage(chatId, repliedTo) : null;
+    if (!hit) {
+      if (!textLookup) return { ok: false, reason: REFUSALS.UNCORRELATED_REPLY };
+      return routeTypedText(msg, resolveAnswersByText, REFUSALS.UNCORRELATED_REPLY);
+    }
 
     // The lookup may answer with a bare questionKey or with {questionKey, shopRef}.
     const questionKey = typeof hit === 'string' ? hit : (hit && hit.questionKey);
@@ -184,50 +202,67 @@ export function routeAsdairUpdate(update, { resolveQuestionByMessage, resolveAns
   // ours and falls through to NOT_ASDAIR precisely as before. A caller that
   // wires nothing keeps today's behaviour.
   if (msg && typeof msg === 'object' && typeof resolveAnswersByText === 'function') {
-    const text = typeof msg.text === 'string' ? msg.text.trim() : '';
-    if (text) {
-      const hit = resolveAnswersByText(text);
-      const mappings = hit && Array.isArray(hit.mappings) ? hit.mappings.filter(
-        (m) => m && typeof m.questionKey === 'string' && m.questionKey !== '',
-      ) : [];
-
-      // NOT CORRELATED IS NOT A FAILURE. A genuine new shopping list lands here
-      // every week, and claiming it would be the defect - so it is refused with
-      // its own reason and the caller lets intake have it.
-      if (mappings.length === 0) return { ok: false, reason: REFUSALS.UNCORRELATED_TEXT };
-
-      return {
-        ok: true,
-        action: ACTIONS.ANSWER,
-        // One message may settle SEVERAL questions. `shopRef`/`arg` name the
-        // first for callers that read one intent; `raw.mappings` carries all of
-        // them, and the adapter turns each into its own answerQuestion command.
-        // Per-mapping is what makes partial success possible: two clear answers
-        // land durably even when a third fragment cannot be placed.
-        shopRef: mappings[0].shopRef || null,
-        arg: mappings[0].questionKey,
-        responder: responderOf(msg.from),
-        raw: {
-          kind: 'text',
-          callbackQueryId: null,
-          chatId: msg.chat && msg.chat.id !== undefined ? msg.chat.id : null,
-          messageId: msg.message_id !== undefined ? msg.message_id : null,
-          data: null,
-          // VERBATIM, exactly as the reply branch above. Which product the words
-          // mean is a decision, and it is not made here.
-          text,
-          mappings: mappings.map((m) => ({
-            questionKey: m.questionKey,
-            shopRef: m.shopRef || null,
-            answerText: typeof m.answerText === 'string' && m.answerText.trim() !== ''
-              ? m.answerText.trim() : text,
-          })),
-        },
-      };
-    }
+    const routed = routeTypedText(msg, resolveAnswersByText, REFUSALS.NOT_ASDAIR);
+    if (routed) return routed;
   }
 
   return { ok: false, reason: REFUSALS.NOT_ASDAIR };
+}
+
+/**
+ * PURE. The free-text half, shared by branches 2 and 3.
+ *
+ * Extracted verbatim by WP-B15-09 so a reply whose card cannot be identified -
+ * a reply to THE BOARD, above all - takes exactly the same grounded path as a
+ * plain typed message, rather than a second implementation of it that could
+ * drift. `emptyReason` is what a message with no usable text refuses as, which
+ * differs by branch and is the only thing the two callers disagree about.
+ *
+ * Returns an intent, or a structured refusal. Never null for a caller that
+ * supplied a lookup.
+ */
+function routeTypedText(msg, resolveAnswersByText, emptyReason) {
+  const text = typeof msg.text === 'string' ? msg.text.trim() : '';
+  if (!text) return { ok: false, reason: emptyReason };
+
+  const hit = resolveAnswersByText(text);
+  const mappings = hit && Array.isArray(hit.mappings) ? hit.mappings.filter(
+    (m) => m && typeof m.questionKey === 'string' && m.questionKey !== '',
+  ) : [];
+
+  // NOT CORRELATED IS NOT A FAILURE. A genuine new shopping list lands here
+  // every week, and claiming it would be the defect - so it is refused with
+  // its own reason and the caller lets intake have it.
+  if (mappings.length === 0) return { ok: false, reason: REFUSALS.UNCORRELATED_TEXT };
+
+  return {
+    ok: true,
+    action: ACTIONS.ANSWER,
+    // One message may settle SEVERAL questions. `shopRef`/`arg` name the
+    // first for callers that read one intent; `raw.mappings` carries all of
+    // them, and the adapter turns each into its own answerQuestion command.
+    // Per-mapping is what makes partial success possible: two clear answers
+    // land durably even when a third fragment cannot be placed.
+    shopRef: mappings[0].shopRef || null,
+    arg: mappings[0].questionKey,
+    responder: responderOf(msg.from),
+    raw: {
+      kind: 'text',
+      callbackQueryId: null,
+      chatId: msg.chat && msg.chat.id !== undefined ? msg.chat.id : null,
+      messageId: msg.message_id !== undefined ? msg.message_id : null,
+      data: null,
+      // VERBATIM, exactly as the reply branch above. Which product the words
+      // mean is a decision, and it is not made here.
+      text,
+      mappings: mappings.map((m) => ({
+        questionKey: m.questionKey,
+        shopRef: m.shopRef || null,
+        answerText: typeof m.answerText === 'string' && m.answerText.trim() !== ''
+          ? m.answerText.trim() : text,
+      })),
+    },
+  };
 }
 
 export default routeAsdairUpdate;
