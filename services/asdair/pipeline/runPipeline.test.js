@@ -20,11 +20,12 @@ import { makeHarness, makeCatalogue, HOUSEHOLD_ID, makeIntake, textUpdate } from
 import * as commands from './commands.js';
 import {
   runPipeline, listDateOf, buildGroundedIntents, planCandidates, assertCatalogueLoaded,
-  trailingPackSize, withoutTrailingPackSizes,
+  trailingPackSize, withoutTrailingPackSizes, excludeForeignListItems,
 } from './runPipeline.js';
+import { _internal as shopLinesSql } from './shopLines.js';
 import { runOnce, loadOpenQuestions, loadDeferredClarifications } from './runtime.js';
 import { listQuestions, listOutbox, resolveCommand } from './store.js';
-import { STEPS } from './stages.js';
+import { STEPS, planOutcome } from './stages.js';
 import { questionKeyFor } from './keys.js';
 
 // The REAL planner, for the one test that wraps deps.planBasket to observe what
@@ -2260,4 +2261,255 @@ test('B15-10 AC4 END TO END: the question card carries the id, so the printed an
     + '"its bloody obvious!"');
   assert.equal(tappable.label, 'Gourmet cat food',
     'the offered label must be the regular own name, looked up from the id');
+});
+
+// =====================================================================
+// WP-B15-10 - THE WORKING SET: EXCLUDE ONLY WHAT ANOTHER SHOP PROVABLY OWNS
+//
+// THE LIVE FAILURE, 2026-08-10. SHOP-2026-08-10-M64 bound to list_id 20, the
+// list of the CANCELLED SHOP-2026-08-10, and item 210 from the dead week became
+// an unanswerable question in Warwick's live shop.
+//
+// THE DIRECTION IS THE DESIGN. An ALLOWLIST keyed on shop_line links was built
+// first and this suite killed it: stepInterpret is the ONLY caller of
+// linkListItem, so a line added by stepApplyCorrections - Warwick correcting or
+// adding one - and a line added by the cockpit's add_regular_to_next_week -
+// which has no shop context and can never link - carry no claim at all, and the
+// allowlist silently dropped both. Tests 2 and 3 below ARE that regression and
+// must never be deleted.
+//
+// ⚠️ HOW THE EXCLUSION STATEMENT IS ANSWERED OFFLINE, STATED PLAINLY.
+// `test/fakePg.js` has no handler for it and is OUTSIDE this Work Order's
+// surface, so `withForeignClaimStatement` below answers it from the SAME
+// `h.db.shop_line` rows fakePg holds. Everything under test is real - the real
+// shopLines.listForeignClaimedItemIds, the real excludeForeignListItems, the
+// real runPipeline wiring, real rows. What is NOT proven here is fakePg's own
+// dispatch, and the handler's proper home is that file. It matches on the
+// EXPORTED constant rather than a hand-written regex, so changing the statement
+// cannot leave a stale matcher quietly green.
+// =====================================================================
+
+/** Answer the one statement test/fakePg.js does not model, from its own rows. */
+function withForeignClaimStatement(h) {
+  const inner = h.deps.readQuery;
+  h.deps.readQuery = async (text, params) => {
+    if (text !== shopLinesSql.SELECT_FOREIGN_CLAIMS_SQL) return inner(text, params);
+    const [shopId, ids] = params;
+    const want = new Set((ids || []).map(String));
+    const hits = [...new Set(h.db.shop_line
+      .filter((l) => String(l.shop_id) !== String(shopId)
+        && l.list_item_id !== null && l.list_item_id !== undefined
+        && want.has(String(l.list_item_id)))
+      .map((l) => String(l.list_item_id)))];
+    return { rows: hits.map((v) => ({ list_item_id: v })), rowCount: hits.length };
+  };
+  return h;
+}
+
+/** A dead shop (id 99) that already owns list 20, plus an item nobody claims -
+ *  the shape a cockpit `add_regular_to_next_week` leaves behind. */
+function sharedListSeed() {
+  return {
+    shopping_lists: [{ id: 20, household_id: HOUSEHOLD_ID, status: 'next_week_draft', list_date: '2026-08-03' }],
+    shopping_list_items: [
+      {
+        id: 210, list_id: 20, item_name: 'HAM ON THE BONE', matched_product_id: null,
+        requested_qty: 1, added_qty: null, status: 'needs_decision', price: null,
+        note: 'typed the night before, for the week that was cancelled', one_week_only: false,
+      },
+      {
+        id: 211, list_id: 20, item_name: 'Cockpit Added Regular', matched_product_id: null,
+        requested_qty: 2, added_qty: null, status: 'requested', price: null,
+        note: 'added via cockpit', one_week_only: false,
+      },
+    ],
+    // The DEAD shop's interpretation claims 210 - and claims NOTHING of 211,
+    // because the cockpit route has no shop and never links.
+    shop_line: [{
+      id: 900, shop_id: 99, line_no: 1, raw_reading: 'HAM ON THE BONE', quantity: null,
+      matched_regular_id: null, match_basis: null, match_confidence: null, alternatives: [],
+      status: 'unmatched_new_item', confirmed_by: null, confirmed_at: null, corrected: false,
+      list_item_id: 210,
+    }],
+  };
+}
+
+/** Drive a fresh shop onto the shared list, recording what the planner is handed. */
+async function planOnSharedList({ seed = sharedListSeed(), wire = withForeignClaimStatement } = {}) {
+  const handed = [];
+  const logs = [];
+  const h = makeHarness({
+    seed,
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      { line_no: 2, raw_reading: 'fruit splits', quantity: null },
+    ],
+  });
+  wire(h);
+  h.deps.log = (event, detail) => logs.push({ event, detail });
+  const realPlan = h.deps.planBasket;
+  h.deps.planBasket = (input) => {
+    handed.push(input.listItems.map((i) => String(i.item_name)));
+    return realPlan(input);
+  };
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan
+  return { h, handed, logs, last: () => handed[handed.length - 1] || [] };
+}
+
+test('B15-10 AC1: the DEAD shop item is excluded from the plan', async () => {
+  const { last } = await planOnSharedList();
+  assert.ok(!last().some((n) => /HAM ON THE BONE/i.test(n)),
+    `a cancelled week's item reached the plan: ${JSON.stringify(last())}`);
+});
+
+test('B15-10 AC1: Warwick is never ASKED about the dead shop item', async () => {
+  const { h } = await planOnSharedList();
+  const asked = h.db.shop_question.map((q) => String(q.question_text));
+  assert.ok(asked.length > 0, 'no question at all was raised - the fixture stopped proving anything');
+  assert.ok(!asked.some((t) => /HAM ON THE BONE/i.test(t)),
+    `an unanswerable question from a cancelled week reached him: ${JSON.stringify(asked)}`);
+});
+
+test('B15-10 AC1 REGRESSION THAT KILLED THE ALLOWLIST: an UNCLAIMED item still reaches the plan', async () => {
+  // The cockpit's add_regular_to_next_week has no shop context and can never
+  // link, so this row is claimed by nobody. Unclaimed belongs to nobody and
+  // STAYS. An allowlist dropped it, which is Warwick silently not getting what
+  // he asked for.
+  const { last } = await planOnSharedList();
+  assert.ok(last().some((n) => /Cockpit Added Regular/i.test(n)),
+    `an item Warwick added from the cockpit was silently dropped: ${JSON.stringify(last())}`);
+});
+
+test('B15-10 AC1 REGRESSION THAT KILLED THE ALLOWLIST: a CORRECTED line still reaches the plan', async () => {
+  // stepApplyCorrections writes through add_list_item and never links either.
+  const { h, handed } = await planOnSharedList();
+  await commands.correctLine({
+    shopRef: REF, actor: ACTOR, itemName: 'silver polish', status: 'needs_decision',
+  }, h.deps);
+  // The shop parks on its OWN open question until that is settled, so settle it
+  // deterministically - a skip needs no model - and let the shop replan.
+  for (const q of h.db.shop_question.filter((row) => row.status === 'open')) {
+    await commands.answerQuestion({
+      shopRef: REF, actor: ACTOR, questionKey: q.question_key, skip: true,
+    }, h.deps);
+  }
+  const before = handed.length;
+  for (let i = 0; i < 4; i += 1) await runPipeline(HANDLE, h.deps);
+
+  assert.ok(handed.length > before, 'the correction never reached a planning pass');
+  const after = handed[handed.length - 1];
+  assert.ok(after.some((n) => /silver polish/i.test(n)),
+    `a line Warwick corrected was silently dropped: ${JSON.stringify(after)}`);
+  assert.ok(!after.some((n) => /HAM ON THE BONE/i.test(n)),
+    'the dead item came back once corrections were applied');
+});
+
+test('B15-10 AC1: an item BOTH shops claim is kept - mine wins over foreign', async () => {
+  const seed = sharedListSeed();
+  // The dead shop also asked for gourmet cat food. add_list_item upserts on
+  // (list_id, lower(item_name)), so there is ONE row and both claim it.
+  seed.shopping_list_items.push({
+    id: 212, list_id: 20, item_name: 'Gourmet cat food', matched_product_id: null,
+    requested_qty: 3, added_qty: null, status: 'requested', price: null, note: null,
+    one_week_only: false,
+  });
+  seed.shop_line.push({
+    id: 901, shop_id: 99, line_no: 2, raw_reading: '3 gourmet cat food', quantity: 3,
+    matched_regular_id: 11, match_basis: 'exact alias', match_confidence: null, alternatives: [],
+    status: 'matched', confirmed_by: null, confirmed_at: null, corrected: false, list_item_id: 212,
+  });
+  const { last } = await planOnSharedList({ seed });
+  assert.ok(last().some((n) => /gourmet/i.test(n)),
+    'a product THIS shop asked for was dropped because a dead shop asked for it too');
+});
+
+test('B15-10 AC1: the shop own items all reach the plan', async () => {
+  const { last } = await planOnSharedList();
+  assert.ok(last().some((n) => /gourmet/i.test(n)), 'a resolved line of THIS shop went missing');
+  assert.ok(last().some((n) => /fruit splits/i.test(n)), 'an unresolved line of THIS shop went missing');
+});
+
+test('B15-10 FAIL OPEN: a claim read that FAILS filters NOTHING, and says so', async () => {
+  const { h, last, logs } = await planOnSharedList({
+    wire: (harness) => {
+      const inner = harness.deps.readQuery;
+      harness.deps.readQuery = async (text, params) => {
+        if (text === shopLinesSql.SELECT_FOREIGN_CLAIMS_SQL) throw new Error('connection reset by peer');
+        return inner(text, params);
+      };
+      return harness;
+    },
+  });
+
+  // NOTHING is removed on a read this code could not make. Filtering on a
+  // failed read would silently recreate the allowlist defect at the exact
+  // moment the database is already unhappy.
+  assert.ok(last().some((n) => /HAM ON THE BONE/i.test(n)),
+    'a failed claim read still filtered the working set - the degraded path MUST be the unfiltered one');
+  assert.ok(last().some((n) => /gourmet/i.test(n)));
+
+  const failed = logs.filter((l) => l.event === 'foreign_claim_read_failed');
+  assert.equal(failed.length > 0, true, 'the degradation was silent - a drop nobody can see is a drop nobody fixes');
+  assert.match(String(failed[0].detail.detail), /connection reset by peer/, 'the reason must travel');
+  assert.equal(String(failed[0].detail.shop_ref), REF);
+  assert.ok(h.db.shop_question.length > 0, 'the shop must still make progress on a degraded read');
+});
+
+test('B15-10: the exclusion is PURE and its direction is pinned', () => {
+  const items = [{ id: 1, item_name: 'mine' }, { id: 2, item_name: 'theirs' }, { id: 3, item_name: 'nobody' }];
+  // Only the provably-foreign row goes.
+  assert.deepEqual(
+    excludeForeignListItems(items, ['2'], ['1']).map((i) => i.item_name),
+    ['mine', 'nobody'],
+    'an unclaimed row was dropped - unclaimed belongs to nobody and stays',
+  );
+  // Nothing provably foreign means nothing is touched.
+  assert.deepEqual(excludeForeignListItems(items, [], []).length, 3);
+  assert.deepEqual(excludeForeignListItems(items, null, null).length, 3);
+  // Mine wins even when a foreign shop claims it too.
+  assert.deepEqual(excludeForeignListItems(items, ['1', '2'], ['1']).map((i) => i.id), [1, 3]);
+  // Ids compare across string/number - a bigint arrives from pg as either.
+  assert.deepEqual(excludeForeignListItems(items, [2], [1]).map((i) => i.id), [1, 3]);
+});
+
+// =====================================================================
+// WP-B15-10 - `lines_unresolved` VERSUS WP-B15-09'S BOARD: DISJOINT, NOT DUPLICATE
+//
+// Larry asked whether the board supersedes this card entirely. ESTABLISHED BY
+// EXECUTION: it does not, and the two can never speak at the same time.
+//
+//   * `planOutcome` (stages.js:337-355) reaches AWAIT_LINE_RESOLUTION - the only
+//     branch that queues this card - ONLY after `openQuestions > 0` has already
+//     returned. So the card fires ONLY when there are ZERO open questions.
+//   * The board's `blocked` is `outstanding.length > 0`, and `outstanding` is
+//     the rows with `status === 'open'` (runtime.js boardStateOf). With zero
+//     open questions the board either does not exist at all (queueBoard returns
+//     `no questions`) or renders `blocked: false` - it positively says nothing
+//     is blocking the shop.
+//
+// So in the one state this card describes, the board is silent or WRONG.
+// Retiring it would restore the silent park Veritas D-2 was raised on. This
+// test pins the DISJOINTNESS, which is what "never a second voice" actually
+// requires - the card cannot duplicate a board that is not speaking.
+// =====================================================================
+
+test('B15-10: the lines_unresolved card can only fire where the board reports NOTHING open', () => {
+  // The gate ordering is the guarantee. Any open question takes the first
+  // branch, so the park - and therefore the card - is unreachable while the
+  // board has anything outstanding to show.
+  assert.equal(
+    planOutcome({ openQuestions: 1, needsReview: false, interpretationConfirmed: true, unresolvedLines: 5 }).to,
+    'NEEDS_DECISION',
+    'the park became reachable with a question open - the card would then be a second voice '
+    + 'beside the board, which is the defect WP-B15-09 closed',
+  );
+  const parked = planOutcome({
+    openQuestions: 0, needsReview: false, interpretationConfirmed: true, unresolvedLines: 5,
+  });
+  assert.equal(parked.step, STEPS.AWAIT_LINE_RESOLUTION);
+  assert.equal(parked.to, null, 'the park must not transition - that livelocks the shop');
 });
