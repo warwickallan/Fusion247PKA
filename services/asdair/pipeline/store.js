@@ -466,6 +466,34 @@ export async function spentLedgerGenerations(deps, family) {
   return Number(rowsOf(res)[0]?.n) || 0;
 }
 
+/**
+ * ONE EXACT GENERATION of a ledger family, whatever its status. (WP-B15-09)
+ *
+ * ── WHY THIS IS A READ AND NOT A NEW TABLE ──────────────────────────────────
+ * The board card is rewritten IN PLACE every time Warwick answers something, so
+ * the next pass has to know where the last one landed. That is one durable fact
+ * per shop - a chat id and a message id - and there was a real temptation to add
+ * a column for it. There is no need: `recordLedgerEntry` already derives a
+ * deterministic idempotency key from (family, generation), and `result` is
+ * already a jsonb column on the row. So the PREVIOUS generation is addressable
+ * by arithmetic, and what happened to it is already recorded on it.
+ *
+ * NO MIGRATION, and deliberately so - this reuses SELECT_LEDGER_BY_IDEMPOTENCY_KEY_SQL
+ * verbatim rather than introducing a second statement that reads the same row a
+ * slightly different way.
+ *
+ * `generation` below 0 returns null rather than throwing: "there is no previous
+ * board" is the ordinary state of the first one, not an error.
+ */
+export async function findLedgerGeneration(deps, family, generation) {
+  if (!Number.isInteger(generation) || generation < 0) return null;
+  const res = await deps.readQuery(
+    SELECT_LEDGER_BY_IDEMPOTENCY_KEY_SQL, [ledgerIdempotencyKey(family, generation)],
+  );
+  const row = rowsOf(res)[0];
+  return row ? toLedgerRow(row) : null;
+}
+
 /** Every OUTSTANDING command for a shop, oldest first. */
 export async function listPendingCommands(deps, shopId) {
   const res = await deps.readQuery(
@@ -511,12 +539,25 @@ export async function recordCommand(deps, { householdId, shopId, command, key, p
  * "consumed by act:interpret" is a receipt, not an error, and conflating the
  * two would make a healthy row look like a failed one in the ledger.
  */
-export async function resolveCommand(deps, ledgerId, status = 'done', note = null) {
+export async function resolveCommand(deps, ledgerId, status = 'done', note = null, extra = null) {
   const mapped = RESOLUTION_STATUS[status];
   if (!mapped) {
     throw new Error(`store: resolveCommand status must be one of ${Object.keys(RESOLUTION_STATUS).join(', ')}, got "${String(status)}"`);
   }
-  const result = JSON.stringify({ note: note === undefined ? null : note, resolution: status });
+  // `extra` is MERGED ALONGSIDE the note, never over it (WP-B15-09). The one
+  // caller today is drainOutbox recording WHERE a card landed - the chat and
+  // message id Telegram allocated - so a later pass can rewrite that exact
+  // message instead of sending a second one. It rides on the existing jsonb
+  // merge and needs no column: `result` is already selected by LEDGER_COLUMNS
+  // and already parsed by toLedgerRow, so there is no migration behind this.
+  //
+  // Additive by construction: every existing caller passes four arguments or
+  // fewer and gets byte-identical `result` shape.
+  const result = JSON.stringify({
+    ...(extra && typeof extra === 'object' && !Array.isArray(extra) ? extra : {}),
+    note: note === undefined ? null : note,
+    resolution: status,
+  });
   const res = await deps.writeQuery(
     `UPDATE asdair.pipeline_command
         SET status = $1,

@@ -15,6 +15,12 @@ import {
   renderPlanReady,
   renderProgress,
   renderQuestionCard,
+  // WP-B15-09 - the board, its numbering inverse, and the two cards that give a
+  // refusal a route that survives a Telegram toast expiring.
+  renderQuestionBoard,
+  parseBoardReply,
+  renderControlRefused,
+  renderReplyNotTaken,
   renderReceipt,
   renderReconciliationSummary,
   renderStatus,
@@ -70,6 +76,28 @@ const SAMPLES = {
   confirmation_received: { shopRef: REF, source: 'forwarded email' },
   reconciliation_summary: { shopRef: REF, purchasedAsPlanned: 33, addedAfterPlanning: 1, omitted: 2, qtyChanged: 1, variantChanged: 0, priceMissing: 35, unresolved: 0 },
   clarification_deferred: { shopRef: REF, items: ['dreamies cheese'], reason: 'I could not tell which size you meant' },
+  // WP-B15-09. THE BOARD - the one surface. Eight independent question cards
+  // landed for one shop on 2026-08-10 and he could not tell what he had already
+  // answered or whether anything was still blocking the shop; Larry had to query
+  // Postgres to say "6 of 8". This card is the product answering that itself.
+  question_board: {
+    shopRef: REF,
+    total: 3,
+    outstanding: [
+      { n: 1, item: 'RICHMOND PORK SAUSAGES', candidates: ['Richmond 12 Skinless Pork Sausages 319g'] },
+      { n: 3, item: 'ARIEL 4in1 PODS 33', candidates: [] },
+    ],
+    answered: [{ n: 2, item: 'VANISH PRETREAT GEL', answer: 'Vanish Pre-Treat Gel' }],
+    blocked: true,
+    blockedReason: 'READY_TO_SHOP cannot be reached while a question is open.',
+  },
+  // WP-B15-09 AC6. A refusal by a route that survives the toast expiring.
+  control_refused: {
+    shopRef: REF, control: 'search', reason: 'not a command',
+    detail: 'searching ASDA is a supervised browser step, not a pipeline command',
+  },
+  // WP-B15-09 AC8. He replied with nothing left open: not an answer, not a list.
+  reply_not_taken: { shopRef: REF, answeredAlready: 'Richmond 12 Skinless Pork Sausages 319g' },
 };
 
 function everyButton(rendered) {
@@ -94,10 +122,15 @@ test('the catalogue covers every message the directive specifies', () => {
   // 'abandoned' and the message is discarded. Pinning the exact key set here,
   // OUTSIDE renderMessages.js, is what makes an unregistered kind impossible to
   // ship unnoticed.
+  // 'question_board', 'control_refused' and 'reply_not_taken' added by
+  // WP-B15-09. The board is THE surface - one card per shop, rewritten in place
+  // - and the other two exist because a refusal that only ever travelled as a
+  // Telegram toast did not reach him: the toast expires with "query is too old"
+  // and the fallback was a journal line he will never read.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
     'basket_ready', 'clarification_deferred', 'confirm_interpretation', 'confirmation_received',
-    'failure', 'lines_unresolved', 'plan_ready', 'progress', 'question', 'receipt',
-    'reconciliation_summary', 'status',
+    'control_refused', 'failure', 'lines_unresolved', 'plan_ready', 'progress', 'question',
+    'question_board', 'receipt', 'reconciliation_summary', 'reply_not_taken', 'status',
   ]);
 });
 
@@ -620,4 +653,124 @@ test('AC10 withdrawing search leaves every card still answerable', () => {
   assert.deepEqual(everyButton(bare).map((b) => b.text), ['Skip this week']);
   assert.match(bare.text, /reply to this message/i,
     'a card with no buttons and no invitation to type is unanswerable');
+});
+
+// =====================================================================
+// WP-B15-09 - THE BOARD, AND THE NUMBERING CONTRACT IT PUBLISHES
+//
+// These are unit proofs of the two pure functions this Work Package added. The
+// AC-level red-then-green regressions live in pipeline/runtime.test.js; what is
+// proven HERE is the part no integration test can pin precisely - the exact
+// wording the card commits to, and every input parseBoardReply must REFUSE.
+// =====================================================================
+
+test('B15-09 the board answers all three questions Warwick could not answer from his phone', () => {
+  const out = renderQuestionBoard(SAMPLES.question_board);
+
+  // 1. WHAT IS LEFT - counted against the total, which is the "6 of 8" Larry
+  //    had to run a SELECT to produce.
+  assert.match(out.text, /STILL WAITING ON YOU — 2 of 3/);
+  assert.match(out.text, /1\. RICHMOND PORK SAUSAGES/);
+  assert.match(out.text, /3\. ARIEL 4in1 PODS 33/);
+  // 2. WHAT HE ALREADY ANSWERED, and WHAT WAS ACCEPTED for it.
+  assert.match(out.text, /ALREADY ANSWERED — 1 of 3/);
+  assert.match(out.text, /2\. VANISH PRETREAT GEL → Vanish Pre-Treat Gel/);
+  // 3. WHETHER ANYTHING IS BLOCKING THE SHOP, in the product's own voice.
+  assert.match(out.text, /THIS SHOP IS BLOCKED/);
+});
+
+test('B15-09 the board says UNBLOCKED only when it is, and says UNKNOWN when it does not know', () => {
+  const clear = renderQuestionBoard({
+    shopRef: REF, total: 2, outstanding: [], blocked: false,
+    answered: [{ n: 1, item: 'a', answer: 'x' }, { n: 2, item: 'b', answer: 'y' }],
+  });
+  assert.match(clear.text, /NOTHING IS BLOCKING THIS SHOP/);
+  assert.doesNotMatch(clear.text, /BLOCKED\./);
+
+  // A producer that never worked it out must not get either reassurance or
+  // alarm. Same contract as every count in this catalogue: unknown is a word.
+  const dunno = renderQuestionBoard({ shopRef: REF, total: 1, outstanding: [], answered: [] });
+  assert.match(dunno.text, /cannot tell you whether anything is blocking/);
+});
+
+test('B15-09 the board NEVER fabricates a denominator', () => {
+  // `total` absent is the half-built-projection case. Printing "2 of 0", or
+  // silently using the array length, would be the exact lie this build exists
+  // to stop telling.
+  const out = renderQuestionBoard({
+    shopRef: REF,
+    outstanding: [{ n: 1, item: 'sausages' }, { n: 2, item: 'pods' }],
+    answered: [], blocked: true,
+  });
+  assert.match(out.text, /STILL WAITING ON YOU — 2 of unknown/);
+});
+
+test('B15-09 the board draws ONE control, and it is one the adapter answers', () => {
+  const out = renderQuestionBoard(SAMPLES.question_board);
+  const buttons = everyButton(out);
+  assert.equal(buttons.length, 1, 'more controls means more ways to press something that does nothing');
+  // ANSWER with no arg. telegramAdapter maps exactly this to getStatus, and
+  // routeTaps rebuilds the board on it - so the button is not merely legal,
+  // it produces something he can see. A new ACTION would have been refused by
+  // the adapter as NOT_A_COMMAND, which is the Search-ASDA defect exactly.
+  assert.equal(buttons[0].callback_data, `asd:answer:${REF}`);
+});
+
+test('B15-09 parseBoardReply reads one numbered answer, and several at once', () => {
+  assert.deepEqual(parseBoardReply('3: the 12 skinless ones'),
+    [{ ordinal: 3, answerText: 'the 12 skinless ones' }]);
+
+  // The whole point: one message settling several questions.
+  assert.deepEqual(parseBoardReply('1. Vanish Oxi Gold\n4) the 33 pack\n7 - any brand'), [
+    { ordinal: 1, answerText: 'Vanish Oxi Gold' },
+    { ordinal: 4, answerText: 'the 33 pack' },
+    { ordinal: 7, answerText: 'any brand' },
+  ]);
+});
+
+test('B15-09 parseBoardReply REFUSES a shopping list - the failure that would cost a week', () => {
+  // Every line here is a real shopping-list shape. A single false positive means
+  // his week's list is recorded as an answer to a question and never becomes a
+  // shop, which is strictly worse than any question going unanswered.
+  const lists = [
+    '3 gourmet cat food\n2 weetabix protein',
+    '2 pints of milk',
+    '12 eggs\n6 apples',
+    '1 PKT HAM ON THE BONE',
+    'richmond pork sausages',
+    '2026 vintage something',
+  ];
+  for (const list of lists) {
+    assert.deepEqual(parseBoardReply(list), [], `a shopping list was read as numbered answers: ${JSON.stringify(list)}`);
+  }
+  assert.deepEqual(parseBoardReply(''), []);
+  assert.deepEqual(parseBoardReply(null), []);
+  // A number with no words after it is not an answer either.
+  assert.deepEqual(parseBoardReply('4:'), []);
+  assert.deepEqual(parseBoardReply('4'), []);
+});
+
+test('B15-09 parseBoardReply takes NEITHER when he contradicts himself on one number', () => {
+  // Two instructions for line 2 in one message. Choosing between them is a
+  // guess, and this system does not guess - the number is dropped and the AC8
+  // notice is what tells him nothing was recorded for it.
+  assert.deepEqual(parseBoardReply('2: the big one\n2: no, the small one'), []);
+  // ...and it does not take the rest of the message down with it.
+  assert.deepEqual(parseBoardReply('1: keep this\n2: the big one\n2: no, the small one'),
+    [{ ordinal: 1, answerText: 'keep this' }]);
+});
+
+test('B15-09 the refusal card names what did NOT happen, which is the part he cannot see', () => {
+  const out = renderControlRefused(SAMPLES.control_refused);
+  assert.match(out.text, /NOTHING HAS CHANGED/);
+  assert.match(out.text, /supervised browser step/);
+  assert.match(out.text, /withdrawn/, 'a stale button he cannot un-press must be explained, not ignored');
+});
+
+test('B15-09 the not-taken card reads correctly for BOTH readers', () => {
+  const out = renderReplyNotTaken(SAMPLES.reply_not_taken);
+  // The one correcting an answer...
+  assert.match(out.text, /NOT recorded as an answer/);
+  // ...and the one who was genuinely sending next week's list.
+  assert.match(out.text, /NEW shopping list, it has not been taken/);
 });

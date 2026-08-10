@@ -818,6 +818,163 @@ export function renderLinesUnresolved({
   };
 }
 
+// ── 11b. THE BOARD (WP-B15-09) ───────────────────────────────────────────────
+
+/**
+ * PURE. THE ONE SURFACE. Every question this shop is waiting on, every question
+ * already settled and what was accepted for it, and whether anything is still
+ * blocking the shop - in a single message that is REWRITTEN IN PLACE as answers
+ * land.
+ *
+ * ── THE DEFECT THIS EXISTS TO CLOSE, IN HIS OWN WORDS ───────────────────────
+ * Eight independent question cards arrived for one shop on 2026-08-10. He
+ * answered some of them and then asked: "How am I supposed to know I have
+ * answered all the questions and the basket is not stuck?" Nothing in the
+ * product could answer that. `lines_unresolved` was gated once-per-shop and went
+ * stale the moment he replied to anything; he never received one; and Larry had
+ * to query Postgres to tell him "6 of 8". A surface that needs a database query
+ * to interpret is not a surface.
+ *
+ * ── WHY THE NUMBERS ARE STABLE, AND WHY THAT IS LOAD-BEARING ────────────────
+ * Each question carries an ordinal that NEVER MOVES for the life of the shop -
+ * its position in the shop's own question order, counting the answered ones too.
+ * Numbering only the outstanding ones would renumber the list every time he
+ * answered something, so a "2" typed against the board he was looking at would
+ * land on a different question by the time it arrived. A number that changes
+ * under a reply is a wrong answer waiting to be recorded, so it does not change.
+ * parseBoardReply below is the exact inverse and lives beside it for the same
+ * reason buildAnswerArg and parseAnswerArg share a file.
+ *
+ * ── ONE CONTROL, AND IT IS ONE THE SYSTEM ANSWERS ───────────────────────────
+ * The single button is ANSWER-with-no-arg, which telegramAdapter already maps to
+ * getStatus. Nothing here draws a control this runtime would refuse (WP-B15-08
+ * AC10), and nothing draws one that looks actionable and does nothing: routeTaps
+ * rebuilds the board on that command.
+ *
+ * @param {{shopRef:string,
+ *          outstanding?:Array<{n:number, item:string, candidates?:string[]}>,
+ *          answered?:Array<{n:number, item:string, answer:string}>,
+ *          total?:number, blocked?:boolean|null, blockedReason?:string|null}} spec
+ */
+export function renderQuestionBoard({
+  shopRef, outstanding = [], answered = [], total, blocked, blockedReason,
+} = {}) {
+  assertShopRef(shopRef);
+  const waiting = Array.isArray(outstanding) ? outstanding : [];
+  const done = Array.isArray(answered) ? answered : [];
+  // NEVER FABRICATED. An absent total renders "unknown" like every other count
+  // in this catalogue - a made-up denominator is the "6 of 8" lie in a
+  // friendlier font.
+  const of = count(total);
+
+  const lines = [
+    '🗒️ Everything I still need from you',
+    `Ref: ${value(shopRef)}`,
+    '',
+    `STILL WAITING ON YOU — ${count(waiting.length)} of ${of}`,
+  ];
+
+  if (waiting.length === 0) {
+    lines.push('  (nothing)');
+  } else {
+    for (const q of waiting) {
+      lines.push(`  ${count(q && q.n)}. ${value(q && q.item)}`);
+      const cands = q && Array.isArray(q.candidates)
+        ? q.candidates.filter((c) => value(c) !== UNKNOWN) : [];
+      if (cands.length > 0) lines.push(`     could be: ${cands.map((c) => value(c)).join('; ')}`);
+    }
+  }
+
+  lines.push('');
+  lines.push(`ALREADY ANSWERED — ${count(done.length)} of ${of}`);
+  if (done.length === 0) {
+    lines.push('  (none yet)');
+  } else {
+    // WHAT WAS ACCEPTED, not merely that it is done. "Answered" without the
+    // answer is one more thing he would have to go and look up.
+    for (const q of done) {
+      lines.push(`  ${count(q && q.n)}. ${value(q && q.item)} → ${value(q && q.answer)}`);
+    }
+  }
+
+  lines.push('');
+  if (blocked === true) {
+    lines.push('⛔ THIS SHOP IS BLOCKED. Nothing goes in a basket until the questions');
+    lines.push('   above are answered.');
+    if (blockedReason) lines.push(`   ${value(blockedReason)}`);
+  } else if (blocked === false) {
+    lines.push('✅ NOTHING IS BLOCKING THIS SHOP — every question is answered.');
+  } else {
+    // The third state is real, and it is never dressed up as either of the
+    // other two.
+    lines.push('❔ I cannot tell you whether anything is blocking this shop.');
+  }
+
+  lines.push('');
+  lines.push('Reply to THIS message. You can answer several at once — start each');
+  lines.push('line with its number:');
+  lines.push('   1: the 12 skinless ones');
+  lines.push('   4: the 33 pack');
+  lines.push('');
+  lines.push('This card is rewritten in place every time you answer, so what you');
+  lines.push('are reading now is always the current state.');
+
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      // No arg = "open the question queue", already mapped to getStatus.
+      [button('Refresh this list', ACTIONS.ANSWER, shopRef)],
+    ]),
+  };
+}
+
+/** Longest board reply this parser will consider, in lines. Anything longer is
+ *  a shopping list, not an answer. */
+export const MAX_BOARD_REPLY_LINES = 40;
+
+/**
+ * PURE. THE INVERSE OF THE BOARD'S NUMBERING.
+ *
+ * "1: the 12 skinless ones\n4: the 33 pack" -> [{ordinal:1,..},{ordinal:4,..}]
+ *
+ * ── IT REFUSES FAR MORE THAN IT ACCEPTS, ON PURPOSE ─────────────────────────
+ * The cost of a false positive here is a genuine shopping list being eaten as an
+ * answer, which is the worst failure this system has. So a line counts only when
+ * it opens with a small integer AND a separator AND carries words after it.
+ * "2 pints of milk" does not match - no separator. "12" alone does not match -
+ * no answer text. A message where NOTHING matches returns an empty array and the
+ * caller falls back to the ordinary correlation path. It never guesses.
+ *
+ * The ordinal is NOT resolved to a question here: this module has no idea which
+ * questions exist. Mapping a number onto a question is the caller's job, and a
+ * number with no question behind it must be reported to the human rather than
+ * silently dropped.
+ */
+export function parseBoardReply(text) {
+  if (typeof text !== 'string' || text.trim() === '') return [];
+  const lines = text.split(/\r?\n/).slice(0, MAX_BOARD_REPLY_LINES);
+  const out = [];
+  const seen = new Set();
+  for (const raw of lines) {
+    // <n><separator><answer>. The separator is mandatory - that is the whole
+    // guard against a quantity at the head of a shopping-list line.
+    const m = /^\s*(\d{1,3})\s*[.:)\]–—-]\s*(\S.*)$/.exec(raw);
+    if (!m) continue;
+    const ordinal = Number(m[1]);
+    if (!Number.isInteger(ordinal) || ordinal < 1) continue;
+    if (seen.has(ordinal)) {
+      // The human contradicting himself inside one message. Take NEITHER:
+      // choosing between two conflicting instructions is a guess.
+      const at = out.findIndex((o) => o.ordinal === ordinal);
+      if (at !== -1) out.splice(at, 1);
+      continue;
+    }
+    seen.add(ordinal);
+    out.push({ ordinal, answerText: m[2].trim() });
+  }
+  return out;
+}
+
 // ── 12. Clarification deferred (WP-B15-A1) ───────────────────────────────────
 
 /**
@@ -918,10 +1075,114 @@ export function renderClarificationDeferred({ shopRef, items, reason, messageNot
  * kind is therefore not complete until its renderer is registered HERE, which is
  * why `clarification_deferred` appears in this map and not merely above it.
  */
+/**
+ * PURE. A CONTROL HE PRESSED THAT THIS SYSTEM WILL NOT ACT ON. (WP-B15-09 AC6)
+ *
+ * ── WHY A MESSAGE AND NOT A TOAST ───────────────────────────────────────────
+ * A refused tap already had a route: answerCallbackQuery, the grey toast on the
+ * button. That route is unreliable by design - Telegram rejects it with "query
+ * is too old and response timeout expired" once the tap has been sitting for
+ * more than about fifteen minutes, which is routine here because a pass runs on
+ * an interval. On 2026-08-10 Warwick pressed "Search ASDA", the runtime refused
+ * it correctly, the toast never arrived, and the only surviving record was
+ *   {"event":"inbound_refused","updateId":171031159,"action":"search",...}
+ * in a journal he will never read. Routing that same refusal into the pass
+ * report instead was not a fix: journal to pass-report is journal to journal.
+ *
+ * So the toast is still attempted AND this card is queued. The toast is the fast
+ * path; this is the one that survives.
+ *
+ * ── IT NAMES WHAT DID NOT HAPPEN, WHICH IS THE PART HE CANNOT SEE ───────────
+ * "Nothing has changed" is the load-bearing sentence. A refusal he cannot see is
+ * indistinguishable from a shop that quietly did the thing.
+ *
+ * @param {{shopRef:string, control?:string, reason?:string, detail?:string}} spec
+ */
+export function renderControlRefused({ shopRef, control, reason, detail } = {}) {
+  assertShopRef(shopRef);
+  const named = typeof control === 'string' && control.trim() !== '' ? value(control) : null;
+  return {
+    text: block([
+      '🚫 That button did nothing, and here is why',
+      `Ref: ${value(shopRef)}`,
+      '',
+      named
+        ? `You pressed a control this shop no longer acts on: "${named}".`
+        : 'You pressed a control this shop could not act on.',
+      `Why: ${value(detail || reason)}`,
+      '',
+      'NOTHING HAS CHANGED. No answer was recorded, nothing was added to a',
+      'basket and nothing was ordered.',
+      '',
+      'Older cards in this chat can still carry buttons that have since been',
+      'withdrawn — they cannot be un-sent. Use the list below instead.',
+    ]),
+    reply_markup: keyboard([
+      [button('Show me what is waiting', ACTIONS.ANSWER, shopRef)],
+    ]),
+  };
+}
+
+/**
+ * PURE. HE REPLIED, AND THERE WAS NOTHING FOR IT TO ANSWER. (WP-B15-09 AC8)
+ *
+ * ── THE TRAP THIS SITS IN THE MIDDLE OF ─────────────────────────────────────
+ * Two outcomes are both wrong, and avoiding one lands on the other:
+ *
+ *   * treat the words as a new list  -> SHOP-2026-08-10-M76/M77/M79/M82, four
+ *     junk shops minted out of four answers;
+ *   * claim the words and say nothing -> a SILENT DROP, which is strictly worse,
+ *     because he cannot see it and therefore cannot correct it.
+ *
+ * The only exit is the third one: do not start a shop, do not pretend to have
+ * recorded an answer, and TELL HIM. Which is what this card is.
+ *
+ * ── IT MUST READ CORRECTLY FOR TWO DIFFERENT PEOPLE ─────────────────────────
+ * The one correcting an answer he already gave, and the one who was genuinely
+ * sending next week's list and needs to know it was not taken. Saying only "that
+ * question is already answered" strands the second.
+ *
+ * @param {{shopRef:string, answeredAlready?:string|null}} spec
+ */
+export function renderReplyNotTaken({ shopRef, answeredAlready } = {}) {
+  assertShopRef(shopRef);
+  const lines = [
+    '🤔 I have not taken that message as anything',
+    `Ref: ${value(shopRef)}`,
+    '',
+    'There is no open question for it to answer — everything I asked about',
+    'this shop has been settled.',
+  ];
+  if (answeredAlready) {
+    lines.push('');
+    lines.push(`The answer I already have is: ${value(answeredAlready)}`);
+  }
+  lines.push('');
+  lines.push('It was NOT recorded as an answer, and it was NOT started as a new');
+  lines.push('shopping list. Nothing has been added to a basket and nothing has');
+  lines.push('been ordered.');
+  lines.push('');
+  lines.push('If you want to CHANGE something, tell me which numbered line and');
+  lines.push('I will ask you about it properly.');
+  lines.push('');
+  lines.push('If you were sending a NEW shopping list, it has not been taken —');
+  lines.push('please send it again once this shop is finished.');
+
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      [button('Show me what is waiting', ACTIONS.ANSWER, shopRef)],
+    ]),
+  };
+}
+
 export const MESSAGES = Object.freeze({
   receipt: renderReceipt,
   plan_ready: renderPlanReady,
   question: renderQuestionCard,
+  question_board: renderQuestionBoard,
+  control_refused: renderControlRefused,
+  reply_not_taken: renderReplyNotTaken,
   confirm_interpretation: renderConfirmInterpretation,
   lines_unresolved: renderLinesUnresolved,
   progress: renderProgress,

@@ -16,6 +16,7 @@
 // =====================================================================
 
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
@@ -533,13 +534,18 @@ const outboxRows = (h, kind) => h.db.pipeline_command.filter((c) => c.kind === '
 test('B1 END TO END: an unmatched line becomes an open question AND a real question card', async () => {
   const h = makeHarness();
   const bot = await makeAskingBot(h);
+  // perQuestionCards NAMES THE MODE THIS PROOF IS ABOUT. It is no longer the
+  // default (WP-B15-09: one board, not N cards), but the render-contract
+  // machinery it exercises is still live for shops carded before that change,
+  // so the proof stays - with its subject stated rather than assumed.
+  const asking = { householdId: HOUSEHOLD_ID, bot, perQuestionCards: true };
   await runOnce(h.deps, {
-    householdId: HOUSEHOLD_ID, bot,
+    ...asking,
     intake: makeIntake([textUpdate({ text: '1 dreamies cheese\n2 gourmet cat food' })]),
   });
   await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
-  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });   // interpret
-  const planned = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot }); // plan + card
+  await runOnce(h.deps, { ...asking, intake: makeIntake([]) });   // interpret
+  const planned = await runOnce(h.deps, { ...asking, intake: makeIntake([]) }); // plan + card
 
   assert.equal(h.db.shop[0].status, 'NEEDS_DECISION');
   assert.equal(h.db.shop_question.length, 1, 'the planner did not open the question this test depends on');
@@ -563,14 +569,14 @@ test('NEVER CARD TWICE: once a question is on his phone, no later pass re-asks i
   const bot = await makeAskingBot(h);
   const { shop } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
 
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
   assert.equal(bot.cards.length, 1);
   assert.equal(h.db.shop_question[0].card_message_id, '9001');
 
   // Four more passes over a shop whose question is still OPEN and unanswered.
   for (let i = 0; i < 4; i += 1) {
-    await queueShopCards(h.deps, {});
+    await queueShopCards(h.deps, { perQuestionCards: true });
     await drainOutbox(h.deps, { bot });
   }
   assert.equal(bot.cards.length, 1, 'the same question was carded more than once');
@@ -584,9 +590,9 @@ test('the window between queueing and sending is closed by the ledger, not by lu
 
   // Three passes with NO bot at all: nothing can send, so card_message_id stays
   // null. The pending row must be ADOPTED each time, never stacked.
-  const first = await queueShopCards(h.deps, {});
-  const second = await queueShopCards(h.deps, {});
-  const third = await queueShopCards(h.deps, {});
+  const first = await queueShopCards(h.deps, { perQuestionCards: true });
+  const second = await queueShopCards(h.deps, { perQuestionCards: true });
+  const third = await queueShopCards(h.deps, { perQuestionCards: true });
   assert.equal(first.questions.length, 1);
   assert.equal(second.questions.length, 0, 'an adopted row was reported as a fresh queue');
   assert.equal(third.questions.length, 0);
@@ -601,7 +607,7 @@ test('B2 THE ANSWER COMES BACK: a tapped candidate becomes an answerQuestion com
     { label: 'Dreamies Cheese 60g', regular_id: 41 },
     { label: 'Dreamies Chicken 60g', regular_id: 42 },
   ]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
 
   const report = await routeTaps(h.deps, {
@@ -627,7 +633,7 @@ test('STALE TAP: a button on a superseded card is REFUSED, never mapped to the n
   const A = { label: 'Dreamies Cheese 60g', regular_id: 41 };
   const B = { label: 'Dreamies Chicken 60g', regular_id: 42 };
   const { questionKey } = await seedQuestion(h, [A, B]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
   assert.equal(h.db.shop_question[0].card_message_id, '9001');
 
@@ -722,7 +728,7 @@ test('AC3 A REJECTED TAP ACKNOWLEDGEMENT MUST NOT ABORT THE PASS', async () => {
     { label: 'Dreamies Cheese 60g', regular_id: 41 },
     { label: 'Dreamies Chicken 60g', regular_id: 42 },
   ]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
   assert.equal(bot.cards.length, 1, 'setup: the first question card never went out');
 
@@ -746,6 +752,7 @@ test('AC3 A REJECTED TAP ACKNOWLEDGEMENT MUST NOT ABORT THE PASS', async () => {
     householdId: HOUSEHOLD_ID,
     bot,
     questions: bot.questions,
+    perQuestionCards: true,
     intake: makeIntake([tapOnCard({ messageId: 9001, questionKey, index: 1 })]),
   });
 
@@ -763,7 +770,7 @@ test('AC3 the rejection is REPORTED, not silently swallowed', async () => {
   const h = makeHarness();
   const bot = await makeAskingBot(h);
   const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
 
   bot.answerTap = async () => { throw new Error('query is too old'); };
@@ -788,7 +795,7 @@ test('B2 TYPED REPLY: replying to a question card answers it, verbatim', async (
   const h = makeHarness();
   const bot = await makeAskingBot(h);
   await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
 
   const report = await routeTaps(h.deps, {
@@ -806,7 +813,7 @@ test('a reply to something that is NOT a question card is not correlated to a gu
   const h = makeHarness();
   const bot = await makeAskingBot(h);
   await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
 
   const report = await routeTaps(h.deps, {
@@ -825,7 +832,7 @@ test('the planner shape is adapted, not dropped: id-less suggestions still reach
     { label: 'Dreamies Cheese 60g', regular_id: 41, source: 'asdair.regulars (resolveByCatalogue)' },
     { label: 'Felix Crispies', source: 'planner suggestion (no product id)' },
   ]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
 
   const card = bot.cards[0].message;
@@ -849,7 +856,7 @@ test('the planner shape is adapted, not dropped: id-less suggestions still reach
 test('a question card on a runtime with no question sender is NOT thrown away', async () => {
   const h = makeHarness();
   await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
 
   const bot = await makeBot();   // no sendQuestionCard wired
   const report = await drainOutbox(h.deps, { bot });
@@ -872,7 +879,7 @@ test('B5: a shop that reaches BASKET_READY hands the basket back - once, ever, p
   await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]), bot });
   h.db.shop[0].status = 'BASKET_READY';
 
-  const first = await queueShopCards(h.deps, {});
+  const first = await queueShopCards(h.deps, { perQuestionCards: true });
   assert.equal(first.basketReady.length, 1, 'a built basket told Warwick nothing');
   await drainOutbox(h.deps, { bot });
   const card = bot.sent.find((s) => /Basket/.test(s.message.text));
@@ -884,7 +891,7 @@ test('B5: a shop that reaches BASKET_READY hands the basket back - once, ever, p
 
   // Three more passes, still at BASKET_READY, waiting for him to check out.
   for (let i = 0; i < 3; i += 1) {
-    await queueShopCards(h.deps, {});
+    await queueShopCards(h.deps, { perQuestionCards: true });
     await drainOutbox(h.deps, { bot });
   }
   assert.equal(outboxRows(h, 'basket_ready').length, 1, 'the basket handback was sent more than once');
@@ -2023,7 +2030,7 @@ test('AC1 A TYPED REPLY TO A CARD CREATES NO SHOP - the live 2026-08-10 defect',
   const h = makeHarness();
   const bot = await makeAskingBot(h);
   await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
   const shopsBefore = h.db.shop.length;
   const listItemsBefore = h.db.shopping_list_items.length;
@@ -2053,7 +2060,7 @@ test('AC1 THE ANSWER STILL LANDS, VERBATIM - suppression must never become a sil
   const h = makeHarness();
   const bot = await makeAskingBot(h);
   const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
 
   await runOnce(h.deps, {
@@ -2074,7 +2081,7 @@ test('AC1 A REPLY THAT CANNOT BE CORRELATED IS STILL A LIST - failing towards in
   const h = makeHarness();
   const bot = await makeAskingBot(h);
   await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
   const shopsBefore = h.db.shop.length;
 
@@ -2098,7 +2105,7 @@ test('AC1 A REPLY TO AN ALREADY-ANSWERED CARD IS NOT SWALLOWED', async () => {
   const h = makeHarness();
   const bot = await makeAskingBot(h);
   const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
-  await queueShopCards(h.deps, {});
+  await queueShopCards(h.deps, { perQuestionCards: true });
   await drainOutbox(h.deps, { bot });
   await commands.answerQuestion({
     shopRef: REF, actor: 'cockpit:warwick', questionKey,
@@ -2167,4 +2174,312 @@ test('AC10 a FOREIGN namespace is still not ours to refuse out loud', async () =
     'the hub\'s cards share this phone - reporting their traffic as our refusals makes every pass look broken');
   assert.equal(events.filter((e) => e.event === 'inbound_refused').length, 1,
     'a foreign inbound must still leave a trace in the journal');
+});
+
+// =====================================================================
+// WP-B15-09 - THE BOARD. ONE SURFACE WARWICK CAN ACTUALLY READ.
+//
+// The defect these prove closed, in his own words after eight cards landed for
+// one shop: "How am I supposed to know I have answered all the questions and
+// the basket is not stuck?" - and Larry had to run a SELECT to tell him "6 of
+// 8". Nothing in the product reported answered-versus-outstanding at all.
+//
+// Every test below fails against the behaviour that shipped before this Work
+// Package. They are the RED half of AC9.
+// =====================================================================
+
+/** A shop carrying SEVERAL open questions, which is the case that broke. */
+async function seedQuestions(h, specs) {
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]) });
+  const shop = h.db.shop[0];
+  const keys = [];
+  for (const s of specs) {
+    const questionKey = questionKeyFor(s.item);
+    await h.deps.shopStore.openQuestion({
+      shop_id: shop.id,
+      question_key: questionKey,
+      question_text: 'Which product is "' + s.item + '"?',
+      candidates: s.candidates || [],
+    });
+    keys.push(questionKey);
+  }
+  return { shop, keys };
+}
+
+/** Every board this bot has put on the wire, oldest first. */
+const boardsOf = (bot) => bot.sent.filter((s) => /still need from you/i.test(s.message.text));
+
+/** The Telegram message_id of the board. The fake sender numbers its messages
+ *  by send order, so the board's id IS its 1-based position - which is exactly
+ *  why this is derived rather than hardcoded: a receipt card goes out first, and
+ *  an earlier draft of these tests replied to THAT and proved nothing. */
+const boardMessageId = (bot) => bot.sent.findIndex((s) => /still need from you/i.test(s.message.text)) + 1;
+
+test('B15-09 AC1+AC2: ONE board names every outstanding question AND every answered one, with the answer he gave', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { shop, keys } = await seedQuestions(h, [
+    { item: 'richmond pork sausages', candidates: [{ label: 'Richmond 12 Skinless Pork Sausages 319g', regular_id: 41 }] },
+    { item: 'ariel 4in1 pods 33', candidates: [{ label: 'Ariel 4in1 PODS, Washing Capsules 33', regular_id: 42 }] },
+    { item: 'vanish pretreat gel', candidates: [] },
+  ]);
+  // He has already answered ONE of the three.
+  await h.deps.shopStore.answerQuestion({
+    shop_id: shop.id, question_key: keys[2], answer_text: 'Vanish pre treat gel', answer_source: 'typed',
+  });
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const boards = boardsOf(bot);
+  assert.equal(boards.length, 1, 'no board reached him - this is the Gate 2 FAIL exactly');
+  const text = boards[0].message.text;
+
+  assert.match(text, /STILL WAITING ON YOU\D*2 of 3/,
+    'the board must count outstanding against the total, which is the "6 of 8" Larry had to query for');
+  assert.match(text, /ALREADY ANSWERED\D*1 of 3/);
+  assert.match(text, /richmond pork sausages/i);
+  assert.match(text, /ariel 4in1 pods 33/i);
+  assert.match(text, /Vanish pre treat gel/,
+    'an answered question must show WHAT WAS ACCEPTED, not merely that it is done');
+});
+
+test('B15-09 AC4: the board says in its own voice whether anything is blocking the shop', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { shop, keys } = await seedQuestions(h, [{ item: 'richmond pork sausages', candidates: [] }]);
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  assert.match(boardsOf(bot)[0].message.text, /THIS SHOP IS BLOCKED/,
+    'a blocked shop that does not say so is the silent park this build keeps re-creating');
+
+  await h.deps.shopStore.answerQuestion({
+    shop_id: shop.id, question_key: keys[0], answer_text: 'Richmond 12 Skinless', answer_source: 'typed',
+  });
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const latest = boardsOf(bot).slice(-1)[0].message.text;
+  assert.match(latest, /NOTHING IS BLOCKING THIS SHOP/,
+    'he must be able to see the shop is unblocked without interpreting anything');
+});
+
+test('B15-09 AC3: answering REWRITES THE SAME MESSAGE - it does not send a second board', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const edits = [];
+  bot.editMessage = async (chatId, messageId, message) => { edits.push({ chatId, messageId, message }); return {}; };
+  const { shop, keys } = await seedQuestions(h, [
+    { item: 'richmond pork sausages', candidates: [] },
+    { item: 'ariel 4in1 pods 33', candidates: [] },
+  ]);
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  const firstBoardCount = boardsOf(bot).length;
+  assert.equal(firstBoardCount, 1);
+
+  await h.deps.shopStore.answerQuestion({
+    shop_id: shop.id, question_key: keys[0], answer_text: 'Richmond 12 Skinless', answer_source: 'typed',
+  });
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  assert.equal(boardsOf(bot).length, firstBoardCount,
+    'a SECOND board was sent - he is back to reconstructing state from scrolling history');
+  assert.equal(edits.length, 1, 'the existing board was never rewritten in place');
+  assert.match(edits[0].message.text, /STILL WAITING ON YOU\D*1 of 2/);
+  assert.match(edits[0].message.text, /Richmond 12 Skinless/);
+});
+
+test('B15-09 AC3: a pass that changes nothing sends and edits NOTHING', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const edits = [];
+  bot.editMessage = async (...a) => { edits.push(a); return {}; };
+  await seedQuestions(h, [{ item: 'richmond pork sausages', candidates: [] }]);
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  for (let i = 0; i < 4; i += 1) {
+    await queueShopCards(h.deps, {});
+    await drainOutbox(h.deps, { bot });
+  }
+
+  assert.equal(boardsOf(bot).length, 1, 'the board was re-sent on a pass where nothing changed');
+  assert.equal(edits.length, 0, 'the board was rewritten on a pass where nothing changed');
+});
+
+test('B15-09 THE STORM STOPS: three open questions produce ONE card, not three', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await seedQuestions(h, [
+    { item: 'richmond pork sausages', candidates: [] },
+    { item: 'ariel 4in1 pods 33', candidates: [] },
+    { item: 'batchelors mac n cheese', candidates: [] },
+  ]);
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  assert.equal(bot.cards.length, 0,
+    'per-question cards are still the default - a board plus three cards is still three cards');
+  assert.equal(outboxRows(h, 'question').length, 0);
+  assert.equal(boardsOf(bot).length, 1);
+});
+
+test('B15-09 FREE TEXT: one reply to the board answers SEVERAL numbered questions at once', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  await seedQuestions(h, [
+    { item: 'richmond pork sausages', candidates: [] },
+    { item: 'ariel 4in1 pods 33', candidates: [] },
+  ]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([replyToCard({
+      messageId: boardMessageId(bot),
+      updateId: 77,
+      text: '1: the 12 skinless ones\n2: the 33 pack',
+    })]),
+  });
+
+  assert.equal(h.db.shop.length, 1,
+    'his answer became a NEW SHOP - this is SHOP-2026-08-10-M76 all over again');
+  const answered = h.db.shop_question.filter((q) => q.status === 'answered');
+  assert.equal(answered.length, 2, 'one reply must settle both numbered questions, settled ' + answered.length);
+  assert.equal(report.answers.length, 2);
+});
+
+test('B15-09 AC5: a control that reads as actionable produces a real card, never silence', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const edits = [];
+  bot.editMessage = async (...a) => { edits.push(a); return {}; };
+  await seedQuestions(h, [{ item: 'richmond pork sausages', candidates: [] }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  const before = boardsOf(bot).length + edits.length;
+
+  // "Show me what is waiting" / "View status" - every one of these maps to
+  // getStatus, which is durable:false and queued NOTHING. He pressed and the
+  // product said nothing at all.
+  await routeTaps(h.deps, {
+    updates: [callbackUpdate({ updateId: 88, data: 'asd:status:' + REF, queryId: 'cbq-status' })],
+    bot,
+    questions: bot.questions,
+  });
+  await drainOutbox(h.deps, { bot });
+
+  assert.ok(boardsOf(bot).length + edits.length > before,
+    'the tap produced nothing he can see - a control that appears actionable and does nothing');
+});
+
+test('B15-09 AC6: a REFUSED tap in our own namespace reaches him by a route that survives the toast', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await seedQuestions(h, [{ item: 'richmond pork sausages', candidates: [] }]);
+  // The toast is the ONLY route today, and Telegram rejects it once the tap is
+  // more than ~15 minutes old. Make it fail exactly as it does live.
+  bot.answerTap = async () => { throw new Error('query is too old and response timeout expired or query ID is invalid'); };
+
+  await routeTaps(h.deps, {
+    updates: [callbackUpdate({ updateId: 91, data: 'asd:search:' + REF, queryId: 'cbq-search' })],
+    bot,
+    questions: bot.questions,
+  });
+  await drainOutbox(h.deps, { bot });
+
+  const told = bot.sent.filter((s) => /that button|not a command|did not work|no longer/i.test(s.message.text));
+  assert.ok(told.length >= 1,
+    'he pressed a button we drew, the toast expired, and the only other record was a journal line he will never read');
+});
+
+test('B15-09 AC7: a stale button tapped five times produces exactly ONE notice, not a storm', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await seedQuestions(h, [{ item: 'richmond pork sausages', candidates: [] }]);
+
+  // DRAIN BETWEEN EVERY TAP, and that is the whole point of this test. While a
+  // notice is still PENDING the ledger adopts a repeat by itself, so a version
+  // of this test that drained only at the end passed with the guard DELETED -
+  // it was pinning the ledger's ordinary idempotency, not this guard. The guard
+  // bites only once the previous notice has been SENT and its generation spent,
+  // which is exactly the live shape: a pass sends, he presses again, or the
+  // offset never advanced and Telegram redelivers the same update.
+  for (let i = 0; i < 5; i += 1) {
+    await routeTaps(h.deps, {
+      updates: [callbackUpdate({ updateId: 95, data: 'asd:search:' + REF, queryId: 'cbq-' + i })],
+      bot,
+      questions: bot.questions,
+    });
+    await drainOutbox(h.deps, { bot });
+  }
+
+  const notices = outboxRows(h, 'control_refused');
+  assert.equal(notices.length, 1,
+    'one redelivered tap minted ' + notices.length + ' notices - that is the storm this guard exists to stop');
+});
+
+test('B15-09 AC8: a reply when nothing is open is NOT a shopping list, and he is told', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  const { shop, keys } = await seedQuestions(h, [{ item: 'richmond pork sausages', candidates: [] }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  await h.deps.shopStore.answerQuestion({
+    shop_id: shop.id, question_key: keys[0], answer_text: 'Richmond 12 Skinless', answer_source: 'typed',
+  });
+
+  const shopsBefore = h.db.shop.length;
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([replyToCard({ messageId: boardMessageId(bot), updateId: 78, text: 'actually make it the 24 pack' })]),
+  });
+  await drainOutbox(h.deps, { bot });
+
+  assert.equal(h.db.shop.length, shopsBefore,
+    'a reply to a settled card became a shopping list - the M76/M77/M79/M82 defect');
+  const told = bot.sent.filter((s) => /not taken|NOT recorded|not been taken|have not taken/i.test(s.message.text));
+  assert.ok(told.length >= 1, 'his words vanished silently, which is strictly worse than the spurious shop');
+});
+
+test('B15-09 C-3: READY_TO_SHOP is unreachable while a question is open - proven on the REAL gate', async () => {
+  const { planOutcome } = await import('./stages.js');
+  assert.equal(planOutcome({ openQuestions: 1, needsReview: false, interpretationConfirmed: true }).to,
+    'NEEDS_DECISION');
+  assert.equal(planOutcome({ openQuestions: 3, needsReview: false, interpretationConfirmed: true }).to,
+    'NEEDS_DECISION');
+  assert.equal(planOutcome({ openQuestions: 0, needsReview: false, interpretationConfirmed: true, unresolvedLines: 2 }).to,
+    null, 'an unresolved LINE must park the shop too, not just an open question');
+  assert.equal(planOutcome({ openQuestions: 0, needsReview: false, interpretationConfirmed: true }).to,
+    'READY_TO_SHOP');
+});
+
+test('B15-09 PRODUCTION WIRING: the real runtime edits the board, and never turns the storm back on', () => {
+  const src = readFileSync(new URL('./runtime.js', import.meta.url), 'utf8');
+  const wiring = src.slice(src.indexOf('async function realWiring'));
+
+  // WITHOUT editMessage on the bot object, drainOutbox can only ever SEND, and
+  // Warwick is back to reading a scrolling history of superseded boards - the
+  // exact complaint this Work Package answers. sendShopperMessage.editMessageText
+  // existed from the start and had no production caller until now.
+  assert.match(wiring, /editMessage:\s*\(chat, messageId, message\)\s*=>\s*sender\.editMessageText\(/,
+    'the real wiring cannot rewrite a board, so every answer would post a new one');
+
+  // And the storm stays off where it matters: in the process that actually talks
+  // to Warwick. `perQuestionCards` is a test-only fallback for the render-contract
+  // machinery; realWiring must never set it.
+  assert.equal(/perQuestionCards/.test(wiring), false,
+    'the production wiring re-enables per-question cards - a board plus eight cards is still eight cards');
 });

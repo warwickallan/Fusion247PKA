@@ -56,6 +56,10 @@ import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
 import { normaliseStoredCandidates, questionLookupFrom } from '../bot/questionRender.js';
 import { resolveCandidateAnswer } from '../bot/resolveTap.js';
 import { ACTIONS, CALLBACK_NAMESPACE, CALLBACK_SEPARATOR } from '../bot/callbackProtocol.js';
+// WP-B15-09. The board's numbering contract and its inverse live together in the
+// renderer, for the same reason buildAnswerArg and parseAnswerArg share a file:
+// a format and the thing that reads it must not be able to drift apart.
+import { parseBoardReply } from '../bot/renderMessages.js';
 
 // THE RETURN LEG. `handoff/claim.js`, `handoff/completion.js` and
 // `reconcile/verifyBasket.js` are CommonJS, pure, and open no connection of
@@ -215,18 +219,25 @@ export async function loadOpenQuestions(deps, { householdId = null, log = () => 
         && shop.household_id !== null && shop.household_id !== undefined
         && String(shop.household_id) !== String(householdId)) continue;
     try {
-      for (const q of await store.listQuestions(deps, shop.id)) {
-        if (q.status !== 'open') continue;
+      const rows = await store.listQuestions(deps, shop.id);
+      rows.forEach((q, i) => {
+        if (q.status !== 'open') return;
         open.push({
           shopRef: shop.shop_ref,
           shopId: shop.id,
           questionKey: q.question_key,
           questionText: q.question_text || null,
           itemName: q.item_name || null,
+          // THE BOARD'S NUMBER FOR THIS QUESTION (WP-B15-09). Derived from the
+          // same immutable `ORDER BY q.id ASC` the board renders from, so what
+          // he reads and what a reply resolves against cannot disagree. It is
+          // computed HERE rather than passed around because this is the one
+          // place that already reads every row of the shop.
+          ordinal: i + 1,
           candidates: Array.isArray(q.candidates) ? q.candidates : [],
           renderedCandidates: Array.isArray(q.rendered_candidates) ? q.rendered_candidates : [],
         });
-      }
+      });
     } catch (err) {
       // One shop's questions must not stop another shop's - same posture as
       // queueShopCards, and for the same reason.
@@ -299,6 +310,70 @@ async function recordedAnswerMatches(deps, { open, questionKey, words, log = () 
  * loadOpenQuestions, and for the same reason: an unreadable ledger must degrade
  * to today's behaviour, never to a pass that cannot run.
  */
+/**
+ * Every shop that has ALREADY BEEN SENT A BOARD. (WP-B15-09 AC8)
+ *
+ * ── WHY THIS EXISTS AND WHY IT IS THIS NARROW ───────────────────────────────
+ * Warwick's standing guard is "no open question, no claim" - it is what stops a
+ * genuine new shopping list ever being swallowed, and it is not being weakened
+ * here. But a board sits on his phone after every question is settled, inviting
+ * a reply, and a reply to it with nothing open fell straight through to intake
+ * and became a shop. Same shape as the deferred window: a card is outstanding,
+ * so a reply to it is foreseeable and must not be mistaken for a list.
+ *
+ * The signal is durable and already exists - a `question_board` outbox row for
+ * an active shop - so this needs no schema change and no new state. The CLAIM
+ * itself stays narrower still: see the reply branch in runOnce, which declines
+ * unless the message is genuinely a reply to one of our own messages.
+ *
+ * A lookup that fails returns an EMPTY list, never a throw - same posture as
+ * loadOpenQuestions, and for the same reason.
+ */
+export async function loadBoardTargets(deps, { householdId = null, log = () => {} } = {}) {
+  const boarded = [];
+  let shops = [];
+  try {
+    shops = await store.listActiveShops(deps, store.CONSUMABLE_COMMANDS);
+  } catch (err) {
+    log('board_targets_lookup_failed', { detail: String(err && err.message ? err.message : err) });
+    return boarded;
+  }
+  for (const shop of shops) {
+    if (householdId !== null && householdId !== undefined
+        && shop.household_id !== null && shop.household_id !== undefined
+        && String(shop.household_id) !== String(householdId)) continue;
+    try {
+      const family = boardFamily(shop);
+      const spent = await store.spentLedgerGenerations(deps, family);
+      if (spent === 0) continue;
+      const last = await store.findLedgerGeneration(deps, family, spent - 1);
+      const delivery = last && last.result && last.result.delivery ? last.result.delivery : null;
+      boarded.push({
+        shopRef: shop.shop_ref,
+        shopId: shop.id,
+        householdId: shop.household_id,
+        chatId: delivery ? String(delivery.chatId) : null,
+        messageId: delivery ? String(delivery.messageId) : null,
+      });
+    } catch (err) {
+      log('board_targets_lookup_failed', {
+        shop_ref: shop.shop_ref, detail: String(err && err.message ? err.message : err),
+      });
+    }
+  }
+  return boarded;
+}
+
+/** PURE. Is this reply pointed at a board we actually sent? EXACT match on both
+ *  ids, for the same reason questionStore.getQuestionByCard is exact: the whole
+ *  scheme rests on "this reply came from THAT card", and a loose match here
+ *  would let an unrelated reply be read as an answer. */
+function boardAt(boardTargets, replyTo) {
+  if (!replyTo || !Array.isArray(boardTargets)) return null;
+  return boardTargets.find((b) => b.chatId !== null && b.messageId !== null
+    && b.chatId === String(replyTo.chatId) && b.messageId === String(replyTo.messageId)) || null;
+}
+
 export async function loadDeferredClarifications(deps, { householdId = null, log = () => {} } = {}) {
   const waiting = [];
   let shops = [];
@@ -367,6 +442,36 @@ export async function loadDeferredClarifications(deps, { householdId = null, log
 export async function correlateTypedAnswer(deps, { text, open, log = () => {} } = {}) {
   const words = typeof text === 'string' ? text.trim() : '';
   if (words === '' || !Array.isArray(open) || open.length === 0) return null;
+
+  // ── 0. THE BOARD'S OWN NUMBERS (WP-B15-09). ───────────────────────────────
+  //
+  // "1: the 12 skinless ones\n4: the 33 pack" answers TWO questions in one
+  // message, and it does so with no model call and no ambiguity: the human
+  // named the questions himself, using the numbers the board printed. That is
+  // strictly better evidence than any correlation further down this function,
+  // so it goes first.
+  //
+  // A number with no open question behind it is DROPPED, not mapped onto the
+  // nearest thing - it is either already answered (so his instruction is late,
+  // and the AC8 notice tells him) or it was never a question at all.
+  const numbered = parseBoardReply(words);
+  if (numbered.length > 0) {
+    const byOrdinal = new Map(open.map((q) => [q.ordinal, q]));
+    const mappings = [];
+    for (const n of numbered) {
+      const q = byOrdinal.get(n.ordinal);
+      if (!q) continue;
+      mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText: n.answerText });
+    }
+    if (mappings.length > 0) {
+      log('board_reply_correlated', { numbered: numbered.length, matched: mappings.length });
+      return { mappings, unmapped: null, modelCalled: false };
+    }
+    // Every number missed. Fall through rather than refusing: "3 for £5" is a
+    // shopping-list line, and this parser must never be the thing that decides
+    // a genuine list is an answer.
+    log('board_reply_uncorrelated', { numbered: numbered.length, open_questions: open.length });
+  }
 
   // ── 1. DETERMINISTIC. No model call, and the same resolver the spine uses. ─
   const exact = open.filter((q) => shopDecisions.resolveExactCandidate({
@@ -474,6 +579,72 @@ function isOurCallback(update) {
 }
 
 /**
+ * PURE. The action and shop a callback CLAIMS, read off the raw payload.
+ *
+ * Deliberately NOT parseCallbackData: this is used on the path where that parser
+ * has already REFUSED, and the point is to tell the human which shop and which
+ * control he touched. Reading two fields out of a string we have already decided
+ * not to act on carries no risk - nothing downstream of here dispatches on it.
+ */
+function claimedCallbackParts(update) {
+  const data = update && update.callback_query && typeof update.callback_query.data === 'string'
+    ? update.callback_query.data : '';
+  const parts = data.split(CALLBACK_SEPARATOR);
+  return {
+    action: parts[1] || null,
+    shopRef: parts[2] && /^[A-Za-z0-9._-]{1,32}$/.test(parts[2]) ? parts[2] : null,
+  };
+}
+
+/**
+ * TELL HIM A CONTROL WAS REFUSED, BY A ROUTE THAT SURVIVES. (WP-B15-09 AC6/AC7)
+ *
+ * ── ONE NOTICE PER TAP, EVER ────────────────────────────────────────────────
+ * The family is keyed on the UPDATE ID, and a spent generation of that family is
+ * the honest question. Without it, a stale button pressed five times - or one
+ * press redelivered because the offset never advanced - mints a notice every
+ * pass and rebuilds the exact storm this Work Package is closing. Same guard,
+ * same reasoning, as the deferred-window notice further down this file.
+ *
+ * ── IT NEVER THROWS ─────────────────────────────────────────────────────────
+ * This runs inside tap routing. A notice that cannot be queued must not take the
+ * pass down with it; the toast and the journal line are still attempted, and the
+ * failure is logged loudly.
+ */
+async function tellControlRefused(deps, { update, action, reason, detail, log = () => {} } = {}) {
+  const { shopRef } = claimedCallbackParts(update);
+  if (!shopRef) return false;
+  try {
+    const shop = await store.findShopByRef(deps, shopRef);
+    if (!shop) return false;
+    const updateId = update && update.update_id !== undefined ? update.update_id : null;
+    if (updateId === null) return false;
+    const key = outboxKeyFor(shop.shop_ref, `control_refused.${updateId}`);
+    const family = ledgerFamilyKey({
+      kind: LEDGER_KINDS.OUTBOX,
+      householdId: shop.household_id,
+      name: 'control_refused',
+      key,
+    });
+    if ((await store.spentLedgerGenerations(deps, family)) > 0) return false;
+    await store.enqueueMessage(deps, {
+      householdId: shop.household_id,
+      shopId: shop.id,
+      kind: 'control_refused',
+      key,
+      payload: { shopRef: shop.shop_ref, control: action || null, reason: reason || null, detail: detail || null },
+    });
+    return true;
+  } catch (err) {
+    log('control_refused_notice_failed', {
+      updateId: update && update.update_id,
+      detail: String(err && err.message ? err.message : err),
+    });
+    return false;
+  }
+}
+
+/**
  * PHASE 1b - route the taps and typed replies the receiver ignored.
  *
  * A tap becomes a command through the SAME surface the Cockpit uses. Nothing
@@ -528,6 +699,11 @@ export async function routeTaps(deps, {
   // NOT fixed by removing the acknowledgement. The missing confirmation is a
   // real UX defect - Warwick tapped repeatedly because nothing came back - and
   // it is REPORTED separately, not resolved by deleting the call.
+  /** PURE. The callback-query id of a raw update, for the refusal path where no
+   *  parsed intent exists to carry one. */
+  const cbIdOf = (update) => (update && update.callback_query && update.callback_query.id !== undefined
+    ? update.callback_query.id : null);
+
   const acknowledge = async (intent, text) => {
     if (!bot.answerTap || !intent || !intent.raw || !intent.raw.callbackQueryId) return;
     try {
@@ -588,9 +764,23 @@ export async function routeTaps(deps, {
       // pressed a button we rendered and the only record was a journal line he
       // will never read. The distinction is the NAMESPACE - never a list of
       // action names, which would go stale the moment an action is added.
+      //
+      // ── AND A PASS REPORT IS NOT A ROUTE TO A HUMAN (WP-B15-09 AC6) ───────
+      // Pushing the refusal into `refused` was where WP-B15-08 stopped, and it
+      // is not enough: the comment above says "the only record was a journal
+      // line he will never read" and the fix wrote to a pass report, which he
+      // reads even less often. He gets the toast AND a card that survives it.
       log('inbound_refused', { updateId: update && update.update_id, reason: intent.reason });
       if (isOurCallback(update)) {
-        refused.push({ action: null, reason: intent.reason, detail: null, refresh: false });
+        const { action: claimed } = claimedCallbackParts(update);
+        refused.push({ action: claimed, reason: intent.reason, detail: null, refresh: false });
+        await acknowledge(
+          { action: claimed, raw: { callbackQueryId: cbIdOf(update) } },
+          'That button is not one I can act on - check the list I sent you',
+        );
+        await tellControlRefused(deps, {
+          update, action: claimed, reason: intent.reason, detail: null, log,
+        });
       }
       continue;
     }
@@ -643,6 +833,16 @@ export async function routeTaps(deps, {
       // journal at 7am wondering why an answer did nothing.
       log('inbound_refused', { updateId: update && update.update_id, action: intent.action, reason });
       await acknowledge(intent, detail || reason);
+      // ── THE TOAST IS NOT A ROUTE HE CAN RELY ON (WP-B15-09 AC6/AC7) ───────
+      // This branch DID acknowledge, and it is the branch Warwick's `Search
+      // ASDA` tap actually took on 2026-08-10 - the journal line carries an
+      // `action` field, which only this call site emits. He still saw nothing,
+      // because answerCallbackQuery is rejected once a tap is more than about
+      // fifteen minutes old and a pass runs on an interval. So the defect was
+      // never a missing acknowledge; it was that the only route expires.
+      if (intent.raw && intent.raw.kind === 'callback') {
+        await tellControlRefused(deps, { update, action: intent.action, reason, detail, log });
+      }
       continue;
     }
     // THE DISPATCH IS THE ONLY THING THIS try GUARDS. Acknowledging outside it
@@ -660,6 +860,22 @@ export async function routeTaps(deps, {
       continue;
     }
     routed.push({ action: intent.action, command: mapped.command, receipt });
+    // ── A READ THAT PRODUCES NOTHING VISIBLE IS A DEAD CONTROL (AC5) ────────
+    // getStatus is `durable:false` - it writes no row and queues no card. So
+    // "View status", "Review list", "View held items", "View exceptions",
+    // "Answer N questions" and "Show me what is waiting" ALL landed here and
+    // produced, on his phone, precisely nothing. Six controls that read as
+    // actionable and did nothing. The board is the answer to every one of them.
+    if (mapped.command === COMMANDS.GET_STATUS && receipt && receipt.shop_id !== undefined) {
+      try {
+        const shop = await store.findShopById(deps, receipt.shop_id);
+        if (shop) await queueBoard(deps, shop, { force: true, log });
+      } catch (err) {
+        log('board_on_demand_failed', {
+          action: intent.action, detail: String(err && err.message ? err.message : err),
+        });
+      }
+    }
     await acknowledge(intent, receipt.duplicate ? 'Already asked for' : 'Got it');
   }
   return { routed, refused };
@@ -846,17 +1062,185 @@ async function handbackAlreadySpent(deps, shop, contract) {
  *   next - is a behaviour, and a behaviour that cannot be exercised cannot be
  *   proven.
  */
+/** The outbox kind of THE BOARD - the one surface (WP-B15-09). */
+export const BOARD_KIND = 'question_board';
+
+/** The ledger family one shop's board occupies. ONE family for the life of the
+ *  shop: every rewrite is the next GENERATION of the same family, which is what
+ *  makes the previous one addressable by arithmetic rather than by a new column. */
+function boardFamily(shop) {
+  return ledgerFamilyKey({
+    kind: LEDGER_KINDS.OUTBOX,
+    householdId: shop.household_id,
+    name: BOARD_KIND,
+    key: outboxKeyFor(shop.shop_ref, 'board'),
+  });
+}
+
+/**
+ * PURE. The board's whole content, derived from the shop's question rows.
+ *
+ * ── THE ORDINAL IS THE ROW ORDER, INCLUDING ANSWERED ONES ───────────────────
+ * store.listQuestions returns `ORDER BY q.id ASC`, which is immutable, so a
+ * question's number is fixed for the life of the shop. Numbering only the
+ * OUTSTANDING ones would have been prettier and is a live wrong-answer hazard:
+ * he reads a board, types "2", and by the time it lands "2" is a different
+ * question because he answered one in between. See renderQuestionBoard.
+ *
+ * ── THE FINGERPRINT IS WHAT "SOMETHING CHANGED" MEANS ───────────────────────
+ * It covers the question set, each status and each accepted answer - i.e. every
+ * fact the board displays. Two passes with the same fingerprint render the same
+ * bytes, so the board is neither re-sent nor rewritten. That is what stops this
+ * becoming an eight-card storm with extra steps.
+ */
+export function boardStateOf(questionRows) {
+  const rows = Array.isArray(questionRows) ? questionRows : [];
+  const outstanding = [];
+  const answered = [];
+  const byOrdinal = new Map();
+
+  rows.forEach((q, i) => {
+    const n = i + 1;
+    // `item_name` is the thing itself; `question_text` is a whole sentence
+    // ("Which product is \"dreamies cheese\"?") and reads terribly in a list.
+    // Neither is fabricated - an absent name travels as null and renders
+    // "unknown".
+    const item = q.item_name || q.question_text || null;
+    byOrdinal.set(n, { questionKey: q.question_key, status: q.status });
+    if (q.status === 'open') {
+      const { candidates, unidentified } = normaliseStoredCandidates(q.candidates);
+      outstanding.push({
+        n,
+        item,
+        questionKey: q.question_key,
+        candidates: [...candidates.map((c) => c.label), ...unidentified],
+      });
+    } else {
+      answered.push({ n, item, questionKey: q.question_key, answer: q.answer_text || null });
+    }
+  });
+
+  return {
+    total: rows.length,
+    outstanding,
+    answered,
+    byOrdinal,
+    blocked: outstanding.length > 0,
+    fingerprint: rows
+      .map((q) => `${q.question_key}~${q.status}~${q.answer_text || ''}`)
+      .join('|'),
+  };
+}
+
+/** The board payload as it is stored on the outbox row and handed to the
+ *  renderer. `byOrdinal` is deliberately NOT carried: it is a lookup for the
+ *  inbound side, not something the card displays. */
+function boardPayload(shop, state, delivery) {
+  return {
+    shopRef: shop.shop_ref,
+    total: state.total,
+    outstanding: state.outstanding.map((q) => ({ n: q.n, item: q.item, candidates: q.candidates })),
+    answered: state.answered.map((q) => ({ n: q.n, item: q.item, answer: q.answer })),
+    blocked: state.blocked,
+    blockedReason: state.blocked
+      ? 'READY_TO_SHOP cannot be reached while a question is open.'
+      : null,
+    // WHAT THIS BOARD IS REPLACING. Carried ON THE ROW so drainOutbox needs no
+    // second read, and so "why did this go out as an edit" is answered by
+    // reading the row rather than by re-deriving anything.
+    boardFingerprint: state.fingerprint,
+    editChatId: delivery ? delivery.chatId : null,
+    editMessageId: delivery ? delivery.messageId : null,
+  };
+}
+
+/**
+ * Queue or REWRITE the board for one shop. (WP-B15-09)
+ *
+ * Returns `{queued, reason}`; `queued:false` with reason `unchanged` is the
+ * ordinary quiet case and is not a failure.
+ */
+async function queueBoard(deps, shop, { force = false, log = () => {} } = {}) {
+  const rows = await store.listQuestions(deps, shop.id);
+  if (rows.length === 0) return { queued: false, reason: 'no questions' };
+
+  const state = boardStateOf(rows);
+  const family = boardFamily(shop);
+  const spent = await store.spentLedgerGenerations(deps, family);
+  // The generation that has already been through the outbox, if any. It carries
+  // both facts this decision needs: what the board last SAID, and where it
+  // landed. One read, no new table, no migration.
+  const previous = spent > 0 ? await store.findLedgerGeneration(deps, family, spent - 1) : null;
+  const previousArgs = (previous && previous.args) || {};
+  const unchanged = Boolean(previous) && previousArgs.boardFingerprint === state.fingerprint;
+
+  if (unchanged && !force) return { queued: false, reason: 'unchanged' };
+
+  // ── A REFRESH HE ASKED FOR MUST BE VISIBLE (WP-B15-09 AC5) ────────────────
+  // Rewriting a message in place with identical bytes is invisible to him, and
+  // Telegram rejects it outright as "message is not modified". So an explicit
+  // refresh whose content has not moved is SENT FRESH, landing where he is
+  // actually looking; the new message then becomes the one that gets rewritten.
+  // A refresh whose content HAS moved edits in place as usual - he is looking at
+  // the board he just tapped, and it changes under him.
+  const delivery = (unchanged && force) ? null
+    : (previous && previous.result && previous.result.delivery ? previous.result.delivery : null);
+
+  const queued = await store.enqueueMessage(deps, {
+    householdId: shop.household_id,
+    shopId: shop.id,
+    kind: BOARD_KIND,
+    key: outboxKeyFor(shop.shop_ref, 'board'),
+    payload: boardPayload(shop, state, delivery),
+  });
+  // ADOPTED means a board queued by an earlier pass has not gone out yet. It
+  // will render from ITS payload, which is now stale - so the fresher state is
+  // reported, and the next pass after that send picks the change up again.
+  if (!queued || !queued.created) return { queued: false, reason: 'already pending' };
+  log('board_queued', {
+    shop_ref: shop.shop_ref,
+    outstanding: state.outstanding.length,
+    answered: state.answered.length,
+    rewrites: delivery ? 'in place' : 'first send',
+  });
+  return { queued: true, reason: delivery ? 'edit' : 'send' };
+}
+
 export async function queueShopCards(deps, {
-  shops, contract = BASKET_HANDBACK_CONTRACT, verificationFor = null, log = () => {},
+  shops, contract = BASKET_HANDBACK_CONTRACT, verificationFor = null,
+  // ── THE BOARD IS THE DEFAULT, AND THE STORM IS OFF (WP-B15-09) ────────────
+  // Eight questions used to mean eight cards. A board PLUS eight cards is still
+  // eight cards, so per-question cards do not fire unless a caller deliberately
+  // asks for them. Nothing in realWiring does, and a test pins that.
+  //
+  // The path is kept rather than deleted for one honest reason: it is the only
+  // thing that seals a question's RENDER CONTRACT (card_message_id plus the
+  // exact displayed candidate list), which is what makes a candidate-index tap
+  // resolvable and a stale tap detectable. Shops carded before this change still
+  // have live buttons that depend on it.
+  perQuestionCards = false,
+  log = () => {},
 } = {}) {
   const questions = [];
   const basketReady = [];
+  const boards = [];
   const list = Array.isArray(shops) ? shops : await store.listActiveShops(deps, store.CONSUMABLE_COMMANDS);
 
   for (const shop of list) {
-    // ── open questions -> question cards
+    // ── THE BOARD. One card, rewritten in place, for every shop with questions.
     try {
-      for (const q of await store.listQuestions(deps, shop.id)) {
+      const board = await queueBoard(deps, shop, { log });
+      if (board.queued) boards.push({ shop_ref: shop.shop_ref, reason: board.reason });
+    } catch (err) {
+      // One shop's board must not stop another shop's - same posture as below.
+      log('board_queue_failed', {
+        shop_ref: shop.shop_ref, detail: String(err && err.message ? err.message : err),
+      });
+    }
+
+    // ── open questions -> question cards (OFF by default: see perQuestionCards)
+    try {
+      for (const q of perQuestionCards ? await store.listQuestions(deps, shop.id) : []) {
         if (q.status !== 'open') continue;
         // Already on his phone. Asked once, never twice.
         if (q.card_message_id !== null && q.card_message_id !== undefined && String(q.card_message_id) !== '') continue;
@@ -968,7 +1352,7 @@ export async function queueShopCards(deps, {
     }
   }
 
-  return { questions, basketReady };
+  return { questions, basketReady, boards };
 }
 
 /**
@@ -1018,6 +1402,25 @@ export function withChecklistUrl(payload, baseUrl) {
  * that stalls without telling anyone. Duplicated beats missing, and the outbox
  * key means it cannot duplicate more than once.
  */
+/** PURE. The message a board payload says it is replacing, or null. Both halves
+ *  are required: half a target is not a target. */
+function deliveryTargetOf(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  if (p.editChatId === null || p.editChatId === undefined || p.editChatId === '') return null;
+  if (p.editMessageId === null || p.editMessageId === undefined || p.editMessageId === '') return null;
+  return { chatId: String(p.editChatId), messageId: String(p.editMessageId) };
+}
+
+/** PURE. Where a send actually landed, from Telegram's own returned Message.
+ *  A sender that returns nothing useful yields null - recorded as "unknown",
+ *  never as a fabricated id. */
+function receiptTargetOf(chatId, receipt) {
+  const id = receipt && typeof receipt === 'object' ? receipt.message_id : null;
+  if (id === null || id === undefined) return null;
+  const chat = receipt && receipt.chat && receipt.chat.id !== undefined ? receipt.chat.id : chatId;
+  return { chatId: String(chat), messageId: String(id) };
+}
+
 export async function drainOutbox(deps, { bot, log = () => {} } = {}) {
   const queued = await store.listOutbox(deps);
   const sent = [];
@@ -1062,8 +1465,43 @@ export async function drainOutbox(deps, { bot, log = () => {} } = {}) {
 
       // The cockpit base URL is applied HERE, at the last moment before sending,
       // so the durable payload never carries a host. See withChecklistUrl.
-      await bot.send(chatId, render(withChecklistUrl(item.payload, bot.checklistBaseUrl)));
-      await store.resolveCommand(deps, item.id, 'done', 'sent');
+      const message = render(withChecklistUrl(item.payload, bot.checklistBaseUrl));
+
+      // ── THE BOARD IS REWRITTEN, NOT RE-SENT (WP-B15-09) ───────────────────
+      // Warwick's complaint was having to reconstruct state by scrolling. A
+      // fresh board each time he answers is a better eight-cards, not a fix, so
+      // the board edits the message it already occupies.
+      //
+      // FALLING BACK IS SAFE IN ONE DIRECTION ONLY. An edit that fails because
+      // he deleted the message, or because the chat moved, must become a send -
+      // otherwise the board disappears silently, which is the whole class of
+      // defect this Work Package exists to close. But "message is not modified"
+      // is Telegram saying the bytes are ALREADY what we want, so falling back
+      // there would post a duplicate board for no reason: it is a success.
+      const target = item.kind === BOARD_KIND ? deliveryTargetOf(item.payload) : null;
+      let delivered = null;
+      if (target && typeof bot.editMessage === 'function') {
+        try {
+          await bot.editMessage(target.chatId, target.messageId, message);
+          delivered = target;
+        } catch (err) {
+          const detail = String(err && err.message ? err.message : err);
+          if (/not modified/i.test(detail)) {
+            delivered = target;
+          } else {
+            log('board_edit_failed', { key: item.key, detail });
+          }
+        }
+      }
+      if (!delivered) {
+        const receipt = await bot.send(chatId, message);
+        delivered = receiptTargetOf(chatId, receipt);
+      }
+      // WHERE IT LANDED, ON THE ROW. This is what the next pass reads to rewrite
+      // this exact message. An unknown message id is recorded as absent, never
+      // guessed - the next board then sends fresh, which is visible and safe.
+      await store.resolveCommand(deps, item.id, 'done', 'sent',
+        delivered ? { delivery: delivered } : null);
       sent.push({ kind: item.kind, key: item.key });
     } catch (err) {
       const detail = String(err && err.message ? err.message : err);
@@ -1108,6 +1546,15 @@ export async function runOnce(deps, wiring = {}) {
   const deferred = openQuestions.length === 0
     ? await loadDeferredClarifications(deps, { householdId: wiring.householdId, log })
     : [];
+  // ── THE BOARD WINDOW (WP-B15-09 AC8). Read only when nothing is open, so the
+  // ordinary claim path is untouched in every other state - same shape and same
+  // reason as the deferred window above.
+  // Read EVERY pass, because a reply to a board is possible whether or not
+  // anything is still open: with questions open it is an ANSWER, and with none
+  // open it is the AC8 notice. Knowing the exact (chat, message) of each board
+  // is what lets such a reply be correlated on evidence rather than on a guess.
+  const boardTargets = await loadBoardTargets(deps, { householdId: wiring.householdId, log });
+  const boarded = openQuestions.length === 0 ? boardTargets : [];
   const claimedUpdateIds = new Set();
   const answers = [];
   const refusals = [];
@@ -1121,7 +1568,7 @@ export async function runOnce(deps, wiring = {}) {
   // NO OPEN QUESTION AND NOTHING DEFERRED, NO CLAIM. Warwick's guard, and the
   // reason a genuine new shopping list is never lost: with nothing to correlate
   // to, routing does not get a vote and intake behaves exactly as it always has.
-  const claim = ((openQuestions.length === 0 && deferred.length === 0)
+  const claim = ((openQuestions.length === 0 && deferred.length === 0 && boarded.length === 0)
     || !wiring.bot || typeof wiring.bot.routeAsdairUpdate !== 'function')
     ? null
     : async (verdict, update) => {
@@ -1148,27 +1595,50 @@ export async function runOnce(deps, wiring = {}) {
       // no shop, nothing to notice. That is strictly worse than the defect. The
       // claim is therefore taken ONLY after the answer is durably written, which
       // is the same rule the bare-text branch below already follows.
+      // ── WHICH CARD DID HE REPLY TO? ─────────────────────────────────────
+      // A QUESTION card resolves to exactly one question and takes the branch
+      // below. THE BOARD resolves to nothing here - it is one card carrying
+      // every question - and must NOT be handed to intake on that basis, which
+      // is what used to happen. It falls through to the shared correlation path,
+      // where the board's own numbers settle it deterministically.
+      let cardRow = null;
+      let repliedToBoard = null;
       if (msg.reply_to_message) {
         const replyTo = replyTargetOf(update);
-        // No lookup wired, or nothing at that (chat, message): NOT ours. Falls
-        // through to intake exactly as before, so a genuine shopping list that
-        // happens to be a reply is never swallowed.
-        if (!questions || typeof questions.getQuestionByCard !== 'function' || !replyTo) return false;
-
-        let row = null;
-        try {
-          row = await questions.getQuestionByCard(replyTo);
-        } catch (err) {
-          // A lookup that cannot run must not become a WRONG correlation, and
-          // must not eat the message either.
-          log('question_lookup_failed', { detail: String(err && err.message ? err.message : err) });
-          return false;
+        if (questions && typeof questions.getQuestionByCard === 'function' && replyTo) {
+          try {
+            cardRow = await questions.getQuestionByCard(replyTo);
+          } catch (err) {
+            // A lookup that cannot run must not become a WRONG correlation, and
+            // must not eat the message either.
+            log('question_lookup_failed', { detail: String(err && err.message ? err.message : err) });
+            return false;
+          }
         }
-        if (!row) {
+        repliedToBoard = cardRow ? null : boardAt(boardTargets, replyTo);
+        // ── NOT A CARD OF OURS => STILL A LIST, EXACTLY AS BEFORE ──────────
+        //
+        // This is the line the existing suite protects, and it caught a real
+        // hazard in an earlier draft of this change. Correlating ANY unmatched
+        // reply through the free-text path lets `correlateTypedAnswer`'s
+        // "only one open question, so nothing to choose between" shortcut fire
+        // on a message that was never an answer - and "3 gourmet cat food",
+        // replied to some unrelated message, gets recorded as the answer to the
+        // one open question and never becomes the shop it was.
+        //
+        // That shortcut is sound for a BARE typed message, where an outstanding
+        // card makes answering the likely intent. It is not sound here, because
+        // the reply target is positive evidence about what he was answering. So
+        // the fall-through is allowed for a reply to a BOARD and for nothing
+        // else, matched exactly on (chat, message).
+        if (!cardRow && !repliedToBoard) {
           log('typed_reply_not_claimed', { updateId: verdict.updateId, reason: 'uncorrelated_reply' });
           return false;
         }
+      }
 
+      if (cardRow) {
+        const row = cardRow;
         const replyIntent = wiring.bot.routeAsdairUpdate(update, {
           resolveQuestionByMessage: questionLookupFrom([row]),
         });
@@ -1244,7 +1714,57 @@ export async function runOnce(deps, wiring = {}) {
       // So the claim is taken only once the notice is durably queued. If the
       // enqueue fails we return false and fall back to the old behaviour: a
       // wrong shop he can see beats a message that vanished.
-      if (openQuestions.length === 0) {
+      // ── HE REPLIED TO THE BOARD WITH NOTHING LEFT OPEN (AC8) ────────────
+      //
+      // Every question is settled and a board is still sitting on his phone
+      // inviting a reply. His words answer nothing, and they are not a list
+      // either - so the only honest outcome is to start no shop, record no
+      // answer, and TELL HIM. The claim is taken ONLY once the notice is
+      // durably queued: a claim with no notice is the silent drop, which is
+      // strictly worse than the spurious shop because he cannot see it.
+      //
+      // THE CONDITION IS DELIBERATELY NARROW. It fires only on a genuine reply
+      // to one of OUR OWN messages. A plain typed message with nothing open is
+      // still a shopping list, exactly as Warwick's standing guard requires -
+      // this widens nothing for the case that guard protects.
+      if (openQuestions.length === 0 && deferred.length === 0 && repliedToBoard) {
+        const target = repliedToBoard;
+        const noticeKey = outboxKeyFor(target.shopRef, `reply_not_taken.${verdict.updateId}`);
+        try {
+          // ONE NOTICE PER MESSAGE, EVER - the same family guard as below, for
+          // the same reason: a redelivery must not mint a new generation every
+          // pass and rebuild the storm.
+          const family = ledgerFamilyKey({
+            kind: LEDGER_KINDS.OUTBOX,
+            householdId: target.householdId,
+            name: 'reply_not_taken',
+            key: noticeKey,
+          });
+          if ((await store.spentLedgerGenerations(deps, family)) === 0) {
+            await store.enqueueMessage(deps, {
+              householdId: target.householdId,
+              shopId: target.shopId,
+              kind: 'reply_not_taken',
+              key: noticeKey,
+              payload: { shopRef: target.shopRef, answeredAlready: null },
+            });
+          }
+        } catch (err) {
+          // TOLD HIM NOTHING => DO NOT CLAIM. Never a silent drop.
+          log('reply_not_taken_notice_failed', {
+            updateId: verdict.updateId,
+            shop_ref: target.shopRef,
+            detail: String(err && err.message ? err.message : err),
+          });
+          return false;
+        }
+        refusals.push({ updateId: verdict.updateId, shop_ref: target.shopRef, reason: 'reply_not_taken' });
+        claimedUpdateIds.add(verdict.updateId);
+        log('typed_reply_not_taken', { updateId: verdict.updateId, shop_ref: target.shopRef });
+        return true;
+      }
+
+      if (openQuestions.length === 0 && deferred.length > 0) {
         const target = deferred[0];
         const noticeKey = outboxKeyFor(target.shopRef, `clarification_deferred.refused.${verdict.updateId}`);
         try {
@@ -1389,7 +1909,13 @@ export async function runOnce(deps, wiring = {}) {
   const advanced = await advanceAll(deps, { log });
   // AFTER the advance, so a question opened by THIS pass's planning step is
   // carded on this pass rather than waiting a full interval for the next one.
-  const cards = await queueShopCards(deps, { verificationFor: wiring.verificationFor || null, log });
+  const cards = await queueShopCards(deps, {
+    verificationFor: wiring.verificationFor || null,
+    // OFF unless a caller deliberately asks. realWiring never does, and
+    // productionWiring pins that - see queueShopCards for why the path survives.
+    perQuestionCards: wiring.perQuestionCards === true,
+    log,
+  });
   const outbox = await drainOutbox(deps, { bot: wiring.bot, log });
 
   return {
@@ -1422,6 +1948,10 @@ export async function runOnce(deps, wiring = {}) {
     cards: {
       questions: cards.questions.length,
       basket_ready: cards.basketReady.length,
+      // THE BOARD, reported separately: "a board was rewritten" and "a question
+      // was carded" are different facts and a shop should now only ever see the
+      // first (WP-B15-09).
+      boards: (cards.boards || []).length,
       detail: cards.questions,
     },
     outbox,
@@ -1578,6 +2108,12 @@ async function realWiring(deps) {
       // values and their placement; this module only names the variable.
       checklistBaseUrl: process.env.ASDAIR_COCKPIT_BASE_URL || null,
       send: (chat, message) => sender.sendMessage(chat, message),
+      // THE BOARD IS REWRITTEN, NOT RE-SENT (WP-B15-09). editMessageText has
+      // existed in sendShopperMessage.js since the bot was built and had no
+      // production caller; without it on this object, drainOutbox can only ever
+      // send, and Warwick is back to reading a scrolling history of superseded
+      // boards - which is the exact complaint this Work Package answers.
+      editMessage: (chat, messageId, message) => sender.editMessageText(chat, messageId, message),
       answerTap: (id, text) => sender.answerCallbackQuery(id, { text }),
       // THE ONLY THING THAT MAY SEND A QUESTION. It sends, then seals the render
       // contract against the message id Telegram allocated. The failure window is
