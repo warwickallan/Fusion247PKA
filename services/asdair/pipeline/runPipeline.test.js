@@ -1503,3 +1503,80 @@ test('B15-3 FIX1 / AC4: a genuinely NEW held line still notifies - repeats are s
   assert.deepEqual(DEFERRED_ITEMS(h.db), ['fruit splits', 'silver polish'],
     'the second card must be about the NEW line, and the first must not have repeated');
 });
+
+// =====================================================================
+// WO-2026-08-10-B15-04 AC1 - AT THE LIVE MAGNITUDE, AND THE QUESTION
+// THE ORDER ASKED, ANSWERED IN A TEST SO IT IS NEVER RE-ASKED.
+//
+// The Work Order's amendment read the live keys
+//   ...clarification_deferred.q8f8d3866#7 / #9 / #13 / #17 / #20
+// as a question key carrying an "incrementing ROUND SUFFIX", and concluded the
+// notice FAMILY moves every round so the landed generation guard cannot bite.
+//
+// THAT READING IS FALSE, and the code makes it structurally impossible:
+//   * questionKeyFor returns `q` + 8 hex characters. The round travels INSIDE
+//     the hash input and never into the output, at every round.
+//   * ledgerFamilyKey runs requireKeyComponent over every component and THROWS
+//     on a `#`, so a family key carrying one could not be built at all.
+//   * The trailing `#N` is ledgerIdempotencyKey's GENERATION separator.
+//
+// So the family was CONSTANT at `...q8f8d3866` and the generation was the only
+// thing moving - which is exactly what the landed guard asks about.
+//
+// The two facts below are asserted rather than argued, at twenty passes: the
+// magnitude Warwick actually received, not the six the earlier fix proved.
+// =====================================================================
+
+test('B15-04 AC1: TWENTY passes over one stuck shop - one card, and the question does not move', async () => {
+  const h = makeHarness({
+    modelLines: MODEL_LINES,
+    depsOverride: { interpretAnswer: scriptedInterpreter(CLARIFY('two sizes')) },
+  });
+  await toDeferredClarification(h);
+
+  const heldAfterFirst = { key: null, round: null };
+  const running = [];
+  for (let i = 0; i < 20; i += 1) {
+    await runPipeline(HANDLE, h.deps);
+    await sendQueuedCards(h);                 // delivered => generation SPENT
+    running.push(DEFERRED_CARDS(h.db).length);
+    // The deferred question, as the enqueue sees it on THIS pass.
+    const held = h.db.shop_question.find((q) => q.status === 'answered' && q.needs_clarification_round === true)
+      || h.db.shop_question[0];
+    if (i === 0) { heldAfterFirst.key = held.question_key; heldAfterFirst.round = Number(held.question_round); }
+    // THE ORDER'S OPEN QUESTION, ANSWERED EVERY PASS: does question_round
+    // advance on the deferred path? It cannot - the branch `continue`s before
+    // any openQuestion call, and everIssued(CONFIRM_INTERPRETATION) is
+    // monotonic so the branch can never be re-entered after the gate clears.
+    assert.equal(held.question_key, heldAfterFirst.key,
+      `the held question key moved on pass ${i + 1} - the notice family is not stable`);
+    assert.equal(Number(held.question_round), heldAfterFirst.round,
+      `question_round advanced on the DEFERRED path at pass ${i + 1}`);
+  }
+
+  assert.equal(DEFERRED_CARDS(h.db).length, 1,
+    `twenty passes queued ${DEFERRED_CARDS(h.db).length} deferred-clarification cards `
+    + `(running total per pass: ${running.join(', ')}). Warwick received about twenty.`);
+
+  // ONE FAMILY, and its key carries the question key with NO generation in it.
+  const [card] = DEFERRED_CARDS(h.db);
+  assert.ok(String(card.args.ledger_key).endsWith(`clarification_deferred.${heldAfterFirst.key}`),
+    `the notice family is not keyed on the stable question key: ${card.args.ledger_key}`);
+  assert.equal(String(card.args.ledger_key).includes('#'), false,
+    'a `#` in the FAMILY key would mean the round really was in it - ledgerFamilyKey must have thrown');
+
+  assert.equal(shopStatus(h), 'PROCESSING',
+    'the shop must still be parked behind the unconfirmed reading, or the loop proved nothing');
+});
+
+test('B15-04 AC1: a clarification round key is still `q`+8 hex - the round NEVER reaches the key', () => {
+  // The structural half of the same fact, pinned against literal shapes so a
+  // future "readable key" refactor cannot quietly reintroduce the storm.
+  for (const round of [1, 2, 3, 7, 9, 13, 17, 20, 99]) {
+    const k = questionKeyFor('oven gloves', round);
+    assert.match(k, /^q[0-9a-f]{8}$/, `round ${round} produced a key of a different shape: ${k}`);
+    assert.equal(k.includes('#'), false, `round ${round} put a generation separator in a question key`);
+  }
+  // Distinct rounds are distinct questions - the round is in the HASH INPUT.
+  assert.notEqual(questionKeyFor('oven gloves', 1), questionKeyFor('oven gloves', 2));
+});
