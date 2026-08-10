@@ -2473,33 +2473,14 @@ test('B15-10 AC4 END TO END: the question card carries the id, so the printed an
 // allowlist silently dropped both. Tests 2 and 3 below ARE that regression and
 // must never be deleted.
 //
-// ⚠️ HOW THE EXCLUSION STATEMENT IS ANSWERED OFFLINE, STATED PLAINLY.
-// `test/fakePg.js` has no handler for it and is OUTSIDE this Work Order's
-// surface, so `withForeignClaimStatement` below answers it from the SAME
-// `h.db.shop_line` rows fakePg holds. Everything under test is real - the real
-// shopLines.listForeignClaimedItemIds, the real excludeForeignListItems, the
-// real runPipeline wiring, real rows. What is NOT proven here is fakePg's own
-// dispatch, and the handler's proper home is that file. It matches on the
-// EXPORTED constant rather than a hand-written regex, so changing the statement
-// cannot leave a stale matcher quietly green.
+// ⚠️ THE EXCLUSION STATEMENT IS ANSWERED BY test/fakePg.js ITSELF.
+// A local harness used to answer it here by matching the exported SQL constant
+// and applying its own hand-written semantics. It modelled the INTENT, not the
+// statement - so inverting the SQL to the allowlist direction left EVERY
+// behavioural test below GREEN, and only a shape test caught it. WP-B15-15 moved
+// the handler into fakePg, derived from the statement text; the harness was
+// deleted at integration (2026-08-10). These tests now go RED on that inversion.
 // =====================================================================
-
-/** Answer the one statement test/fakePg.js does not model, from its own rows. */
-function withForeignClaimStatement(h) {
-  const inner = h.deps.readQuery;
-  h.deps.readQuery = async (text, params) => {
-    if (text !== shopLinesSql.SELECT_FOREIGN_CLAIMS_SQL) return inner(text, params);
-    const [shopId, ids] = params;
-    const want = new Set((ids || []).map(String));
-    const hits = [...new Set(h.db.shop_line
-      .filter((l) => String(l.shop_id) !== String(shopId)
-        && l.list_item_id !== null && l.list_item_id !== undefined
-        && want.has(String(l.list_item_id)))
-      .map((l) => String(l.list_item_id)))];
-    return { rows: hits.map((v) => ({ list_item_id: v })), rowCount: hits.length };
-  };
-  return h;
-}
 
 /** A dead shop (id 99) that already owns list 20, plus an item nobody claims -
  *  the shape a cockpit `add_regular_to_next_week` leaves behind. */
@@ -2530,7 +2511,10 @@ function sharedListSeed() {
 }
 
 /** Drive a fresh shop onto the shared list, recording what the planner is handed. */
-async function planOnSharedList({ seed = sharedListSeed(), wire = withForeignClaimStatement } = {}) {
+// `wire` is OPT-IN FAULT INJECTION ONLY. It has no default: the exclusion
+// statement is answered by test/fakePg.js, and a default that intercepted it
+// here is exactly what made these tests blind to the SQL until 2026-08-10.
+async function planOnSharedList({ seed = sharedListSeed(), wire = null } = {}) {
   const handed = [];
   const logs = [];
   const h = makeHarness({
@@ -2540,7 +2524,7 @@ async function planOnSharedList({ seed = sharedListSeed(), wire = withForeignCla
       { line_no: 2, raw_reading: 'fruit splits', quantity: null },
     ],
   });
-  wire(h);
+  if (wire) wire(h);
   h.deps.log = (event, detail) => logs.push({ event, detail });
   const realPlan = h.deps.planBasket;
   h.deps.planBasket = (input) => {
