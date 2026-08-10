@@ -46,8 +46,15 @@ test('the buttons a REAL question card renders all route back correctly', () => 
   const buttons = card.reply_markup.inline_keyboard.flat();
   const intents = buttons.map((b) => routeAsdairUpdate(tap(b.callback_data)));
   assert.ok(intents.every((i) => i.ok && i.shopRef === REF));
-  assert.deepEqual(intents.map((i) => i.action), ['answer', 'answer', 'search', 'skip']);
-  assert.deepEqual(intents.map((i) => i.arg), ['q7.0', 'q7.1', 'q7', 'q7']);
+  // WP-B15-08 AC10, 2026-08-10 — REQUIREMENT CHANGE, not a weakened proof.
+  // 'Search ASDA' is no longer rendered. It was drawn on every question card
+  // and had NO handler: the runtime refused the tap with "that button is not
+  // a command" and journaled the refusal instead of telling anyone. Warwick
+  // pressed it during a live shop and nothing happened. A control the system
+  // refuses must not be drawn. If ASDA search is ever built, this assertion
+  // comes back WITH its handler — never before it.
+  assert.deepEqual(intents.map((i) => i.action), ['answer', 'answer', 'skip']);
+  assert.deepEqual(intents.map((i) => i.arg), ['q7.0', 'q7.1', 'q7']);
 });
 
 test('a responder with no id degrades to telegram:unknown rather than throwing', () => {
