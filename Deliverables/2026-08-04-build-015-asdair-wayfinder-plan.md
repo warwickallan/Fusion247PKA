@@ -1169,7 +1169,7 @@ EXISTING North Star — not a new build, direction or success criterion.**
 **The numbered functional requirements are the five corrections** recorded under SUB-PHASE B15-3.
 Restated here in numbered form so a gate can grade them separately:
 
-| # | Functional requirement | Delivered on `b15-3/integration` @ `318e0e3` | Known residual against it |
+| # | Functional requirement | Delivered — **now on `main`** (was `b15-3/integration` @ `318e0e3`) | Known residual against it |
 |---|---|---|---|
 | **1** | **Free text is a first-class production input** — a typed natural-language reply reaches the SAME durable question → answer → `shop_decision` → recomputation spine. No button-only dependency, no silently discarded text, no Larry relay. | Lane A, `a61fc44`. `answer_source='typed'`; unrecognised source **throws and writes nothing** | **The real production event has never run.** No live Telegram message has traversed it; **Terra's prompt has never met the model** |
 | **2** | **Coherent question surface** — unresolved questions presented together; one typed reply may answer several where the mapping can be grounded safely | Lane A. Terra called **once** with all open keys; two questions answered; two separate ledger commands | With exactly ONE open question, any answer-shaped message is claimed — so a genuine new list typed while a stale question is open would be read as an answer. **No list-shape heuristic was invented** |
@@ -1177,15 +1177,44 @@ Restated here in numbered form so a gate can grade them separately:
 | **4** | **Uncertainty is spoken, never guessed and never silently parked** — applies to an unmappable reply fragment and to an unclear or conflicting prose rule alike | Lanes A and R1. Six executed uncertainty paths incl. unreachable consumer → flag on every affected line; **unparseable reply → error recorded, never read as approval** | — |
 | **5** | **Traced to the real production caller** — not "a model wired to a prompt" | Lane C, `8e625b4`: `buildHandoff`, the execution packet and `verifyBasket` now have production callers, proven reachable from the runtime entry, with `requestBrowserBuild` asserted OFF the path | **AC6(f) OPEN:** `openHandoff` writes `progress.handoff` while `runner.js reconstruct()` reads `progress.plan`, so **a CDP arm can still ignore the payload.** `browser-runner/progress.cjs` was outside every granted surface. Named, not hidden |
 
-**Where the work lives:** branch **`b15-3/integration`**, worktree `C:/Fusion247PKA-b153-int`, head
-**`318e0e3`** — carrying Lane A (`a61fc44`), Lane C (`8e625b4`), Lane R1 (`466cba9`), the INT1
-harness repair (`dde0d51`) and the CRLF control fix (`318e0e3`). **Unpushed. Not merged to `main`.**
+**Where the work lives — RE-CUT 2026-08-10.** ~~branch `b15-3/integration`, worktree
+`C:/Fusion247PKA-b153-int`, head `318e0e3`. **Unpushed. Not merged to `main`.**~~ **All four clauses of
+that sentence are now false and a fresh session was orienting on them** (Veritas, Gate 1 at `3696960`).
+
+**It is on `main`.** `b15-3/integration` merged and carries **zero** commits `main` does not have
+(`git rev-list --count main..b15-3/integration` = 0); the worktree `C:/Fusion247PKA-b153-int` was
+**removed** during the 2026-08-10 convergence pass, and `main` is mirrored to
+`origin/backup/2026-08-10-local-main-safety`, so it is no longer unpushed. Lane A (`a61fc44`), Lane C
+(`8e625b4`), Lane R1 (`466cba9`), the INT1 harness repair (`dde0d51`) and the CRLF control fix
+(`318e0e3`) are all ancestors of `main`.
+
+**Still true, and it is Warwick's gate, not an oversight:** `origin/main` is far behind local `main`.
+The main push and the merge remain his (`merge-decision`).
 
 **Measured suite state at that head** — counts, not exit codes: pipeline **327/327** · handoff
 114/114 · packet 109/109 · browser-runner 75/75 · bot 165/165 · intake 34/34 · reconcile 106/106 ·
 skill 281 run, 272 pass, **7 fail proven pre-existing** (`pg` absent, `ASDAIR_DB_URL` unset).
 
-> ### 🔴 VERITAS GATE 1 — **HOLD on all five requirements** (`318e0e3`, receipt `b377ce2`)
+> ### ✅ SUPERSEDED 2026-08-10 — this HOLD is DISCHARGED. The block below is HISTORY, not current state.
+>
+> **Veritas re-graded the enclosing WP-B15-3 rows 1–5 at `3696960` and returned PASS on all five**, and
+> **explicitly discharged D1**: *"the prior D1 HOLD is discharged — traced, no test-only hop."*
+> `applyRulebook` is called from `planWithDecisions` (`runPipeline.js:168`) with `consult` bound to
+> `realConsultRulebook` in the real `createDeps()` (`deps.js:784`), across three production call sites,
+> and the live runtime executes that code.
+>
+> **Receipts:** `Builds/BUILD-015-.../Assurance/veritas-wp-b15-04-05-gate1-3696960.md` and
+> `…/veritas-phase-b15-live-readiness-gate2-3696960.md`.
+>
+> **What is NOT discharged, so nobody reads this as "everything passed":** Gate 1 holds on
+> **B15-04 AC4** (no committed mutation record) and **B15-05 AC7** (the checklist renders but its card
+> path is not a link Warwick can open), and **Gate 2 is HOLD on the browser step for that same reason.**
+>
+> **The original finding is preserved below because it is true about `318e0e3` and about how it
+> happened — Larry merged a lane whose wiring the order deliberately excluded, then commissioned the
+> gate without wiring it.** That lesson outlives the HOLD.
+
+> ### 🔴 VERITAS GATE 1 — **HOLD on all five requirements** (`318e0e3`, receipt `b377ce2`) — HISTORICAL
 >
 > **The blocking finding is D1, against requirement 3: `skill/rulebook.js` has ZERO production
 > callers.** `planner.js`'s entire change is a 13-line comment claiming the dropped rows *"are now
