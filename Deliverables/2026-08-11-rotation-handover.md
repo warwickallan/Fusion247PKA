@@ -164,6 +164,36 @@ Febreze **Vanilla Butterscotch** (his ASDA Regulars) versus the catalogue's "Sun
    polling because none was declared. Read the amended contract (`65f7375`, `62aa2e8`, `0658290`).
 7. **Only on Gate Zero + Gate 1 + Gate 2 PASS may Warwick be asked for a photograph.**
 
+## Pax's independent measurement — `Deliverables/2026-08-11-pax-session-failure-report.md`
+
+**The headline, and it is the one that should govern the next session's priorities:**
+
+> **12 substantive defects reached Warwick's hands. The assurance layer found 0 of them before he
+> did.** The system found exactly one real product defect he had not already hit (Veritas's
+> cross-shop routing collision), plus 16 faults in **Larry's own Work Orders** via the three Keel
+> read-backs.
+
+**Pax's diagnosis of why, and it is sharper than Larry's:** the Veritas ratio this session was
+*healthy* — 2 verdicts, 1 genuine Work Order, nothing like the 4B incident. **The failure was not
+review volume or review discipline. Every gate graded "does the machine process this list
+correctly?" and no gate ever graded "is this list Warwick's list?"** A perfectly-run review of the
+wrong scope returns a confident wrong answer.
+
+**And:** the cheapest control in the estate — the read-back gate — outperformed 1,982 unit tests, a
+secret scanner and a mutation harness combined.
+
+**Measured elapsed:** 6h 06m 25s of git-visible activity (16:52:04 → 22:58:29 BST); ~7h 50m
+photograph-to-stop. **Total not measurable** — everything after 22:58:29, including the entire
+browser rescue, was uncommitted at the time. **Tokens: not measurable. Fourth consecutive session
+with no ledger.**
+
+**Pax's open items, carried forward:** it could **not** verify the input-truth facts first-hand
+(subagents get no MCP tools) — re-run the query in the blocker document · **why** the transcript is
+empty is unknown and **where the 35 lines came from is observed, not established** · the 15:33
+BST-vs-Z ambiguity from the prior report is still unresolved · the scratchpad-collision reports were
+corroborated only in class, so **any mutation kill claimed this session should be treated as
+unproven until re-run in isolation.**
+
 ## What must NOT be claimed
 
 - **Not** that AsdAIr works end to end. It has never been demonstrated.

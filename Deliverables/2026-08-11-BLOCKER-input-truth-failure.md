@@ -28,6 +28,35 @@ Established read-only against the live store on 2026-08-11, on `asdair.shop` id 
 | `needs_review` | **true** |
 | `raw_media_path` | present — the real photograph is on disk |
 
+### The raw query and its output, so nobody has to take Larry's word for it
+
+⚠️ **Pax could NOT independently verify this** — subagents receive no MCP tools, so it tried three
+tool names and got "No such tool available" for each. **Until someone else with database access
+re-runs this, it is a single-source measurement by Larry.** Re-run it first thing:
+
+```sql
+select id, shop_ref, source_kind, status,
+       length(coalesce(transcript,''))        as transcript_len,
+       coalesce(transcript_provider,'NULL')   as provider,
+       coalesce(transcript_model,'NULL')      as model,
+       coalesce(transcript_confidence::text,'NULL') as confidence,
+       needs_review,
+       (select count(*) from asdair.shop_line sl where sl.shop_id = s.id) as shop_line_rows,
+       raw_media_path
+from asdair.shop s where s.id = 14;
+```
+
+Output, executed 2026-08-11:
+
+```json
+{"id":14, "shop_ref":"SHOP-2026-08-10-M64", "source_kind":"photo", "status":"NEEDS_DECISION",
+ "transcript_len":0, "provider":"NULL", "model":"NULL", "confidence":"NULL", "needs_review":true,
+ "shop_line_rows":35,
+ "raw_media_path":"C:\\.fusion247\\asdair\\shopper-media\\tg-shopper-chat-8601328832-msg-64-AQAD8xBrG5YW0FN-.jpg"}
+```
+
+**35 line rows. Zero-length transcript. No provider. No model. No confidence.**
+
 **And yet 35 `asdair.shop_line` rows existed**, each with a plausible `raw_reading`, each carrying a
 `line_no`, most resolved to a catalogue product, and 28 of them promoted to `requested` list items.
 
@@ -93,6 +122,12 @@ impeccably on top of a fiction.
 7. **£74.30 was outside SOP-021 rule 7's expected £120–150 band.** The SOP requires that band be
    checked and flagged. Larry did not use that signal, and reported success instead.
 8. **Warwick caught it**, by looking at the price.
+
+**TWO in-repo signals were already sitting there and neither was consulted** (found by Pax, not by
+Larry): `SOP-021` line 267 sets the **£120–150** band and instructs that anything outside it be
+flagged; and `RUNTIME-DECISION.md` line 53 records the household's **last real basket at 35 products
+/ £136.94**. **£74.30 across 23 items is roughly 54% of the last real shop.** Both numbers were in
+the repository, in files Larry had open that evening, and the success claim was made anyway.
 
 **Every control in the estate was green while this happened.** 1,982 unit tests, three Keel
 read-back gates, two Veritas gates, a secret scanner, and a mutation-proof harness. **None of them
