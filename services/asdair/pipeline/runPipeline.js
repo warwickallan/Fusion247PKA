@@ -2065,7 +2065,24 @@ export function messageForTransition(shop, result) {
       return {
         kind: 'progress',
         discriminator: 'browser.queued',
-        payload: { shopRef: shop.shop_ref, stage: 'browser build requested' },
+        payload: {
+          shopRef: shop.shop_ref,
+          stage: 'browser build requested',
+          // WHERE THE CHECKLIST IS (AC7). Until this, the handover card told
+          // Warwick the browser build had been requested and gave him no way to
+          // reach what he was supposed to shop FROM - the checklist was rendered
+          // nowhere, by nothing. The path is built from the shop_ref he already
+          // recognises and carried on the DURABLE payload, so the card says the
+          // same thing however many passes later it is sent.
+          //
+          // A PATH, not an absolute URL: this module has no business knowing the
+          // cockpit's host, and a hard-coded one would be wrong on the first
+          // machine that differed. The renderer shows the path; a base URL is
+          // Mack's to configure. Honest either way, and never a dead link.
+          checklistPath: `/asdair/checklist?shop=${shop.shop_ref}`,
+          basketLines: result.packet_lines ?? null,
+          held: result.held_lines ?? null,
+        },
       };
     case 'ORDER_CONFIRMATION_RECEIVED':
       return {

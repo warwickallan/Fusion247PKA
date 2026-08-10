@@ -1582,3 +1582,150 @@ test('A CORRELATOR THAT THROWS never eats the message', async () => {
   assert.equal(report.intake.claimed, 0);
   assert.equal(report.intake.received, 1, 'a failed correlation lost the message entirely');
 });
+
+// =====================================================================
+// AC5 - THE ARTEFACT IS PRODUCED BY THE REAL PASS, ONCE
+//
+// Root CLAUDE.md, "Nothing may live only in Larry's head": a callable
+// buildHandoff(), a green unit test and a successful manual invocation prove
+// CAPABILITY only. So this test invokes nothing directly. It drives `runOnce` -
+// the exact function `runtime.js main()` calls on every `--once` and every tick
+// of `--watch` - and asserts on what the pass LEFT BEHIND in durable state.
+//
+// And it runs the pass MANY times, not once. The estate has shipped the
+// once-per-round defect twice: eighteen identical clarification cards in
+// seventeen minutes, keyed on a value that changed every round. A single pass
+// cannot distinguish "produced once" from "produced once per minute", so a
+// single pass is not the proof.
+// =====================================================================
+
+/** Drive the real pass until the shop stops moving, or `limit` passes elapse. */
+async function passUntilSettled(h, bot, limit = 8) {
+  let passes = 0;
+  for (; passes < limit; passes += 1) {
+    const report = await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+    if (report.stepped === 0) break;
+  }
+  return passes;
+}
+
+test('AC5: the REAL PASS leaves a durable browser handoff, and TWELVE passes leave exactly ONE', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+
+  assert.equal(h.db.shop[0].status, 'READY_TO_SHOP');
+  // NOTHING IS HANDED OVER BEFORE WARWICK ASKS. The "Build ASDA basket" gate is
+  // deliberate (stages.js READY_TO_SHOP waitsFor), and this pins that closing
+  // the seam did not quietly remove it.
+  assert.equal(h.db.browser_build_request.length, 0,
+    'a shop must not be handed to a browser step nobody asked for');
+
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+
+  // THE PASS RUNS EVERY MINUTE. Twelve minutes of it.
+  for (let i = 0; i < 12; i += 1) {
+    await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  }
+
+  assert.equal(h.db.browser_build_request.length, 1,
+    'twelve passes must leave ONE browser build request, not twelve');
+
+  const request = h.db.browser_build_request[0];
+  assert.ok(request.progress && request.progress.handoff,
+    'the pass must leave a durable HANDOFF on the request - a bare "go and shop" row is the defect');
+  assert.ok(request.progress.handoff.packet_fingerprint,
+    'and it must be bound to the packet it was built from');
+  assert.equal(request.progress.handoff.opened_by, 'asdair:pipeline',
+    'PRODUCED BY THE PIPELINE. A handoff opened by anything else would prove capability, not automation.');
+  assert.ok(request.progress.handoff.instructions_version,
+    'the operating contract version travels with it - buildHandoff refuses to build without one');
+
+  assert.equal(h.db.shop[0].status, 'WAITING_FOR_BROWSER');
+});
+
+test('AC5: Warwick is told ONCE that the basket build was handed over, not once per pass', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+
+  for (let i = 0; i < 12; i += 1) {
+    await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  }
+
+  // The handover card, on the phone, exactly once across twelve passes.
+  const handover = bot.sent.filter((s) => /browser build requested/.test(s.message.text || ''));
+  assert.equal(handover.length, 1,
+    `Warwick received ${handover.length} handover cards. Twenty identical cards is the defect this build has `
+    + 'already shipped twice; the key must be stable for the life of the shop.');
+  assert.equal(ledger(h, 'outbox', 'progress').filter((c) => c.status === 'pending').length, 0,
+    'and nothing is left stuck in the outbox');
+});
+
+// =====================================================================
+// AC7 - THE CHECKLIST WARWICK ACTUALLY SHOPS FROM
+//
+// AC5 proved the real pass leaves a durable artefact. That is not yet a shop:
+// until this, the artefact stored on the request was a RECEIPT - a fingerprint,
+// two version numbers and the expected counts - so a supervised worker who
+// claimed it had nothing to shop from, and renderChecklist(), which renders
+// from the artefact and nothing else, had no artefact to render.
+//
+// These drive the REAL PASS and then render what it left behind, through the
+// SAME renderer the cockpit route uses. Nothing is invoked by hand.
+// =====================================================================
+
+test('AC7: the artefact the REAL PASS stores renders a checklist with the lines, method and prohibitions', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+
+  const stored = h.db.browser_build_request[0].progress.handoff;
+
+  // THE ARTEFACT, NOT A RECEIPT. Each of these was absent before 2026-08-10.
+  assert.ok(Array.isArray(stored.lines) && stored.lines.length > 0,
+    'the pass stored no LINES - a worker claiming this request has nothing to shop from');
+  assert.ok(Array.isArray(stored.method) && stored.method.length > 0, 'the pass stored no METHOD');
+  assert.ok(Array.isArray(stored.prohibited_actions) && stored.prohibited_actions.length > 0,
+    'the pass stored no PROHIBITIONS - the five things that must never happen');
+
+  // AND IT RENDERS. Through the one renderer, the same one the cockpit calls.
+  const { renderChecklist } = requireCjs('../handoff/renderChecklist.js');
+  const md = renderChecklist(stored);
+  for (const line of stored.lines) {
+    assert.ok(md.includes(line.canonical_product_name), `"${line.canonical_product_name}" missing from the checklist`);
+  }
+  for (const p of stored.prohibited_actions) {
+    assert.ok(md.includes(p.text), `prohibition "${p.text}" missing from the checklist`);
+  }
+  assert.ok(md.includes(stored.packet_fingerprint), 'the fingerprint he must quote back is missing');
+});
+
+test('AC7: the handover card TELLS Warwick where the checklist is', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  for (let i = 0; i < 6; i += 1) {
+    await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  }
+
+  const handover = bot.sent.filter((s) => /browser build requested/.test(s.message.text || ''));
+  assert.equal(handover.length, 1, 'still exactly one handover card across many passes');
+  assert.match(handover[0].message.text, /\/asdair\/checklist\?shop=SHOP-/,
+    'the card must carry the route to the checklist. Telling him the shop is ready while giving him no '
+    + 'way to reach the list is the silent park this build has already closed three times.');
+  assert.match(handover[0].message.text, new RegExp(REF),
+    'and it must name HIS shop, not just a route');
+});

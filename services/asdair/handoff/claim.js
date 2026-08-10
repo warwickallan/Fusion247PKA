@@ -47,7 +47,32 @@
 // =====================================================================
 'use strict';
 
-const DEFAULT_LEASE_MS = 45_000;
+// THE LEASE IS SIZED FOR A PERSON, NOT FOR A CDP RUNNER. Warwick, 2026-08-09:
+// "Retain lease/fencing but NOT a 45-second CDP lease for a human-paced step."
+//
+// This module's claimant is the SUPERVISED browser step - a human, or Sonnet in
+// Claude for Chrome under a human's supervision. It has no programmatic trigger
+// (see README.md) and therefore nothing that reliably heartbeats every ten
+// seconds. browser-runner/lease.cjs keeps 45_000 and is RIGHT to: that claimant
+// is a machine process with a heartbeat timer, and a short window there is what
+// recovers a runner killed with -9.
+//
+// At 45 seconds against a human the expiry did the OPPOSITE of its job. Warwick
+// starts shopping, is interrupted, makes a coffee; the lease lapses under him
+// and a second writer becomes eligible for the same trolley - a data-corruption
+// defect, not an inconvenience. The expiry exists to stop two writers; sized for
+// the wrong actor it invites them.
+//
+// 90 minutes covers a ~40 minute shop plus a long interruption, and stays
+// BOUNDED so an abandoned session self-heals rather than wedging the request for
+// ever. Expiry remains RECOVERABLE (another writer may claim once it lapses) and
+// VISIBLE (`progress._lease.expires_at`, written from the DATABASE clock). The
+// fencing itself is untouched: every progress, heartbeat and completion write
+// still carries the runner_id guard.
+//
+// Pinned by claim.test.js against literals held in the TEST, so restoring the
+// CDP value here fails the suite rather than silently re-opening the window.
+const DEFAULT_LEASE_MS = 90 * 60_000;
 const DEFAULT_HEARTBEAT_MS = 10_000;
 const LIVE_STATUSES = ['queued', 'claimed', 'running'];
 const TERMINAL_STATUSES = ['complete', 'failed', 'cancelled'];
@@ -98,14 +123,42 @@ function leaseIsLive(row, nowMs) {
   return new Date(lease.expires_at).getTime() > nowMs;
 }
 
-/** The handoff block stored on the request row. */
+/**
+ * The handoff block stored on the request row - THE WHOLE ARTEFACT, not a receipt.
+ *
+ * ── WHAT THIS USED TO STORE, AND WHY IT WAS THE DEFECT ──────────────────────
+ * Six summary fields: the fingerprint, the shop ref, two version numbers and the
+ * expected counts. No lines. No method. No prohibitions. So a supervised worker
+ * who claimed this request was handed A FINGERPRINT AND SOME COUNTS and had
+ * nothing whatsoever to shop from, and `renderChecklist()` - which renders from
+ * the artefact and nothing else - had no artefact to render.
+ *
+ * That is the same defect class Lane C closed one layer further out: the
+ * producers existed, were correct, and reached nobody. A receipt proves a
+ * handover happened; it is not the thing being handed over.
+ *
+ * ── WHY STORED, WHEN THIS SYSTEM'S RULE IS RECOMPUTE-NOT-STORE ──────────────
+ * Because recomputation is no longer deterministic and the checklist must not
+ * drift from the packet it is bound to. Since WP-B15-3 every plan recomputation
+ * runs `planWithDecisions`, which CONSULTS A MODEL - so rebuilding the artefact
+ * at read time could legitimately produce a different basket from the one the
+ * handover recorded, and Warwick would shop from a list that no longer matches
+ * `packet_fingerprint`. `makeVerificationFor` already refuses to verify across
+ * that boundary; letting a human shop across it would be worse.
+ *
+ * It would also put a model call on a page view.
+ *
+ * So the artefact is written ONCE, at handover, bound to the fingerprint it was
+ * built from, and rendered on demand from what was stored. Recomputation still
+ * owns everything upstream of the handover; nothing here recomputes.
+ *
+ * The six original fields are all fields OF the artefact, so spreading it is
+ * strictly additive - every existing reader (openHandoff's resume comparison,
+ * completeHandoff's fingerprint guard, the cockpit) keeps working unchanged.
+ */
 function handoffBlock(handoff, openedBy) {
   return {
-    packet_fingerprint: handoff.packet_fingerprint,
-    shop_ref: handoff.shop_ref,
-    handoff_version: handoff.handoff_version,
-    instructions_version: handoff.instructions_version,
-    expected: { distinct_products: handoff.expected.distinct_products, total_units: handoff.expected.total_units },
+    ...handoff,
     opened_by: openedBy == null ? null : String(openedBy),
   };
 }

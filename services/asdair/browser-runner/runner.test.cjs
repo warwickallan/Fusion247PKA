@@ -284,6 +284,82 @@ test('being throttled leaves the request queued for later rather than marking it
   assert.strictEqual(row.claimed_by, null, 'and the lease is given back');
 });
 
+// =====================================================================
+// AC6(f) - THE PRODUCER/CONSUMER KEY MISMATCH
+//
+// The Wayfinder recorded this as "openHandoff writes progress.handoff while
+// runner.js reconstruct() reads progress.plan, so a CDP arm can still ignore
+// the payload." The measured behaviour was worse than "ignore": an absent
+// progress.plan validated to an EMPTY plan, the step loop never entered, and
+// run() fell through to finishBasketReady() - marking the request complete and
+// the shop BASKET_READY with an empty trolley.
+//
+// These tests drive the REAL producer (handoff/claim.js openHandoff, over its
+// own offline fake) into the REAL consumer, so nothing about the payload shape
+// is guessed at here. If either end changes its key, the first test fails.
+// =====================================================================
+
+const os = require('node:os');
+const path = require('node:path');
+const fs = require('node:fs');
+const { buildHandoff } = require('../handoff/buildHandoff.js');
+const { openHandoff } = require('../handoff/claim.js');
+const { basePacket } = require('../handoff/test/fixtures.js');
+const { makeFakeStore: makeHandoffStore } = require('../handoff/test/fakeRequestStore.js');
+
+/** The progress block the PIPELINE actually writes, produced by the real producer. */
+async function pipelineWrittenProgress() {
+  const store = makeHandoffStore({ requests: [], now: () => new Date() });
+  const opened = await openHandoff(store.query, {
+    shopId: 1, handoff: buildHandoff(basePacket()), openedBy: 'asdair:pipeline',
+  });
+  return opened.request.progress;
+}
+
+test('AC6(f): the producer writes progress.handoff and no progress.plan - the mismatch is real', async () => {
+  const progress = await pipelineWrittenProgress();
+  assert.ok(progress.handoff, 'openHandoff must write the artefact under progress.handoff');
+  assert.ok(progress.handoff.packet_fingerprint, 'and it must carry the packet fingerprint');
+  assert.ok(!Array.isArray(progress.plan),
+    'openHandoff writes no progress.plan. This assertion IS the mismatch: the CDP arm reads that key. '
+    + 'If a later change starts synthesising a plan here, read reconstruct()\'s header before deleting this.');
+});
+
+test('AC6(f): an arm handed a supervised handoff REFUSES - it never reports a basket it did not build', async () => {
+  const progress = await pipelineWrittenProgress();
+  const { runner, query, session } = scenario({ plan: [], progress });
+
+  const res = await runner.run({});
+
+  // THE PROPERTY. Before the fix this returned { outcome: 'basket_ready' }.
+  assert.strictEqual(res.outcome, 'failed', 'an unexecutable request must fail loudly, not succeed quietly');
+  assert.match(res.error, /NoExecutablePlanError/);
+  assert.match(res.error, /progress\.plan/, 'the reason must name the key it could not find');
+
+  assert.deepStrictEqual(commandsIssued(session), [], 'not one browser command may be issued');
+  const row = query.state.requests[0];
+  assert.notStrictEqual(row.status, 'complete', 'the request must NOT be completed');
+  assert.strictEqual(row.status, 'failed', 'it is parked FAILED, visibly, with a reason');
+  assert.ok(/NoExecutablePlanError/.test(String(row.last_error)), 'and the reason is durable on the row');
+  assert.strictEqual(query.state.shops[0].status, 'WAITING_FOR_BROWSER',
+    'the SHOP must not be moved - BASKET_READY on an empty trolley is the defect this closes');
+});
+
+test('AC6(f): --plan-file remains the explicit way to give this arm real work', async () => {
+  const progress = await pipelineWrittenProgress();
+  const { runner, session } = scenario({ plan: [], progress });
+  const planFile = path.join(os.tmpdir(), `asdair-plan-${process.pid}.json`);
+  fs.writeFileSync(planFile, JSON.stringify(PLAN), 'utf8');
+  try {
+    const res = await runner.run({ planFile });
+    assert.strictEqual(res.outcome, 'basket_ready', 'an explicitly supplied plan still runs');
+    assert.deepStrictEqual(commandsIssued(session),
+      ['add_known_product', 'select_search_result', 'set_quantity', 'read_basket']);
+  } finally {
+    fs.unlinkSync(planFile);
+  }
+});
+
 test('argument parsing carries only known switches', () => {
   const a = parseArgs(['--request', '7', '--lease-ms', '1000', '--dry-run', '--plan-file', 'p.json']);
   assert.strictEqual(a.requestId, '7');

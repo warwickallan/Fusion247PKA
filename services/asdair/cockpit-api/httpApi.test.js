@@ -165,16 +165,17 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   assert.equal(res.status, 404);
   assert.deepEqual(res.body.routes, ROUTES);
   // Pinned to a LITERAL so growing the surface is a deliberate edit here, never
-  // a silent side effect. It has already done that job TWICE: adding
-  // GET /asdair/rules failed this line before anything else noticed, and so did
-  // adding GET /asdair/packet.
-  assert.equal(ROUTES.length, 6);
+  // a silent side effect. It has already done that job THREE times: adding
+  // GET /asdair/rules failed this line before anything else noticed, then
+  // GET /asdair/packet, and then GET /asdair/checklist.
+  assert.equal(ROUTES.length, 7);
   assert.ok(ROUTES.includes('GET /asdair/rules'));
   assert.ok(ROUTES.includes('GET /asdair/packet'));
+  assert.ok(ROUTES.includes('GET /asdair/checklist'));
   // The header comment above ROUTES states a count in prose. Prose rots; this
   // asserts the two agree, which is why the header's stale "THREE" cannot recur.
   const header = require('node:fs').readFileSync(require('node:path').join(__dirname, 'httpApi.js'), 'utf8');
-  assert.ok(/SIX ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
+  assert.ok(/SEVEN ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
 });
 
 test('the packet route forwards the reader payload verbatim', async () => {
@@ -265,4 +266,51 @@ test('a stored path that escapes the root is refused', () => {
   });
   // A sibling directory whose name merely starts with the root must not pass.
   assert.equal(resolveMediaPath('../asdair-backup/x.jpg', root).ok, false);
+});
+
+// ── THE CHECKLIST ROUTE ───────────────────────────────────────────────────
+// Markdown for a person on a phone; ?format=json for a caller that wants the
+// state. A state that is not `ready` is still a 200, because "not handed over
+// yet" is a true answer to a well-formed question, not a broken link.
+
+test('GET /asdair/checklist serves the checklist as MARKDOWN, not as JSON', async () => {
+  const res = await handleRequest(
+    { method: 'GET', path: '/asdair/checklist', query: { shop: '1' } },
+    { readChecklist: async () => ({ ok: true, state: 'ready', markdown: '# ASDA basket - SHOP-X\n- [ ] 1. milk' }) }
+  );
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /text\/markdown/);
+  assert.equal(res.body, '# ASDA basket - SHOP-X\n- [ ] 1. milk');
+  assert.equal(typeof res.body, 'string', 'a phone must not have to unwrap JSON to read a shopping list');
+});
+
+test('GET /asdair/checklist?format=json returns the state and counts', async () => {
+  const payload = { ok: true, state: 'ready', markdown: '# x', lines_count: 4, packet_fingerprint: 'abc' };
+  const res = await handleRequest(
+    { method: 'GET', path: '/asdair/checklist', query: { shop: '1', format: 'json' } },
+    { readChecklist: async () => payload }
+  );
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /application\/json/);
+  assert.equal(res.body.lines_count, 4);
+});
+
+test('a shop with no handover answers 200 with the REASON - never an empty list', async () => {
+  const res = await handleRequest(
+    { method: 'GET', path: '/asdair/checklist', query: { shop: '1' } },
+    { readChecklist: async () => ({ ok: true, state: 'not_handed_over', markdown: null, message: 'This shop has not been handed over to the browser step yet.' }) }
+  );
+  assert.equal(res.status, 200, '"not yet" is a true answer, not a 404');
+  assert.match(res.body, /No checklist yet/);
+  assert.match(res.body, /has not been handed over/, 'the reason must reach the page');
+});
+
+test('a read failure on the checklist route is a scrubbed 500, never a stack', async () => {
+  const res = await handleRequest(
+    { method: 'GET', path: '/asdair/checklist', query: { shop: '1' } },
+    { readChecklist: async () => { throw new Error('connect ECONNREFUSED postgres://u:p@h/db'); } }
+  );
+  assert.equal(res.status, 500);
+  assert.equal(res.body.error, 'read_failed');
+  assert.ok(!/postgres:\/\/u:p/.test(JSON.stringify(res.body)), 'a connection string must never reach a browser');
 });
