@@ -114,6 +114,31 @@ Keel built it, the existing suite caught that it silently dropped Warwick's own 
 cockpit's additions, and it **reverted rather than shipped**. Silent partial loss is worse than the
 bug it replaced.
 
+**8. MY OWN FINDING BECAME THE AUTHORITY FOR A WRONG DECISION, AND I NEARLY ACTED ON MY SUMMARY
+INSTEAD OF THE CODE.**
+
+I wrote a finding saying durable learning was *"built, tested and DELIBERATELY UNWIRED"*. Every word
+was true. Hours later I read my own document, inferred *"so wire it"*, and **cut a worktree to
+dispatch that**. What stopped me was reading the modules, where `buildAnswerLearning.js` carries a
+header written for exactly this moment: *"WHAT MAKES NEXT WEEK'S QUESTION NOT HAPPEN — and it is NOT
+the rule. Read this before changing anything here, because the obvious answer is the wrong one."*
+Wiring it would have produced audit rows that change no basket.
+
+Two things in this, and the second is the durable one:
+
+- **A finding that states a FACT without its CONSEQUENCE invites the wrong fix.** "Unwired" is a
+  fact. "Wiring it would not deliver the outcome, and here is what would" is the thing a later
+  reader — including me — actually needs. **A finding should carry what it implies for action, or it
+  becomes a trap with my own name on it.**
+- **The estate's code comments are load-bearing documentation, not commentary.** Three times tonight
+  a comment written by a previous worker prevented a defect: this one, `runner.js reconstruct()`'s
+  explanation of the two-arm split, and `deps.js:317`'s reason for the deferral. **Read the comment
+  before changing the code it guards.**
+
+*(Recorded because the near-miss is more instructive than the catch. Five times today I diagnosed
+from the shape of a symptom; this is the only one where nothing external caught it and the code
+itself did.)*
+
 ---
 
 ## Open at the close of this window
