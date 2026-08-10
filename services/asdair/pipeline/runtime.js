@@ -1479,6 +1479,29 @@ async function main() {
   const wiring = await realWiring(deps);
   wiring.log = (event, detail) => console.log(JSON.stringify({ event, ...detail }));
 
+  // ── OBSERVABLE AT BOOT, 2026-08-10 ─────────────────────────────────────────
+  // The checklist link's origin is read ONCE, from the environment, when the
+  // bot is wired. Nothing exposed it, so nobody could tell from outside what
+  // the next handover card would carry - and a card carrying a bare path is
+  // the whole defect this base URL exists to fix.
+  //
+  // Veritas held on exactly that: not a stable approved runtime, not
+  // observable, real production event not exercised. This closes the middle
+  // one. It reports what THIS process actually resolved, not what a status
+  // tool's own environment happens to hold - a value read in a different
+  // process is a surface merely correlated with the outcome, which is the
+  // measurement mistake this estate keeps making.
+  //
+  // Absent is logged as loudly as present, because absent is the state that
+  // silently degrades the card back to an unusable path.
+  wiring.log('checklist_base_url', {
+    set: Boolean(wiring.bot && wiring.bot.checklistBaseUrl),
+    value: (wiring.bot && wiring.bot.checklistBaseUrl) || null,
+    consequence: (wiring.bot && wiring.bot.checklistBaseUrl)
+      ? 'handover cards carry a tappable absolute URL'
+      : 'handover cards carry a BARE PATH Warwick cannot open - set ASDAIR_COCKPIT_BASE_URL',
+  });
+
   try {
     if (once) {
       const report = await runOnce(deps, wiring);
