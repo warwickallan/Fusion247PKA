@@ -36,6 +36,20 @@ const P = require('./progress.cjs');
 const { validatePlan } = require('./commands.cjs');
 const { Session, ReauthRequiredError, RateLimitedError, sleep } = require('./browser.cjs');
 
+/**
+ * THE REQUEST CARRIES NOTHING THIS RUNNER CAN EXECUTE.
+ *
+ * Named, so `run()`'s catch parks the request FAILED with a readable reason
+ * rather than letting the arm report a basket it never built. See reconstruct().
+ */
+class NoExecutablePlanError extends Error {
+  constructor(msg, detail = {}) {
+    super(msg);
+    this.name = 'NoExecutablePlanError';
+    this.detail = detail;
+  }
+}
+
 const DEFAULTS = Object.freeze({
   leaseMs: lease.DEFAULT_LEASE_MS,
   heartbeatMs: lease.DEFAULT_HEARTBEAT_MS,
@@ -123,6 +137,37 @@ class Runner {
    * RECONSTRUCT AFTER RESTART. The plan and everything already done live in the
    * durable row, so a fresh process rebuilds exactly where the dead one stopped
    * without being told anything.
+   *
+   * ── AN EMPTY PLAN IS A REFUSAL, NOT "EVERYTHING IS ALREADY DONE" ────────────
+   * This is the AC6(f) defect, and it was worse than the Wayfinder's wording
+   * ("a CDP arm can still ignore the payload") implies. The pipeline's producer,
+   * `handoff/claim.js openHandoff`, writes the artefact under `progress.handoff`;
+   * this method reads `progress.plan`. Nothing writes `progress.plan` on the
+   * production route, so `validatePlan(undefined || [])` returned `[]`,
+   * `remainingPlan` returned `[]`, `run()`'s step loop never entered, and control
+   * fell straight through to `finishBasketReady()`.
+   *
+   * The arm did not merely ignore the payload. IT REPORTED A BASKET IT HAD NEVER
+   * BUILT - marking the request complete and the shop BASKET_READY with an empty
+   * trolley. A silent false success is the one outcome this build treats as worse
+   * than a hard stop, so an empty plan now throws.
+   *
+   * ── WHY THE FIX IS HERE AND NOT IN openHandoff ──────────────────────────────
+   * Because a handoff CANNOT be mechanically translated into this runner's
+   * allowlisted steps, and pretending otherwise would be the real defect. Under
+   * Warwick's Product Ruling 2 a known line with no usable ASDA reference travels
+   * `source_view: "search"` carrying a RETRIEVAL contract - verify identity
+   * before adding. The only allowlisted step that adds a searched product is
+   * `select_search_result`, which requires a `product_ref` that, by definition,
+   * that line does not have. Synthesising one would be exactly the least-bad
+   * match this estate refuses everywhere else, and it would do it while holding
+   * the trolley.
+   *
+   * So the two ends are made to AGREE by refusing, not by inventing: the
+   * supervised route consumes `progress.handoff`, this arm consumes
+   * `progress.plan`, and an arm handed a supervised handoff it cannot execute
+   * stops loudly instead of completing an empty shop. `--plan-file` remains the
+   * explicit, human-supplied way to give this runner real work.
    */
   reconstruct({ planFile = null } = {}) {
     let rawPlan = this.progress.plan;
@@ -132,6 +177,24 @@ class Runner {
       this.log(`no plan on the request - seeded ${rawPlan.length} step(s) from ${planFile}`);
     }
     this.plan = validatePlan(rawPlan || []);
+    if (this.plan.length === 0) {
+      const handoff = this.progress.handoff || null;
+      throw new NoExecutablePlanError(
+        handoff
+          ? `this request carries a SUPERVISED handoff (packet ${handoff.packet_fingerprint || 'unknown'}, `
+            + `shop ${handoff.shop_ref || 'unknown'}) under progress.handoff, and no executable step plan under `
+            + 'progress.plan. This runner executes progress.plan only. Refusing rather than reporting a basket '
+            + 'that was never built - hand this shop to the supervised browser route, or supply --plan-file.'
+          : 'this request carries no executable step plan (progress.plan is absent or empty). Refusing rather '
+            + 'than reporting a basket that was never built.',
+        {
+          requestId: this.request ? this.request.id : null,
+          shopId: this.request ? this.request.shop_id : null,
+          hasHandoff: handoff !== null,
+          packetFingerprint: handoff ? handoff.packet_fingerprint || null : null,
+        },
+      );
+    }
     this.remaining = P.remainingPlan(this.plan, this.progress);
     const inFlight = P.inFlightStepId(this.progress);
     this.inFlight = inFlight;
@@ -480,7 +543,7 @@ async function main() {
   return res.outcome === 'basket_ready' || res.outcome === 'human_takeover' ? 0 : (res.outcome === 'failed' ? 1 : 0);
 }
 
-module.exports = { Runner, parseArgs, DEFAULTS };
+module.exports = { Runner, parseArgs, DEFAULTS, NoExecutablePlanError };
 
 if (require.main === module) {
   main().then((c) => process.exit(c)).catch((e) => { console.error('FATAL', e); process.exit(1); });
