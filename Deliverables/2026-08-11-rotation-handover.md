@@ -39,7 +39,7 @@ supersedes_as_entry_point: Deliverables/2026-08-10-rotation-handover.md
 |---|---|
 | Local `main` | `cfea559` + this rotation's documentation commits — see the final commit in the log |
 | `origin/main` | **still far behind.** The push and the merge remain Warwick's (`merge-decision`) |
-| Runtime | **PID 12204, started 2026-08-10 21:40:57, still on PRE-CHANGE bytes.** No cutover was performed tonight |
+| Runtime | **PID 12204, started 2026-08-10 21:40:57, still on PRE-CHANGE bytes.** Command line, recorded exactly: `"C:\Program Files\nodejs\node.exe" C:\Fusion247PKA\services\asdair\pipeline\runtime.js --watch`. It runs from the **PRIMARY CHECKOUT**, so a restart picks up whatever is on `main` at that moment. Scheduled task `MyPKA-AsdAIr-Runtime` state `Ready`. **No cutover was performed tonight** |
 | Working checkout | clean of product code — Larry's own `shop_id` edit was reverted out and banked to a branch |
 | Live DB | migration 019 applied, ledger `20260810215203`; `asdair.regulars` gained 6 rows (114–119) and 2 enriched (37, 85) |
 
