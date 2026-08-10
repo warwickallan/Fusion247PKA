@@ -1195,7 +1195,18 @@ its evidence so it can be re-established or falsified in minutes.**
 > has never run) · **the remembered-choice normaliser mismatch** (his answer under one spelling is
 > not found under another) · **`asdairCommands` ignores `idempotency_key`** while `keys.js` mints one.
 >
-> **THE NEXT REAL ACTION.** Land B15-10, B15-13 and B15-14; re-point `runPipeline`'s duplicate
+> **⚠️ THE LIVE RUNTIME IS DELIBERATELY BEHIND `main`, AND THIS IS A DECISION, NOT DRIFT.**
+> PID 6592 started 2026-08-10T17:56:08Z and therefore predates the integrations of B15-11, B15-12,
+> B15-09 and B15-10. **It does not have the board.** Two reasons, both load-bearing:
+> **(1)** WP-B15-15 is fixing a KNOWN truthfulness defect in that board — it can render
+> `blocked: false` about a shop that cannot move — and **shipping a board that lies is worse than
+> shipping no board, because Warwick would believe it**; **(2)** `editMessageText` has never met the
+> real Bot API, so the board is unproven where it counts. Cutting over five times would also mean
+> five live restarts. **If Warwick sends a photograph before cutover he gets the OLD eight-card
+> surface** — he has been told to hold, and no inbound traffic has arrived. Cut over ONCE, after the
+> batch, **via the scheduled task**.
+>
+> **THE NEXT REAL ACTION.** Land B15-13, B15-14, B15-15 and B15-16; re-point `runPipeline`'s duplicate
 > pack-size rule; cut the runtime over **via the scheduled task** (`ASDAIR_COCKPIT_BASE_URL` comes
 > from the user environment, NOT the env files — a shell restart silently loses the checklist link);
 > then Veritas Gate 1 + Gate 2 under the **amended contract**. **Only then** ask Warwick for a fresh
