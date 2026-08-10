@@ -73,3 +73,58 @@ building on sand.
 
 **Queued, not dropped, and written down rather than carried** — the rule this whole class of defect
 breaks.
+
+---
+
+## CORRECTION — 2026-08-10. **I was about to order the wrong fix. The code stopped me.**
+
+This document said durable learning is "built, tested and DELIBERATELY UNWIRED", and I read that as
+*the second half Warwick asked for does not run, so wire it.* **I had cut a worktree to dispatch
+exactly that.** Then I read the modules, and the estate's own comments say the obvious fix is the
+wrong one.
+
+### What is actually true
+
+**1. The learning that matters IS wired, and it fires at RECONCILE.**
+`deps.js:789` binds `recordLearning: realRecordLearning`, and `runPipeline.js:2198 stepReconcile`
+calls it as *"the last arc of the cycle: what actually arrived becomes next week's catalogue."* It
+performs **alias enrichment** — `add_aka` for any line that resolved by something weaker than an
+exact alias, which is precisely the case where the household's shorthand is missing from the
+catalogue.
+
+**2. Wiring `promoteDecision` would NOT stop next week's question, and `buildAnswerLearning.js` says
+so in its own header — in a passage written to stop somebody doing exactly what I was about to do:**
+
+> *"WHAT MAKES NEXT WEEK'S QUESTION NOT HAPPEN — and it is NOT the rule. Read this before changing
+> anything here, because the obvious answer is the wrong one. A promoted STANDING RULE is the audit
+> record of a decision. It is NOT reliably the thing that stops the question, because `planner.js`
+> `actionableRules()` DISCARDS every rule whose directive is `info`, and an unproven promotion is
+> inert `info` BY DESIGN; and rule matching is exact-string on `match_term`."*
+
+So wiring it would have produced audit rows that change no basket — and at worst a drift of inert
+rules nobody reads, which is the "built something that looks like the fix" failure this estate has
+been burned by.
+
+**3. `promoteDecision`'s deferral has a real reason, not an oversight.** `deps.js:317`: the pipeline
+*"does not currently capture 'and this applies going forward' as a distinct human act"*, and
+guessing it is the ambiguous-inference failure its own provenance guard exists to stop.
+
+### So why has nothing been learned?
+
+**Because no shop has ever reached `RECONCILED`.** Learning fires in `stepReconcile`, at the end of
+a completed cycle — and the cycle has never completed, because the supervised browser step dead-ends
+(see [[2026-08-10-finding-supervised-browser-dead-end]], now partly closed by WP-B15-14).
+
+**The learning half is not missing. It is downstream of the gap I have spent the evening fixing.**
+
+### Corrected disposition
+
+**No order is raised for this, and the worktree I cut for it has been removed.** The right sequence
+is: finish the journey → a shop reconciles → alias enrichment runs for the first time → then judge
+from real rows whether Warwick is still asked things he has already answered. **If he is, the fix is
+in the resolver and the alias corpus, not in promoting rules** — and WP-B15-13's remembered-choice
+finding (a memory keyed on a different normaliser) is already the more likely culprit.
+
+**What stands from the original document:** two of Warwick's four typed answers on
+`SHOP-2026-08-10-M64` expressed standing preferences and nothing durable was written from them. That
+observation is still true. What was wrong was my inference about the cause and the fix.
