@@ -155,6 +155,35 @@ zero browser commands were issued between claiming and releasing.
 
 ## D — STOP AT BASKET-READY
 
+> ### ⚠️ SUPERSEDED BEHAVIOUR — 2026-08-10, WP-B15-12. The RUN below happened; it can no longer happen this way.
+>
+> **This section, §B's closing line, §E step 5 and §"Trolley restoration" all record `--dry-run`
+> runs reaching `status complete` / `runner_state basket_ready` and moving a shop
+> `WAITING_FOR_BROWSER → SHOPPING → BASKET_READY`. A dry run no longer does any of that.**
+>
+> **A rehearsal must not move real shop state.** A `--dry-run` against a real request used to mark
+> it complete and transition a real shop to `BASKET_READY` **having issued not one browser
+> command** — the purest instance of the thing Warwick required to be impossible: *"the browser must
+> never claim BASKET_READY for an empty or unbuilt trolley."* A dry run has by definition built
+> nothing.
+>
+> **Current behaviour:** a dry run ends `status queued`, `runner_state dry_run`, and the shop is
+> left unchanged at `WAITING_FOR_BROWSER`. Separately, a REAL run whose basket read-back reports
+> zero products now throws `EmptyBasketError` and parks the request `failed` rather than declaring
+> a basket.
+>
+> **The properties these sections were written to prove are UNAFFECTED** — §B's no-duplicate
+> property and §E's kill-and-recover property both still hold, and were re-proven green. Only the
+> terminal line differs. §"Trolley restoration" is the one substantive change: a dry run now
+> *releases* rather than *finishes*, so `finish` is no longer on the dry-run path.
+>
+> **The runs below are NOT rewritten.** They are a true record of what the runner did on the day,
+> and history is not edited to make old bytes disappear. This banner states what changed and why, so
+> a reader does not mistake a historical transcript for current behaviour.
+>
+> *Also stale and NOT caused by this change:* §"Offline test suite" records `# tests 65 / pass 65`.
+> It was already stale at 78 before WP-B15-12 and is **92** as of this commit.
+
 Reached at the end of run B:
 
 ```
