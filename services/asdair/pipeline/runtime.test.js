@@ -24,6 +24,9 @@ import { makeHarness, makeIntake, textUpdate, callbackUpdate, HOUSEHOLD_ID } fro
 import {
   runOnce, runWatch, pollIntake, routeTaps, drainOutbox, queueShopCards, createCapturingTelegram,
   BASKET_HANDBACK_CONTRACT, basketHandbackPayload, withChecklistUrl,
+  // WP-B15-15. The board's truthfulness is decided by these two pure functions,
+  // so they are proven directly as well as through the wire.
+  boardStateOf, parkStateOf,
 } from './runtime.js';
 import { MESSAGES } from '../bot/renderMessages.js';
 import { intentToCommand, ADAPTER_REFUSALS } from './telegramAdapter.js';
@@ -36,8 +39,11 @@ import { buildAnswerArg, isValidShopRef, MAX_SHOP_REF_BYTES } from '../bot/callb
 // WP-B15-07 / AC9. The three downstream pins a fresh shop's ref must survive,
 // imported HERE so the proof runs against the ref the runtime actually created
 // rather than against a ref this file made up.
-import { listDateOf } from './runPipeline.js';
+import { listDateOf, runPipeline } from './runPipeline.js';
 import { buildExecutionPacket } from '../packet/buildExecutionPacket.js';
+// WP-B15-15 AC4. The exclusion statement is imported from the module that OWNS
+// it, so a proof about its text can never drift from the text in production.
+import { _internal as shopLinesSql } from './shopLines.js';
 
 const REF = 'SHOP-2026-08-03';
 
@@ -2482,4 +2488,419 @@ test('B15-09 PRODUCTION WIRING: the real runtime edits the board, and never turn
   // machinery; realWiring must never set it.
   assert.equal(/perQuestionCards/.test(wiring), false,
     'the production wiring re-enables per-question cards - a board plus eight cards is still eight cards');
+});
+
+// =====================================================================
+// WP-B15-15 - THE BOARD IS NEVER WRONG ABOUT BEING BLOCKED
+//
+// WP-B15-09 gave Warwick ONE board and told him to trust it. WP-B15-10 found,
+// while proving something else, that in the one state he most needs telling it
+// says the opposite of the truth.
+//
+// ── THE PARKED-STATE ENUMERATION, WHICH IS THE SCOPE ────────────────────────
+// `planOutcome` (stages.js:337-356) has FOUR exits. A park is an exit with
+// `to: null`; stepPlan takes the `gate.to === null` branch, writes NO
+// transition, and the shop STAYS at PROCESSING.
+//
+//   E0      openQuestions > 0                      -> NEEDS_DECISION   (moves)
+//   PARK-1  needsReview && !interpretationConfirmed -> to:null  wait:interpretation_confirmation
+//   PARK-2  unresolvedLines > 0                    -> to:null  wait:line_resolution
+//   E3      else                                    -> READY_TO_SHOP   (moves)
+//
+// So there are EXACTLY TWO parks, and BOTH are structurally unreachable unless
+// `openQuestions === 0` - which is precisely the condition under which
+// `boardStateOf`'s `outstanding` array is empty and `blocked` was computed as
+// `false`. The board therefore printed "NOTHING IS BLOCKING THIS SHOP" over a
+// shop that cannot reach READY_TO_SHOP, or - with no question rows at all -
+// printed nothing whatsoever.
+//
+// PARK-1 IS THE OLDER AND MORE REACHABLE OF THE TWO, and it is the recorded
+// shape of shop 6: PROCESSING, needs_review, every question answered, five
+// days, not one event. A fix aimed only at PARK-2 would have left the board
+// asserting "nothing is blocking" over exactly that.
+//
+// Every test below fails against the behaviour that shipped before this Work
+// Package. They are the RED half of AC5.
+// =====================================================================
+
+/**
+ * Drive a shop into the exact window planOutcome's parks live in: PROCESSING,
+ * with zero OPEN questions. Answered rows are left in place deliberately -
+ * "every question is answered" is the state in which the board used to say the
+ * shop was clear.
+ */
+async function shopInParkWindow(h, { needsReview = false, items = [] } = {}) {
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]) });
+  const shop = h.db.shop[0];
+  for (const item of items) {
+    const key = questionKeyFor(item);
+    await h.deps.shopStore.openQuestion({
+      shop_id: shop.id, question_key: key, question_text: `Which product is "${item}"?`, candidates: [],
+    });
+    await h.deps.shopStore.answerQuestion({
+      shop_id: shop.id, question_key: key, answer_text: 'the one I meant', answer_source: 'typed',
+    });
+  }
+  shop.status = 'PROCESSING';
+  shop.needs_review = needsReview;
+  return shop;
+}
+
+/**
+ * The durable trace PARK-2 leaves, written exactly as runPipeline.stepPlan
+ * writes it. This row is the board's ONLY evidence that the line gate parked
+ * this shop, which is why `lines_unresolved` may not be retired.
+ */
+async function announceLinesUnresolved(h, shop) {
+  const storeMod = await import('./store.js');
+  const { outboxKeyFor } = await import('./keys.js');
+  await storeMod.enqueueMessage(h.deps, {
+    householdId: shop.household_id,
+    shopId: shop.id,
+    kind: 'lines_unresolved',
+    key: outboxKeyFor(shop.shop_ref, 'lines_unresolved'),
+    payload: {
+      shopRef: shop.shop_ref, items: ['1 PKT HAM ON THE BONE'], unresolvedCount: 1, awaitingClarification: 0,
+    },
+  });
+}
+
+/** The board text most recently put on the wire, or null. */
+const latestBoard = (bot) => {
+  const all = boardsOf(bot);
+  return all.length === 0 ? null : all[all.length - 1].message.text;
+};
+
+test('B15-15 AC1 PARK-2: the board must not say NOTHING IS BLOCKING a shop parked on unresolved LINES', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const shop = await shopInParkWindow(h, { items: ['richmond pork sausages'] });
+  await announceLinesUnresolved(h, shop);
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const text = latestBoard(bot);
+  assert.ok(text, 'no board reached him at all for a parked shop');
+  assert.equal(/NOTHING IS BLOCKING THIS SHOP/.test(text), false,
+    'the board positively asserted that nothing is blocking a shop that CANNOT reach READY_TO_SHOP - '
+    + 'worse than the eight cards it replaced, because he would believe it');
+  assert.match(text, /THIS SHOP IS BLOCKED/);
+  assert.match(text, /line/i, 'the board says it is blocked but never says the lines are why');
+});
+
+test('B15-15 AC1 PARK-1: the board must not say NOTHING IS BLOCKING a shop parked on an UNCONFIRMED reading', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  // needs_review with no confirmInterpretation ever issued: shop 6's exact
+  // shape, and the park planOutcome checks FIRST.
+  await shopInParkWindow(h, { needsReview: true, items: ['richmond pork sausages'] });
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const text = latestBoard(bot);
+  assert.ok(text, 'no board reached him at all for a parked shop');
+  assert.equal(/NOTHING IS BLOCKING THIS SHOP/.test(text), false,
+    'PARK-1 is the older and more reachable park - repairing PARK-2 alone moves the defect, it does not close it');
+  assert.match(text, /THIS SHOP IS BLOCKED/);
+  assert.match(text, /confirm/i, 'the board never says the unconfirmed reading is what is holding the shop');
+});
+
+test('B15-15 AC1 ORDER: a shop holding BOTH parks reports the one planOutcome checks first', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const shop = await shopInParkWindow(h, { needsReview: true, items: ['richmond pork sausages'] });
+  await announceLinesUnresolved(h, shop);
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const text = latestBoard(bot);
+  assert.ok(text, 'no board reached him at all');
+  // planOutcome evaluates the interpretation gate BEFORE the line gate, so the
+  // board must name the interpretation - and flip to the lines the moment he
+  // confirms the reading. Picking one would make the board disagree with the
+  // authority about why the shop is stopped.
+  assert.match(text, /confirm/i,
+    'the board named the wrong park - it must follow stages.js own ordering, not choose');
+});
+
+test('B15-15 AC2: a question-less parked shop still gets a board - silence is not an acceptable answer', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const shop = await shopInParkWindow(h, { items: [] });
+  await announceLinesUnresolved(h, shop);
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const text = latestBoard(bot);
+  assert.ok(text,
+    'queueBoard returned "no questions" and he was left with NOTHING in exactly the state '
+    + 'he most needs telling');
+  assert.match(text, /THIS SHOP IS BLOCKED/);
+});
+
+test('B15-15 AC2: a question-less shop parked on an UNCONFIRMED reading also gets a board', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await shopInParkWindow(h, { needsReview: true, items: [] });
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  assert.ok(latestBoard(bot), 'the shop is parked and the board does not exist - a park with no voice');
+});
+
+test('B15-15 AC1: where the board CANNOT see, it says so - it never says "nothing is blocking"', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  // PROCESSING, no open questions, and NO park evidence. `unresolvedLines` is
+  // computed by the planner inside runPipeline and cannot be re-derived here;
+  // re-implementing it would create a second authority that can drift from
+  // stages.js, which is the very class of defect this closes. So the board
+  // stops claiming rather than guesses.
+  await shopInParkWindow(h, { items: ['richmond pork sausages'] });
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const text = latestBoard(bot);
+  assert.ok(text);
+  assert.equal(/NOTHING IS BLOCKING THIS SHOP/.test(text), false,
+    'the board cannot see the line gate from here, so asserting the shop is clear is a guess dressed as a fact');
+  assert.match(text, /I cannot tell you whether anything is blocking/,
+    'the renderer has shipped this third state since WP-B15-09 and nothing has ever produced it');
+});
+
+test('B15-15 AC2: an "I cannot tell" state does NOT queue a board of its own - the storm stays off', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await shopInParkWindow(h, { items: [] });   // no questions, no park evidence
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  assert.equal(boardsOf(bot).length, 0,
+    'an "I cannot tell" card for every question-less PROCESSING shop is the storm this build removed');
+});
+
+test('B15-15 AC1: becoming parked REWRITES the board even though the question set never changed', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const edits = [];
+  bot.editMessage = async (chatId, messageId, message) => { edits.push({ chatId, messageId, message }); return {}; };
+  const shop = await shopInParkWindow(h, { items: ['richmond pork sausages'] });
+
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  assert.equal(boardsOf(bot).length, 1);
+
+  // The park arrives. Not one question row moves.
+  await announceLinesUnresolved(h, shop);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  assert.equal(edits.length, 1,
+    'the fingerprint covers only the question rows, so a shop that BECOMES parked keeps the board '
+    + 'it had before - the fix would exist and never reach his phone');
+  assert.match(edits[0].message.text, /THIS SHOP IS BLOCKED/);
+});
+
+test('B15-15 AC1: parkStateOf answers for EVERY park planOutcome can reach', async () => {
+  const { planOutcome, STEPS } = await import('./stages.js');
+
+  // The enumeration, established against the authority rather than asserted.
+  // Any exit carrying `to: null` is a park the board must be able to report.
+  const parks = [
+    { name: 'PARK-1', gate: { openQuestions: 0, needsReview: true, interpretationConfirmed: false, unresolvedLines: 0 },
+      evidence: { status: 'PROCESSING', openQuestions: 0, needsReview: true, interpretationConfirmed: false } },
+    { name: 'PARK-2', gate: { openQuestions: 0, needsReview: false, interpretationConfirmed: true, unresolvedLines: 3 },
+      evidence: { status: 'PROCESSING', openQuestions: 0, needsReview: false, interpretationConfirmed: true, linesUnresolvedAnnounced: true } },
+  ];
+  for (const p of parks) {
+    const outcome = planOutcome(p.gate);
+    assert.equal(outcome.to, null, `${p.name} is meant to be a park`);
+    const park = parkStateOf(p.evidence);
+    assert.equal(park.parked, true, `${p.name} is a park the board cannot report`);
+    assert.equal(park.step, outcome.step, `${p.name}: the board names a different step from the authority`);
+  }
+
+  // And the two exits that MOVE are not parks, so the board must not invent one.
+  assert.equal(planOutcome({ openQuestions: 2, needsReview: false, interpretationConfirmed: true }).to, 'NEEDS_DECISION');
+  assert.equal(parkStateOf({ status: 'NEEDS_DECISION', openQuestions: 2 }), null);
+  assert.equal(planOutcome({ openQuestions: 0, needsReview: false, interpretationConfirmed: true }).to, 'READY_TO_SHOP');
+  assert.equal(parkStateOf({ status: 'READY_TO_SHOP', openQuestions: 0 }), null);
+  assert.ok(STEPS.AWAIT_LINE_RESOLUTION && STEPS.AWAIT_INTERPRETATION_CONFIRMATION);
+});
+
+test('B15-15 AC1: boardStateOf never returns blocked:false while a park is evidenced', () => {
+  const rows = [{ question_key: 'q1', status: 'answered', answer_text: 'yes', item_name: 'ham' }];
+
+  // No park supplied - the pure back-compatible reading, decided by questions.
+  assert.equal(boardStateOf(rows).blocked, false);
+
+  const parked = boardStateOf(rows, { parked: true, step: 'wait:line_resolution', reason: 'lines' });
+  assert.equal(parked.blocked, true);
+  assert.equal(parked.blockedReason, 'lines');
+
+  const unknown = boardStateOf(rows, { parked: null, step: null, reason: null });
+  assert.equal(unknown.blocked, null, 'the third state must be null - never dressed up as either of the other two');
+
+  // An OPEN question still wins outright: it is the one blocker the board can
+  // see for itself, and its reason must not be replaced by a park's.
+  const open = boardStateOf([{ question_key: 'q1', status: 'open' }], { parked: null });
+  assert.equal(open.blocked, true);
+  assert.match(open.blockedReason, /question is open/);
+});
+
+test('B15-15 AC1: the park travels in the fingerprint, or a newly parked shop is never rewritten', () => {
+  const rows = [{ question_key: 'q1', status: 'answered', answer_text: 'yes' }];
+  const clear = boardStateOf(rows, { parked: false, step: null, reason: null });
+  const parked = boardStateOf(rows, { parked: true, step: 'wait:line_resolution', reason: 'lines' });
+  assert.notEqual(clear.fingerprint, parked.fingerprint,
+    'two boards saying opposite things share a fingerprint, so the second one is never sent');
+});
+
+// =====================================================================
+// WP-B15-15 AC4 - THE HARNESS MODELS THE SQL, NOT ITS INTENT
+//
+// WP-B15-10 mutated its own exclusion statement to `shop_id = $1` - the
+// ALLOWLIST direction, the very bug it had just reverted - and EVERY
+// BEHAVIOURAL TEST STAYED GREEN. Only a statement-shape test went red.
+//
+// The cause is not the statement. `test/fakePg.js` had no handler for it, so
+// `runPipeline.test.js` answered it from a hand-written closure that matched
+// the EXPORTED CONSTANT and then applied its own hardcoded `shop_id !==`
+// semantics. It modelled what the query is MEANT to do, not what it SAYS, so
+// inverting the text changed the constant on both sides of an equality check
+// and nothing else. A harness like that cannot fail.
+//
+// The handler now lives in test/fakePg.js and READS THE OPERATOR OUT OF THE
+// STATEMENT, in the same spirit as selectProjection() above it: no SQL parser,
+// no schema registry, and it throws loudly on anything it cannot read.
+//
+// ── WHY THIS PROOF LIVES HERE AND NOT BESIDE ITS SUBJECT ────────────────────
+// The behavioural foreign-claim tests are in runPipeline.test.js, which is
+// another Work Package's ACTIVE surface and is READ-ONLY to this one. Every one
+// of them still routes through `withForeignClaimStatement`, which replaces
+// `deps.readQuery` and returns BEFORE delegating to fakePg - so those
+// particular tests remain blind to the statement until that closure is deleted.
+// This suite drives the SAME production path - real shopLines.
+// listForeignClaimedItemIds, real excludeForeignListItems, real runPipeline
+// wiring, real rows - through fakePg's OWN dispatch, so the inversion that
+// survived once cannot survive here.
+// =====================================================================
+
+/** A dead shop (id 99) that already owns list 20, plus an item nobody claims -
+ *  the shape a cockpit `add_regular_to_next_week` leaves behind. Mirrors the
+ *  fixture in runPipeline.test.js deliberately: the same durable rows, answered
+ *  by fakePg's dispatch instead of by a closure. */
+function sharedListSeedForFakePg() {
+  return {
+    shopping_lists: [{ id: 20, household_id: HOUSEHOLD_ID, status: 'next_week_draft', list_date: '2026-08-03' }],
+    shopping_list_items: [
+      {
+        id: 210, list_id: 20, item_name: 'HAM ON THE BONE', matched_product_id: null,
+        requested_qty: 1, added_qty: null, status: 'needs_decision', price: null,
+        note: 'typed the night before, for the week that was cancelled', one_week_only: false,
+      },
+      {
+        id: 211, list_id: 20, item_name: 'Cockpit Added Regular', matched_product_id: null,
+        requested_qty: 2, added_qty: null, status: 'requested', price: null,
+        note: 'added via cockpit', one_week_only: false,
+      },
+    ],
+    shop_line: [{
+      id: 900, shop_id: 99, line_no: 1, raw_reading: 'HAM ON THE BONE', quantity: null,
+      matched_regular_id: null, match_basis: null, match_confidence: null, alternatives: [],
+      status: 'unmatched_new_item', confirmed_by: null, confirmed_at: null, corrected: false,
+      list_item_id: 210,
+    }],
+  };
+}
+
+/** Drive a fresh shop onto the shared list with NO statement wiring at all, so
+ *  the exclusion is answered by test/fakePg.js reading the real SQL. */
+async function planOnSharedListThroughFakePg() {
+  const handed = [];
+  const h = makeHarness({
+    seed: sharedListSeedForFakePg(),
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      { line_no: 2, raw_reading: 'fruit splits', quantity: null },
+    ],
+  });
+  const realPlan = h.deps.planBasket;
+  h.deps.planBasket = (input) => {
+    handed.push(input.listItems.map((i) => String(i.item_name)));
+    return realPlan(input);
+  };
+  await commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate: '2026-08-03', sourceKind: 'photo',
+    rawMediaPath: 'C:/.fusion247/asdair/shopper-media/fake.jpg', needsReview: true,
+    actor: 'telegram:555', telegramChatId: '555', telegramMessageId: '900',
+  }, h.deps);
+  await commands.buildShop({ shopRef: REF, actor: 'telegram:555' }, h.deps);
+  await runPipeline({ shopRef: REF }, h.deps);   // transcribe
+  await runPipeline({ shopRef: REF }, h.deps);   // interpret
+  await runPipeline({ shopRef: REF }, h.deps);   // plan
+  return { h, handed, last: () => handed[handed.length - 1] || [] };
+}
+
+test('B15-15 AC4 BEHAVIOURAL: a DEAD shop\'s item is excluded, answered by fakePg reading the real SQL', async () => {
+  const { last } = await planOnSharedListThroughFakePg();
+  assert.ok(last().length > 0, 'the planner was never handed anything - the fixture stopped proving anything');
+  assert.ok(!last().some((n) => /HAM ON THE BONE/i.test(n)),
+    `a cancelled week's item reached the plan: ${JSON.stringify(last())}`);
+});
+
+test('B15-15 AC4 BEHAVIOURAL: THIS shop\'s own lines still reach the planner', async () => {
+  // ESTABLISHED BY EXECUTING THE INVERSION, not assumed: this assertion holds
+  // in BOTH directions, and the reason is worth carrying. Under `shop_id = $1`
+  // the statement returns what THIS shop claims - but excludeForeignListItems
+  // then subtracts `ownIds` from the foreign set ("a row this shop also claims
+  // is this shop's, whatever else claims it", runPipeline.js:511-515), which
+  // empties it. So the allowlist direction degrades to EXCLUDING NOTHING rather
+  // than to deleting Warwick's week.
+  //
+  // That is exactly why the bug was so quiet, and why the test above - the dead
+  // shop's item coming BACK - is the assertion that kills it. This one pins the
+  // other half: the fix must never start dropping the shop's own lines either.
+  const { last } = await planOnSharedListThroughFakePg();
+  assert.ok(last().some((n) => /gourmet cat food/i.test(n)),
+    `the shop's own interpreted line was excluded from its own plan: ${JSON.stringify(last())}`);
+});
+
+test('B15-15 AC4 BEHAVIOURAL: an UNCLAIMED item still reaches the plan', async () => {
+  // Unclaimed belongs to nobody and STAYS. Neither direction of the statement
+  // returns it, so this pins that the handler is not simply keeping everything.
+  const { last } = await planOnSharedListThroughFakePg();
+  assert.ok(last().some((n) => /Cockpit Added Regular/i.test(n)),
+    `an item Warwick added from the cockpit was silently dropped: ${JSON.stringify(last())}`);
+});
+
+test('B15-15 AC4: fakePg REFUSES a foreign-claims statement whose predicate it cannot read', async () => {
+  // A handler that silently tolerated an unrecognised shape would recreate the
+  // exact blindness this closes, so the failure is loud rather than lenient.
+  const { _internal } = await import('./test/fakePg.js');
+  assert.throws(
+    () => _internal.foreignClaimPredicate(
+      'SELECT DISTINCT list_item_id FROM asdair.shop_line WHERE shop_id ~~ $1 AND list_item_id = ANY($2::bigint[])'),
+    /operator/i,
+  );
+  assert.throws(
+    () => _internal.foreignClaimPredicate(
+      'SELECT DISTINCT list_item_id FROM asdair.shop_line WHERE shop_id <> $1'),
+    /list_item_id/i,
+  );
+  // And it reads BOTH directions rather than assuming the one it prefers.
+  assert.equal(_internal.foreignClaimPredicate(shopLinesSql.SELECT_FOREIGN_CLAIMS_SQL).foreign, true);
+  assert.equal(
+    _internal.foreignClaimPredicate(
+      shopLinesSql.SELECT_FOREIGN_CLAIMS_SQL.replace('shop_id <> $1', 'shop_id = $1')).foreign,
+    false,
+    'the handler cannot see the inversion, so every test built on it is blind to the statement',
+  );
 });
