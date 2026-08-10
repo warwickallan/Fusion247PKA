@@ -563,8 +563,20 @@ test('A1: the production loop reads open questions BEFORE intake runs', () => {
   // be taken against a stale picture - or not at all.
   const at = runtimeSrc.indexOf('export async function runOnce');
   assert.notEqual(at, -1);
-  const body = runtimeSrc.slice(at, at + 4000);
-  assert.ok(body.indexOf('loadOpenQuestions') < body.indexOf('pollIntake'),
+  // THE WINDOW IS THE FUNCTION, NOT A CHARACTER COUNT. A fixed 4000-char slice
+  // made this control LIE once already: runOnce grew past it, `pollIntake` fell
+  // outside the window, indexOf returned -1, and `x < -1` reported the wiring
+  // BROKEN while the order was still correct. A control whose verdict depends on
+  // the length of the code it inspects is not a control.
+  const nextExport = runtimeSrc.indexOf('\nexport ', at + 1);
+  const body = runtimeSrc.slice(at, nextExport === -1 ? runtimeSrc.length : nextExport);
+  const loadAt = body.indexOf('loadOpenQuestions');
+  const pollAt = body.indexOf('pollIntake');
+  // ASSERT BOTH WERE FOUND, then compare - otherwise a rename reads as a
+  // comparison of two -1s, which is a verdict about nothing.
+  assert.notEqual(loadAt, -1, 'runOnce no longer reads the open questions at all');
+  assert.notEqual(pollAt, -1, 'runOnce no longer polls intake at all');
+  assert.ok(loadAt < pollAt,
     'intake is polled before the open questions are known - routing cannot claim anything');
 });
 

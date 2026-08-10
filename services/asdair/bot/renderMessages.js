@@ -800,14 +800,31 @@ export function renderLinesUnresolved({
  * action offered is the one that actually unblocks it: confirming the reading,
  * after which the real round-2 question is asked through ordinary machinery.
  *
- * @param {{shopRef:string, items?:string[], reason?:string}} spec
+ * ── AND WHY IT ALSO ANSWERS A MESSAGE IT COULD NOT ACCEPT (B15-04 AC2) ──────
+ * The note above says an answer button "would invite a reply with nowhere to
+ * land". The CARD invites one anyway - Warwick read it and typed, and with no
+ * open question his words were consumed by intake as next week's shopping list
+ * (SHOP-2026-08-10, one line: his answer). The route-first claim seam never ran,
+ * because runOnce only builds a claim when a question is OPEN.
+ *
+ * `messageNotAccepted: true` is that same situation reported back to him. It is
+ * the SAME outbox kind and the SAME renderer deliberately - no new message kind
+ * was introduced - and it is purely ADDITIVE: without the flag every existing
+ * card renders byte-for-byte as before.
+ *
+ * It must read correctly for BOTH readers: the one answering the clarification,
+ * and the one who was genuinely sending a new list and needs to know it was not
+ * taken. Saying only "I could not read your answer" would strand the second.
+ *
+ * @param {{shopRef:string, items?:string[], reason?:string, messageNotAccepted?:boolean}} spec
  */
-export function renderClarificationDeferred({ shopRef, items, reason } = {}) {
+export function renderClarificationDeferred({ shopRef, items, reason, messageNotAccepted } = {}) {
   assertShopRef(shopRef);
 
+  const refused = messageNotAccepted === true;
   const named = Array.isArray(items) ? items.filter((i) => typeof i === 'string' && i.trim() !== '') : [];
   const lines = [
-    '🤔 I could not read one of your answers',
+    refused ? '🤔 I have not taken that message as anything' : '🤔 I could not read one of your answers',
     `Ref: ${value(shopRef)}`,
     '',
   ];
@@ -823,9 +840,24 @@ export function renderClarificationDeferred({ shopRef, items, reason } = {}) {
     lines.push('');
   }
 
-  lines.push('I have NOT guessed, and nothing has been added to a basket.');
-  lines.push('I will ask you about it properly once you confirm I read the list');
-  lines.push('correctly - that check deliberately comes first.');
+  if (refused) {
+    // BOTH READERS, IN ORDER. First what did NOT happen to his words, because
+    // that is the thing he cannot see; then the one action that unblocks it;
+    // then the person who was sending a list, who must not walk away thinking
+    // it landed.
+    lines.push('It was NOT recorded as an answer, and it was NOT started as a');
+    lines.push('new shopping list. Nothing has been added to a basket.');
+    lines.push('');
+    lines.push('I am still waiting for you to confirm I read this list correctly.');
+    lines.push('Tap below, and then I can ask you properly.');
+    lines.push('');
+    lines.push('If you were sending a NEW shopping list, it has not been taken -');
+    lines.push('please send it again once this shop is finished.');
+  } else {
+    lines.push('I have NOT guessed, and nothing has been added to a basket.');
+    lines.push('I will ask you about it properly once you confirm I read the list');
+    lines.push('correctly - that check deliberately comes first.');
+  }
 
   return {
     text: block(lines),

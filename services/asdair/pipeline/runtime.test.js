@@ -697,6 +697,88 @@ test('a tap nothing has any record of is refused, and the two flavours of "no" a
   assert.equal(bot.answered.length, 2, 'a refused tap must still be answered');
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WO-2026-08-10-B15-04 AC3 - THE COSMETIC FAILURE THAT KILLED THE EVENING.
+//
+// Observed live on 2026-08-09/10: Telegram answers a stale callback query with
+// "Bad Request: query is too old and response timeout expired or query ID is
+// invalid". The throw escaped routeTaps, escaped runOnce, and runWatch logged
+// pass_failed - repeatedly, all evening. Everything AFTER routeTaps in that pass
+// (advanceAll, queueShopCards, drainOutbox) never ran, so nothing progressed and
+// no card reached his phone.
+//
+// The acknowledgement is a grey toast on a button. The tap itself is already
+// durable and every answer landed. A toast must never be able to stop the shop.
+// ─────────────────────────────────────────────────────────────────────────────
+test('AC3 A REJECTED TAP ACKNOWLEDGEMENT MUST NOT ABORT THE PASS', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { shop, questionKey } = await seedQuestion(h, [
+    { label: 'Dreamies Cheese 60g', regular_id: 41 },
+    { label: 'Dreamies Chicken 60g', regular_id: 42 },
+  ]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  assert.equal(bot.cards.length, 1, 'setup: the first question card never went out');
+
+  // A SECOND question, opened but not yet carded. It is the witness: it can only
+  // reach his phone if the pass gets PAST routeTaps to queueShopCards/drainOutbox.
+  await h.deps.shopStore.openQuestion({
+    shop_id: shop.id,
+    question_key: questionKeyFor('gourmet cat food'),
+    question_text: 'Which product is "gourmet cat food"?',
+    candidates: [{ label: 'Gourmet Gold 12x85g', regular_id: 77 }],
+  });
+
+  // Telegram rejects the acknowledgement. Verbatim wording from the live failure.
+  let acks = 0;
+  bot.answerTap = async () => {
+    acks += 1;
+    throw new Error('Bad Request: query is too old and response timeout expired or query ID is invalid');
+  };
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([tapOnCard({ messageId: 9001, questionKey, index: 1 })]),
+  });
+
+  assert.equal(acks, 1, 'the acknowledgement was never attempted - this test proves nothing');
+  assert.equal(report.ok, true, 'a cosmetic acknowledgement failure aborted the whole pass');
+  // The tap is durable regardless - that was true before the fix and must stay true.
+  assert.equal(h.db.shop_question[0].status, 'answered', 'the tap itself did not land');
+  assert.equal(h.db.shop_question[0].answer_text, 'Dreamies Chicken 60g');
+  // ...and the pass carried on doing the work Warwick was waiting for.
+  assert.equal(bot.cards.length, 2,
+    'the pass died at the acknowledgement - the second question card never reached his phone');
+});
+
+test('AC3 the rejection is REPORTED, not silently swallowed', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  bot.answerTap = async () => { throw new Error('query is too old'); };
+  const events = [];
+  const report = await routeTaps(h.deps, {
+    updates: [tapOnCard({ messageId: 9001, questionKey, index: 0 })],
+    bot,
+    questions: bot.questions,
+    log: (event, detail) => events.push([event, detail]),
+  });
+
+  // The command still succeeded. It is NOT reported as a failed command, because
+  // it did not fail - only its receipt did.
+  assert.equal(report.routed.length, 1, 'a successful command was lost to a failed acknowledgement');
+  assert.equal(report.refused.length, 0, 'a landed answer was misreported as a refusal');
+  const logged = events.filter(([e]) => e === 'tap_ack_failed');
+  assert.equal(logged.length, 1, 'a swallowed acknowledgement failure left no trace at all');
+  assert.match(String(logged[0][1].detail), /too old/);
+});
+
 test('B2 TYPED REPLY: replying to a question card answers it, verbatim', async () => {
   const h = makeHarness();
   const bot = await makeAskingBot(h);
