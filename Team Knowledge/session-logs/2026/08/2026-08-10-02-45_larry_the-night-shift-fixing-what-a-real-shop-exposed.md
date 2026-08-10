@@ -40,8 +40,7 @@ interesting places.
   checklist Warwick would shop from was never rendered anywhere.
 - **`WO-2026-08-10-B15-06`** — the last mile. The card emitted a path with **no Cockpit proxy behind
   it**, and the read service `JSON.stringify`'d **every** routed response, so the checklist went out as
-  a quoted one-liner with literal `
-`. **Larry curled that exact response earlier and did not register
+  a quoted one-liner with literal backslash-n. **Larry curled that exact response earlier and did not register
   it as a defect; the worker's preflight did**, and correctly refused to compensate in the proxy.
   **Closed and verified live:** `node services/cockpit/asdair-checklist-check.mjs` → 22 assertions, 0
   failed, `DEPLOYMENT MATCHES SOURCE`; and
@@ -55,7 +54,7 @@ interesting places.
 B15-05 AC7) and **Gate 2 HOLD** (Q1 *yes*, Q2 *"not yet, and it should not be presented to him as
 ready"*). **It discharged the long-standing D1 hold on the rulebook** — traced, no test-only hop.
 
-**Larry, directly:** the governor guard hole; shop disposal; worktree convergence 16 → 2; both runtime
+**Larry, directly:** the governor guard hole; shop disposal; worktree convergence 16 → 1; both runtime
 restarts; the read-service logon task; the map re-cuts; the evidence record; and the independent
 mutation re-run that discharged AC4.
 
