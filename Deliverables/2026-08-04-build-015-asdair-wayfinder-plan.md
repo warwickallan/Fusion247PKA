@@ -1176,9 +1176,18 @@ its evidence so it can be re-established or falsified in minutes.**
 > | **B15-11** | the pack-size rule is SHARED (typed path no longer orders 33 packs); the intake CLI can no longer eat a pending list |
 > | **B15-12** | a basket is never reported built when empty; dry-run no longer moves real shop state; four unawaited terminations fixed |
 >
-> **IN FLIGHT** — `B15-10` (fresh list scoping + retire the superseded `lines_unresolved` card) ·
-> `B15-13` (grounding: `VANISH PRETREAT GEL` must find `Vanish Pre-Treat Gel`) ·
-> `B15-14` (the supervised browser step can finish).
+> **ALSO LANDED** — `B15-10` (a dead shop's items stop reaching a live plan; **`lines_unresolved`
+> was NOT retired** — the worker refused my instruction with evidence and was right: it is the only
+> voice for the stuck state).
+>
+> **IN FLIGHT** — `B15-13` (grounding: `VANISH PRETREAT GEL` must find `Vanish Pre-Treat Gel`) ·
+> `B15-14` (the supervised browser step can finish — surface widened to `runPipeline.js` after the
+> worker falsified my hypothesis that stage decisions execute generically; a new step without its
+> dispatch case would FAIL the shop) · `B15-15` (**the board can currently say `blocked: false`
+> about a shop that cannot move**, plus a `fakePg` handler so the exclusion tests become sensitive
+> to their own SQL) · `B15-16` (**migration 019** — the shop owns the list, not the date;
+> written and proven against real Postgres, **NOT applied to the live store**, which is a gated
+> action).
 >
 > **KNOWN AND QUEUED, NOT FORGOTTEN** — each has a durable record under `Deliverables/`:
 > **migration 019** (Silas: the shop owns the list, not the date) · **durable household learning**
