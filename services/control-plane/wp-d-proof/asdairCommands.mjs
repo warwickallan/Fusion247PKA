@@ -8,7 +8,9 @@
 // ALLOWLISTED COMMANDS (anything else -> not executed):
 //   add_regular_to_next_week {regular_id:int, qty:int 1..99}   (BUILD-014)
 //   add_list_item {item_name, requested_qty?:int 1..99|null, status:'requested'|'needs_decision',
-//                  note?, household?}                           (BUILD-002 WP5 — the Shopper write)
+//                  note?, household?, list_date?, shop_id?}      (BUILD-002 WP5 — the Shopper write)
+//                  shop_id (WP-B15-16) names the OWNING SHOP: with it the item lands on that shop's
+//                  own list; without it, on the date-keyed unowned lane, exactly as before.
 
 export const ALLOWLIST = new Set(['add_regular_to_next_week', 'add_list_item']);
 
@@ -28,10 +30,39 @@ async function resolveHousehold(client, household) {
   return null; // 0 or >1 with no selector -> caller fails closed
 }
 
+// WP-B15-16: THE SHOP OWNS THE LIST, NOT THE DATE.
+//
+// When `shopId` is given the list is resolved by OWNER (asdair.shopping_lists.shop_id, added by
+// migration 019) and never by date. That is the whole fix: two shops on one date each get their own
+// list row, so neither can read, clobber or inherit the other's items. Postgres enforces one list per
+// shop via `uq_lists_shop` -- a second list for the same shop is a 23505, not an application check.
+//
+// When `shopId` is ABSENT the behaviour is unchanged, deliberately and to the byte. The cockpit and
+// Shopper routes have no shop behind them and stay in the "unowned lane", which 019 preserves as
+// `unique (household_id, list_date) where shop_id is null` -- exactly the guarantee the original
+// constraint gave. The two three-column statements below are therefore left EXACTLY as they were:
+// services/asdair/pipeline/test/fakePg.js matches this insert POSITIONALLY on
+// `(household_id, status, list_date)` and runs this real handler against that double, so editing the
+// statement would break the offline pipeline suite. The four-column form is only ever issued on the
+// shop-owned path, which the double never reaches.
+//
 // If listDate is given, resolve/create the draft list for THAT date exactly (so an item is never added
 // to a different week's list around a boundary); otherwise fall back to the latest next_week_draft or
 // create one dated next week. listDate must be an ISO YYYY-MM-DD when provided.
-async function findOrCreateDraftList(client, householdId, listDate = null) {
+async function findOrCreateDraftList(client, householdId, listDate = null, shopId = null) {
+  if (shopId !== null && shopId !== undefined) {
+    if (listDate && !/^\d{4}-\d{2}-\d{2}$/.test(listDate)) throw new Error(`invalid list_date "${listDate}" (want YYYY-MM-DD)`);
+    const byShop = await client.query('select id from asdair.shopping_lists where shop_id=$1', [shopId]);
+    if (byShop.rowCount) return byShop.rows[0].id;
+    // The owning shop has no list yet. list_date stays MEANINGFUL -- it is the week the list is for,
+    // and the read path still renders it; it simply is no longer the identity.
+    const insShop = listDate
+      ? await client.query(
+        `insert into asdair.shopping_lists (household_id, status, list_date, shop_id) values ($1,'next_week_draft',$2,$3) returning id`, [householdId, listDate, shopId])
+      : await client.query(
+        `insert into asdair.shopping_lists (household_id, status, list_date, shop_id) values ($1,'next_week_draft',(current_date+7),$2) returning id`, [householdId, shopId]);
+    return insShop.rows[0].id;
+  }
   if (listDate) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(listDate)) throw new Error(`invalid list_date "${listDate}" (want YYYY-MM-DD)`);
     const byDate = await client.query(
@@ -49,6 +80,51 @@ async function findOrCreateDraftList(client, householdId, listDate = null) {
   return ins.rows[0].id;
 }
 
+// WP-B15-16 / AC6: which list a COCKPIT tap should land on.
+//
+// `add_regular_to_next_week` carries no shop context, so before 019 it always resolved the unowned
+// lane -- which, once a shop owns its own list, is a DIFFERENT list from the one Warwick is actually
+// shopping. That is not what he means when he taps "add to next week" mid-shop.
+//
+// The safe default (Silas's recommendation, an ordinary technical choice): if the household has a
+// live (non-terminal) shop that ALREADY has a list, use that list. Otherwise fall back to the unowned
+// lane exactly as before. Terminal is ('RECONCILED','CANCELLED'), mirroring
+// services/asdair/shop/shopState.js TERMINAL_STATUSES -- 'FAILED' is deliberately NOT terminal,
+// because a failed shop can still be resumed and must not have its list forked underneath it.
+//
+// Two links are consulted, and the order matters. `shopping_lists.shop_id` is the new owner key.
+// `shop.list_id` is the link that has existed since 006 and is what production still populates today,
+// because the pipeline does not yet emit shop_id (that is a follow-on outside this change). Reading
+// both means the cockpit tap lands correctly NOW, not only after the pipeline half ships.
+//
+// This never CREATES a shop-owned list: a cockpit tap must not claim ownership of a list its shop has
+// not made yet. No live shop with a list -> unowned lane, unchanged.
+// It must also work on a database where 019 has NOT been applied yet. This code ships before the
+// migration is run against the live store, so probing for the column rather than assuming it is a
+// correctness requirement, not test convenience: assuming `shop_id` here would break every cockpit
+// tap in the window between this landing and 019 being applied.
+async function resolveCockpitTargetList(client, householdId) {
+  const shape = await client.query(
+    `select to_regclass('asdair.shop') is not null as has_shop,
+            exists (select 1 from information_schema.columns
+                     where table_schema='asdair' and table_name='shopping_lists'
+                       and column_name='shop_id') as has_owner_column`);
+  const { has_shop: hasShop, has_owner_column: hasOwner } = shape.rows[0];
+  if (!hasShop) return null;
+  const ownedSelect = hasOwner
+    ? '(select sl.id from asdair.shopping_lists sl where sl.shop_id = s.id)'
+    : 'null::bigint';
+  const live = await client.query(
+    `select s.list_id, ${ownedSelect} as owned_list_id
+       from asdair.shop s
+      where s.household_id = $1
+        and s.status not in ('RECONCILED','CANCELLED')
+      order by s.id desc
+      limit 1`, [householdId]);
+  if (!live.rowCount) return null;
+  return live.rows[0].owned_list_id ?? live.rows[0].list_id ?? null;
+}
+
 export async function execute(client, command, args) {
   const at = new Date().toISOString();
   if (!ALLOWLIST.has(command)) return { ok: false, command, error: 'command not in allowlist (not executed)', worker: 'cp_worker', executed_at: at };
@@ -62,7 +138,9 @@ export async function execute(client, command, args) {
     if (reg.rowCount === 0) return { ok: false, command, error: `regular ${regularId} not found`, worker: 'cp_worker', executed_at: at };
     const { household_id: householdId, name } = reg.rows[0];
     await client.query('select pg_advisory_xact_lock($1)', [householdId]);
-    const listId = await findOrCreateDraftList(client, householdId);
+    // WP-B15-16: land on the live shop's list when there is one, else the unowned lane (see
+    // resolveCockpitTargetList). Before 019 this was always the unowned lane.
+    const listId = (await resolveCockpitTargetList(client, householdId)) ?? await findOrCreateDraftList(client, householdId);
     const existing = await client.query(`select id from asdair.shopping_list_items where list_id=$1 and lower(item_name)=lower($2) limit 1 for update`, [listId, name]);
     let itemId, action;
     if (existing.rowCount) { itemId = existing.rows[0].id; await client.query(`update asdair.shopping_list_items set requested_qty=$2 where id=$1`, [itemId, qty]); action = 'updated'; }
@@ -88,10 +166,21 @@ export async function execute(client, command, args) {
     const note = typeof args?.note === 'string' ? args.note : null;
 
     const listDate = args?.list_date ?? null;
+    // WP-B15-16: the OWNING SHOP, when the caller knows it. Optional and additive -- args are
+    // free-form on the command_request payload and assertAllowedIntents allowlists commands, not arg
+    // keys. Validated as a positive integer and failing closed on garbage, like every other arg here:
+    // a malformed shop_id must never silently fall back to the date-keyed lane, because that is the
+    // exact behaviour this change exists to remove.
+    let shopId = args?.shop_id;
+    if (shopId === undefined || shopId === null || shopId === '') shopId = null;
+    else {
+      shopId = Number(shopId);
+      if (!Number.isInteger(shopId) || shopId <= 0) return { ok: false, command, error: 'shop_id must be a positive integer when provided', worker: 'cp_worker', executed_at: at };
+    }
     const householdId = await resolveHousehold(client, args?.household);
     if (!householdId) return { ok: false, command, error: 'household could not be resolved (missing selector or ambiguous)', worker: 'cp_worker', executed_at: at };
     await client.query('select pg_advisory_xact_lock($1)', [householdId]);
-    const listId = await findOrCreateDraftList(client, householdId, listDate);
+    const listId = await findOrCreateDraftList(client, householdId, listDate, shopId);
 
     const existing = await client.query(`select id, requested_qty, status, note from asdair.shopping_list_items where list_id=$1 and lower(item_name)=lower($2) limit 1 for update`, [listId, itemName]);
     let itemId, action, corrected = false;
@@ -106,7 +195,7 @@ export async function execute(client, command, args) {
       const ins = await client.query(`insert into asdair.shopping_list_items (list_id,item_name,requested_qty,status,note) values ($1,$2,$3,$4,$5) returning id`, [listId, itemName, storedQty, status, note ?? 'added via Shopper route']);
       itemId = ins.rows[0].id; action = 'inserted';
     }
-    return { ok: true, command, item_name: itemName, household_id: householdId, list_id: listId, item_id: itemId, qty: storedQty, qty_known: qty !== null, status, action, corrected, worker: 'cp_worker', executed_at: at };
+    return { ok: true, command, item_name: itemName, household_id: householdId, list_id: listId, shop_id: shopId, item_id: itemId, qty: storedQty, qty_known: qty !== null, status, action, corrected, worker: 'cp_worker', executed_at: at };
   }
 
   return { ok: false, command, error: 'unhandled command', worker: 'cp_worker', executed_at: at };

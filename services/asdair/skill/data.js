@@ -210,8 +210,20 @@ async function loadList(listDate, household) {
     throw new Error('Unknown household "' + String(household) + '". Check asdair.households.name.');
   }
 
+  // WP-B15-16: `LIMIT 1` with NO `ORDER BY` was non-deterministic the moment more than one list can
+  // share a date -- and after migration 019 (the shop owns the list, not the date) that is the normal
+  // case, not an edge case. Postgres is free to return either row, so the same question could answer
+  // from a different shop's list between two calls. `ORDER BY id DESC` makes it deterministic and
+  // resolves to the most recently created list, which is the live shop's.
+  //
+  // Deliberately NOT joining asdair.shop to prefer the live shop's list, though that would be the
+  // sharper rule: the complete grant matrix (012) gives asdair_ro no privilege on asdair.shop, so a
+  // join here would risk `permission denied for table shop` on the live read path -- the exact failure
+  // that killed a live shop twice on 2026-08-03 and caused migration 010. That is a grant decision,
+  // not something a read path should assume. This form needs no new grant and behaves identically
+  // before and after 019.
   const listRows = await readQuery(
-    'SELECT id, list_date, status FROM asdair.shopping_lists WHERE household_id = $1 AND list_date = $2 LIMIT 1',
+    'SELECT id, list_date, status FROM asdair.shopping_lists WHERE household_id = $1 AND list_date = $2 ORDER BY id DESC LIMIT 1',
     [householdId, listDate]
   );
   if (listRows.length === 0) {
