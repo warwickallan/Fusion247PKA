@@ -119,3 +119,65 @@ test('the interpret and plan halves share ONE matcher, so they cannot drift apar
   assert.equal(interpret.normaliseTerm, planner.termMatch.normaliseMatchText,
     'two matchers written twice is how this defect got in; there must be exactly one');
 });
+
+// ---------------------------------------------------------------------
+// WP-B15-13 - the LIVE failure of SHOP-2026-08-10-M64.
+//
+// Warwick was asked "Which product is VANISH PRETREAT GEL?" against a
+// household regular literally named "Vanish Pre-Treat Gel", and the card
+// said "No candidate products found". His words: "its bloody obvious!"
+//
+// The rows below are the five products the runtime itself offered on that
+// card, so the refusal cases have the real neighbours to be confused with.
+// ---------------------------------------------------------------------
+
+const VANISH_CATALOGUE = [
+  { id: 40, name: 'Vanish Pre-Treat Gel', aka: [] },
+  { id: 41, name: 'Vanish Gold Oxi Action Stain Remover Powder for clothes 450g', aka: [] },
+  { id: 42, name: 'Vanish Oxi Action Laundry Stain Remover Powder, 450g', aka: [] },
+  { id: 43, name: 'Vanish Oxi Action Laundry Whitener and Stain Remover Powder, 450g', aka: [] },
+  { id: 44, name: 'VO5 Volume Boost Gel Spray 165g', aka: [] }
+];
+
+test('LIVE CASE 2026-08-10: "VANISH PRETREAT GEL" resolves to the Vanish Pre-Treat Gel regular', function () {
+  const r = resolveReading('VANISH PRETREAT GEL', VANISH_CATALOGUE);
+  assert.equal(r.status, 'matched', 'grounding the household already holds must not become a question');
+  assert.equal(r.matched_regular_id, 40);
+  assert.equal(r.matched_product_name, 'Vanish Pre-Treat Gel');
+  assert.equal(r.match_basis, BASIS.REGULAR,
+    'a punctuation-only difference is the canonical name, not an approximation - the record must say so');
+});
+
+test('the same reading spelled the catalogue way still resolves the same way', function () {
+  const r = resolveReading('Vanish Pre-Treat Gel', VANISH_CATALOGUE);
+  assert.equal(r.matched_regular_id, 40);
+  assert.equal(r.match_basis, BASIS.REGULAR);
+});
+
+test('a separator-blind ALIAS is still reported as an exact alias', function () {
+  const withAlias = [{ id: 45, name: 'Vanish Pre-Treat Gel', aka: ['pre-treat'] }];
+  const r = resolveReading('pretreat', withAlias);
+  assert.equal(r.status, 'matched');
+  assert.equal(r.matched_regular_id, 45);
+  assert.equal(r.match_basis, BASIS.EXACT_ALIAS);
+});
+
+test('REFUSAL: the OXI card still asks, and still never picks a Vanish for Warwick', function () {
+  // "VANISH OXI ACTION POWDER" genuinely has three plausible answers. The
+  // separator rule must not turn a real ambiguity into a silent purchase.
+  const r = resolveReading('VANISH OXI ACTION POWDER', VANISH_CATALOGUE);
+  assert.equal(r.status, 'needs_confirmation');
+  assert.equal(r.matched_regular_id, null);
+  assert.equal(r.alternatives.some(function (a) { return a.id === 40; }), false,
+    'the pre-treat gel is not an oxi action powder');
+});
+
+test('OUT OF SCOPE and it must STAY out: "BATCHLORS MAC N CHEESE" is still unmatched', function () {
+  // A misspelling plus a token subset. Fixing it needs fuzzy or subset
+  // matching, which this Work Order refuses to build - the same suggestion
+  // channel that got Batchelors right also offered toothpaste for gloves.
+  const r = resolveReading('BATCHLORS MAC N CHEESE', [
+    { id: 50, name: "Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g", aka: [] }
+  ]);
+  assert.equal(r.matched_regular_id, null, 'a separator rule must not be credited with fixing a misspelling');
+});

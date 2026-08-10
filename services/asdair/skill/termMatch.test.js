@@ -180,3 +180,95 @@ test('empty and junk input match nothing rather than everything', function () {
   assert.equal(tm.matchTerms(null, null).tier, null);
   assert.equal(tm.matchTerms('...', '---').tier, null);
 });
+
+// ---------------------------------------------------------------------
+// SEPARATOR-BLIND IDENTITY (WP-B15-13, live failure SHOP-2026-08-10-M64).
+//
+// Warwick was asked "Which product is VANISH PRETREAT GEL?" against a
+// household regular literally named "Vanish Pre-Treat Gel", and told
+// "No candidate products found".
+//
+//   "VANISH PRETREAT GEL"  -> "vanish pretreat gel"
+//   "Vanish Pre-Treat Gel" -> "vanish pre treat gel"
+//
+// normaliseMatchText turns every non-alphanumeric run into a SPACE, so a
+// hyphen INSIDE a word splits it into two tokens while the unhyphenated
+// spelling stays one. They can never be equal, and no later tier rescues it.
+//
+// The rule is NOT a similarity score, an edit distance, a threshold or an
+// exception list: two terms are the same product when their letters and
+// digits agree IN ORDER, wherever the separators fall.
+// ---------------------------------------------------------------------
+
+test('LIVE CASE 2026-08-10: "VANISH PRETREAT GEL" is the same product as "Vanish Pre-Treat Gel"', function () {
+  const m = tm.matchTerms('VANISH PRETREAT GEL', 'Vanish Pre-Treat Gel');
+  assert.equal(m.tier, tm.TIER.EXACT, 'a hyphen inside a word is not a different product');
+  assert.equal(m.confident, true);
+});
+
+test('separator-blind identity is symmetric and survives a leading quantity', function () {
+  assert.equal(tm.matchTerms('Vanish Pre-Treat Gel', 'VANISH PRETREAT GEL').tier, tm.TIER.EXACT);
+  assert.equal(tm.matchTerms('2 vanish pretreat gel', 'Vanish Pre-Treat Gel').tier, tm.TIER.EXACT);
+});
+
+test('squashMatchText keeps letters and digits IN ORDER and drops every separator', function () {
+  assert.equal(tm.squashMatchText('Vanish Pre-Treat Gel'), 'vanishpretreatgel');
+  assert.equal(tm.squashMatchText('VANISH PRETREAT GEL'), 'vanishpretreatgel');
+  assert.equal(tm.squashMatchText('Ariel 4in1 PODS, 33'), 'ariel4in1pods33');
+  assert.equal(tm.squashMatchText(null), '');
+});
+
+test('the property the normaliser comment claims now HOLDS: hyphen, space and comma all agree', function () {
+  // These three spellings of one product must all be one product.
+  assert.equal(tm.matchTerms('yazoo-choc', 'yazoo choc').tier, tm.TIER.EXACT);
+  assert.equal(tm.matchTerms('yazoo, choc', 'yazoo choc').tier, tm.TIER.EXACT);
+  assert.equal(tm.matchTerms('yazoochoc', 'yazoo choc').tier, tm.TIER.EXACT,
+    'the intra-word case is the one that was false before WP-B15-13');
+});
+
+test('separator-blindness does NOT loosen anything else - every refusal still refuses', function () {
+  // Different letters are still different products. Removing spaces cannot
+  // make any of these pairs agree, and nothing else in the file moved.
+  assert.equal(tm.matchTerms('bread', 'shortbread').tier, null);
+  assert.equal(tm.matchTerms('beans', 'beers').tier, null);
+  assert.equal(tm.matchTerms('lemon', 'melon').tier, null);
+  assert.equal(tm.matchTerms('butter', 'batter').tier, null);
+  // These two were ADVISORY before this change and must stay ADVISORY: an
+  // advisory may hold a line for a human and may NEVER name a product.
+  // Pinning the whole result, not merely "not exact", is what would catch a
+  // separator rule that quietly promoted them.
+  assert.deepEqual(tm.matchTerms('cream', 'ice cream'),
+    { tier: tm.TIER.SHARED_DISTINCTIVE, confident: false, via: ['cream'] });
+  assert.deepEqual(tm.matchTerms('Ariel 4in1 PODS 33', 'Ariel 4in1 PODS 22'),
+    { tier: tm.TIER.SHARED_DISTINCTIVE, confident: false, via: ['ariel'] },
+    'a different pack size is a different product and must never be resolved as one');
+});
+
+test('OUT OF SCOPE and it must STAY out: a misspelling is not a separator difference', function () {
+  // "BATCHLORS" vs "batchelors" is a missing letter plus a token subset. It
+  // needs fuzzy or subset matching, which this Work Order explicitly refuses
+  // to build. This test PINS that it is still not matched, so nobody can
+  // claim WP-B15-13 quietly closed it.
+  const m = tm.matchTerms('BATCHLORS MAC N CHEESE', "Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g");
+  assert.equal(m.confident, false, 'a misspelling must not be resolved by a separator rule');
+});
+
+test('a separator BETWEEN TWO DIGITS is never removed - 1.5L is not 15L', function () {
+  // MEASURED, not imagined: without this guard "Coca-Cola 1.5L" and "Coca
+  // Cola 15L" were EXACT, and that grade may establish identity. Joining two
+  // numbers invents a third.
+  assert.equal(tm.squashMatchText('Coca-Cola 1.5L'), 'cocacola1 5l');
+  assert.equal(tm.squashMatchText('Coca Cola 15L'), 'cocacola15l');
+  assert.notEqual(tm.matchTerms('Coca-Cola 1.5L', 'Coca Cola 15L').tier, tm.TIER.EXACT);
+  // "Ariel Pods 3 3" against "Ariel Pods 33" stays ADVISORY - it shares the
+  // brand, so it may hold the line for a human, and it may never name the
+  // product. Two separate numbers are not one number.
+  assert.equal(tm.matchTerms('Ariel Pods 3 3', 'Ariel Pods 33').confident, false,
+    'two separate numbers are not one number');
+});
+
+test('digit-to-LETTER is still joined, so sizes and pack forms still agree', function () {
+  assert.equal(tm.matchTerms('ASDA Ham 450g', 'ASDA Ham 450 g').tier, tm.TIER.EXACT);
+  assert.equal(tm.matchTerms('Ariel 4in1 PODS 33', 'Ariel 4 in 1 pods 33').tier, tm.TIER.EXACT);
+  assert.equal(tm.matchTerms('Vanish Pre-Treat Gel', 'VANISH PRETREAT GEL').tier, tm.TIER.EXACT);
+});
