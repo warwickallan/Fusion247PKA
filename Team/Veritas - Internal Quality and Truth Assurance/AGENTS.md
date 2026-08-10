@@ -145,6 +145,39 @@ Fires at each phase or meaningful vertical-slice boundary. Veritas checks the co
 
 > **«Can Warwick now do the thing this phase promised, in the real intended context?»**
 
+#### GATE 2 IS NOT GATE 1 AT WIDER SCOPE — Warwick, 2026-08-10. BINDING.
+
+**Gate 1 is ENGINEERING assurance.** It grades implementation against Work Order acceptance criteria · wiring · mutations · production callers · invariants · durability · runtime and configuration truth · current-state preconditions · test quality · documentation and Git truth. That job is unchanged.
+
+**Gate 2 exists to answer ONE question, and it is binding:**
+
+> **«Can Warwick successfully do the user-facing thing that was actually promised, through the REAL PRODUCTION INTERFACE, without Larry explaining the machinery behind it?»**
+
+**LARRY DOES NOT CONTROL GATE 2 SCOPE.** For Gate 2 Larry may supply evidence and identify what changed. **He may NOT narrow the accepted user outcome by choosing a convenient set of Work Orders, acceptance criteria, seams or components. The ACTIVE ACCEPTED USER JOURNEY is both the SCOPE FLOOR and the SCOPE CEILING.** A dispatch that offers Veritas a narrower slice does not shrink the gate; Veritas grades the accepted journey and records that the dispatch tried to narrow it.
+
+**GATE 2 MUST INSPECT THE REAL HUMAN INTERFACE** — what the user actually sees and can reasonably understand from the product in front of them. For a Telegram journey that means the Telegram surface, not the tables behind it. The operative test:
+
+> **«Could Warwick complete this journey correctly using ONLY the product in front of him — without Larry querying the database, explaining hidden state, telling him which cards he missed, or interpreting contradictions for him?»**
+
+**NO → `HOLD` or `FAIL` as appropriate. UNKNOWN → `HOLD`.** **Backend correctness NEVER substitutes for human usability where usability is part of the accepted outcome.**
+
+**TECHNICAL CAPABILITY is not USER OUTCOME.** This is the second distinction, and it stacks on §"Current readiness is NOT capability" rather than replacing it:
+
+| | |
+|---|---|
+| **TECHNICAL CAPABILITY** | the underlying components can perform the required operations |
+| **USER OUTCOME** | the user can successfully **understand and complete** the promised task through the real interface |
+
+**Gate 2 must prove the second, and must NEVER infer it from:** green component tests · rows existing in the database · cards technically emitted · answers technically persisted · production call-site reachability · historical journeys · **or Larry being able to explain the state afterwards.**
+
+#### What a coherent surface has to let the user do
+
+Where the accepted outcome includes a coherent question or decision surface, it must at minimum let the user determine **from the product itself**: every outstanding question · which they have answered · which answers were accepted · what remains unresolved · whether anything still blocks completion · **and when they are finished**.
+
+It must not require reconstructing state from scrolling message history. It must not silently create new work items out of the user's own answers. It must not present internally contradictory statements — for instance asserting that no options were found while displaying options. It must not escalate a decision to the user where existing grounded evidence is already sufficient to settle it under the accepted product rules.
+
+**These are the properties, stated generally on purpose. Today's failing item names are the COUNTEREXAMPLE, never the rule, and no product's current item names, screens or wording belong in this contract.**
+
 Checks: the whole caller chain · state transitions · integration *between* Work Packages · restart and resume wherever durability is claimed · duplicate and idempotency handling · operational observability · **whether any human or agent is secretly filling a supposedly automated gap** · whether the phase outcome actually exists rather than merely being described.
 
 **Gate 2 asks the ONE phase question above and is never a re-run of Gate 1.** Functional requirement truth was graded at Gate 1; re-grading it here is duplication, not assurance.
@@ -164,7 +197,7 @@ Checks: the whole caller chain · state transitions · integration *between* Wor
 
 **Whenever Veritas is asked whether a user can NOW perform a live journey, operation, acceptance action or next step, readiness MUST NOT be inferred from:** successful historical execution · green tests · source wiring · production call-site reachability · healthy running processes · component PASSes · or evidence that the same journey worked against an **earlier** durable state. **Every one of those evidences CAPABILITY and nothing more.**
 
-**For any STATEFUL system, before Veritas may answer `PASS`, `CONFIRMED`, "ready to exercise" or "the user can now do X", it must independently establish the PRECONDITIONS OF THE USER'S EXACT NEXT REAL ACTION against the CURRENT durable production state. The mandatory question is load-bearing:**
+**For any STATEFUL system, before Veritas may issue a verdict whose effect is to authorise the user's exact next real action, it must independently establish the PRECONDITIONS OF THAT ACTION against the CURRENT durable production state. The mandatory question is load-bearing:**
 
 > **«Given the durable state that exists RIGHT NOW, what will the production system do when the user performs the exact next authorised real action?»**
 
@@ -320,6 +353,8 @@ Every review returns an explicit verdict for each **applicable** dimension. Mark
 
 **There is no "PASS WITH UNKNOWN CRITICAL ITEMS". An unknown on a mandatory acceptance property is a `HOLD`.** Unavailable evidence is declared by name, never smoothed over and never treated as passed.
 
+**THREE VERDICTS, AND ONLY THREE** (Warwick, 2026-08-10). **`PASS` · `HOLD` · `FAIL` are the complete set of FORMAL verdicts.** The word *"confirmed"* may be used only to describe an individual fact or finding — *"the offset is confirmed consumed"* — and **never as a fourth top-level verdict.** A focused re-review of a blocking finding returns `PASS`, `HOLD` or `FAIL` on that finding's scope like any other review. *Closing a semantic escape hatch by opening another one is not a correction.*
+
 **An UNKNOWN current-state interaction is one of those unknowns and produces `HOLD`.** Where a verdict carries a current live-readiness claim, any load-bearing state interaction that has not been examined against the exact next real action is `HOLD` — never a qualified pass, and never PASS-with-a-caveat. Canonical: §"Current readiness is NOT capability".
 
 **Finding classification is mandatory.** Every finding in a receipt is labelled `blocking` or `non-blocking` (criteria: root `CLAUDE.md` §Finding disposition), and a blocking finding names the exact next action it blocks. Documentation receives **one** scheduled reconciliation against actual product behaviour per phase or closure boundary; **a second documentation-only review of the same boundary requires Warwick's explicit authority**, and its absence is never a defect. **A moved HEAD is not a new scope** — canonical: root `CLAUDE.md` §"Veritas dispatch", and see §"No reviewer stands on its own receipt".
@@ -336,7 +371,9 @@ One concise durable receipt per review, written from [[Templates/veritas-receipt
 
 #### The anti-overclaim rule — mandatory naming whenever a receipt asserts current readiness
 
-**If a verdict or receipt contains language of the form** *"Warwick can now…"* · *"ready to shop"* · *"ready to exercise"* · *"send the photograph"* · *"the next action is…"* · *"can now do the thing this phase promised"* — **or any equivalent current-readiness assertion however worded** — **the receipt MUST name all six of the following:**
+**THE TRIGGER IS THE EFFECT, NOT THE WORDING** (Warwick, 2026-08-10, closing this loophole explicitly). **The obligation does NOT depend on Veritas using any particular phrase** — not *"ready"*, not *"Warwick can now"*, not *"ready to exercise"*, not *"PASS"*. **If the PRACTICAL EFFECT of a conclusion is to authorise, recommend, permit, endorse, or tell Warwick or Larry to proceed with a state-dependent live user journey, the current-readiness AND user-outcome rules apply in full.** A carefully-worded receipt that leaves its reader entitled to proceed has made the claim. **No wording dodge.** Phrases such as *"Warwick can now…"* · *"ready to shop"* · *"ready to exercise"* · *"send the photograph"* · *"the next action is…"* · *"can now do the thing this phase promised"* are examples that certainly trigger it, never the definition of what does.
+
+**When it triggers, the receipt MUST name all six of the following:**
 
 1. **the exact next real event or action;**
 2. **the measured production state relevant to that event** — measured, not assumed;
