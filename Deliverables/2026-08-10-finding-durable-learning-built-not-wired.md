@@ -1,0 +1,75 @@
+---
+title: FINDING — durable household learning is BUILT, TESTED, and DELIBERATELY NOT WIRED
+date: 2026-08-10
+author: Larry, established by execution
+status: OPEN — the accepted outcome's second half does not run
+relates_to: Warwick's standing list of 2026-08-10, item 3
+---
+
+# The learning half exists and has never run
+
+Warwick, item 3: *"where Warwick's statement clearly expresses a standing preference/rule, persist
+the appropriate durable household knowledge; **do not pretend this half exists if it has not
+actually been built and exercised.**"*
+
+**Checked, as instructed. Here is the honest answer.**
+
+## It is built, and it is good
+
+`services/asdair/outcome/promoteDecision.js` is complete and tested. Its own header states what it
+was written to repair:
+
+> *"The LEARNING half of the loop the schema always designed but never wired: `asdair.rule_qa_log`
+> had zero writers, so `applies_going_forward` and its `promoted_rule_id` back-link into
+> `asdair.rules` were dead code. **Every human answer was forgotten and nothing was ever learned
+> from a shop.**"*
+
+It records every decision, promotes one to a standing rule **only** when the human said it applies
+going forward, does both in one transaction with rollback, and refuses to promote a one-week-only
+exclusion — because *"Do not buy X this week"* promoted forever is a wrong-but-confident basket for
+as long as nobody notices.
+
+## It is not wired, and that was a decision, not an oversight
+
+`services/asdair/pipeline/deps.js:317` — **"DELIBERATELY NOT WIRED HERE: promoteDecision"**, on the
+grounds that inferring *"does this apply going forward?"* from an answer would be *"exactly the
+ambiguous-inference failure promoteDecision's provenance guard exists to refuse."*
+
+`buildAnswerLearning` demands a **strict boolean** and hard-errors on an absent one, precisely so
+nobody can guess it. `productionWiring.test.js` and `answerJourney.test.js` both record the module
+as complete, tested and unwired.
+
+**So the honest status of item 3 is: the machinery exists, has production-grade guards, and has
+never once run against a real answer.** This is the standing CAPAE family — *built, tested,
+committed, and never activated* — and it is the second half of what Warwick asked for last night.
+
+## What the real shop showed
+
+Two of his four typed answers on `SHOP-2026-08-10-M64` plainly express standing preferences:
+
+- *"This is definitely in regulars and favourites"*
+- *"Any gloves, i don't care want to rotate as soon as safe to do so!"*
+
+Both settled their question. **Neither wrote a rule, a `rule_qa_log` row, or anything durable.** They
+will be asked again next week.
+
+## The missing piece, precisely
+
+Not the writer — that exists. **The missing piece is how `applies_going_forward` is established
+honestly.** The code refuses to have it guessed, and it is right to.
+
+Warwick's own requirements already determine the route, so this is engineering rather than a new
+product decision: item 2 requires free text to be *"interpret[ed] … through the intended bounded
+semantic path where required"*, and item 3 requires persistence *"where Warwick's statement clearly
+expresses a standing preference/rule."* That is Terra's job — the bounded semantic consumer — and
+the guard's demand for a strict boolean is satisfied by an explicit interpretation, not an inference
+smuggled in by the caller.
+
+## Sequencing
+
+**Depends on WP-B15-09**, which is rebuilding where an answer is captured and how a free-text reply
+maps to one or more questions. Wiring learning into a surface being replaced this hour would be
+building on sand.
+
+**Queued, not dropped, and written down rather than carried** — the rule this whole class of defect
+breaks.
