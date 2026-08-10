@@ -943,6 +943,44 @@ export async function queueShopCards(deps, {
 }
 
 /**
+ * PURE. Apply the deployment's cockpit base URL to a card's checklist path, at
+ * SEND time.
+ *
+ * ── WHY THE HOST IS APPLIED HERE AND NOWHERE EARLIER ────────────────────────
+ * runPipeline.js writes `/api/asdair/checklist?shop=<ref>` onto the DURABLE
+ * outbox payload and must never write a host: a host stored in the database is
+ * wrong the day the machine, the port or the tailnet name changes, and every
+ * card queued before that day would still be carrying it. The path is the
+ * durable fact; the host is deployment configuration, and this is the last
+ * moment before the bytes leave for Telegram.
+ *
+ * ── WHY IT MATTERS THAT IT IS ABSOLUTE ──────────────────────────────────────
+ * Telegram linkifies an absolute https URL and does not linkify a bare path. A
+ * path on the card is a string Warwick has to reassemble against a host he is
+ * expected to remember, standing in a shop. That is the same class of failure
+ * as the unreachable route itself: technically present, practically absent.
+ *
+ * ── ABSENT CONFIG IS THE HONEST DEGRADED STATE, NOT A GUESS ─────────────────
+ * With no base URL configured the payload is returned UNCHANGED and the card
+ * shows the path exactly as before. Nothing is invented, nothing is defaulted
+ * to a plausible-looking host, and an absent checklist path still renders
+ * nothing rather than a dead link.
+ *
+ * @param {object} payload   the durable outbox payload - never mutated
+ * @param {string|null} baseUrl  e.g. https://host:8443 - trailing slash tolerated
+ */
+export function withChecklistUrl(payload, baseUrl) {
+  const base = typeof baseUrl === 'string' ? baseUrl.trim().replace(/\/+$/, '') : '';
+  const p = payload && typeof payload === 'object' ? payload : null;
+  if (!base || !p) return payload;
+  const rel = typeof p.checklistPath === 'string' ? p.checklistPath.trim() : '';
+  // Only a relative path is prefixed. A payload that already carries an absolute
+  // URL is left alone rather than having a second origin glued onto the front.
+  if (rel === '' || !rel.startsWith('/')) return payload;
+  return { ...p, checklistPath: base + rel };
+}
+
+/**
  * PHASE 3 - drain the outbox.
  *
  * A message is rendered from its durable payload, sent, and only THEN resolved.
@@ -993,7 +1031,9 @@ export async function drainOutbox(deps, { bot, log = () => {} } = {}) {
         continue;
       }
 
-      await bot.send(chatId, render(item.payload));
+      // The cockpit base URL is applied HERE, at the last moment before sending,
+      // so the durable payload never carries a host. See withChecklistUrl.
+      await bot.send(chatId, render(withChecklistUrl(item.payload, bot.checklistBaseUrl)));
       await store.resolveCommand(deps, item.id, 'done', 'sent');
       sent.push({ kind: item.kind, key: item.key });
     } catch (err) {
@@ -1403,6 +1443,13 @@ async function realWiring(deps) {
       parseAnswerArg: callback.parseAnswerArg,
       messages: botMessages.MESSAGES,
       chatId,
+      // THE COCKPIT'S BASE URL - a NAME, never a value read from a credentials
+      // file, exactly like every other config on this object. Unset is a valid
+      // state and the honest one: the card then shows the cockpit PATH, which is
+      // what it did before. Set it to the tailnet origin Warwick actually opens
+      // and the same card carries a link he can tap. Owned by Mack, who owns
+      // values and their placement; this module only names the variable.
+      checklistBaseUrl: process.env.ASDAIR_COCKPIT_BASE_URL || null,
       send: (chat, message) => sender.sendMessage(chat, message),
       answerTap: (id, text) => sender.answerCallbackQuery(id, { text }),
       // THE ONLY THING THAT MAY SEND A QUESTION. It sends, then seals the render

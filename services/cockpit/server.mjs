@@ -30,6 +30,11 @@ import { capaeResponse } from './capae.mjs';
 // gate could execute it, because importing this file opens two live pools via db.mjs. It is now
 // executed end to end, against a recording fake upstream, by origin-boundary-check.mjs.
 import { PRIVATE_API_PREFIX, privateApiCtx, servePrivateApi } from './private-api.mjs';
+// The AsdAIr CHECKLIST proxy — the page Warwick actually shops from, and the one AsdAIr route the
+// browser had no way to reach. Its own module for the same reason as the five above: a handler that
+// lives in this file cannot be executed by any gate, because importing this file opens live pools.
+// asdair-checklist-check.mjs runs it end to end over real HTTP. Its header carries the reasoning.
+import { ASDAIR_CHECKLIST_ROUTE, proxyAsdairChecklist } from './asdair-checklist.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -395,6 +400,8 @@ const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/asdair/rules')) return j(res, 200, await apiAsdairRules());
     if (req.url.startsWith('/api/asdair/packet')) { const s = new URL(req.url, 'http://x').searchParams.get('shop'); return j(res, 200, await apiAsdairPacket(s)); }
     if (req.url.startsWith('/api/asdair/media')) return proxyAsdairMedia(req, res);
+    // THE CHECKLIST. Not `j(res, ...)`: this one answers a document a person reads, not JSON.
+    if (req.url.startsWith(ASDAIR_CHECKLIST_ROUTE)) return proxyAsdairChecklist(req, res, ASDAIR_ORIGIN);
     // Private-app same-origin bridge (opt-in via COCKPIT_PRIVATE_API). Must run before static.
     if (req.url.startsWith(PRIVATE_API_PREFIX)) return servePrivateApi(req, res, PRIVATE_API);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {

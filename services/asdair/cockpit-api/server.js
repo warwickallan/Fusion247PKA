@@ -56,6 +56,33 @@ function send(res, status, headers, payload) {
   res.end(payload);
 }
 
+/**
+ * PURE. Turn a router answer into wire bytes, ACCORDING TO ITS OWN DECLARED
+ * CONTENT-TYPE.
+ *
+ * THE DEFECT THIS CLOSES. This binder used to write `JSON.stringify(out.body)`
+ * for every routed answer without exception. httpApi.markdown() returns a
+ * STRING body under `text/markdown`, so the checklist - the page a person reads
+ * standing in a shop - went out as a JSON string literal: surrounding double
+ * quotes, and every line break rendered as a literal backslash-n. The header
+ * said markdown and the body was a quoted one-liner. Verified on the live
+ * service before the fix: GET /asdair/checklist answered 200, text/markdown,
+ * body `"# No checklist yet\n\n..."`.
+ *
+ * A JSON.stringify of a string is not a formatting nit here: it makes the ONE
+ * artefact this route exists to deliver unreadable, and the reader has no way
+ * to tell it is a serialisation bug rather than the checklist itself.
+ *
+ * THE RULE, and it is deliberately narrow: a body that is ALREADY A STRING is
+ * written as-is; anything else is JSON. Every JSON route in httpApi.js returns
+ * an OBJECT via json(), so no JSON route's shape changes - a JSON body is still
+ * JSON.stringify'd, exactly as before. Only markdown(), whose bodies are the
+ * only strings the router produces, is affected.
+ */
+function serialiseBody(body) {
+  return typeof body === 'string' ? body : JSON.stringify(body);
+}
+
 function collectBody(req) {
   return new Promise(function (resolve, reject) {
     const chunks = [];
@@ -133,7 +160,7 @@ function createServer() {
     url.searchParams.forEach(function (v, k) { query[k] = v; });
 
     const out = await handleRequest({ method: req.method, path: url.pathname, query: query, body: body });
-    send(res, out.status, out.headers, JSON.stringify(out.body));
+    send(res, out.status, out.headers, serialiseBody(out.body));
   });
 }
 
@@ -149,6 +176,13 @@ function start() {
   return server;
 }
 
-module.exports = { createServer: createServer, start: start };
+module.exports = {
+  createServer: createServer,
+  start: start,
+  // Exported so the string-vs-JSON rule is EXECUTED by a test rather than
+  // asserted in a comment. It was wrong for the checklist's whole lifetime and
+  // nothing could have caught it: it lived inline in a closure.
+  _internal: { serialiseBody: serialiseBody },
+};
 
 if (require.main === module) start();
