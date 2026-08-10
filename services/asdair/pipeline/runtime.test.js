@@ -1998,3 +1998,173 @@ test('AC9: the collision ref stays inside the Telegram callback budget, and the 
   assert.equal(isValidShopRef('SHOP-2026-08-10-M' + '9'.repeat(16)), false,
     '16 digits exceeds the cap - if Telegram message ids ever reach this, the scheme needs revisiting');
 });
+
+// =====================================================================
+// WP-B15-08 AC1 - AN ANSWER IS NEVER ALSO A SHOPPING LIST
+//
+// THE LIVE DEFECT, 2026-08-10. Warwick photographed his list. It became
+// SHOP-2026-08-10-M64 with 8 question cards. He REPLIED to those cards in free
+// text, and every reply did TWO things: it answered the question (6 of 8
+// landed) AND it was ingested as a brand-new shopping list, minting M76, M77,
+// M79 and M82 - one junk shop per answer.
+//
+// ── WHY THE EXISTING SUITE NEVER CAUGHT IT ──────────────────────────────────
+// "B2 TYPED REPLY: replying to a question card answers it, verbatim" drives
+// routeTaps DIRECTLY. It proves the answer lands and can say nothing at all
+// about what intake did with the same message on the way past. The double
+// effect only exists in a WHOLE PASS, so these tests drive runOnce.
+//
+// The seam is one line in the claim closure: a message carrying
+// reply_to_message was declined outright ("routeTaps handles it"), so intake
+// treated it as a list before routing ever saw it.
+// =====================================================================
+
+test('AC1 A TYPED REPLY TO A CARD CREATES NO SHOP - the live 2026-08-10 defect', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  const shopsBefore = h.db.shop.length;
+  const listItemsBefore = h.db.shopping_list_items.length;
+
+  // A DIFFERENT CALENDAR DAY, deliberately. On the seeded day the receiver
+  // would RESUME the existing week and the new row would be invisible; on the
+  // next day an ingested reply mints a genuinely new shop, which is exactly
+  // the shape of the four junk shops Warwick got. The 08-03 shop stays active
+  // and still carries the open question, so the claim path is fully engaged.
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([replyToCard({ messageId: 9001, text: 'the cheese one please', updateId: 61 })]),
+    bot,
+    questions: bot.questions,
+    now: () => Date.parse('2026-08-04T09:00:00.000Z'),
+  });
+
+  assert.equal(h.db.shop.length, shopsBefore,
+    'his ANSWER was ingested as a shopping list - this is the live defect: SHOP-2026-08-10-M76/M77/M79/M82');
+  assert.equal(h.db.shopping_list_items.length, listItemsBefore,
+    'his answer became a line on a shopping list');
+  assert.equal(report.intake.received, 0, 'the answer reached receiveList at all');
+  assert.equal(report.intake.claimed, 1, 'the reply was not claimed by the router');
+});
+
+test('AC1 THE ANSWER STILL LANDS, VERBATIM - suppression must never become a silent drop', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([replyToCard({ messageId: 9001, text: 'the cheese one please', updateId: 61 })]),
+    bot,
+    questions: bot.questions,
+    now: () => Date.parse('2026-08-04T09:00:00.000Z'),
+  });
+
+  const q = h.db.shop_question.find((r) => r.question_key === questionKey);
+  assert.equal(q.status, 'answered', 'the reply was swallowed without being recorded - a SILENT DROP, worse than the junk shop');
+  assert.equal(q.answer_text, 'the cheese one please', 'his words were not recorded verbatim');
+  assert.equal(q.answer_source, 'typed', 'a typed reply recorded as anything else is a false provenance record');
+});
+
+test('AC1 A REPLY THAT CANNOT BE CORRELATED IS STILL A LIST - failing towards intake is the safe direction', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  const shopsBefore = h.db.shop.length;
+
+  // A reply to a message that is NOT a question card. Nothing correlates it, so
+  // claiming it would throw a genuine shopping list away. It must fall through.
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([replyToCard({ messageId: 12345, text: '3 gourmet cat food', updateId: 62 })]),
+    bot,
+    questions: bot.questions,
+    now: () => Date.parse('2026-08-04T09:00:00.000Z'),
+  });
+
+  assert.equal(report.intake.claimed, 0, 'an uncorrelatable reply was claimed and lost');
+  assert.equal(report.intake.received, 1, 'a genuine shopping list was swallowed by the router');
+  assert.equal(h.db.shop.length, shopsBefore + 1, 'the new list did not become a shop');
+  assert.equal(h.db.shop_question[0].status, 'open', 'an unrelated question was answered by a guess');
+});
+
+test('AC1 A REPLY TO AN ALREADY-ANSWERED CARD IS NOT SWALLOWED', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  await commands.answerQuestion({
+    shopRef: REF, actor: 'cockpit:warwick', questionKey,
+    answerText: 'the cheese one', answerSource: 'typed',
+  }, h.deps);
+
+  // answerQuestion is a compare-and-set on status='open', so a LATER reply with
+  // DIFFERENT words is refused by the row and recorded nowhere. Claiming on that
+  // receipt would swallow a message that was never stored - the B15-04 lesson,
+  // which must survive this change.
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([replyToCard({ messageId: 9001, text: 'actually the chicken one', updateId: 63 })]),
+    bot,
+    questions: bot.questions,
+    now: () => Date.parse('2026-08-04T09:00:00.000Z'),
+  });
+
+  assert.equal(report.intake.claimed, 0,
+    'a message whose words were stored NOWHERE was claimed and swallowed');
+  assert.equal(h.db.shop_question.find((r) => r.question_key === questionKey).answer_text, 'the cheese one',
+    'first answer wins - a later reply must not overwrite a recorded decision');
+});
+
+// =====================================================================
+// WP-B15-08 AC10 - OUR OWN REFUSALS ARE NOT FOREIGN TRAFFIC
+//
+// `refused` is what a pass REPORTS; the journal is where a trace is left. The
+// existing rule - "a foreign namespace is not ours to refuse out loud" - is
+// right, and it was being applied to EVERYTHING, including callbacks in our own
+// `asd:` namespace that came off cards we drew ourselves. The distinction is
+// the NAMESPACE, never a list of action names.
+// =====================================================================
+
+test('AC10 a refused callback in OUR namespace is REPORTED, not merely journaled', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const events = [];
+
+  const report = await routeTaps(h.deps, {
+    updates: [callbackUpdate({ updateId: 8, data: 'asd:notanaction:SHOP-2026-08-03' })],
+    bot,
+    questions: bot.questions,
+    log: (event, detail) => events.push({ event, detail }),
+  });
+
+  assert.equal(report.refused.length, 1,
+    'a button in our own namespace was refused and the pass reported nothing - Warwick pressed it and nothing happened');
+  assert.equal(events.filter((e) => e.event === 'inbound_refused').length, 1,
+    'the journal trace must survive too - reporting does not replace it');
+});
+
+test('AC10 a FOREIGN namespace is still not ours to refuse out loud', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const events = [];
+
+  const report = await routeTaps(h.deps, {
+    updates: [callbackUpdate({ updateId: 9, data: 'decision:something-else' })],
+    bot,
+    questions: bot.questions,
+    log: (event, detail) => events.push({ event, detail }),
+  });
+
+  assert.equal(report.refused.length, 0,
+    'the hub\'s cards share this phone - reporting their traffic as our refusals makes every pass look broken');
+  assert.equal(events.filter((e) => e.event === 'inbound_refused').length, 1,
+    'a foreign inbound must still leave a trace in the journal');
+});

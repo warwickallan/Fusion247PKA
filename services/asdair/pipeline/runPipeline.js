@@ -463,6 +463,81 @@ function readingsFromRoute(routed) {
 }
 
 /**
+ * PURE. The trailing bare integer of a reading, when that number is part of the
+ * product's NAME rather than a quantity someone wrote. (WP-B15-08 AC5)
+ *
+ * ── THE LIVE DEFECT, 2026-08-10 ────────────────────────────────────────────
+ * "ARIEL 4in1 PODS 33" was read with quantity 33, and both shop_line 21 and
+ * list item 230 carried 33 - thirty-three PACKS of laundry pods, roughly GBP
+ * 350. The 33 is printed on the box. Warwick did not write it.
+ *
+ * ── THE ASYMMETRY THIS RESTS ON, STATED SO IT CAN BE ARGUED WITH ───────────
+ * On a handwritten list the quantity is written BEFORE the item, essentially
+ * always - every example Warwick gave does it: "9 ROLLS", "16 CAPSULES",
+ * "4 x 500ml", "4 x 4pts ARLA", "2pkts TWIX". A number at the END of a product
+ * name is part of the name: a pod count, an SPF, WD-40, omega 3, 4in1. So this
+ * fires ONLY on a trailing bare integer, and the caller fires only when the
+ * reported quantity IS that number - which is the evidence that it was lifted
+ * off the end of the name rather than read as a separate instruction.
+ *
+ * ── THE BOUNDARIES, ALL DELIBERATE ─────────────────────────────────────────
+ *   * whitespace before the digits is REQUIRED, so a glued form is untouched:
+ *     "7up", "2x4", "b12".
+ *   * the token must be PURE ASCII DIGITS to end of line, so a size or unit
+ *     token is untouched: "yazoo 400ml", "milk 2L", "tuna 500g".
+ *   * at least one NON-NUMERIC token must precede it: a reading that is only a
+ *     number has no name for a pack size to belong to.
+ *
+ * These are the same boundaries skill/listNormaliser.js draws for TYPED text,
+ * where it reaches the OPPOSITE default (a typed trailing number is a
+ * quantity). That is not an inconsistency: a typed digit is a deliberate
+ * keystroke, a photographed one is print on a box. This function governs the
+ * PHOTOGRAPHED path only. The typed path is unchanged and still defective for
+ * this case; it lives outside this Work Order's surface and is reported.
+ *
+ * @returns {number|null} the trailing pack size, or null
+ */
+export function trailingPackSize(rawReading) {
+  const text = typeof rawReading === 'string' ? rawReading.trim() : '';
+  if (text === '') return null;
+  const m = /\s(\d+)\s*$/.exec(text);
+  if (!m) return null;
+  // Everything before the trailing number must contain a non-numeric token,
+  // otherwise there is no product name here to carry a pack size.
+  const head = text.slice(0, m.index).trim();
+  if (head === '') return null;
+  if (!head.split(/\s+/).some((tok) => !/^\d+$/.test(tok))) return null;
+  const n = Number(m[1]);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/**
+ * PURE. Strip a trailing pack size that was mistaken for an order quantity.
+ * (WP-B15-08 AC5)
+ *
+ * Applied to the READINGS, at the one point both source kinds converge, so the
+ * durable shop_line, the catalogue resolution and the list item cannot end up
+ * disagreeing about how many were asked for.
+ *
+ * ONLY when the reported quantity IS the trailing number. A reading whose
+ * quantity is something else ("ARIEL 4in1 PODS 33", quantity 2) is a genuine
+ * request for two boxes and is left exactly alone - destroying that would be
+ * worse than the bug.
+ *
+ * The raw reading is NEVER edited: it is the evidence of what was on the page.
+ * The correction rides beside it as `pack_size_reading`.
+ */
+export function withoutTrailingPackSizes(readings) {
+  return (Array.isArray(readings) ? readings : []).map((l) => {
+    const qty = l && l.quantity;
+    if (!Number.isInteger(qty)) return l;
+    const packSize = trailingPackSize(l.raw_reading);
+    if (packSize === null || packSize !== qty) return l;
+    return { ...l, quantity: null, pack_size_reading: packSize };
+  });
+}
+
+/**
  * INTERPRET. Catalogue first. Then read. Then identity from OUR rows. Then
  * persist the interpretation, and only then the list.
  *
@@ -518,6 +593,12 @@ async function stepInterpret(deps, snapshot) {
       { sourceId, listDate, requestedBy: 'asdair:pipeline' },
     ));
   }
+
+  // ── A TRAILING PACK SIZE IS NOT AN ORDER QUANTITY (WP-B15-08 AC5) ─────────
+  // Applied HERE, where both source kinds have converged on readings and before
+  // anything durable is written, so shop_line, the resolution and the list item
+  // cannot disagree about how many were asked for. See trailingPackSize.
+  readings = withoutTrailingPackSizes(readings);
 
   // ── IDENTITY IS THE CATALOGUE'S, NOT THE MODEL'S ──────────────────────────
   // resolveByCatalogue maps a reading onto a real asdair.regulars.id, or says
@@ -660,6 +741,19 @@ export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy })
     const notes = [];
     if (l.match_basis) notes.push(`matched by ${l.match_basis}`);
     if (!matched) notes.push(`needs review: ${l.status}`);
+    // WP-B15-08 AC5. Re-derived from the DURABLE reading rather than carried on
+    // a field, because shop_line has a fixed column list and inventing one to
+    // ferry this across would be a schema change this order may not make. The
+    // rule is the same pure function either way, so the two cannot drift.
+    //
+    // Warwick must be able to SEE a call the system made on his behalf: a wrong
+    // one he is never shown is a wrong one he can never correct.
+    const packSize = l.quantity === null || l.quantity === undefined
+      ? trailingPackSize(l.raw_reading)
+      : null;
+    if (packSize !== null) {
+      notes.push(`pack size ${packSize} read from the product name, not as an order quantity - asking for 1`);
+    }
     if (Array.isArray(l.alternatives) && l.alternatives.length > 0) {
       // `regular_id` is named, not `id`: these came from resolveByCatalogue and
       // are asdair.regulars ids. Nothing here reads an id off any other table.

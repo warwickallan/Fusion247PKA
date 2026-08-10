@@ -18,7 +18,10 @@ import { createRequire } from 'node:module';
 
 import { makeHarness, makeCatalogue, HOUSEHOLD_ID, makeIntake, textUpdate } from './test/harness.js';
 import * as commands from './commands.js';
-import { runPipeline, listDateOf, buildGroundedIntents, planCandidates, assertCatalogueLoaded } from './runPipeline.js';
+import {
+  runPipeline, listDateOf, buildGroundedIntents, planCandidates, assertCatalogueLoaded,
+  trailingPackSize, withoutTrailingPackSizes,
+} from './runPipeline.js';
 import { runOnce, loadOpenQuestions, loadDeferredClarifications } from './runtime.js';
 import { listQuestions, listOutbox, resolveCommand } from './store.js';
 import { STEPS } from './stages.js';
@@ -1895,4 +1898,108 @@ test('B15-04 AC1: a clarification round key is still `q`+8 hex - the round NEVER
   }
   // Distinct rounds are distinct questions - the round is in the HASH INPUT.
   assert.notEqual(questionKeyFor('oven gloves', 1), questionKeyFor('oven gloves', 2));
+});
+
+// =====================================================================
+// WP-B15-08 AC5 - A TRAILING PACK SIZE IS NOT AN ORDER QUANTITY
+//
+// THE LIVE DEFECT, 2026-08-10. The photographed line "ARIEL 4in1 PODS 33" was
+// read with quantity 33, and shop_line 21 / list item 230 both carried 33 -
+// thirty-three PACKS of laundry pods, roughly GBP 350. The 33 is printed on the
+// box; it is part of the product's identity, not a number Warwick wrote.
+//
+// ── THE ASYMMETRY THIS RULE RESTS ON, STATED SO IT CAN BE ARGUED WITH ───────
+// On a handwritten list the quantity is written BEFORE the item, essentially
+// always - every one of Warwick's own examples does it ("9 ROLLS", "16
+// CAPSULES", "4 x 500ml", "4 x 4pts ARLA", "2pkts TWIX"). A number at the END
+// of a product name is part of the name: a pod count, an SPF, WD-40, omega 3.
+// So the guard fires ONLY on a trailing bare integer, and ONLY when the
+// quantity the reader reported is that very number - which is the evidence
+// that the number was lifted off the end of the name rather than read as a
+// separate instruction.
+//
+// COST OF BEING WRONG, both directions, because this is a judgement:
+//   wrong here  -> 1 pack instead of 2, visible in the note, one tap to fix.
+//   wrong today -> 33 packs of pods, about GBP 350, discovered at the door.
+// =====================================================================
+
+test('AC5 the trailing-pack-size rule fires ONLY on a trailing bare integer', () => {
+  // FIRES: the number is at the end of a name that has real words before it.
+  assert.equal(trailingPackSize('ARIEL 4in1 PODS 33'), 33);
+  assert.equal(trailingPackSize('finish dishwasher tablets 60'), 60);
+
+  // DOES NOT FIRE - every leading-quantity form Warwick named. Breaking any of
+  // these would be worse than the bug being fixed.
+  assert.equal(trailingPackSize('9 ROLLS'), null);
+  assert.equal(trailingPackSize('16 CAPSULES'), null);
+  assert.equal(trailingPackSize('4 x 500ml'), null);
+  assert.equal(trailingPackSize('4 x 4pts ARLA'), null);
+  assert.equal(trailingPackSize('2pkts TWIX'), null);
+
+  // DOES NOT FIRE - a size/unit token is not a bare integer.
+  assert.equal(trailingPackSize('yazoo 400ml'), null);
+  assert.equal(trailingPackSize('milk 2L'), null);
+  assert.equal(trailingPackSize('tuna 500g'), null);
+
+  // DOES NOT FIRE - a reading that is ONLY a number has no name to carry a
+  // pack size, and a glued form is not a trailing token at all.
+  assert.equal(trailingPackSize('33'), null);
+  assert.equal(trailingPackSize('7up'), null);
+  assert.equal(trailingPackSize(''), null);
+  assert.equal(trailingPackSize(null), null);
+});
+
+test('AC5 a reading is corrected ONLY when the reported quantity IS the trailing number', () => {
+  const corrected = withoutTrailingPackSizes([
+    // The live defect: 33 reported, 33 printed on the end of the name.
+    { line_no: 1, raw_reading: 'ARIEL 4in1 PODS 33', quantity: 33 },
+    // The SAME name, but the reader read no quantity off it. Nothing to correct.
+    { line_no: 2, raw_reading: 'ARIEL 4in1 PODS 33', quantity: null },
+    // The SAME name with a quantity that is NOT the trailing number - Warwick
+    // genuinely asked for two boxes. Left exactly alone.
+    { line_no: 3, raw_reading: 'ARIEL 4in1 PODS 33', quantity: 2 },
+    // Leading quantities, untouched.
+    { line_no: 4, raw_reading: '9 ROLLS', quantity: 9 },
+    { line_no: 5, raw_reading: '4 x 4pts ARLA', quantity: 4 },
+    { line_no: 6, raw_reading: '2pkts TWIX', quantity: 2 },
+  ]);
+
+  assert.equal(corrected[0].quantity, null, 'the pack size was still taken as an order quantity');
+  assert.equal(corrected[0].raw_reading, 'ARIEL 4in1 PODS 33',
+    'the raw reading must survive verbatim - the evidence is never edited');
+  assert.equal(corrected[0].pack_size_reading, 33, 'the correction left no evidence behind it');
+  assert.equal(corrected[1].quantity, null);
+  assert.equal(corrected[1].pack_size_reading, undefined, 'nothing was corrected, so nothing may be claimed');
+  assert.equal(corrected[2].quantity, 2, 'a genuine quantity was destroyed by the pack-size guard');
+  assert.equal(corrected[3].quantity, 9);
+  assert.equal(corrected[4].quantity, 4);
+  assert.equal(corrected[5].quantity, 2);
+});
+
+test('AC5 END TO END: a photographed pack size never reaches the list as a quantity', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: 'ARIEL 4in1 PODS 33', quantity: 33 },
+      { line_no: 2, raw_reading: '3 gourmet cat food', quantity: 3 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+
+  const ariel = h.db.shop_line.find((l) => l.raw_reading === 'ARIEL 4in1 PODS 33');
+  assert.equal(ariel.quantity, null, 'shop_line still carries 33 - thirty-three packs of pods');
+  assert.equal(ariel.raw_reading, 'ARIEL 4in1 PODS 33', 'the photographed wording must survive verbatim');
+
+  // add_list_item stores the schema default of 1 for an unknown quantity, which
+  // is the right answer for a pack: one box.
+  const item = h.db.shopping_list_items.find((i) => /ariel/i.test(i.item_name));
+  assert.equal(item.requested_qty, 1, 'the list still asks for 33 - about GBP 350 of laundry pods');
+  assert.match(String(item.note), /pack size/i,
+    'the correction is invisible to Warwick - he cannot spot a wrong call he is never shown');
+
+  // The other line is untouched: a leading quantity is a real instruction.
+  const cat = h.db.shop_line.find((l) => l.raw_reading === '3 gourmet cat food');
+  assert.equal(cat.quantity, 3, 'a leading quantity was destroyed - worse than the bug');
 });
