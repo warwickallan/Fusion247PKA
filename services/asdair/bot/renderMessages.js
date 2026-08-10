@@ -899,9 +899,15 @@ export function renderQuestionBoard({
 
   lines.push('');
   if (blocked === true) {
-    lines.push('⛔ THIS SHOP IS BLOCKED. Nothing goes in a basket until the questions');
-    lines.push('   above are answered.');
+    // WP-B15-15 found this sentence hardcoded "until the questions above are
+    // answered". BOTH of planOutcome's parks are structurally unreachable
+    // UNLESS zero questions are open - an unconfirmed interpretation, or
+    // unresolved lines - so on exactly the states the board was extended to
+    // describe, that sentence was false. The specific reason leads when we
+    // have one; the generic sentence is the fallback, never the headline.
+    lines.push('⛔ THIS SHOP IS BLOCKED. Nothing goes in a basket yet.');
     if (blockedReason) lines.push(`   ${value(blockedReason)}`);
+    else lines.push('   The questions above need answering.');
   } else if (blocked === false) {
     lines.push('✅ NOTHING IS BLOCKING THIS SHOP — every question is answered.');
   } else {

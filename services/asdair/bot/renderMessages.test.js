@@ -679,6 +679,27 @@ test('B15-09 the board answers all three questions Warwick could not answer from
   assert.match(out.text, /THIS SHOP IS BLOCKED/);
 });
 
+test('B15-15 a park with NO open questions does not blame the questions', () => {
+  // WP-B15-15 found this sentence hardcoded "until the questions above are
+  // answered". Both of planOutcome's parks are structurally unreachable UNLESS
+  // zero questions are open - an unconfirmed interpretation, or unresolved
+  // lines - so on exactly the states the board was extended to describe, that
+  // sentence was false. Nothing pinned it, which is why it survived.
+  const parked = renderQuestionBoard({
+    shopRef: REF, total: 0, outstanding: [], answered: [], blocked: true,
+    blockedReason: 'the reading of your photograph has not been confirmed yet',
+  });
+  assert.match(parked.text, /THIS SHOP IS BLOCKED/);
+  assert.match(parked.text, /the reading of your photograph has not been confirmed yet/);
+  assert.doesNotMatch(parked.text, /questions[\s\S]*above are answered/);
+
+  // With no reason supplied the generic sentence is still the honest fallback.
+  const generic = renderQuestionBoard({
+    shopRef: REF, total: 1, outstanding: [{ n: 1, item: 'x' }], answered: [], blocked: true,
+  });
+  assert.match(generic.text, /The questions above need answering/);
+});
+
 test('B15-09 the board says UNBLOCKED only when it is, and says UNKNOWN when it does not know', () => {
   const clear = renderQuestionBoard({
     shopRef: REF, total: 2, outstanding: [], blocked: false,
