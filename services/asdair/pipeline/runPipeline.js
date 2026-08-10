@@ -82,6 +82,13 @@ import { createRequire } from 'node:module';
 const requireCjs = createRequire(import.meta.url);
 const { buildHandoff } = requireCjs('../handoff/buildHandoff.js');
 const { openHandoff } = requireCjs('../handoff/claim.js');
+// WP-B15-11 made skill/listNormaliser.js the CANONICAL home of the trailing
+// pack-size rule so the money defect cannot survive on one input path while
+// being fixed on another. This file used to carry its own identical copy;
+// Larry re-pointed it at integration (2026-08-10). The direction is forced:
+// skill/ is CommonJS and pipeline/ is ESM, so the shared rule can only live
+// on the skill side and be imported outward.
+const { trailingPackSize: canonicalTrailingPackSize } = requireCjs('../skill/listNormaliser.js');
 
 // THE SUPERVISED STEP'S RETURN LEG (WP-B15-14). `ingestCompletion` validates
 // the operator's line report against the packet it was issued for - including
@@ -622,17 +629,9 @@ function readingsFromRoute(routed) {
  * @returns {number|null} the trailing pack size, or null
  */
 export function trailingPackSize(rawReading) {
-  const text = typeof rawReading === 'string' ? rawReading.trim() : '';
-  if (text === '') return null;
-  const m = /\s(\d+)\s*$/.exec(text);
-  if (!m) return null;
-  // Everything before the trailing number must contain a non-numeric token,
-  // otherwise there is no product name here to carry a pack size.
-  const head = text.slice(0, m.index).trim();
-  if (head === '') return null;
-  if (!head.split(/\s+/).some((tok) => !/^\d+$/.test(tok))) return null;
-  const n = Number(m[1]);
-  return Number.isSafeInteger(n) && n > 0 ? n : null;
+  // Delegates to the ONE canonical rule. Kept as a named export because
+  // runPipeline.test.js pins the boundaries through this name.
+  return canonicalTrailingPackSize(rawReading);
 }
 
 /**
