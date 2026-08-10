@@ -803,6 +803,22 @@ test('the list date comes from the WEEK REF, never from a clock', () => {
   assert.throws(() => listDateOf(null), /SHOP-YYYY-MM-DD/);
 });
 
+test('WP-B15-07: a FRESH shop can ADVANCE - its collision ref yields the DATE PART only', () => {
+  // listDateOf runs on every advancing pass. A shop that started fresh because a
+  // terminal one owned its date carries a `-M<message id>` suffix; if that threw
+  // here, the fresh shop would die on its first step and Warwick would still get
+  // no card - the original lost-list bug moved rather than fixed.
+  assert.equal(listDateOf('SHOP-2026-08-10-M63'), '2026-08-10');
+  assert.equal(listDateOf('SHOP-2026-08-10-M171031156'), '2026-08-10',
+    'the suffix is discarded whatever its length - it is not part of the date');
+
+  // The suffix is NARROW. A lazier relaxation would let these through and put
+  // rubbish into list_date.
+  for (const bad of ['SHOP-2026-08-10-M', 'SHOP-2026-08-10-63', 'SHOP-2026-08-10-MX', 'SHOP-2026-08-10-M6-M7']) {
+    assert.throws(() => listDateOf(bad), /SHOP-YYYY-MM-DD/, `${bad} must be refused`);
+  }
+});
+
 test('an EMPTY catalogue is refused - open-ended transcription is the measured-wrong method', () => {
   assert.throws(() => assertCatalogueLoaded(null, 'interpretation'), /Never interpret a shopping list without/);
   assert.throws(() => assertCatalogueLoaded({ household_id: 1, candidates: [] }, 'interpretation'), /EMPTY catalogue/);

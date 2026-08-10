@@ -399,3 +399,94 @@ test('A1 `typed` SURVIVES INTACT - the provenance Warwick actually needs', async
   assert.equal(h.db.shop_question[0].answer_source, 'typed');
   assert.equal(h.db.shop_question[0].answer_text, 'the cheese one please');
 });
+
+// =====================================================================
+// WP-B15-07 - RETURNING MUST MEAN CAPTURED
+//
+// receiveList runs inside intake's onRecord, BEFORE the Telegram offset moves,
+// so a returned receipt is read by the receiver as "safe to let Telegram forget
+// this message". On 2026-08-10 that reading was false and a real list was lost.
+// =====================================================================
+
+test('AC4: receiveList REFUSES to report success when the list only reached a TERMINAL shop', async () => {
+  // The store no longer produces this outcome - it creates a fresh shop instead.
+  // This is the defence-in-depth layer, driven directly, because the cost of
+  // being wrong here is a silently lost shopping list.
+  const h = makeHarness();
+  const deps = {
+    ...h.deps,
+    shopStore: {
+      ...h.deps.shopStore,
+      createOrResumeShop: async () => ({
+        shop: { id: 9, household_id: HOUSEHOLD_ID, shop_ref: REF, status: 'CANCELLED' },
+        created: false,
+        resumed: true,
+        matched_by: 'shop_ref',
+        superseded_terminal_ref: null,
+      }),
+    },
+  };
+
+  await assert.rejects(
+    () => commands.receiveList({
+      householdId: HOUSEHOLD_ID, listDate: '2026-08-03', sourceKind: 'text', rawText: 'milk',
+      actor: ACTOR, telegramChatId: '555', telegramMessageId: '901', telegramUpdateId: '5',
+    }, deps),
+    /refuses to report success|never captured/,
+    'a list that reached only a terminal shop must raise, so the offset is held and Telegram redelivers'
+  );
+});
+
+test('AC4: a REDELIVERY whose shop was later cancelled still succeeds - it must not wedge the poller', async () => {
+  // The message IS captured; Warwick cancelled the shop afterwards. Raising here
+  // would hold the offset and make Telegram redeliver it forever. Keying the
+  // guard on liveness rather than on capture would do exactly that.
+  const h = makeHarness();
+  const deps = {
+    ...h.deps,
+    shopStore: {
+      ...h.deps.shopStore,
+      createOrResumeShop: async () => ({
+        shop: { id: 9, household_id: HOUSEHOLD_ID, shop_ref: REF, status: 'CANCELLED' },
+        created: false,
+        resumed: true,
+        matched_by: 'telegram_message',
+        superseded_terminal_ref: null,
+      }),
+    },
+  };
+
+  const receipt = await commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate: '2026-08-03', sourceKind: 'text', rawText: 'milk',
+    actor: ACTOR, telegramChatId: '555', telegramMessageId: '900', telegramUpdateId: '9',
+  }, deps);
+
+  assert.equal(receipt.matched_by, 'telegram_message');
+  assert.equal(receipt.duplicate, true);
+});
+
+test('AC2: a fresh shop born of a terminal collision REPORTS which shop it superseded', async () => {
+  const h = makeHarness({
+    seed: {
+      shop: [{
+        id: 1, household_id: HOUSEHOLD_ID, shop_ref: REF, status: 'CANCELLED', source_kind: 'text',
+        telegram_chat_id: '555', telegram_message_id: '800', telegram_update_id: '0',
+        raw_text: 'abandoned', raw_media_path: null, transcript: null, transcript_provider: null,
+        transcript_model: null, transcript_confidence: null, needs_review: false, list_id: null,
+        last_error: null, created_at: '2026-08-03T00:15:00.000Z', updated_at: '2026-08-03T00:49:00.000Z',
+      }],
+    },
+  });
+
+  const receipt = await receive(h, { telegramMessageId: '901' });
+
+  assert.equal(receipt.created, true);
+  assert.equal(receipt.superseded_terminal_ref, REF,
+    'the receipt must say WHY this date has two shops, rather than leaving it to a ref suffix');
+  assert.equal(h.db.shop.length, 2);
+  assert.equal(h.db.shop[1].shop_ref, REF + '-M901');
+
+  // An ordinary receive reports null, so the field is informative rather than noise.
+  const plain = await receive(makeHarness(), { telegramMessageId: '902' });
+  assert.equal(plain.superseded_terminal_ref, null);
+});

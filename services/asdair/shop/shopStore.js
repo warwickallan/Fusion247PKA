@@ -71,6 +71,7 @@ const {
   PENDING_ACTION_INSERT_COLUMNS,
   BROWSER_LIVE_STATUSES,
   TERMINAL_STATUSES,
+  collisionShopRef,
   _internal: stateInternal
 } = require('./shopState');
 
@@ -236,55 +237,134 @@ async function inTransaction(options, fn) {
 //                                  matched so it can say so out loud rather
 //                                  than pretend the new message created it.
 //
+// The three values above are UNCHANGED. A terminal collision is reported in the
+// separate `superseded_terminal_ref` field (null on every ordinary call), so no
+// existing reader of matched_by changes meaning.
+//
+// ── THE TERMINAL COLLISION (WP-B15-07) ────────────────────────────────────
+//
+// A RECONCILED or CANCELLED shop is terminal: nothing ever moves it again. So
+// resuming one is not "resuming" at all - it is dropping the new list into a
+// grave and reporting success. That is exactly what happened on 2026-08-10, and
+// the list is gone: the caller saw no error, told Telegram the message was
+// consumed, and Telegram forgot it permanently.
+//
+// So when the ref matched and the row it matched is TERMINAL, this does NOT
+// resume it and does NOT touch it. It derives a fresh identity from the inbound
+// message and inserts a genuinely new shop.
+//
+// STILL INSERT-FIRST. The retry is a second INSERT ... ON CONFLICT DO NOTHING
+// with a re-select behind it, not a check-then-insert: two concurrent
+// deliveries of DIFFERENT messages both find the terminal row, both compute
+// their own distinct collision ref, and both insert. Two deliveries of the SAME
+// message compute the SAME ref, so the database picks a winner and the loser
+// reads the winner's row back.
+//
+// EXACTLY ONE RETRY, and it cannot loop. The collision ref embeds the message
+// id, so a colliding collision ref could only belong to a shop created from
+// THIS same message - which the inbound index would have matched first, before
+// the ref branch was ever reached.
+//
 async function createOrResumeShop(intent, options) {
   // PURE validation first: a bad shop_ref or half an inbound key fails BEFORE
   // any connection is opened.
   const built = buildShopCreate(intent);
 
   return inTransaction(options, async function (client) {
-    const params = built.columns.map(function (col) {
-      const v = built.row[col];
-      return v === undefined ? null : v;
-    });
-    const placeholders = built.columns.map(function (_, i) { return '$' + (i + 1); });
-
-    // NO conflict target: asdair.shop carries TWO unique indexes and this must
-    // survive a collision on either. DO NOTHING (never DO UPDATE) because an
-    // upsert would be a route to rewriting an existing week's evidence.
-    const insertSql = 'INSERT INTO asdair.shop (' + built.columns.join(', ') + ') VALUES (' +
-      placeholders.join(', ') + ') ON CONFLICT DO NOTHING RETURNING ' + SHOP_SELECT_LIST;
-
-    const inserted = firstRow(await client.query(insertSql, params));
+    const inserted = await insertShopRow(client, built);
     if (inserted) {
-      await client.query(SHOP_EVENT_INSERT_SQL, [
-        inserted.id,
-        'milestone',
-        null,
-        'RECEIVED',
-        'shop ' + built.row.shop_ref + ' created from a ' + built.row.source_kind + ' message'
-      ]);
-      return { shop: inserted, created: true, resumed: false, matched_by: 'insert' };
+      await recordShopCreated(client, inserted, built, null);
+      return { shop: inserted, created: true, resumed: false, matched_by: 'insert', superseded_terminal_ref: null };
     }
 
     // The insert wrote nothing, so an existing row holds one of the natural
     // keys. Re-select on them, most specific first.
+    //
+    // THE INBOUND KEY IS CHECKED FIRST AND THAT ORDER IS LOAD-BEARING. A match
+    // here means THIS message is already durably captured - a redelivery. It
+    // resumes even when the shop has since been cancelled, because the content
+    // did reach a shop and nothing was dropped; treating that as a failure
+    // would hold the Telegram offset and make the same message redeliver
+    // forever, which is a worse outage than the bug this function fixes.
     if (built.row.telegram_chat_id !== null && built.row.telegram_message_id !== null) {
       const byInbound = firstRow(await client.query(SELECT_SHOP_BY_INBOUND_SQL,
         [built.row.telegram_chat_id, built.row.telegram_message_id]));
       if (byInbound) {
-        return { shop: byInbound, created: false, resumed: true, matched_by: 'telegram_message' };
+        return { shop: byInbound, created: false, resumed: true, matched_by: 'telegram_message', superseded_terminal_ref: null };
       }
     }
 
     const byRef = firstRow(await client.query(SELECT_SHOP_BY_REF_SQL,
       [built.row.household_id, built.row.shop_ref]));
     if (byRef) {
-      return { shop: byRef, created: false, resumed: true, matched_by: 'shop_ref' };
+      if (TERMINAL_STATUSES.indexOf(byRef.status) === -1) {
+        // A LIVE shop already owns this week. Unchanged behaviour: resume it,
+        // and tell the caller which key matched.
+        return { shop: byRef, created: false, resumed: true, matched_by: 'shop_ref', superseded_terminal_ref: null };
+      }
+
+      // TERMINAL. The dead row is not read again, not updated and not touched.
+      const deadRef = built.row.shop_ref;
+      const freshRef = collisionShopRef(deadRef, built.row.telegram_message_id);
+      const freshBuilt = buildShopCreate(Object.assign({}, intent, { shop_ref: freshRef }));
+
+      const freshInserted = await insertShopRow(client, freshBuilt);
+      if (freshInserted) {
+        await recordShopCreated(client, freshInserted, freshBuilt, deadRef);
+        return { shop: freshInserted, created: true, resumed: false, matched_by: 'insert', superseded_terminal_ref: deadRef };
+      }
+
+      // Another delivery of this same message won the race. Read its row back.
+      const raced = firstRow(await client.query(SELECT_SHOP_BY_INBOUND_SQL,
+        [freshBuilt.row.telegram_chat_id, freshBuilt.row.telegram_message_id]))
+        || firstRow(await client.query(SELECT_SHOP_BY_REF_SQL,
+          [freshBuilt.row.household_id, freshRef]));
+      if (raced) {
+        return { shop: raced, created: false, resumed: true, matched_by: 'telegram_message', superseded_terminal_ref: deadRef };
+      }
+
+      fail('shop ' + deadRef + ' is ' + byRef.status + ' (terminal), so the inbound list was given the fresh ' +
+        'identity ' + freshRef + ' - but that insert wrote nothing and no shop holds it either. Nothing was ' +
+        'written and the list has NOT been captured; hold the inbound acknowledgement and retry.');
     }
 
     fail('the insert wrote no shop and no existing shop matches either natural key ' +
       '(telegram_chat_id + telegram_message_id, or household_id + shop_ref). Nothing was written.');
   });
+}
+
+// The one INSERT statement shape for asdair.shop, used by both the first
+// attempt and the terminal-collision retry so the two can never drift apart.
+//
+// NO conflict target: asdair.shop carries TWO unique indexes and this must
+// survive a collision on either. DO NOTHING (never DO UPDATE) because an upsert
+// would be a route to rewriting an existing week's evidence.
+async function insertShopRow(client, built) {
+  const params = built.columns.map(function (col) {
+    const v = built.row[col];
+    return v === undefined ? null : v;
+  });
+  const placeholders = built.columns.map(function (_, i) { return '$' + (i + 1); });
+  const insertSql = 'INSERT INTO asdair.shop (' + built.columns.join(', ') + ') VALUES (' +
+    placeholders.join(', ') + ') ON CONFLICT DO NOTHING RETURNING ' + SHOP_SELECT_LIST;
+  return firstRow(await client.query(insertSql, params));
+}
+
+// The creation milestone. When the shop exists because a terminal one already
+// held the date, the event SAYS SO - that sentence is the only durable record
+// of why this week has two shops, and someone reading the audit trail months
+// later should not have to infer it from a ref suffix.
+async function recordShopCreated(client, shop, built, supersededRef) {
+  const because = supersededRef === null || supersededRef === undefined
+    ? ''
+    : ' (a fresh shop: ' + supersededRef + ' is terminal and was left untouched)';
+  await client.query(SHOP_EVENT_INSERT_SQL, [
+    shop.id,
+    'milestone',
+    null,
+    'RECEIVED',
+    'shop ' + built.row.shop_ref + ' created from a ' + built.row.source_kind + ' message' + because
+  ]);
 }
 
 // =====================================================================

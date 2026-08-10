@@ -116,7 +116,11 @@ export const HELD_REASONS = Object.freeze([
 // it is pinned to the committed schema by buildExecutionPacket.test.js.
 export const FORBIDDEN_HELD_REASON = 'substituted';
 
-const SHOP_REF_PATTERN = /^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+// The optional `-M<message id>` suffix (WP-B15-07) identifies a shop that had to
+// start fresh because a terminal shop already owned the date. Refusing it would
+// mean a fresh shop could never be shopped, which is the lost-list defect moved
+// one step downstream rather than fixed.
+const SHOP_REF_PATTERN = /^SHOP-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-M[0-9]+)?$/;
 const ASDA_PRODUCT_REF_PATTERN = /^[0-9]{3,12}$/;
 
 // The exact keys a caller may put on an input line. Anything else is a

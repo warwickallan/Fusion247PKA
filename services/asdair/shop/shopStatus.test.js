@@ -256,6 +256,17 @@ test('a malformed handle is refused by name', async function () {
   await assert.rejects(function () { return project(client, '', {}); }, /required/);
 });
 
+test('a FRESH shop (WP-B15-07) is lookupable by its collision ref', async function () {
+  // A shop that started fresh because a terminal one owned its date carries a
+  // `-M<message id>` suffix. If status refused that handle, the shop would exist
+  // and nobody - not the Cockpit, not the CLI, not Warwick - could ask about it.
+  const client = makeClient(script({
+    byRef: [shopRow({ id: 77, household_id: 1, shop_ref: 'SHOP-2026-08-10-M63' })]
+  }));
+  const s = await project(client, 'SHOP-2026-08-10-M63', {});
+  assert.equal(s.shop_id, 77);
+});
+
 test('a missing shop is an error, not an empty projection', async function () {
   const client = makeClient(script({ shop: [] }));
   await assert.rejects(function () { return project(client, SHOP_ID, {}); }, /no shop with id 42/);

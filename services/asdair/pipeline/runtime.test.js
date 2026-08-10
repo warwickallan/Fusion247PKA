@@ -31,7 +31,12 @@ import * as commands from './commands.js';
 import { questionKeyFor } from './keys.js';
 import { sendQuestionCard } from '../bot/questionRender.js';
 import { TAP_REFUSALS } from '../bot/resolveTap.js';
-import { buildAnswerArg } from '../bot/callbackProtocol.js';
+import { buildAnswerArg, isValidShopRef, MAX_SHOP_REF_BYTES } from '../bot/callbackProtocol.js';
+// WP-B15-07 / AC9. The three downstream pins a fresh shop's ref must survive,
+// imported HERE so the proof runs against the ref the runtime actually created
+// rather than against a ref this file made up.
+import { listDateOf } from './runPipeline.js';
+import { buildExecutionPacket } from '../packet/buildExecutionPacket.js';
 
 const REF = 'SHOP-2026-08-03';
 
@@ -1769,4 +1774,227 @@ test('AC7: a configured cockpit base URL makes the card carry a tappable absolut
   // An already-absolute path is never given a second origin.
   const already = { checklistPath: 'https://elsewhere/x' };
   assert.equal(withChecklistUrl(already, 'https://h:8443').checklistPath, 'https://elsewhere/x');
+});
+
+// =====================================================================
+// WP-B15-07 - A NEW LIST NEVER DIES IN A TERMINAL SHOP
+//
+// THE LIVE FAILURE THESE REPRODUCE (2026-08-10, a real lost shopping list):
+//   Warwick's photograph arrived on a date whose shop had already been
+//   CANCELLED. nextShopRef computed the DEAD row's ref, the INSERT hit
+//   shop_ref_uniq, ON CONFLICT DO NOTHING wrote nothing, createOrResumeShop
+//   reported `resumed`/`shop_ref`, receiveList returned NORMALLY - and the
+//   caller, seeing no throw, let the Telegram offset advance. Telegram then
+//   forgot the update permanently. A CANCELLED shop is terminal, so no pass
+//   ever advanced it, so no card was ever sent. The list is gone.
+//
+// These tests drive the REAL production path - runIntake -> onRecord ->
+// receiveList -> createOrResumeShop - against the fake database's REAL unique
+// indexes. They are not calls to a helper.
+// =====================================================================
+
+// buildHandoff is CommonJS, so it comes through the same bridge the rest of
+// this file already uses for CJS modules.
+const { buildHandoff } = createRequire(import.meta.url)('../handoff/buildHandoff.js');
+
+const DEAD_DATE = '2026-08-10';
+const DEAD_REF = 'SHOP-' + DEAD_DATE;
+const DEAD_CLOCK = () => Date.parse(DEAD_DATE + 'T09:00:00.000Z');
+
+/** The CANCELLED row that already owns the date. Shaped exactly as fakePg's
+ *  SHOP_COLUMNS, so nothing about it is a convenience the real table lacks. */
+function terminalShopSeed(overrides = {}) {
+  return {
+    id: 1,
+    household_id: HOUSEHOLD_ID,
+    shop_ref: DEAD_REF,
+    status: 'CANCELLED',
+    source_kind: 'text',
+    telegram_chat_id: '555',
+    telegram_message_id: '58',
+    telegram_update_id: '171031151',
+    raw_text: 'the list that was abandoned',
+    raw_media_path: null,
+    transcript: null,
+    transcript_provider: null,
+    transcript_model: null,
+    transcript_confidence: null,
+    needs_review: false,
+    list_id: null,
+    last_error: null,
+    created_at: DEAD_DATE + 'T00:15:00.000Z',
+    updated_at: DEAD_DATE + 'T00:49:00.000Z',
+    ...overrides,
+  };
+}
+
+/** A photograph of a handwritten list. Built here rather than in the harness
+ *  because the harness is not this Work Order's to widen. */
+function photoUpdate({ updateId = 171031156, chatId = 555, messageId = 63 } = {}) {
+  return {
+    update_id: updateId,
+    message: {
+      message_id: messageId,
+      from: { id: chatId },
+      chat: { id: chatId, type: 'private' },
+      photo: [{ file_id: 'f-' + messageId, file_unique_id: 'u-' + messageId, width: 900, height: 1200, file_size: 4096 }],
+    },
+  };
+}
+
+test('AC6 REGRESSION: a DIFFERENT list on a date whose shop is TERMINAL starts a FRESH shop, and the dead row is untouched', async () => {
+  const h = makeHarness({ seed: { shop: [terminalShopSeed()] } });
+  const deadBefore = JSON.stringify(h.db.shop[0]);
+
+  const report = await pollIntake(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([photoUpdate()], { mediaPath: 'C:/tmp/fake-msg-63.jpg' }),
+    now: DEAD_CLOCK,
+  });
+
+  // THE FAILURE THIS REPRODUCES: pre-fix this is 1, because the photo was
+  // absorbed into the cancelled row and reported as a successful receive.
+  assert.equal(h.db.shop.length, 2, 'the new list was absorbed into the terminal shop instead of starting a fresh one');
+
+  const fresh = h.db.shop.find((s) => String(s.telegram_message_id) === '63');
+  assert.ok(fresh, 'no shop carries the NEW message - the inbound event was dropped');
+  assert.notEqual(fresh.id, 1, 'the "fresh" shop is the dead row');
+  assert.equal(fresh.telegram_update_id, '171031156');
+  assert.equal(fresh.source_kind, 'photo');
+  assert.equal(fresh.raw_media_path, 'C:/tmp/fake-msg-63.jpg', 'the raw evidence was not retained');
+  assert.equal(fresh.needs_review, true, 'a photographed list must be flagged for review');
+  assert.equal(fresh.status, 'RECEIVED', 'the fresh shop is not in a live status, so nothing will ever advance it');
+
+  // The identity is grounded in the inbound event and is NOT the dead ref.
+  assert.notEqual(fresh.shop_ref, DEAD_REF);
+  assert.equal(fresh.shop_ref, DEAD_REF + '-M63');
+
+  // AC2: the terminal row is left EXACTLY as it was - every column, including
+  // updated_at. Asserted, not assumed.
+  const dead = h.db.shop.find((s) => s.id === 1);
+  assert.equal(JSON.stringify(dead), deadBefore, 'the terminal shop was mutated');
+
+  // The receive was reported as a genuine creation, not a resume.
+  assert.equal(report.received.length, 1);
+  assert.equal(report.received[0].created, true, 'receiveList reported a resume for a brand-new list');
+  assert.equal(report.failed.length, 0);
+});
+
+test('AC1: the SAME message redelivered onto a terminal date still yields exactly ONE fresh shop', async () => {
+  const h = makeHarness({ seed: { shop: [terminalShopSeed()] } });
+  const opts = {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([photoUpdate()], { mediaPath: 'C:/tmp/fake-msg-63.jpg' }),
+    now: DEAD_CLOCK,
+  };
+
+  await pollIntake(h.deps, opts);
+  assert.equal(h.db.shop.length, 2);
+
+  // A fresh intake wiring re-delivering the identical update - i.e. the offset
+  // file was lost and Telegram sent it again.
+  const again = await pollIntake(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([photoUpdate()], { mediaPath: 'C:/tmp/fake-msg-63.jpg' }),
+    now: DEAD_CLOCK,
+  });
+
+  assert.equal(h.db.shop.length, 2, 'a redelivery of the same message created a second shop');
+  assert.equal(again.received.length, 1);
+  assert.equal(again.received[0].created, false, 'a redelivery must resume, not create');
+  assert.equal(again.received[0].matched_by, 'telegram_message',
+    'the inbound unique index must be what matched - it is the instrument that makes a retry idempotent');
+  assert.equal(again.failed.length, 0, 'a redelivery must NOT hold the offset - that would wedge the poller forever');
+});
+
+test('AC2: two DIFFERENT new lists on the same terminal date get two DIFFERENT fresh shops', async () => {
+  const h = makeHarness({ seed: { shop: [terminalShopSeed()] } });
+
+  await pollIntake(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([photoUpdate({ updateId: 900001, messageId: 63 })]),
+    now: DEAD_CLOCK,
+  });
+  await pollIntake(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([photoUpdate({ updateId: 900002, messageId: 64 })]),
+    now: DEAD_CLOCK,
+  });
+
+  const refs = h.db.shop.map((s) => s.shop_ref).sort();
+  assert.deepEqual(refs, [DEAD_REF, DEAD_REF + '-M63', DEAD_REF + '-M64'],
+    'a genuinely different message on the same date must get its own identity');
+});
+
+test('AC3: a LIVE shop on the same date still RESUMES - multi-shop semantics are unchanged', async () => {
+  const h = makeHarness({ seed: { shop: [terminalShopSeed({ status: 'RECEIVED' })] } });
+
+  const report = await pollIntake(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([photoUpdate()]),
+    now: DEAD_CLOCK,
+  });
+
+  assert.equal(h.db.shop.length, 1, 'a live shop on the same date must be RESUMED, exactly as it is today');
+  assert.equal(report.received[0].created, false);
+  assert.equal(report.received[0].matched_by, 'shop_ref');
+  assert.equal(h.db.shop[0].shop_ref, DEAD_REF, 'the live shop was renamed');
+});
+
+test('AC9: the fresh shop can ADVANCE - its ref survives listDateOf, the execution packet and the browser handoff', async () => {
+  const h = makeHarness({ seed: { shop: [terminalShopSeed()] } });
+  await pollIntake(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([photoUpdate()], { mediaPath: 'C:/tmp/fake-msg-63.jpg' }),
+    now: DEAD_CLOCK,
+  });
+
+  const fresh = h.db.shop.find((s) => String(s.telegram_message_id) === '63');
+  assert.ok(fresh, 'no fresh shop was created, so there is nothing to advance');
+  const ref = fresh.shop_ref;
+
+  // 1. THE PIPELINE. listDateOf runs on every advancing pass; a throw here is
+  //    the fresh shop dying on its first step - which is the original bug
+  //    moved rather than fixed.
+  assert.equal(listDateOf(ref), DEAD_DATE, 'the date part must still be derivable from the collision ref');
+
+  // 2. THE EXECUTION PACKET. Without this the shop can never be shopped.
+  const packet = buildExecutionPacket({
+    shop_ref: ref,
+    generated_at: '2026-08-10T09:00:00.000Z',
+    household_id: HOUSEHOLD_ID,
+    lines: [{
+      original_list_line: 'milk 2',
+      origin: 'known',
+      canonical_product_id: 41,
+      canonical_product_name: 'Semi Skimmed Milk 2L',
+      brand: 'ASDA',
+      source_view: 'regulars',
+      asda_product_ref: '1000383091',
+      required_quantity: 1,
+    }],
+  });
+  assert.equal(packet.shop_ref, ref);
+
+  // 3. THE BROWSER HANDOFF. Without this the basket is never built.
+  const artefact = buildHandoff(packet);
+  assert.equal(artefact.shop_ref, ref);
+
+  // 4. THE BUTTON WARWICK ACTUALLY TAPS. callback_data is capped by Telegram and
+  //    this protocol never truncates, so a ref that outgrew the cap would render
+  //    a shop nobody can act on - a fresh shop that exists, advances, and then
+  //    cannot be built. Checked here rather than reasoned about.
+  assert.equal(isValidShopRef(ref), true, 'the fresh shop ref cannot ride a callback button');
+});
+
+test('AC9: the collision ref stays inside the Telegram callback budget, and the ceiling is stated', () => {
+  // 'SHOP-YYYY-MM-DD' (15) + '-M' (2) = 17 bytes of fixed prefix, against a
+  // 32-byte cap. So the suffix affords 15 digits of message id. Real Telegram
+  // message ids in a private chat are small - Warwick's was 63 - and this is
+  // recorded so the margin is a measured fact rather than an assumption.
+  assert.equal(MAX_SHOP_REF_BYTES, 32, 'the callback budget moved - re-check the collision ref ceiling');
+  assert.equal(isValidShopRef('SHOP-2026-08-10-M63'), true);
+  assert.equal(isValidShopRef('SHOP-2026-08-10-M' + '9'.repeat(15)), true, '15 digits must still fit');
+  assert.equal(isValidShopRef('SHOP-2026-08-10-M' + '9'.repeat(16)), false,
+    '16 digits exceeds the cap - if Telegram message ids ever reach this, the scheme needs revisiting');
 });

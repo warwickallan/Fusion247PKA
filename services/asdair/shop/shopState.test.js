@@ -184,6 +184,84 @@ test('isShopRef recognises the convention and rejects near-misses', function () 
 });
 
 // ---------------------------------------------------------------------
+// collisionShopRef (WP-B15-07)
+//
+// The date stopped being a sufficient identity on 2026-08-10, when a real
+// shopping list was lost: the date's shop was CANCELLED, the new photograph
+// computed the dead row's ref, and the list was acknowledged to Telegram and
+// never captured. These pin the replacement identity.
+// ---------------------------------------------------------------------
+
+test('collisionShopRef grounds a fresh shop in the inbound message', function () {
+  assert.equal(state.collisionShopRef('SHOP-2026-08-10', '63'), 'SHOP-2026-08-10-M63');
+  assert.equal(state.collisionShopRef('SHOP-2026-08-10', 63), 'SHOP-2026-08-10-M63');
+});
+
+test('collisionShopRef is DETERMINISTIC - the same message always gives the same ref', function () {
+  // This is what keeps a redelivery idempotent. A counter, a clock or any
+  // randomness here would make the SAME message create a SECOND shop, which is
+  // the failure the whole mechanism exists to prevent.
+  const a = state.collisionShopRef('SHOP-2026-08-10', '63');
+  const b = state.collisionShopRef('SHOP-2026-08-10', '63');
+  assert.equal(a, b);
+  // ...and a DIFFERENT message must give a different one, or two lists collapse.
+  assert.notEqual(state.collisionShopRef('SHOP-2026-08-10', '64'), a);
+});
+
+test('collisionShopRef REFUSES when there is no inbound message to ground on', function () {
+  // A shop-cli entry or a pasted text carries no message id. A loud refusal is
+  // the ruled behaviour: an invented identity would either need a clock this
+  // module refuses to have, or would let a retry create a second shop.
+  for (const bad of [null, undefined, '', '   ', 'abc', '0', '-1', '1.5']) {
+    assert.throws(
+      function () { state.collisionShopRef('SHOP-2026-08-10', bad); },
+      /inbound Telegram message id|required|empty/,
+      'a missing or malformed message id must refuse, not invent an identity (got ' + String(bad) + ')'
+    );
+  }
+});
+
+test('collisionShopRef is never derived from another collision ref', function () {
+  assert.throws(
+    function () { state.collisionShopRef('SHOP-2026-08-10-M63', '64'); },
+    /plain date form/
+  );
+  // It still validates the calendar, exactly as nextShopRef does.
+  assert.throws(function () { state.collisionShopRef('SHOP-2026-02-30', '63'); }, /not a real day/);
+});
+
+test('a collision ref is a VALID shop_ref everywhere the convention is checked', function () {
+  // If this is false the fresh shop exists and nothing downstream will accept
+  // it - creation without advancement, which is the original bug relocated.
+  assert.equal(state.isShopRef('SHOP-2026-08-10-M63'), true);
+  assert.equal(state.SHOP_REF_PATTERN.test('SHOP-2026-08-10-M63'), true);
+  const built = state.buildShopCreate({
+    household_id: 1,
+    shop_ref: 'SHOP-2026-08-10-M63',
+    source_kind: 'photo',
+    raw_media_path: '/tmp/x.jpg',
+    telegram_chat_id: '555',
+    telegram_message_id: '63',
+  });
+  assert.equal(built.row.shop_ref, 'SHOP-2026-08-10-M63');
+});
+
+test('the suffix is NARROW - it admits a message id and nothing else', function () {
+  // A widened pattern is only safe while it stays this specific. Each of these
+  // would have been accepted by a lazier relaxation such as `-.*`.
+  for (const bad of [
+    'SHOP-2026-08-10-M',        // no id at all
+    'SHOP-2026-08-10-63',       // no marker
+    'SHOP-2026-08-10-MX',       // not a number
+    'SHOP-2026-08-10-M63-M64',  // a collision ref of a collision ref
+    'SHOP-2026-08-10-m63',      // wrong case
+    'SHOP-2026-08-10 M63',      // a space, not a separator
+  ]) {
+    assert.equal(state.isShopRef(bad), false, bad + ' must not be a valid shop_ref');
+  }
+});
+
+// ---------------------------------------------------------------------
 // buildShopCreate
 // ---------------------------------------------------------------------
 
