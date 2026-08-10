@@ -5,7 +5,7 @@
 // handleRequest() takes a plain {method, path, query, body} and returns a
 // plain {status, body}. server.js binds it to node:http and does nothing else.
 //
-// SIX ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
+// SEVEN ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
 // the count was stale, the list was not. Keep this count honest - ROUTES below
 // is the machine-readable answer and httpApi.test.js asserts the two agree.)
 //   GET  /asdair/health     - CAN THIS SERVICE DO ITS JOB. Dependency-aware:
@@ -15,6 +15,10 @@
 //   GET  /asdair/workspace  - the durable payload for ONE shop (SELECT only)
 //   GET  /asdair/rules      - the durable RULEBOOK: rules, decision log,
 //                             regulars + aliases (SELECT only)
+//   GET  /asdair/checklist  - the browser checklist for ONE shop, as Markdown:
+//                             lines, method and prohibitions, rendered by
+//                             handoff/renderChecklist.js from the stored
+//                             artefact (SELECT only)
 //   GET  /asdair/packet     - the Sonnet execution packet + basket
 //                             reconciliation for ONE shop (SELECT only)
 //   POST /asdair/command    - dispatch ONE named command from the shared surface
@@ -52,12 +56,23 @@ const ROUTES = Object.freeze([
   'GET /asdair/workspace',
   'GET /asdair/rules',
   'GET /asdair/packet',
+  'GET /asdair/checklist',
   'POST /asdair/command',
   'GET /asdair/media'
 ]);
 
 function json(status, body) {
   return { status: status, headers: { 'content-type': 'application/json; charset=utf-8' }, body: body };
+}
+
+/**
+ * Markdown, served as Markdown. The checklist is READ BY A PERSON while they are
+ * standing in a shop, so it is returned as text a phone renders rather than as a
+ * JSON string a client has to unwrap and re-render - which would be a second
+ * renderer by the back door.
+ */
+function markdown(status, body) {
+  return { status: status, headers: { 'content-type': 'text/markdown; charset=utf-8' }, body: body };
 }
 
 /**
@@ -182,6 +197,35 @@ async function handleRequest(req, deps) {
     } catch (err) {
       return json(500, { ok: false, error: 'read_failed', message: safeMessage(err) });
     }
+  }
+
+  // THE CHECKLIST WARWICK SHOPS FROM. The lines, the method and the
+  // prohibitions, rendered by handoff/renderChecklist.js from the artefact
+  // stored at handover - the ONLY renderer, deliberately.
+  //
+  // Markdown by default because a person reads it on a phone; `?format=json`
+  // for a caller that wants the state and the counts without the page.
+  //
+  // A state that is not `ready` answers 200, not 404: "this shop has not been
+  // handed over yet" is a true, useful answer to a well-formed question about a
+  // real shop, and 404 would make a normal state look like a broken link.
+  if (method === 'GET' && route === '/asdair/checklist') {
+    const read = d.readChecklist || require('./readChecklist').readChecklist;
+    const wantsJson = String(query.format || '').toLowerCase() === 'json';
+    let payload;
+    try {
+      payload = await read({ shop: query.shop === undefined ? null : query.shop });
+    } catch (err) {
+      return json(500, { ok: false, error: 'read_failed', message: safeMessage(err) });
+    }
+    if (payload && payload.ok === false) {
+      return wantsJson ? json(400, payload) : markdown(400, '# No shop named\n\n' + String(payload.message || ''));
+    }
+    if (wantsJson) return json(200, payload);
+    if (payload && payload.state === 'ready') return markdown(200, String(payload.markdown));
+    // Never an empty page, and never an empty shopping list. The reason is the
+    // body, so a phone that followed the link is told what is actually going on.
+    return markdown(200, '# No checklist yet\n\n' + String((payload && payload.message) || 'Unknown state.'));
   }
 
   if (method === 'GET' && route === '/asdair/media') {

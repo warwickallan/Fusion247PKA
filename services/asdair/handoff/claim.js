@@ -123,14 +123,42 @@ function leaseIsLive(row, nowMs) {
   return new Date(lease.expires_at).getTime() > nowMs;
 }
 
-/** The handoff block stored on the request row. */
+/**
+ * The handoff block stored on the request row - THE WHOLE ARTEFACT, not a receipt.
+ *
+ * ── WHAT THIS USED TO STORE, AND WHY IT WAS THE DEFECT ──────────────────────
+ * Six summary fields: the fingerprint, the shop ref, two version numbers and the
+ * expected counts. No lines. No method. No prohibitions. So a supervised worker
+ * who claimed this request was handed A FINGERPRINT AND SOME COUNTS and had
+ * nothing whatsoever to shop from, and `renderChecklist()` - which renders from
+ * the artefact and nothing else - had no artefact to render.
+ *
+ * That is the same defect class Lane C closed one layer further out: the
+ * producers existed, were correct, and reached nobody. A receipt proves a
+ * handover happened; it is not the thing being handed over.
+ *
+ * ── WHY STORED, WHEN THIS SYSTEM'S RULE IS RECOMPUTE-NOT-STORE ──────────────
+ * Because recomputation is no longer deterministic and the checklist must not
+ * drift from the packet it is bound to. Since WP-B15-3 every plan recomputation
+ * runs `planWithDecisions`, which CONSULTS A MODEL - so rebuilding the artefact
+ * at read time could legitimately produce a different basket from the one the
+ * handover recorded, and Warwick would shop from a list that no longer matches
+ * `packet_fingerprint`. `makeVerificationFor` already refuses to verify across
+ * that boundary; letting a human shop across it would be worse.
+ *
+ * It would also put a model call on a page view.
+ *
+ * So the artefact is written ONCE, at handover, bound to the fingerprint it was
+ * built from, and rendered on demand from what was stored. Recomputation still
+ * owns everything upstream of the handover; nothing here recomputes.
+ *
+ * The six original fields are all fields OF the artefact, so spreading it is
+ * strictly additive - every existing reader (openHandoff's resume comparison,
+ * completeHandoff's fingerprint guard, the cockpit) keeps working unchanged.
+ */
 function handoffBlock(handoff, openedBy) {
   return {
-    packet_fingerprint: handoff.packet_fingerprint,
-    shop_ref: handoff.shop_ref,
-    handoff_version: handoff.handoff_version,
-    instructions_version: handoff.instructions_version,
-    expected: { distinct_products: handoff.expected.distinct_products, total_units: handoff.expected.total_units },
+    ...handoff,
     opened_by: openedBy == null ? null : String(openedBy),
   };
 }

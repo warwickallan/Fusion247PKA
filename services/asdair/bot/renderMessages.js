@@ -383,13 +383,32 @@ export function renderConfirmInterpretation({
  * things that actually need his attention (held items and substitutions) under
  * dozens of notifications, and would make the phone unusable during a shop.
  *
+ * ── WHERE THE CHECKLIST IS (AC7) ────────────────────────────────────────────
+ * This card announced that the browser build had been requested and gave
+ * Warwick NO WAY TO REACH WHAT HE WAS SUPPOSED TO SHOP FROM. The checklist -
+ * every line, the full method, the five prohibitions - was rendered nowhere, by
+ * nothing, because `handoff/renderChecklist.js` had no production caller. Being
+ * told a shop is ready, with no list, is the same silent park this build has
+ * closed three times already.
+ *
+ * `checklistPath` is rendered ONLY when the producer supplied one, so the older
+ * progress cards - which have no checklist behind them - do not grow a line
+ * pointing at nothing. An absent path renders NOTHING rather than an "unknown":
+ * a dead link on a card someone is holding in a supermarket is worse than
+ * silence.
+ *
  * @param {{shopRef:string, stage?:string, regularsAdded?:number, searchItemsAdded?:number,
- *          held?:number, substitutions?:number, basketLines?:number}} spec
+ *          held?:number, substitutions?:number, basketLines?:number,
+ *          checklistPath?:string}} spec
  */
 export function renderProgress({
   shopRef, stage, regularsAdded, searchItemsAdded, held, substitutions, basketLines,
+  checklistPath,
 } = {}) {
   assertShopRef(shopRef);
+  const checklist = typeof checklistPath === 'string' && checklistPath.trim() !== ''
+    ? ['', 'Your checklist - every line, the method, and what never to do:', checklistPath.trim()]
+    : [];
   return {
     text: block([
       '⏳ Building the basket',
@@ -400,6 +419,7 @@ export function renderProgress({
       `Held: ${count(held)}`,
       `Substitutions: ${count(substitutions)}`,
       `Basket lines: ${count(basketLines)}`,
+      ...checklist,
     ]),
     reply_markup: keyboard([
       [button('View held items', ACTIONS.HELD, shopRef)],

@@ -1584,3 +1584,66 @@ test('AC5: Warwick is told ONCE that the basket build was handed over, not once 
   assert.equal(ledger(h, 'outbox', 'progress').filter((c) => c.status === 'pending').length, 0,
     'and nothing is left stuck in the outbox');
 });
+
+// =====================================================================
+// AC7 - THE CHECKLIST WARWICK ACTUALLY SHOPS FROM
+//
+// AC5 proved the real pass leaves a durable artefact. That is not yet a shop:
+// until this, the artefact stored on the request was a RECEIPT - a fingerprint,
+// two version numbers and the expected counts - so a supervised worker who
+// claimed it had nothing to shop from, and renderChecklist(), which renders
+// from the artefact and nothing else, had no artefact to render.
+//
+// These drive the REAL PASS and then render what it left behind, through the
+// SAME renderer the cockpit route uses. Nothing is invoked by hand.
+// =====================================================================
+
+test('AC7: the artefact the REAL PASS stores renders a checklist with the lines, method and prohibitions', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+
+  const stored = h.db.browser_build_request[0].progress.handoff;
+
+  // THE ARTEFACT, NOT A RECEIPT. Each of these was absent before 2026-08-10.
+  assert.ok(Array.isArray(stored.lines) && stored.lines.length > 0,
+    'the pass stored no LINES - a worker claiming this request has nothing to shop from');
+  assert.ok(Array.isArray(stored.method) && stored.method.length > 0, 'the pass stored no METHOD');
+  assert.ok(Array.isArray(stored.prohibited_actions) && stored.prohibited_actions.length > 0,
+    'the pass stored no PROHIBITIONS - the five things that must never happen');
+
+  // AND IT RENDERS. Through the one renderer, the same one the cockpit calls.
+  const { renderChecklist } = requireCjs('../handoff/renderChecklist.js');
+  const md = renderChecklist(stored);
+  for (const line of stored.lines) {
+    assert.ok(md.includes(line.canonical_product_name), `"${line.canonical_product_name}" missing from the checklist`);
+  }
+  for (const p of stored.prohibited_actions) {
+    assert.ok(md.includes(p.text), `prohibition "${p.text}" missing from the checklist`);
+  }
+  assert.ok(md.includes(stored.packet_fingerprint), 'the fingerprint he must quote back is missing');
+});
+
+test('AC7: the handover card TELLS Warwick where the checklist is', async () => {
+  const h = makeHarness();
+  const bot = await makeBot();
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate()]), bot });
+  await commands.buildShop({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  await passUntilSettled(h, bot);
+  await commands.requestBasketBuild({ shopRef: REF, actor: 'cockpit:warwick' }, h.deps);
+  for (let i = 0; i < 6; i += 1) {
+    await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([]), bot });
+  }
+
+  const handover = bot.sent.filter((s) => /browser build requested/.test(s.message.text || ''));
+  assert.equal(handover.length, 1, 'still exactly one handover card across many passes');
+  assert.match(handover[0].message.text, /\/asdair\/checklist\?shop=SHOP-/,
+    'the card must carry the route to the checklist. Telling him the shop is ready while giving him no '
+    + 'way to reach the list is the silent park this build has already closed three times.');
+  assert.match(handover[0].message.text, new RegExp(REF),
+    'and it must name HIS shop, not just a route');
+});
