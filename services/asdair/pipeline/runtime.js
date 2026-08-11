@@ -274,8 +274,21 @@ function sameWords(a, b) {
  * words landed, and the safe direction here is to not claim - the worst case is
  * the pre-existing behaviour, never a silently discarded message.
  */
-async function recordedAnswerMatches(deps, { open, questionKey, words, log = () => {} } = {}) {
-  const entry = (Array.isArray(open) ? open : []).find((q) => q.questionKey === questionKey);
+async function recordedAnswerMatches(deps, { open, questionKey, shopRef = null, words, log = () => {} } = {}) {
+  // ── SCOPED BY SHOP (WP-B15-18) ────────────────────────────────────────────
+  // A question_key is derived from the ITEM NAME and carries no shop component
+  // (keys.js questionKeyFor), so two active shops asking about the same item
+  // hold the IDENTICAL key. Finding the entry by key alone returned the FIRST
+  // match in shop-id order, which is not necessarily his shop - so this check
+  // could read a stranger's row, conclude his words had not landed, and decline
+  // a reply that was in fact a redelivery of his own answer. Declining it means
+  // it is not claimed, and an unclaimed reply becomes a shopping list.
+  //
+  // `shopRef` comes from the CARD he replied to, which is positive evidence
+  // about which shop he meant. It stays optional so a caller with no such
+  // evidence gets exactly today's behaviour rather than a silent refusal.
+  const entry = (Array.isArray(open) ? open : []).find((q) => q.questionKey === questionKey
+    && (shopRef === null || shopRef === undefined || q.shopRef === shopRef));
   if (!entry) return false;
   try {
     const rows = await store.listQuestions(deps, entry.shopId);
@@ -379,6 +392,44 @@ function boardAt(boardTargets, replyTo) {
     && b.chatId === String(replyTo.chatId) && b.messageId === String(replyTo.messageId)) || null;
 }
 
+/**
+ * PURE. Which tokens CANNOT be resolved without knowing which shop he meant?
+ * (WP-B15-18)
+ *
+ * ── THE DEFECT THIS CLOSES ──────────────────────────────────────────────────
+ * Every identifier a typed answer is correlated by is unique WITHIN a shop and
+ * not across them: the board ordinal restarts at 1 on every board, and a
+ * question_key hashes the item name with no shop component. Both were fed
+ * straight into `new Map(...)`, which is LAST-WRITE-WINS - so with two shops
+ * active the higher shop id silently took every contested token and the answer
+ * was written to a shop he was never looking at. It succeeded and it logged
+ * success, which is why nobody saw it.
+ *
+ * ── WHY A SET OF AMBIGUOUS TOKENS RATHER THAN A FILTER ──────────────────────
+ * Returning the tokens to DROP keeps one rule in one place and makes the
+ * bound and unbound cases the same code: when the candidate set has already
+ * been scoped to one shop, every token belongs to one shop, this returns an
+ * EMPTY set, and nothing is dropped. There is no branch to get wrong.
+ *
+ * It drops rather than picks, deliberately. Choosing between two shops that
+ * both offer a token is the guess this whole function refuses to make - the
+ * doctrine already written at "AMBIGUITY GOES UP, NEVER SIDEWAYS" below,
+ * extended across shops rather than newly invented.
+ */
+function tokensOfferedByMoreThanOneShop(rows, tokenOf) {
+  const shopsByToken = new Map();
+  for (const q of Array.isArray(rows) ? rows : []) {
+    const token = tokenOf(q);
+    if (token === null || token === undefined) continue;
+    const shops = shopsByToken.get(token) || new Set();
+    shops.add(String(q.shopId));
+    shopsByToken.set(token, shops);
+  }
+  const ambiguous = new Set();
+  for (const [token, shops] of shopsByToken) if (shops.size > 1) ambiguous.add(token);
+  return ambiguous;
+}
+
 export async function loadDeferredClarifications(deps, { householdId = null, log = () => {} } = {}) {
   const waiting = [];
   let shops = [];
@@ -444,9 +495,30 @@ export async function loadDeferredClarifications(deps, { householdId = null, log
  * throw, an unusable return - lands on `null` for that reason. Failing towards
  * "not mine" is the only safe direction here.
  */
-export async function correlateTypedAnswer(deps, { text, open, log = () => {} } = {}) {
+export async function correlateTypedAnswer(deps, { text, open, boardShopId = null, log = () => {} } = {}) {
   const words = typeof text === 'string' ? text.trim() : '';
-  if (words === '' || !Array.isArray(open) || open.length === 0) return null;
+  const all = Array.isArray(open) ? open : [];
+
+  // ── THE SHOP SCOPE (WP-B15-18). ONE PLACE, BEFORE ANY STEP RUNS. ──────────
+  //
+  // Two shops are simultaneously active whenever last week's has not reconciled
+  // and this week's has arrived - the ordinary state, not an edge case. Every
+  // step below then had to answer "which question is this?" against a candidate
+  // set spanning shops, keyed by tokens that are only unique within one. The
+  // answer went to the wrong shop's row, successfully and silently.
+  //
+  // `boardShopId` is the shop whose BOARD he replied to, matched exactly on
+  // (chat, message). It is the only positive evidence in the message about
+  // which shop he meant, so where it exists everything downstream sees just
+  // that shop and inherits the scope from here rather than each step
+  // re-deriving it. Where it does not exist, correlation is NOT disabled -
+  // ambiguity is dropped token by token below, so a candidate that only one
+  // shop offers still resolves exactly as it does today.
+  const scoped = boardShopId === null || boardShopId === undefined
+    ? all
+    : all.filter((q) => String(q.shopId) === String(boardShopId));
+
+  if (words === '' || scoped.length === 0) return null;
 
   // ── 0. THE BOARD'S OWN NUMBERS (WP-B15-09). ───────────────────────────────
   //
@@ -461,12 +533,27 @@ export async function correlateTypedAnswer(deps, { text, open, log = () => {} } 
   // and the AC8 notice tells him) or it was never a question at all.
   const numbered = parseBoardReply(words);
   if (numbered.length > 0) {
-    const byOrdinal = new Map(open.map((q) => [q.ordinal, q]));
+    // A number he typed means "the question printed beside that number on the
+    // board I am looking at". With no board to bind to, a number offered by two
+    // shops names two different questions and is dropped rather than guessed.
+    const ambiguousOrdinals = tokensOfferedByMoreThanOneShop(scoped, (q) => q.ordinal);
+    const byOrdinal = new Map(scoped
+      .filter((q) => !ambiguousOrdinals.has(q.ordinal))
+      .map((q) => [q.ordinal, q]));
     const mappings = [];
+    let refusedForShop = 0;
     for (const n of numbered) {
+      if (ambiguousOrdinals.has(n.ordinal)) { refusedForShop += 1; continue; }
       const q = byOrdinal.get(n.ordinal);
       if (!q) continue;
       mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText: n.answerText });
+    }
+    if (refusedForShop > 0) {
+      log('board_reply_shop_ambiguous', {
+        numbered: numbered.length,
+        refused: refusedForShop,
+        open_questions: scoped.length,
+      });
     }
     if (mappings.length > 0) {
       log('board_reply_correlated', { numbered: numbered.length, matched: mappings.length });
@@ -475,11 +562,18 @@ export async function correlateTypedAnswer(deps, { text, open, log = () => {} } 
     // Every number missed. Fall through rather than refusing: "3 for £5" is a
     // shopping-list line, and this parser must never be the thing that decides
     // a genuine list is an answer.
-    log('board_reply_uncorrelated', { numbered: numbered.length, open_questions: open.length });
+    log('board_reply_uncorrelated', { numbered: numbered.length, open_questions: scoped.length });
   }
 
   // ── 1. DETERMINISTIC. No model call, and the same resolver the spine uses. ─
-  const exact = open.filter((q) => shopDecisions.resolveExactCandidate({
+  //
+  // NEEDS NO AMBIGUITY DROP OF ITS OWN, and that is worth stating rather than
+  // leaving to be rediscovered: `exact.length === 1` already requires the label
+  // to be unique across the whole candidate set, so a label offered by two
+  // shops falls through here by construction. What was wrong before WP-B15-18
+  // was the SET - unscoped, so the single match could belong to a shop he was
+  // not addressing. Scoping the set is the entire fix for this step.
+  const exact = scoped.filter((q) => shopDecisions.resolveExactCandidate({
     status: 'open',
     answer_text: words,
     candidates: q.candidates,
@@ -494,9 +588,17 @@ export async function correlateTypedAnswer(deps, { text, open, log = () => {} } 
   }
 
   // ── 2. NOTHING TO CHOOSE BETWEEN. ─────────────────────────────────────────
-  if (open.length === 1) {
+  //
+  // THE WORST OF THE FOUR, because it needs no number and no label - so when it
+  // wrote to the wrong shop there was nothing left in the message for anyone to
+  // blame. "Nothing to choose between" is only true inside ONE shop: with his
+  // board fully settled and another shop holding one open question, this used
+  // to read the estate as having exactly one candidate and answer a shop he was
+  // not looking at. Scoped, the question is asked of his board and the settled
+  // case is caught earlier, by the notice in runOnce.
+  if (scoped.length === 1) {
     return {
-      mappings: [{ questionKey: open[0].questionKey, shopRef: open[0].shopRef, answerText: words }],
+      mappings: [{ questionKey: scoped[0].questionKey, shopRef: scoped[0].shopRef, answerText: words }],
       unmapped: null,
       modelCalled: false,
     };
@@ -505,7 +607,7 @@ export async function correlateTypedAnswer(deps, { text, open, log = () => {} } 
   // ── 3. TERRA, ONCE, WITH EVERY OPEN KEY. ──────────────────────────────────
   if (typeof deps.correlateAnswer !== 'function') {
     log('answer_correlation_unavailable', {
-      open_questions: open.length,
+      open_questions: scoped.length,
       detail: 'no answer correlator is wired into this runtime, so a typed message cannot be matched to one of several open questions',
     });
     return null;
@@ -515,7 +617,7 @@ export async function correlateTypedAnswer(deps, { text, open, log = () => {} } 
   try {
     returned = await deps.correlateAnswer({
       answer_text: words,
-      questions: open.map((q) => ({
+      questions: scoped.map((q) => ({
         question_key: q.questionKey,
         question_text: q.questionText,
         item_name: q.itemName,
@@ -524,27 +626,41 @@ export async function correlateTypedAnswer(deps, { text, open, log = () => {} } 
     });
   } catch (err) {
     log('answer_correlation_failed', {
-      open_questions: open.length, detail: String(err && err.message ? err.message : err),
+      open_questions: scoped.length, detail: String(err && err.message ? err.message : err),
     });
     return null;
   }
 
   if (!returned || !Array.isArray(returned.mappings) || returned.mappings.length === 0) {
-    log('answer_correlation_empty', { open_questions: open.length });
+    log('answer_correlation_empty', { open_questions: scoped.length });
     return null;
   }
 
-  const byKey = new Map(open.map((q) => [q.questionKey, q]));
+  // A question_key hashes the ITEM NAME and nothing else, so two shops asking
+  // about the same thing mint the identical key and the model's answer names
+  // BOTH of them. Unscoped, last-write-wins picked one. That derivation is
+  // pinned to live rows and is not ours to change - the lookup is.
+  const ambiguousKeys = tokensOfferedByMoreThanOneShop(scoped, (q) => q.questionKey);
+  const byKey = new Map(scoped
+    .filter((q) => !ambiguousKeys.has(q.questionKey))
+    .map((q) => [q.questionKey, q]));
   const mappings = [];
+  let refusedForShop = 0;
   for (const m of returned.mappings) {
     if (!m || m.confidence !== 'high') continue;
+    if (ambiguousKeys.has(m.question_key)) { refusedForShop += 1; continue; }
     const q = byKey.get(m.question_key);
     // A key the correlator was never shown is dropped, not corrected.
     if (!q) continue;
     mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText: m.answer_text || words });
   }
+  if (refusedForShop > 0) {
+    log('answer_correlation_shop_ambiguous', {
+      refused: refusedForShop, open_questions: scoped.length,
+    });
+  }
   if (mappings.length === 0) {
-    log('answer_correlation_low_confidence', { open_questions: open.length, offered: returned.mappings.length });
+    log('answer_correlation_low_confidence', { open_questions: scoped.length, offered: returned.mappings.length });
     return null;
   }
 
@@ -1823,6 +1939,10 @@ export async function runOnce(deps, wiring = {}) {
           recorded = await recordedAnswerMatches(deps, {
             open: openQuestions,
             questionKey: replyMapped.spec.questionKey,
+            // The card he replied to resolved to exactly one shop, so the check
+            // is made against THAT shop's row rather than the first row in the
+            // estate that happens to share the key (WP-B15-18).
+            shopRef: replyMapped.spec.shopRef,
             words: replyMapped.spec.answerText,
             log,
           });
@@ -1876,7 +1996,23 @@ export async function runOnce(deps, wiring = {}) {
       // to one of OUR OWN messages. A plain typed message with nothing open is
       // still a shopping list, exactly as Warwick's standing guard requires -
       // this widens nothing for the case that guard protects.
-      if (openQuestions.length === 0 && deferred.length === 0 && repliedToBoard) {
+      // ── AND THE CONDITION IS PER-BOARD, NOT PER-ESTATE (WP-B15-18) ──────
+      //
+      // This used to ask whether the ESTATE had nothing open. With two shops
+      // active that is a different question from the one that matters, and the
+      // gap between them was the quietest failure in this file: his board fully
+      // settled, another shop holding one open question, so this notice did not
+      // fire, correlation ran instead, and "there is only one open question"
+      // wrote his words onto a shop he was not looking at. No number in the
+      // message, no error, nothing to notice.
+      //
+      // Asked of HIS board it is the honest question: is there anything open on
+      // the shop whose card he replied to? With exactly one active shop the two
+      // conditions are identical, so the single-shop journey is untouched.
+      const openOnRepliedBoard = repliedToBoard
+        ? openQuestions.filter((q) => String(q.shopId) === String(repliedToBoard.shopId))
+        : openQuestions;
+      if (openOnRepliedBoard.length === 0 && deferred.length === 0 && repliedToBoard) {
         const target = repliedToBoard;
         const noticeKey = outboxKeyFor(target.shopRef, `reply_not_taken.${verdict.updateId}`);
         try {
@@ -1959,8 +2095,15 @@ export async function runOnce(deps, wiring = {}) {
         return true;
       }
 
+      // The board he replied to is the only thing in this message that says
+      // which shop he meant, so it travels with the words (WP-B15-18). A bare
+      // typed message carries no such evidence and passes null, which keeps
+      // correlation running and drops only what two shops both offer.
       const correlation = await correlateTypedAnswer(deps, {
-        text: verdict.text, open: openQuestions, log,
+        text: verdict.text,
+        open: openQuestions,
+        boardShopId: repliedToBoard ? repliedToBoard.shopId : null,
+        log,
       });
       if (!correlation) {
         log('typed_message_not_claimed', {
