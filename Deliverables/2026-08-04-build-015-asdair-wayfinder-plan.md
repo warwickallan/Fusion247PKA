@@ -1573,6 +1573,44 @@ its evidence so it can be re-established or falsified in minutes.**
 
 ---
 
+### 🔴 STOP — RE-CUT 2026-08-11 ~20:40. THE FRONTIER IS LIST RECONCILIATION, NOT A BROWSER BUILD.
+
+> **Everything in the block below this one (Gate Zero CLOSED / Gate 1 / Gate 2 PASS) is CORRECT and
+> STANDS — it is not superseded, only insufficient.** Reaching those gates and reaching
+> `READY_TO_SHOP` proved the pipeline mechanics work end to end for the real first time. It did
+> **not** prove the plan is correct. Those are different claims.
+>
+> **READ FIRST:** `Deliverables/2026-08-11-list-reconciliation-blocks-browser-build.md` — the full
+> comparison of `SHOP-2026-08-11-M93`'s resolved plan against last night's independently-verified
+> 41-product trolley. **9 quantity errors** (Richmond sausages showed 16, should be 1), **9+ items
+> missing entirely**, **6 items of uncertain provenance** (including Bloo, which Warwick explicitly
+> said to skip this week — a remembered-decision question, not a reading question).
+>
+> **⛔ DO NOT TAP OR TRIGGER "Build ASDA basket" ON THE CURRENT PLAN.** Doing so would repeat the
+> shape of the 2026-08-10 failure with a better hit rate, not a solved problem. `browser_build_request`
+> id 7 is additionally stale relative to later corrections and must be regenerated, not reused, once
+> the list itself is fixed.
+>
+> **THE NEXT ACTION** is the 7-step list at the end of the blocker document: re-read the actual
+> photograph with full rigor against every named discrepancy (several genuinely ambiguous lines were
+> never resolved with certainty — Cottage Pie vs Mashed Potato, Beef Quarter Pounders vs Birds Eye
+> Burgers, whether Lucozade Raspberry/Mars are real or a residual bias), ask Warwick the two open
+> product questions (Bloo standing-exclusion vs one-off; what he meant by "Sol" and whether a
+> stronger/second model is wanted), fix the confirmed errors through the real command surface, THEN
+> regenerate the handoff packet, THEN resolve the browser-driving mechanism (Claude-in-Chrome was not
+> connected tonight; the existing CDP runner is marked experimental/deferred per SOP-021 §4), THEN
+> attempt the supervised build.
+>
+> **Also true and unclosed:** `SHOP-2026-08-10-M64` and a stray misrouted-reply shop
+> `SHOP-2026-08-11-M109` are both genuinely cancelled tonight — no cleanup owed there. The Stop hook
+> that caused a runaway self-notification loop (`idle-ding-check.mjs`) is disabled in
+> `.claude/settings.json`, committed at `674c8a7` — takes effect next session, not this one.
+>
+> **Closing head `227a5a1`**, pushed to `origin/build-015/durable/2026-08-11-rotation`.
+> **`origin/main` still deliberately not updated** — Warwick's `merge-decision`, unchanged.
+
+---
+
 ### ⛔ SUPERSEDED 2026-08-11 (later same day) — Gate Zero CLOSED, Gate 1 PASS, Gate 2 preflight PASS. DIRECTS NOTHING BELOW THIS POINT.
 
 > **The STOP block immediately below (timestamped earlier on 2026-08-11) is HISTORY, not the
