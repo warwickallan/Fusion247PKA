@@ -59,6 +59,19 @@ const QUESTIONS_SQL =
   'SELECT id, list_item_id, question_key, question_text, candidates, status, answer_text, ' +
   'answer_source, asked_at, answered_at FROM asdair.shop_question WHERE shop_id = $1 ORDER BY id ASC';
 
+// The durable, per-question DECISION (migration 017). What an answer MEANT for
+// this shop - never re-derived here, only read. May not exist yet on every
+// database (017 is a recent migration): read via readDecisions() below, which
+// treats "relation does not exist" as "none recorded", exactly like
+// probeItemColumns() already does for optional columns. A MISSING row (or a
+// missing TABLE) means "decided before this existed" or "not yet decided" -
+// it never means no decision was made; assembleWorkspace.js's buildQuestions
+// degrades to the raw answer_text when no decision row is present.
+const DECISIONS_SQL =
+  'SELECT id, question_id, decision_kind, decided_regular_id, decided_quantity, decided_item_name, ' +
+  'clarification_reason, forward_intent, interpreted_by, interpreted_at ' +
+  'FROM asdair.shop_decision WHERE shop_id = $1 ORDER BY id ASC';
+
 const ALTERNATIVES_SQL =
   'SELECT id, list_item_id, alternative_name, price, chosen FROM asdair.product_alternatives ' +
   'WHERE list_item_id = ANY($1::bigint[]) ORDER BY id ASC';
@@ -100,7 +113,7 @@ const COLUMN_PROBE_SQL =
 // Every statement this module can issue, so the SELECT-only property is
 // testable rather than merely asserted in a comment.
 const ALL_SQL = Object.freeze([
-  CURRENT_SHOP_SQL, SHOP_LIST_SQL, SHOP_ROW_SQL, EVENTS_SQL, QUESTIONS_SQL, ALTERNATIVES_SQL,
+  CURRENT_SHOP_SQL, SHOP_LIST_SQL, SHOP_ROW_SQL, EVENTS_SQL, QUESTIONS_SQL, DECISIONS_SQL, ALTERNATIVES_SQL,
   CATALOGUE_SQL, CONFIRMATION_SQL, CONFIRMATION_LINES_SQL, PREVIOUS_ORDER_SQL,
   PREVIOUS_ORDER_ITEMS_SQL, ROTATION_RULES_SQL, COLUMN_PROBE_SQL
 ]);
@@ -275,6 +288,21 @@ async function probeItemColumns(client) {
   }
 }
 
+// asdair.shop_decision (migration 017) may not exist on every database yet.
+// Same shape as probeItemColumns above: a database that cannot answer this
+// query (relation does not exist, or any other error) yields "no durable
+// decisions known" rather than a 500 - the workspace still reads, it just
+// cannot show the machine-interpreted resolution and falls back to the raw
+// answer_text (assembleWorkspace.js's buildQuestions does that fallback).
+async function readDecisions(client, shopId) {
+  try {
+    const res = await client.query(DECISIONS_SQL, [shopId]);
+    return rows(res);
+  } catch (ignore) {
+    return [];
+  }
+}
+
 /**
  * Read everything the workspace needs, inside ONE read-only snapshot.
  *
@@ -329,6 +357,7 @@ async function gather(client, opts) {
 
   const events = rows(await client.query(EVENTS_SQL, [status.shop_id]));
   const questions = rows(await client.query(QUESTIONS_SQL, [status.shop_id]));
+  const decisions = await readDecisions(client, status.shop_id);
 
   // 4. The list, if one exists yet.
   let listItems = [];
@@ -366,6 +395,7 @@ async function gather(client, opts) {
     list_items: listItems,
     alternatives: alternatives,
     questions: questions,
+    decisions: decisions,
     catalogue: catalogue,
     confirmation: confirmation,
     confirmation_lines: confirmationLines,
@@ -405,10 +435,12 @@ module.exports = {
     gather: gather,
     buildItemSelect: buildItemSelect,
     probeItemColumns: probeItemColumns,
+    readDecisions: readDecisions,
     CURRENT_SHOP_SQL: CURRENT_SHOP_SQL,
     SHOP_ROW_SQL: SHOP_ROW_SQL,
     EVENTS_SQL: EVENTS_SQL,
     QUESTIONS_SQL: QUESTIONS_SQL,
+    DECISIONS_SQL: DECISIONS_SQL,
     CATALOGUE_SQL: CATALOGUE_SQL,
     CONFIRMATION_SQL: CONFIRMATION_SQL,
     CONFIRMATION_LINES_SQL: CONFIRMATION_LINES_SQL,

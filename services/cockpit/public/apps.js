@@ -102,7 +102,7 @@ const APPS = [
     desc: 'the weekly household shop, end to end',
     tone: 'green',
     // It has a read service (services/asdair/cockpit-api, GET /asdair/health). Whether it is
-    // RUNNING is measured, never assumed — as of this build it is not deployed.
+    // RUNNING is measured, never assumed — the tile never claims "up" from hope.
     probe: true,
     // Its ROWS print as "Shopping" — Warwick's word for the job — while the app tile keeps its own
     // name. Two module keys ('shopping' and this one) deliberately share one human name.
@@ -110,7 +110,7 @@ const APPS = [
     lane: 'life',
     views: [
       { key: 'overview', label: 'Overview', blurb: 'Where this week’s shop has got to, and anything waiting on you.' },
-      { key: 'details', label: 'Details', blurb: 'Every line on the list — what it was read as, what it matched in the household catalogue, and the evidence behind the match.' },
+      { key: 'details', label: 'Details', blurb: 'Every line on the list — what it was read as, what it matched in the household catalogue, and the evidence behind the match — plus what’s still waiting on you and what you’ve already resolved.' },
       { key: 'basket', label: 'Basket', blurb: 'The execution packet in Brand A–Z order — every product, its quantity, and WHY that quantity — and, once the basket has been built, how it reconciled against what was expected.' },
       { key: 'rules', label: 'Rules', blurb: 'The durable rulebook: the standing rules AsdAIr plans against, the decisions it has been given, and the household catalogue with its aliases. Read-only — this is what the system believes.' },
       { key: 'about', label: 'About', blurb: 'What this app does, what it will never do, and where its data lives.' },

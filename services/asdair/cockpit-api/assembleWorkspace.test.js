@@ -399,6 +399,80 @@ test('open questions only offer replies that have a real command behind them', (
   assert.deepEqual(p.questions.items[0].allowed_replies.map((r) => r.key), ['choose', 'typed', 'search', 'skip']);
 });
 
+test('a resolved question shows Warwick\'s own answer verbatim, even with no decision row on record', () => {
+  const p = assembleWorkspace(input({
+    questions: [
+      { id: 6, list_item_id: 102, question_key: 'q2', question_text: 'Which sausages?', status: 'answered', answer_text: 'Richmond 12 Skinless Pork Sausages 319g', answer_source: 'typed', answered_at: '2026-07-28T10:05:00Z', candidates: [] }
+    ]
+    // No `decisions` supplied at all — pre-migration-017 answer, or the read
+    // failed over gracefully. The raw answer must still be shown.
+  }));
+  assert.equal(p.questions.open_count_display, '0');
+  assert.equal(p.questions.resolved_count_display, '1');
+  const r = p.questions.resolved[0];
+  assert.equal(r.status_display, 'answered');
+  assert.equal(r.answer_text_display, 'Richmond 12 Skinless Pork Sausages 319g');
+  assert.equal(r.decision, null);
+  // No decision row and not skipped => no invented resolution sentence.
+  assert.equal(r.resolution_display, null);
+});
+
+// REGRESSION — Vera, CONDITIONAL PASS, 2026-08-11. answered_at_display rendered as a raw
+// toISOString() instant (P.when()'s output) right beside "You said: ..." / "-> Resolved to ..." —
+// primary content in the exact section this Work Order exists to make human-readable. Scoped fix:
+// a local humanWhen() for this field and decisionSummary()'s interpreted_at_display only; every
+// OTHER P.when() call site on the page (History, evidence, browser, order...) is unchanged.
+test('a resolved question\'s answered_at is human-readable, never a raw ISO instant', () => {
+  const p = assembleWorkspace(input({
+    questions: [
+      { id: 6, list_item_id: 102, question_key: 'q2', question_text: 'Which sausages?', status: 'answered', answer_text: 'Richmond 12 Skinless Pork Sausages 319g', answer_source: 'typed', answered_at: '2026-07-28T10:05:00Z', candidates: [] }
+    ]
+  }));
+  const display = p.questions.resolved[0].answered_at_display;
+  assert.ok(!/^\d{4}-\d{2}-\d{2}T/.test(display), 'answered_at_display looks like a raw ISO instant: ' + display);
+  assert.equal(display, new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date('2026-07-28T10:05:00Z')));
+});
+
+test('a skipped question with no decision row still reads as skipped, in plain English', () => {
+  const p = assembleWorkspace(input({
+    questions: [
+      { id: 7, list_item_id: 103, question_key: 'q3', question_text: 'Which gloves?', status: 'skipped', answer_text: null, answered_at: '2026-07-28T10:06:00Z', candidates: [] }
+    ]
+  }));
+  assert.equal(p.questions.resolved[0].status_display, 'skipped');
+  assert.equal(p.questions.resolved[0].resolution_display, 'Skipped — not bought this week.');
+});
+
+test('a decision row translates into a plain-language resolution, grounded in the catalogue by id', () => {
+  const p = assembleWorkspace(input({
+    questions: [
+      { id: 8, list_item_id: 104, question_key: 'q4', question_text: 'Which milk?', status: 'answered', answer_text: 'the usual', answer_source: 'button', answered_at: '2026-07-28T10:07:00Z', candidates: [] }
+    ],
+    decisions: [
+      { id: 900, question_id: 8, decision_kind: 'existing_regular', decided_regular_id: 11, interpreted_by: 'terra', interpreted_at: '2026-07-28T10:07:05Z' }
+    ]
+  }));
+  const r = p.questions.resolved[0];
+  assert.equal(r.answer_text_display, 'the usual');
+  assert.equal(r.decision.kind, 'existing_regular');
+  assert.equal(r.decision.decided_product_name_display, 'Arla semi skimmed 4pt');
+  assert.equal(r.resolution_display, 'Resolved to Arla semi skimmed 4pt.');
+  // Same regression, the decision's own timestamp: also primary content beside the resolution
+  // sentence, also must never be a raw ISO instant.
+  assert.ok(!/^\d{4}-\d{2}-\d{2}T/.test(r.decision.interpreted_at_display),
+    'decision.interpreted_at_display looks like a raw ISO instant: ' + r.decision.interpreted_at_display);
+});
+
+test('resolved questions come back newest-first', () => {
+  const p = assembleWorkspace(input({
+    questions: [
+      { id: 1, list_item_id: 101, question_key: 'qa', question_text: 'first', status: 'answered', answer_text: 'a', answered_at: '2026-07-28T10:00:00Z' },
+      { id: 2, list_item_id: 102, question_key: 'qb', question_text: 'second', status: 'answered', answer_text: 'b', answered_at: '2026-07-28T10:01:00Z' }
+    ]
+  }));
+  assert.deepEqual(p.questions.resolved.map((r) => r.id), [2, 1]);
+});
+
 // ---------------------------------------------------------------------
 // HISTORY
 // ---------------------------------------------------------------------
