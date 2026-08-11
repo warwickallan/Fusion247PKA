@@ -1148,6 +1148,44 @@ export function createFakeClient(store, options = {}) {
       db.shopping_lists.push(row);
       return rows([{ id: row.id }]);
     }],
+
+    // ── THE SHOP-OWNED LANE (migration 019 / WP-B15-16, taught WP-B15-22) ──
+    //
+    // findOrCreateDraftList's shopId branch was previously UNREACHED by this
+    // suite: runPipeline.js never emitted shop_id on an add_list_item intent
+    // before WP-B15-21, so every call took the date-keyed lane below and these
+    // three statements had no handler. WP-B15-21 makes every shop supply its
+    // own id, which means EVERY add_list_item call in the whole pipeline suite
+    // now takes this branch first - reported as the reason B15-21's merge
+    // reddened the suite (473 -> 371/102) until this was taught.
+    //
+    // Read FIRST (by owner), matching asdairCommands.mjs's own precedence: the
+    // owning shop is asked before any date-keyed row is ever consulted.
+    [/^select id from asdair\.shopping_lists where shop_id=\$1/i, (sql, p) =>
+      rows(db.shopping_lists.filter((l) => String(l.shop_id) === String(p[0])).map((l) => ({ id: l.id })))],
+    // Insert WITH an explicit list_date - three real params (household, date, shop).
+    [/^insert into asdair\.shopping_lists \(household_id, status, list_date, shop_id\) values \(\$1,'next_week_draft',\$2,\$3\)/i, (sql, p) => {
+      const row = {
+        id: id('shopping_lists'), household_id: p[0], status: 'next_week_draft',
+        list_date: p[1] ?? null, shop_id: p[2] ?? null,
+      };
+      db.shopping_lists.push(row);
+      return rows([{ id: row.id }]);
+    }],
+    // Insert with NO list_date - the DB computes (current_date+7). Two real
+    // params (household, shop); list_date is left null here exactly as the
+    // existing no-date 3-column form above already does - this fake has no
+    // real clock semantics for that literal and none of its callers read
+    // list_date back off a freshly-created shop-owned row.
+    [/^insert into asdair\.shopping_lists \(household_id, status, list_date, shop_id\) values \(\$1,'next_week_draft',\(current_date\+7\),\$2\)/i, (sql, p) => {
+      const row = {
+        id: id('shopping_lists'), household_id: p[0], status: 'next_week_draft',
+        list_date: null, shop_id: p[1] ?? null,
+      };
+      db.shopping_lists.push(row);
+      return rows([{ id: row.id }]);
+    }],
+
     [/^select id, requested_qty, status, note from asdair\.shopping_list_items where list_id=\$1 and lower\(item_name\)=lower\(\$2\)/i, (sql, p) => {
       const hit = db.shopping_list_items.find((i) => String(i.list_id) === String(p[0])
         && String(i.item_name).toLowerCase() === String(p[1]).toLowerCase());
