@@ -8,6 +8,30 @@
 // `raw_reading` - what it believes is physically on the paper. Anything
 // canonical comes from OUR catalogue, looked up by id. A model cannot
 // hallucinate a product that does not exist if it is never asked to name one.
+//
+// ── REGION-CITATION CONTRACT, ADDED WO-2026-08-11-B15-VISION-01 (AC1/AC2/AC3) ──
+// `buildGroundedPrompt(catalogue, options)` now takes an OPTIONAL second
+// argument. `options.regions` - an array of {region_no, region_kind} from
+// pipeline/imagePrep.js's planRegions(), matching the rows already persisted
+// to asdair.shop_image_region (migration 020) - is the ONLY new behaviour:
+//
+//   * ABSENT (or an empty array): the prompt and its JSON-output contract are
+//     BYTE-IDENTICAL to before this change. Every existing caller
+//     (interpret/interpret-list.js, its tests, pipeline/test/harness.js) is
+//     therefore unaffected and untouched by this edit - see
+//     groundedPrompt.test.js's regression test, which pins that claim rather
+//     than asserting it in prose.
+//   * PRESENT: the prompt gains an "AVAILABLE IMAGE REGIONS" section listing
+//     every region_no the model may cite, and the JSON-output contract gains
+//     a REQUIRED per-line `source_region` field. The model is told explicitly
+//     it may ONLY name a region_no from that list - it can never assert its
+//     own coordinates. This is the prompt half of the anti-hallucination
+//     design; migration 020's composite foreign key
+//     (shop_line_provenance_region_fk) is the half that makes it a database
+//     fact rather than a prompt request (see that migration's own header).
+//
+// This module still asks nothing of a model gateway and calls nothing - it
+// remains PURE string-building, exactly as before.
 'use strict';
 
 const STATUSES = Object.freeze([
@@ -53,11 +77,51 @@ function renderLastOrder(lastOrder) {
   return lastOrder.lines.map((l) => `  ${l.qty ?? '?'} x ${l.item_name}`).join('\n');
 }
 
+// Human-readable label for a region, used only in the listing shown to the
+// model - `region_no` (the number the model must actually cite) is the only
+// part of this that reaches the JSON contract.
+function renderRegions(regions) {
+  return regions
+    .map((r) => `  region ${r.region_no}: ${r.region_kind === 'full_page' ? 'the full page' : 'a strip of the page'}`)
+    .join('\n');
+}
+
 /**
  * @param {object} catalogue - from loadCatalogue()
+ * @param {object} [options]
+ * @param {Array<{region_no:number, region_kind:string}>} [options.regions] -
+ *   OPTIONAL. See the module header's "REGION-CITATION CONTRACT". Absent or
+ *   empty leaves the prompt and JSON contract byte-identical to before.
  * @returns {string} the grounded prompt
  */
-function buildGroundedPrompt(catalogue) {
+function buildGroundedPrompt(catalogue, options) {
+  const regions = (options && Array.isArray(options.regions)) ? options.regions : [];
+  const regionNos = regions.map((r) => r.region_no);
+  const citesRegions = regions.length > 0;
+
+  const regionsSection = citesRegions
+    ? `
+
+AVAILABLE IMAGE REGIONS (this is EVERY region you may cite - you may NEVER assert your own coordinates
+or a region number not listed here):
+${renderRegions(regions)}`
+    : '';
+
+  const sourceRegionTask = citesRegions
+    ? `\n8. For each line, set source_region to the region number (from the list above) where you actually saw that
+   line. You may ONLY use a number from the AVAILABLE IMAGE REGIONS list - never invent one, never describe a
+   location in words. If a line is visible in more than one overlapping strip, cite the ONE strip that gives
+   the clearest, most complete view of it.`
+    : '';
+
+  const sourceRegionField = citesRegions
+    ? `,\n           "source_region":${regionNos[0] ?? 1}`
+    : '';
+
+  const sourceRegionNote = citesRegions
+    ? ` source_region is REQUIRED on every line and MUST be one of: ${regionNos.join(', ')}.`
+    : '';
+
   return `You are helping interpret a photograph of a handwritten weekly shopping list for ONE household.
 
 You are NOT transcribing arbitrary handwriting. This household buys the same things most weeks. Your job is to
@@ -70,7 +134,7 @@ STANDING RULES THAT AFFECT INTERPRETATION:
 ${renderRules(catalogue.rules)}
 
 WHAT THEY BOUGHT LAST TIME (useful prior - they repeat most weeks):
-${renderLastOrder(catalogue.last_order)}
+${renderLastOrder(catalogue.last_order)}${regionsSection}
 
 TASK
 1. Locate EVERY handwritten line on the page, in page order. Do not drop a line because you are unsure of it,
@@ -87,7 +151,7 @@ TASK
 5. If two candidates are both plausible, set status "needs_confirmation" and list BOTH in alternatives.
 6. Quantity: only record a number you can actually SEE. If the quantity is unreadable or ambiguous, set
    quantity to null and status "unreadable". Never guess a quantity.
-7. If the same product appears twice, mark the later one "possible_duplicate".
+7. If the same product appears twice, mark the later one "possible_duplicate".${sourceRegionTask}
 
 Return ONLY strict JSON, no prose and no code fences:
 
@@ -98,10 +162,10 @@ Return ONLY strict JSON, no prose and no code fences:
            "match_basis":"one of: ${MATCH_BASES.join(' | ')}",
            "confidence":0.0,
            "alternatives":[],
-           "status":"one of: ${STATUSES.join(' | ')}"}]}
+           "status":"one of: ${STATUSES.join(' | ')}"${sourceRegionField}}]}
 
 alternatives is a list of candidate ids. confidence is 0.0-1.0. matched_regular_id MUST be an id from the list
-above, or null. Never write a product name into matched_regular_id.`;
+above, or null. Never write a product name into matched_regular_id.${sourceRegionNote}`;
 }
 
-module.exports = { buildGroundedPrompt, STATUSES, MATCH_BASES, renderCandidates };
+module.exports = { buildGroundedPrompt, STATUSES, MATCH_BASES, renderCandidates, renderRegions };

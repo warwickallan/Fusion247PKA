@@ -54,10 +54,20 @@ export function answerModel() {
 
 async function gatewayChat(role, prompt, imageUrl = null, modelOverride = null) {
   // Text-only when no imageUrl is given (identical wire body to before); OpenAI-style
-  // multimodal content parts when one is.
-  const content = imageUrl === null
+  // multimodal content parts when one is given.
+  //
+  // MULTI-IMAGE, added WO-2026-08-11-B15-VISION-01 (AC2): `imageUrl` may now
+  // ALSO be an array of data:/http(s): URLs, in which case ONE image_url
+  // content part is emitted per entry, IN ARRAY ORDER, alongside the single
+  // text part — this is what lets vision() send the corrected page plus
+  // every numbered strip in ONE request rather than one call per image. A
+  // single string still behaves exactly as before (one image_url part); this
+  // is purely additive, and every existing caller that never passes an array
+  // is unaffected.
+  const images = imageUrl === null ? [] : (Array.isArray(imageUrl) ? imageUrl : [imageUrl]);
+  const content = images.length === 0
     ? prompt
-    : [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageUrl } }];
+    : [{ type: 'text', text: prompt }, ...images.map((url) => ({ type: 'image_url', image_url: { url } }))];
   const res = await fetch(`${GATEWAY.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(GATEWAY_KEY ? { Authorization: `Bearer ${GATEWAY_KEY}` } : {}) },
@@ -111,6 +121,14 @@ export async function answer(prompt) {
 // The vision role: read an IMAGE (e.g. a photographed handwritten shopping list) plus a prompt.
 // `imageUrl` is a data: or http(s): URL — the caller decides what it is willing to send.
 //
+// MULTI-IMAGE, added WO-2026-08-11-B15-VISION-01 (AC2): `imageUrl` may ALSO be a
+// non-empty ARRAY of such URLs, sent as separate image parts in ONE request — this is
+// what lets the vision pipeline send "the corrected page + numbered strips ... in ONE
+// request per normal case" (AC2's own wording) rather than a call per image. A single
+// string is unchanged, existing behaviour. EVERY entry is validated exactly as the
+// single-URL form always was — an empty array, or any non-string/empty entry, is
+// refused rather than silently sending a partial or malformed request.
+//
 // Deliberately NO fallback. The box path (`lightrag.generate`) is text-only, so falling back would
 // hand a blind text model a prompt about an image it cannot see and invite an invented answer —
 // exactly the failure mode a household shopping list must never have. With no gateway configured
@@ -123,8 +141,14 @@ export async function vision(prompt, imageUrl) {
       'Refusing to fall back to a text-only model for an image task.'
     );
   }
-  if (typeof imageUrl !== 'string' || imageUrl === '') {
-    throw new Error('fusion-gateway vision: an image reference (data: or http(s): URL) is required');
+  const images = Array.isArray(imageUrl) ? imageUrl : [imageUrl];
+  if (images.length === 0) {
+    throw new Error('fusion-gateway vision: at least one image reference (data: or http(s): URL) is required');
+  }
+  for (const url of images) {
+    if (typeof url !== 'string' || url === '') {
+      throw new Error('fusion-gateway vision: every image reference must be a non-empty data: or http(s): URL');
+    }
   }
   return gatewayChat('vision', prompt, imageUrl);
 }

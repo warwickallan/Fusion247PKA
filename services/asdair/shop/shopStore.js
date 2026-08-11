@@ -127,6 +127,64 @@ const SHOP_UPDATE_ALLOWED_COLUMNS = [
 // module has no clock; now() is the honest answer for "when did this happen".
 const SHOP_UPDATE_LITERALS = { updated_at: 'now()' };
 
+// =====================================================================
+// human_state - WO-2026-08-11-B15-VISION-01 AC7 / Amendment 2 Finding 1.
+//
+// Migration 020 adds asdair.shop.human_state (CHECK-enforced, six values)
+// and leaves WHAT MAPS TO WHAT for this layer to implement - "written by
+// the SAME code path that already transitions shop.status" (the migration's
+// own words). applyTransition() below is that one path (see its own header
+// comment: "THE ONLY place asdair.shop.status is written"), so this mapping
+// lives here, computed inline, alongside status - never as a second writer.
+//
+// THE MAPPING IS A VERBATIM MIRROR of migration 020's own backfill CASE
+// statement (services/asdair/db/020_shop_line_provenance_and_human_state.sql,
+// section 5) - not re-derived, so the column's INITIAL VALUE (the backfill)
+// and its ONGOING VALUE (every value written from here on) can never quietly
+// drift apart. Two cells are Silas's OWN FLAGGED-ARGUABLE calls, carried
+// forward exactly as he wrote them (WO-2026-08-11-B15-VISION-01's
+// schema_decision field: "implement as Silas wrote them; report back...
+// if either looks wrong"):
+//   BASKET_READY -> READY_FOR_WARWICK (built, awaiting his review)
+//   CANCELLED    -> COMPLETE (closed, nothing more will happen)
+const HUMAN_STATES = Object.freeze([
+  'NEEDS_WARWICK', 'ASDAIR_WORKING', 'READY_FOR_WARWICK',
+  'BROWSER_WORKING', 'COMPLETE', 'FAILED',
+]);
+
+const HUMAN_STATE_BY_STATUS = Object.freeze({
+  RECEIVED: 'ASDAIR_WORKING',
+  TRANSCRIBING: 'ASDAIR_WORKING',
+  PROCESSING: 'ASDAIR_WORKING',
+  NEEDS_DECISION: 'NEEDS_WARWICK',
+  READY_TO_SHOP: 'READY_FOR_WARWICK',
+  WAITING_FOR_BROWSER: 'BROWSER_WORKING',
+  SHOPPING: 'BROWSER_WORKING',
+  BASKET_READY: 'READY_FOR_WARWICK', // Silas: flagged-arguable, implemented as written
+  ORDER_CONFIRMATION_RECEIVED: 'ASDAIR_WORKING',
+  RECONCILED: 'COMPLETE',
+  FAILED: 'FAILED',
+  CANCELLED: 'COMPLETE', // Silas: flagged-arguable, implemented as written
+});
+
+/**
+ * Compute human_state for a given asdair.shop.status. An UNKNOWN status
+ * (one this mapping does not name) is a defect in THIS mapping falling out
+ * of sync with migration 001/006's status vocabulary, not something to
+ * paper over with a guessed default - it throws loudly rather than writing
+ * a human_state that does not actually describe the row.
+ * @param {string} status
+ * @returns {string} one of HUMAN_STATES
+ */
+function computeHumanState(status) {
+  const mapped = HUMAN_STATE_BY_STATUS[status];
+  if (!mapped) {
+    throw new Error('shopStore: computeHumanState has no mapping for status "' + String(status)
+      + '" - migration 020\'s vocabulary and this mapping have fallen out of sync. Nothing was written.');
+  }
+  return mapped;
+}
+
 const SHOP_EVENT_INSERT_SQL =
   'INSERT INTO asdair.shop_event (shop_id, event_type, from_status, to_status, description) ' +
   'VALUES ($1, $2, $3, $4, $5) RETURNING id, occurred_at';
@@ -403,6 +461,15 @@ async function applyTransition(client, spec) {
     params.push(spec.set[col] === undefined ? null : spec.set[col]);
     assignments.push(col + ' = $' + params.length);
   });
+
+  // human_state (AC7 / Amendment 2 Finding 1): computed from spec.to_status,
+  // which every caller of applyTransition already supplies and which always
+  // equals the new status this same UPDATE is about to write - so the two
+  // columns are set by the SAME statement, from the SAME source value, and
+  // can never be observed disagreeing between one write and the next.
+  params.push(computeHumanState(spec.to_status));
+  assignments.push('human_state = $' + params.length);
+
   Object.keys(SHOP_UPDATE_LITERALS).forEach(function (col) {
     assignments.push(col + ' = ' + SHOP_UPDATE_LITERALS[col]);
   });
@@ -926,6 +993,11 @@ module.exports = {
     CLAIM_BROWSER_REQUEST_SQL: CLAIM_BROWSER_REQUEST_SQL,
     SELECT_LAST_FAILURE_SQL: SELECT_LAST_FAILURE_SQL,
     SELECT_SHOP_BY_INBOUND_SQL: SELECT_SHOP_BY_INBOUND_SQL,
-    SELECT_SHOP_BY_REF_SQL: SELECT_SHOP_BY_REF_SQL
+    SELECT_SHOP_BY_REF_SQL: SELECT_SHOP_BY_REF_SQL,
+    // WO-2026-08-11-B15-VISION-01 AC7: exposed so pipeline/test/humanState.test.js
+    // can prove the status->human_state mapping directly, without a database.
+    computeHumanState: computeHumanState,
+    HUMAN_STATES: HUMAN_STATES,
+    HUMAN_STATE_BY_STATUS: HUMAN_STATE_BY_STATUS
   }
 };
