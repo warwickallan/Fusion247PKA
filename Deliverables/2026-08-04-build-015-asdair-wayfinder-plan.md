@@ -1669,6 +1669,23 @@ once that decision lands.
 
 **Closing head at time of writing: `0aaaa23`.**
 
+**Progress update, same session, later:** Silas's schema decision landed
+(`Deliverables/2026-08-12-silas-schema-decision-photo-truth-and-cockpit-state.md`, migration
+`services/asdair/db/020_shop_line_provenance_and_human_state.sql` — corrected Larry's stale migration
+number, 020 not 018). The vision-pipeline Work Order was then properly issued and dispatched
+(`Deliverables/2026-08-11-wo-b15-24-vision-pipeline-order.md`) — all three legs of tonight's parallel
+dispatch now in flight. **Keel's Cockpit-backend work returned PARTIAL, honestly**: AC1/AC2/AC3(amended)/
+AC5 confirmed MET with real evidence (163/163 and 188/188 executed test passes); AC4 blocked on a
+test file, `renderMessages.test.js`, that pinned an exact message-key set and was outside Keel's
+declared surface — Keel correctly refused to force its (design-correct) url-button renderers into
+that test's callback_data-only shape rather than game it. Fixed by AMENDMENT 2: surface widened by
+exactly that one file. Also found and reported, not fixed (correctly out of scope): a real
+`correctLine`/`markCorrected` identifier-space mismatch (string item_name vs. integer lineNo), and a
+missing "mark not this week" command for an already-resolved line — both flagged residuals for later,
+not chased tonight.
+
+**Closing head at time of writing: `8866659`.**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
