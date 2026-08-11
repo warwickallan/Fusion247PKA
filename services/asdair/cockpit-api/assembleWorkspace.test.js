@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 
 const { assembleWorkspace, INTERPRETATION_STATUSES } = require('./assembleWorkspace');
 const { COMMAND_NAMES } = require('./commandSurface');
+const { computeCanonicalState } = require('./canonicalState');
 
 // ---------------------------------------------------------------------
 // Fixtures. Synthetic. No household data, no real product names beyond the
@@ -90,6 +91,32 @@ test('no shop at all is reported as no_shop, not as an empty shop', () => {
 test('the 12 stages travel with the payload so the UI never hand-types them', () => {
   const p = assembleWorkspace(input({ all_stages: ['RECEIVED', 'RECONCILED'] }));
   assert.deepEqual(p.shop.all_stages, ['RECEIVED', 'RECONCILED']);
+});
+
+// ---------------------------------------------------------------------
+// CANONICAL STATE (AC1, WO-2026-08-11-B15-COCKPIT-BE-01) - computed by
+// canonicalState.js and exposed exactly here, nowhere else in this payload.
+// The mapping rules themselves are canonicalState.test.js's job; this only
+// proves the payload actually carries what that one function returns.
+// ---------------------------------------------------------------------
+test('shop.canonical_state is exactly what computeCanonicalState returns for the same status', () => {
+  const status = baseStatus({ stage: 'NEEDS_DECISION', needs_review: true });
+  const p = assembleWorkspace(input({ status }));
+  assert.equal(p.shop.canonical_state, computeCanonicalState(status));
+  assert.equal(p.shop.canonical_state, 'NEEDS_WARWICK');
+});
+
+test('shop.canonical_state tracks the stage across the lifecycle - one function, not reimplemented here', () => {
+  [
+    ['RECEIVED', 'ASDAIR_WORKING'],
+    ['READY_TO_SHOP', 'READY_FOR_WARWICK'],
+    ['WAITING_FOR_BROWSER', 'BROWSER_WORKING'],
+    ['RECONCILED', 'COMPLETE'],
+    ['FAILED', 'FAILED'],
+  ].forEach(([stage, expected]) => {
+    const p = assembleWorkspace(input({ status: baseStatus({ stage, needs_review: false }) }));
+    assert.equal(p.shop.canonical_state, expected, `stage ${stage}`);
+  });
 });
 
 // ---------------------------------------------------------------------

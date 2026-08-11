@@ -33,6 +33,7 @@
 
 const P = require('./present');
 const { COMMAND_NAMES } = require('./commandSurface');
+const { computeCanonicalState } = require('./canonicalState');
 
 // The interpretation vocabulary (services/asdair/interpret/resolveByCatalogue.js).
 const INTERPRETATION_STATUSES = Object.freeze([
@@ -697,6 +698,12 @@ function assembleWorkspace(input) {
       stage: status.stage,
       stage_display: P.text(status.stage),
       stage_label_display: P.text(status.stage_label),
+      // THE ONE canonical six-value state (AC1) - computed by canonicalState.js
+      // and nowhere else. See that file's header: this is a documented
+      // placeholder pending the durable field the vision-pipeline WP will
+      // introduce, derived here from the SAME `status` this module already
+      // has - no new read, no raw-count recomputation.
+      canonical_state: computeCanonicalState(status),
       // The 12 states, so the UI can show where this shop sits in the whole
       // lifecycle rather than only its current label. Supplied by the reader
       // from shopStatus.SHOP_STATUSES - never hand-typed into the UI.

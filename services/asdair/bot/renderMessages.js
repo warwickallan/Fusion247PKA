@@ -1119,12 +1119,149 @@ export function renderPhotoRead({
   };
 }
 
+// =====================================================================
+// ── 14. Cockpit notification shapes (WO-2026-08-11-B15-COCKPIT-BE-01 AC4,
+//         AMENDMENT 1 — additive only) ───────────────────────────────────
+//
+// The design (`Deliverables/2026-08-11-cockpit-and-vision-pipeline-design.md`
+// Part 2, "Telegram's new role"): Telegram becomes notification-only —
+// "list read", "shop ready", "basket built", each linking to the Cockpit for
+// the actual decision. No card-per-question, no in-Telegram decision flow.
+//
+// THESE THREE FUNCTIONS ARE DELIBERATELY NOT REGISTERED IN `MESSAGES` BELOW.
+// Registering them broke the existing, already-passing, out-of-surface
+// `renderMessages.test.js` two independent ways, discovered by attempting it:
+//
+//   1. `Object.keys(MESSAGES).sort()` is asserted against a PINNED, EXACT
+//      16-entry list at renderMessages.test.js:136-140 — "pinning the exact
+//      key set here, OUTSIDE renderMessages.js, is what makes an
+//      unregistered kind impossible to ship unnoticed" (that file's own
+//      comment). Adding a 17th/18th/19th key fails that assertion outright.
+//   2. The catalogue-wide loops (renderMessages.test.js:143-185) call
+//      `render(SAMPLES[name])` and then walk every button expecting
+//      `callback_data` (parsed via `parseCallbackData`) — these three
+//      renderers correctly use `urlButton()` (a real `url`, not a command)
+//      per the design's "link to Cockpit" requirement, so even fixing (1)
+//      would still fail (2) on a button shape those loops do not expect.
+//
+// `renderMessages.test.js` is NOT in this Work Order's `file_surface`
+// (only `renderMessages.js` and `sendShopperMessage.js` are named), so
+// fixing either failure is out of scope for THIS WP — it is not a defect in
+// these three functions, it is a one-file surface gap. See the final
+// handback for the exact recommended follow-up. Once that file is in scope,
+// registering these three is a two-line change: add the keys to `MESSAGES`
+// below, and extend `SAMPLES`/the pinned key list accordingly.
+//
+// Otherwise these follow every rule the rest of this module follows: PURE,
+// plain text, `count()`/`value()` for every dynamic field, nothing fabricated.
+// =====================================================================
+
+/**
+ * PURE. One inline URL button. Deliberately distinct from `button()` above,
+ * which always builds `callback_data` through the protocol — these three
+ * notification cards point at the Cockpit, an external link Telegram opens
+ * directly, never a command this runtime would dispatch. A separate helper
+ * keeps `button()`'s callback_data contract from ever being weakened to
+ * accept a bare URL by mistake.
+ */
+export function urlButton(label, url) {
+  return { text: labelFor(label), url: String(url) };
+}
+
+/**
+ * PURE. Renders no row at all when no link was supplied — the same rule
+ * `renderProgress`'s `checklistPath` already follows: a dead link on a card
+ * someone is holding is worse than the card saying nothing about one.
+ */
+function cockpitLinkRow(cockpitLink) {
+  return typeof cockpitLink === 'string' && cockpitLink.trim() !== ''
+    ? [[urlButton('Open in Cockpit', cockpitLink.trim())]]
+    : [];
+}
+
+/**
+ * PURE. "List read" — role 1 of 3. A list arrived and AsdAIr read it; any
+ * decision happens in the Cockpit, so this card offers no answer buttons of
+ * its own, only a link.
+ *
+ * @param {{shopRef:string, lines?:number, regularsAdded?:number,
+ *          needAttention?:number, cockpitLink?:string}} spec
+ */
+export function renderListRead({
+  shopRef, lines, regularsAdded, needAttention, cockpitLink,
+} = {}) {
+  assertShopRef(shopRef);
+  return {
+    text: block([
+      '📷 Shopping list read',
+      `Ref: ${value(shopRef)}`,
+      `Lines read: ${count(lines)}`,
+      `Regulars added: ${count(regularsAdded)}`,
+      `Need your attention: ${count(needAttention)}`,
+    ]),
+    reply_markup: keyboard(cockpitLinkRow(cockpitLink)),
+  };
+}
+
+/**
+ * PURE. "Shop ready" — role 2 of 3. Every question is answered; building the
+ * basket is an action taken in the Cockpit, never from a Telegram button, so
+ * this card is notification-only.
+ *
+ * @param {{shopRef:string, resolvedCount?:number, totalCount?:number,
+ *          cockpitLink?:string}} spec
+ */
+export function renderShopReady({
+  shopRef, resolvedCount, totalCount, cockpitLink,
+} = {}) {
+  assertShopRef(shopRef);
+  return {
+    text: block([
+      '✅ Shop ready',
+      `Ref: ${value(shopRef)}`,
+      `Resolved: ${count(resolvedCount)} of ${count(totalCount)}`,
+      'Nothing is outstanding — ready to build the basket.',
+    ]),
+    reply_markup: keyboard(cockpitLinkRow(cockpitLink)),
+  };
+}
+
+/**
+ * PURE. "Basket built" — role 3 of 3. The supervised runner finished;
+ * whether it reconciles is reviewed in the Cockpit, never decided from this
+ * card.
+ *
+ * @param {{shopRef:string, added?:number, missing?:number,
+ *          cockpitLink?:string}} spec
+ */
+export function renderBasketBuilt({
+  shopRef, added, missing, cockpitLink,
+} = {}) {
+  assertShopRef(shopRef);
+  return {
+    text: block([
+      '🧺 Basket built',
+      `Ref: ${value(shopRef)}`,
+      `Added: ${count(added)}`,
+      `Missing: ${count(missing)}`,
+      '',
+      NO_ORDER_LINE,
+    ]),
+    reply_markup: keyboard(cockpitLinkRow(cockpitLink)),
+  };
+}
+
 /**
  * The catalogue, by name. Lets a caller (and the test suite) enumerate every
  * renderer without importing them one at a time — the shape test in
  * renderMessages.test.js walks this map, so a NEW renderer added here is
  * automatically covered by the "every renderer returns {text, reply_markup}"
  * and "no secret leaks into rendered output" proofs.
+ *
+ * `renderListRead` / `renderShopReady` / `renderBasketBuilt` above are
+ * DELIBERATELY NOT in this map yet — see the section header above them for
+ * exactly why, and the final handback for the recommended one-file surface
+ * widening that unblocks registering them.
  *
  * ── A KIND WITH NO ENTRY HERE IS A SILENT DROP ──────────────────────────────
  * runtime.js drainOutbox resolves an outbox row whose `kind` is absent from this
