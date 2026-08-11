@@ -256,6 +256,66 @@ test('GATE ZERO END TO END: a TEXT shop never acquires transcript provenance - i
   assert.equal(shop.transcript_confidence, null);
 });
 
+test('GATE ZERO §4: the plan_ready advisory log flags an IMPLAUSIBLY LOW line count on a photo shop', async () => {
+  // No priced comparator is cheaply available at plan_ready (SOP-021's own
+  // GBP 120-150 band is "structurally inoperative" - no price column exists;
+  // Larry narrowed this to line-count-only, logged, never a new pricing call).
+  // A weekly photo shop returning ONE usable line is implausible on its face -
+  // exactly the shape of a near-total interpretation failure.
+  const logs = [];
+  const h = makeHarness({
+    modelLines: [{ line_no: 1, raw_reading: 'fruit splits', quantity: null, confidence: 0.9 }],
+  });
+  h.deps.log = (event, detail) => logs.push({ event, detail });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan -> NEEDS_DECISION
+
+  const advisory = logs.find((l) => l.event === 'plan_ready_line_count_advisory');
+  assert.ok(advisory, 'the advisory log never fired at plan_ready');
+  assert.equal(advisory.detail.total_requested, 1);
+  assert.equal(advisory.detail.implausibly_low, true,
+    'a single-line photo interpretation must be flagged, not silently accepted as a normal week');
+  assert.equal(advisory.detail.shop_ref, REF);
+
+  // ADVISORY MEANS ADVISORY: the shop still makes real progress and the real
+  // plan_ready message still queues, unaltered - nothing here ever blocks.
+  assert.equal(h.db.shop.find((s) => s.shop_ref === REF).status, 'NEEDS_DECISION');
+  assert.equal(h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'plan_ready').length, 1,
+    'the plan_ready message must still be queued - advisory logging must never withhold it');
+});
+
+test('GATE ZERO §4: the plan_ready advisory log does NOT flag an ordinary multi-line interpretation', async () => {
+  const logs = [];
+  const h = makeHarness({ modelLines: MODEL_LINES });
+  h.deps.log = (event, detail) => logs.push({ event, detail });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan
+
+  const advisory = logs.find((l) => l.event === 'plan_ready_line_count_advisory');
+  assert.ok(advisory, 'the advisory log never fired at plan_ready');
+  assert.equal(advisory.detail.total_requested, 3);
+  assert.equal(advisory.detail.implausibly_low, false, 'an ordinary 3-line week must never be flagged');
+});
+
+test('GATE ZERO §4: a TEXT shop never fires the advisory log - it was never read by a vision model', async () => {
+  const logs = [];
+  const h = makeHarness();
+  h.deps.log = (event, detail) => logs.push({ event, detail });
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING
+  await runPipeline(HANDLE, h.deps);   // plan
+
+  const advisory = logs.find((l) => l.event === 'plan_ready_line_count_advisory');
+  assert.equal(advisory, undefined, 'the line-count sanity signal exists to catch vision misreads, not typed lists');
+});
+
 // =====================================================================
 // THE LIVE INCIDENT (SHOP-2026-08-03), CLOSED
 //

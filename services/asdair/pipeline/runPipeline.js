@@ -2518,6 +2518,35 @@ async function queueMilestoneMessage(deps, snapshot, result) {
   const shop = snapshot.shop;
   const spec = messageForTransition(shop, result);
   if (!spec) return null;
+
+  // ── SOURCE-VS-DERIVED SANITY, ADVISORY ONLY (WP-B15-22, GATE ZERO §4) ────
+  // SOP-021's own known-good comparators (the GBP 120-150 weekly band, the
+  // last real basket total) are BOTH priced numbers, and SOP-021 itself
+  // already records that the price band is "structurally inoperative - no
+  // price column exists anywhere in the schema" (Larry, narrowing this
+  // Work Order's scope: do not build a pricing call that does not exist yet
+  // to manufacture one). At plan_ready there is genuinely no priced
+  // comparator available cheaply - `messageForTransition` above is PURE and
+  // reads nothing else, so a real comparison would be new plumbing this
+  // Work Order was explicitly told not to build.
+  //
+  // What IS free: the derived line count itself, against nothing but common
+  // sense - a photo interpretation of a weekly shop returning one or zero
+  // usable lines is implausible on its face, exactly the shape of a
+  // near-total interpretation failure Gate Zero exists to make visible
+  // rather than silently accepted. LOGGED, never blocking: this never
+  // withholds the message or stops the shop, it only leaves a record a human
+  // or a later pass can go and look at.
+  if (spec.kind === 'plan_ready' && shop.source_kind === 'photo' && typeof deps.log === 'function') {
+    const totalRequested = spec.payload.listLines;
+    deps.log('plan_ready_line_count_advisory', {
+      shop_ref: shop.shop_ref,
+      total_requested: totalRequested,
+      needs_decision: spec.payload.needDecision,
+      implausibly_low: Number.isFinite(Number(totalRequested)) && Number(totalRequested) <= 1,
+    });
+  }
+
   return store.enqueueMessage(deps, {
     householdId: shop.household_id,
     shopId: shop.id,
