@@ -216,6 +216,46 @@ test('GATE ZERO END TO END: the model\'s own "unreadable" status survives to the
   assert.equal(line1.matched_regular_id, null);
 });
 
+test('GATE ZERO END TO END: asdair.shop.transcript_provider/transcript_model/transcript_confidence are populated after a photo interpretation', async () => {
+  // Before WP-B15-22, buildShopCreate COULD set these three columns, but only
+  // at shop creation - stepInterpret runs long after a shop exists and had no
+  // writer for them at all, so every photo shop's transcript columns stayed
+  // empty (Deliverables/2026-08-11-GATE-ZERO-source-truth-established.md §1).
+  const h = makeHarness({
+    visionModel: 'test-vision-model-x',
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.92 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1, confidence: 0.55 },
+      { line_no: 3, raw_reading: 'fruit splits', quantity: null, confidence: 0.4 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING
+
+  const shop = h.db.shop.find((s) => s.shop_ref === REF);
+  assert.equal(shop.transcript_provider, 'fusion-gateway');
+  assert.equal(shop.transcript_model, 'test-vision-model-x',
+    'the model id must be RESOLVED at call time (deps.visionModel), never a literal frozen in this test or the code');
+  // MINIMUM across lines, not the average - a single badly-read line is
+  // exactly what caused SHOP-2026-08-10-M64, and a mean would hide it.
+  assert.equal(shop.transcript_confidence, 0.4);
+});
+
+test('GATE ZERO END TO END: a TEXT shop never acquires transcript provenance - it was never read by a vision model', async () => {
+  const h = makeHarness();
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING for a text shop
+
+  const shop = h.db.shop.find((s) => s.shop_ref === REF);
+  assert.equal(shop.transcript_provider, null,
+    'a typed list was never read by a vision model - inventing provenance for it would be dishonest');
+  assert.equal(shop.transcript_model, null);
+  assert.equal(shop.transcript_confidence, null);
+});
+
 // =====================================================================
 // THE LIVE INCIDENT (SHOP-2026-08-03), CLOSED
 //

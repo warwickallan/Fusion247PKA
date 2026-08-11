@@ -183,6 +183,15 @@ export function makeHarness(script = {}) {
       return resolveAll(lines, regulars);
     },
 
+    /** WP-B15-22 (Gate Zero): the resolved vision model id, faked as a fixed,
+     *  obviously-synthetic string so a test asserting on it never depends on
+     *  a real env var. A test that cares which value was recorded overrides
+     *  this on its own harness instance, exactly like every other dep here. */
+    async visionModel() {
+      calls.push({ dep: 'visionModel' });
+      return script.visionModel !== undefined ? script.visionModel : 'fake-vision-model';
+    },
+
     async shopperRoute(payload, opts) {
       calls.push({ dep: 'shopperRoute', kind: payload.kind });
       const { shopperRoute } = await import('../../../hub/shopper/shopperRoute.mjs');

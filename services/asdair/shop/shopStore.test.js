@@ -665,7 +665,16 @@ test('the shop UPDATE is built from an allowlist that excludes identity and evid
     'telegram_chat_id', 'telegram_message_id', 'created_at'].forEach(function (col) {
     assert.equal(allowed.indexOf(col), -1, col + ' must never be settable while progressing a shop');
   });
-  assert.deepEqual(allowed, ['status', 'last_error', 'list_id']);
+  // WP-B15-22 (Gate Zero): transcript_provider/transcript_model/
+  // transcript_confidence added - provenance for a photo interpretation,
+  // never a substitute for the raw evidence. `transcript` itself (the raw
+  // text) is deliberately still absent from this allowlist and must stay so.
+  assert.equal(allowed.indexOf('transcript'), -1,
+    'the raw transcript text must never be settable while progressing a shop - only its provenance/summary');
+  assert.deepEqual(allowed, [
+    'status', 'last_error', 'list_id',
+    'transcript_provider', 'transcript_model', 'transcript_confidence',
+  ]);
   assert.deepEqual(store._internal.SHOP_UPDATE_LITERALS, { updated_at: 'now()' });
 });
 

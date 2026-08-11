@@ -108,7 +108,20 @@ const PENDING_SELECT_LIST =
 // absent and must stay absent: household_id, shop_ref, source_kind, and every
 // raw_* evidence column. Progressing a shop must never be able to rewrite what
 // arrived or which week it belongs to.
-const SHOP_UPDATE_ALLOWED_COLUMNS = ['status', 'last_error', 'list_id'];
+//
+// transcript_provider/transcript_model/transcript_confidence added WP-B15-22
+// (Gate Zero): buildShopCreate could already set them AT CREATION, but
+// stepInterpret runs well after a shop exists, and until now had no writer
+// for them at all - every photo shop's transcript columns were empty, not
+// just SHOP-2026-08-10-M64's (see the Gate Zero source-truth document).
+// Deliberately still absent: `transcript` itself (the raw text). This is
+// METADATA ONLY - provenance and a confidence summary - never the reading,
+// the prompt or the photo; that sanitisation is store.recordGroundingEvidence's
+// own deliberate privacy decision and stays undisturbed here.
+const SHOP_UPDATE_ALLOWED_COLUMNS = [
+  'status', 'last_error', 'list_id',
+  'transcript_provider', 'transcript_model', 'transcript_confidence',
+];
 
 // SQL literals for columns the database, not the caller, must time. This
 // module has no clock; now() is the honest answer for "when did this happen".

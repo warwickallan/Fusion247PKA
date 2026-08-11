@@ -822,6 +822,34 @@ async function stepInterpret(deps, snapshot) {
     if (itemId) await shopLines.linkListItem(deps, shop.id, stored[i].line_no, itemId);
   }
 
+  // ── PROVENANCE FOR A PHOTO INTERPRETATION (WP-B15-22, GATE ZERO) ─────────
+  // shopState.js's buildShopCreate could already SET these three columns, but
+  // only at shop creation - stepInterpret runs long after a shop exists, and
+  // had no writer for them at all, so every photo shop's transcript columns
+  // stayed empty (Deliverables/2026-08-11-GATE-ZERO-source-truth-established.md
+  // §1). Photo shops only: a typed list was never read by a vision model, so
+  // "which model read this" and "how confident was the read" have no meaning
+  // for it. METADATA ONLY - provenance and a confidence SUMMARY, never the
+  // raw reading, the prompt or the photograph; store.recordGroundingEvidence's
+  // deliberate privacy sanitisation is untouched by this.
+  //
+  // transcript_confidence is the MINIMUM across every line, not the average -
+  // a single badly-read line is exactly what caused SHOP-2026-08-10-M64, and
+  // a mean would dilute it into invisibility. A line with no vision signal at
+  // all cannot occur here (this whole block is photo-only); a gated line's
+  // own low confidence is exactly what should pull this summary down.
+  let transcriptFields = {};
+  if (shop.source_kind === 'photo') {
+    const confidences = resolved
+      .map((l) => (Number.isFinite(Number(l.match_confidence)) ? Number(l.match_confidence) : 0));
+    const transcriptConfidence = confidences.length ? Math.min(...confidences) : null;
+    transcriptFields = {
+      transcriptProvider: 'fusion-gateway',
+      transcriptModel: await deps.visionModel(),
+      transcriptConfidence,
+    };
+  }
+
   // The list_id rides the transition, in one transaction with its audit event.
   await store.advanceWithList(deps, {
     shopId: shop.id,
@@ -829,6 +857,7 @@ async function stepInterpret(deps, snapshot) {
     toStatus: 'PROCESSING',
     listId: written.listId,
     description: `interpreted ${intents.length} line(s) against a catalogue of ${catalogue.candidates.length} known products`,
+    ...transcriptFields,
   });
 
   return {

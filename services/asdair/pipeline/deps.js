@@ -191,6 +191,20 @@ async function realLoadCatalogue(householdId) {
 }
 
 /**
+ * The vision model id ACTUALLY resolved for a grounded photo interpretation -
+ * read at call time, exactly as `answerModel()` (services/obsidiwikai/src/
+ * core/models.mjs) already does for the answer role, and for the same
+ * reason: a durable provenance row must say what actually answered, not a
+ * literal frozen at some earlier point that env resolution could since have
+ * moved past. Never hardcoded (WP-B15-22 Gate Zero - Warwick: do not write
+ * "gpt-5-mini" here, resolve it the same way the codebase already does).
+ */
+async function realVisionModel() {
+  const { ROLE_ALIAS } = await import('../../obsidiwikai/src/core/models.mjs');
+  return ROLE_ALIAS.vision;
+}
+
+/**
  * ONE grounded vision request. Not a daemon, not a conversation, not an agent.
  *
  * The prompt is built from the catalogue by groundedPrompt.js and asks the model
@@ -759,6 +773,7 @@ export function createDeps(overrides = {}) {
     loadCatalogue: realLoadCatalogue,
     buildGroundedPrompt,
     interpretPhoto: realInterpretPhoto,
+    visionModel: realVisionModel,
     resolveAll,
 
     // list -> intents -> real rows
