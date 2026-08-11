@@ -1606,8 +1606,12 @@ its evidence so it can be re-established or falsified in minutes.**
 > that caused a runaway self-notification loop (`idle-ding-check.mjs`) is disabled in
 > `.claude/settings.json`, committed at `674c8a7` — takes effect next session, not this one.
 >
-> **Closing head `227a5a1`**, pushed to `origin/build-015/durable/2026-08-11-rotation`.
+> **Closing head `55f5652`**, pushed to `origin/build-015/durable/2026-08-11-rotation`.
 > **`origin/main` still deliberately not updated** — Warwick's `merge-decision`, unchanged.
+> **Session report**: `Deliverables/2026-08-11-session-report-gate-zero-live-acceptance.md` (Pax,
+> per `/rotate`), Supabase-populated and CAPAE-synced. Notable finding: the notification Stop hook
+> (now disabled) is a genuinely new CAPAE causal class — a mechanical reminder with no way to tell
+> "forgot to ding" from "was told not to" — reported unforced under `findings_without_family`.
 
 ---
 
