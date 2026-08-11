@@ -1573,56 +1573,56 @@ its evidence so it can be re-established or falsified in minutes.**
 
 ---
 
-### 🟡 RE-CUT 2026-08-11 (late session) — LIST RECONCILIATION IS RESOLVED. THE FRONTIER IS NOW: OPEN PRODUCT DECISIONS, THEN A VISION/COCKPIT DESIGN DECISION. NOT YET A BROWSER BUILD.
+### 🟢 RE-CUT 2026-08-11 (later still) — NO SHOP IS PENDING. THE FRONTIER IS DESIGN/RESEARCH WORK ONLY, NOT A BROWSER BUILD OF ANY KIND.
 
-> **The STOP block immediately below this one (~20:40, "THE FRONTIER IS LIST RECONCILIATION") is
-> HISTORY as a direction — its underlying facts stand, its "what to do next" no longer does.**
+> **⛔ Corrects the block immediately below this one (also 2026-08-11, "late session"), which was
+> WRONG about what tonight's photograph was.** Per the amendment discipline this map itself states —
+> "Supersede the body, or do not append the amendment" — this is a correction of that block's body,
+> not an addition beside it. **What follows is Larry's record of Warwick's correction; only the
+> quoted fragments below are his words.**
 >
-> **What actually happened, this same session, later:** Warwick sent a fresh photograph of the
-> identical shopping list. A direct catalogue-grounded re-read (rotate → zoom-crop every disputed
-> line → re-read → cross-check against the independently human-verified 41-product trolley in
-> `2026-08-11-trolley-reconciliation-41-lines.md`) produced **38 of 39 lines matching the verified
-> trolley exactly on product and quantity.** The one non-match (Bloo) is not a misread — the trolley
-> doc itself records Bloo as a one-week stock-driven skip, not a standing exclusion.
+> **The error:** the block below treated tonight's fresh photograph as a pending shop blocked on four
+> product decisions, and stated `Build ASDA basket` was "not authorised... yet." **Warwick corrected
+> this directly:** *"there is no this week's shop. it had to [be] driven manually by you last night
+> but it's done now. The list was a test to test your OCR versus terra."* Last night's 41-product
+> shop (`2026-08-11-trolley-reconciliation-41-lines.md`) was manually completed and is closed.
+> Tonight's re-send of the identical photograph was a **deliberate, controlled accuracy test** — the
+> 38/39 cross-check against that already-completed trolley was the test's scoring mechanism, not
+> input to a new shop. **There was never a browser-build question to authorise or withhold tonight.**
 >
-> **The 39-vs-41 gap is fully explained, not merely counted:** 39 photo lines − 1 (Bloo, explained
-> stock skip) + 3 (Batchelors Mac 'n' Cheese, Vanish Pre-Treat Gel, Ariel 4in1 Pods — all confirmed,
-> from the trolley doc's own build notes, as Regulars-review additions never written on this
-> photograph) = 41. **List reconciliation, as a blocking question, is CLOSED.** Full detail:
-> this session's transcript and `2026-08-11-list-reconciliation-blocks-browser-build.md` (retained,
-> now historical evidence rather than an open blocker).
+> **What still stands, unchanged by this correction:**
+> - List reconciliation as a method is proven (38/39 exact match) — the finding about *why* my read
+>   beat Terra's stands, and feeds directly into the vision-pipeline design below.
+> - The four discrepancy items (Richmond pack size, Arla milk size/brand, Birds Eye vs ASDA quarter
+>   pounders, Bloo restock) are **residual open questions about product identity, not live blockers.**
+>   They matter to a FUTURE real shop, whenever one exists; nothing is waiting on them right now.
+> - The vision-pipeline + Cockpit design (`2026-08-11-cockpit-and-vision-pipeline-design.md`) —
+>   DESIGNED, CAPTURED, refined through two review rounds, **still NOT build-authorised, still NOT
+>   started.**
+> - The Luna/Sol gateway-model research task — **still BLOCKED**, not dispatched: it needs AsdAIr's
+>   own gateway credentials, which requires a `private_surface` under GL-012 that hasn't been scoped
+>   yet (AsdAIr's actual runtime path, `C:/.fusion247/asdair/**`, doesn't cleanly fit GL-012's stated
+>   `C:/.fusion247/private/<project>/**` shape — a real open question, not a formality).
 >
-> **What is now open, and IS the frontier, in order:**
+> **New, from this same exchange: status of "Pax's report on improving the pipeline and OCR" was
+> asked for and could NOT be established.** Larry searched committed Deliverables (keyword and
+> author grep), full git history across every local branch, and the live task list — **no such
+> commission, in progress or complete, exists anywhere in this repository.** This is recorded as a
+> genuine unknown, not assumed either way — if Warwick commissioned this in a different session or
+> is thinking of a different assistant, that needs his confirmation before anyone treats it as
+> existing or missing.
 >
-> 1. **Four product decisions, still Warwick's to make** (unchanged from the block below — re-stated
->    here so they are not lost under the newer heading): Richmond sausage pack size (6-pack vs the
->    usual 12-pack), Arla milk size/brand (literal 4pt vs the usual Cravendale 2L), Birds Eye vs ASDA
->    quarter pounders (literal brand vs last week's substitution), Bloo toilet rim (fresh stock check
->    needed, not an automatic skip).
-> 2. **A vision-pipeline and Cockpit redesign has been DESIGNED and CAPTURED, but NOT build-authorised
->    and NOT started.** Full spec: `Deliverables/2026-08-11-cockpit-and-vision-pipeline-design.md`.
->    Summary: deterministic image pre-processing (rotate/crop/strip) + one household-aware vision call
->    + deterministic sanity checks + one batched follow-up call only if needed, keeping photo-read and
->    Regulars-enrichment as separate durable stages; Cockpit becomes the control surface (single
->    source of truth for status, a question board replacing scattered Telegram cards, exception-first
->    list view, two distinct basket views, Telegram demoted to three notification shapes only).
-> 3. **A research task is authorised (Warwick, this session: "yes research") but NOT YET DISPATCHED
->    at the time this block was written:** live-probe the fusion gateway's actual model registry for
->    "Luna" and "Sol" (Warwick: these are real models, part of a family with the already-used
->    "Terra"). The last confirmed probe (`D-2026-08-03-05`, over a week old) found neither registered.
->    Must run with AsdAIr's own gateway credentials, not Larry's (Larry's shell has no
->    `FUSION_GATEWAY_URL` — by design). Test protocol, not a blind swap: apply the improved pipeline
->    to the ONE photograph this build already knows the correct answer for; only escalate model choice
->    if Terra-with-better-input still misses. Full detail in the design doc above.
-> 4. **`Build ASDA basket` is still not authorised** — the four product decisions in (1) must be
->    settled first, same prohibition as the block below, for the same reason (a plausible, well-formed
->    wrong trolley is not a solved problem).
+> **THE ACTUAL FRONTIER, in order:** (1) resolve what "Pax's OCR/pipeline report" refers to — a real
+> prior commission this repo doesn't show, or something to commission fresh; (2) get Warwick's
+> decision on whether to proceed with the vision-pipeline + Cockpit design as a scoped Work Order to
+> Keel; (3) settle the GL-012 private-surface question for AsdAIr's runtime so the Luna/Sol probe can
+> run. **No shop, no basket, no browser action is pending or blocked by anything.**
 >
-> **Closing head at time of writing: `c268198`.**
+> **Closing head at time of writing: `51906ab`.**
 
 ---
 
-### ⛔ SUPERSEDED 2026-08-11 ~20:40 (earlier this session) — list reconciliation was the frontier; now resolved, see the block above. Retained for its full discrepancy detail.
+### ⛔ SUPERSEDED 2026-08-11 ~20:40 (earlier this session) — list reconciliation was the frontier; now resolved, see the block above. **Also wrongly assumed a shop was pending — see the correction two blocks above; there was none.** Retained for its full discrepancy detail.
 
 > **Everything in the block below this one (Gate Zero CLOSED / Gate 1 / Gate 2 PASS) is CORRECT and
 > STANDS — it is not superseded, only insufficient.** Reaching those gates and reaching
