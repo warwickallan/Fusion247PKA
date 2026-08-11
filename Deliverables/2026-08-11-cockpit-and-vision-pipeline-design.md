@@ -25,9 +25,22 @@ for it to be considered, improved, and captured here — not built yet.
 **Warwick's explicit framing, verbatim intent:** cost-conscious, not opposed to "more machinery and a
 better pipeline" if justified; not ready to retire Telegram; wants the Cockpit meaningfully better.
 
+**⭐ PRIORITY, STATED EXPLICITLY SO IT CANNOT DRIFT: Part 1 (vision pipeline) is the critical-path
+dependency. Part 2 (Cockpit) is parallel, secondary work — an exception-resolution surface, never a
+substitute for fixing source truth.** Warwick's correction, this session, verbatim intent: *"if [the
+Wayfinder frontier] has become primarily 'Cockpit redesign', [Larry] has lost the plot slightly.
+Vision/source truth remains the first dependency. Everything in the Cockpit is just a nicer way of
+displaying rubbish if that bit isn't fixed."* The scope is deliberately narrow — give Terra better
+visual evidence without turning a weekly ASDA shop into a multi-model OCR factory — not a research
+programme.
+
+**The success criterion, stated once, plainly, and not to be restated more loosely later:**
+> On a normal list, one household-aware vision call produces trustworthy source truth. A difficult
+> list costs at most one additional batched reread.
+
 ---
 
-## Part 1 — Vision pipeline improvement
+## Part 1 — Vision pipeline improvement — THE CRITICAL-PATH DEPENDENCY
 
 ### The problem, stated precisely
 
@@ -71,13 +84,29 @@ Telegram image → deterministic image prep (free, local, no API call)
    plan with nothing tying it back to what was actually said). "No line without visible evidence" is a
    prompt request; a `source_region` that must resolve against a real, application-owned region list
    is what lets the next stage enforce that in code.
-3. **Deterministic sanity checks, no LLM.** Implausible quantities (16 sausage packs), duplicates,
-   lines with no catalogue match, lines with no evidence locator, model-invented lines. This is not
+3. **Deterministic sanity checks, no LLM.** Implausible quantities (16 sausage packs), lines with no
+   catalogue match, lines with no evidence locator, model-invented lines, **and — per Pax's
+   independent review, a named gap the design previously left unspecified — an explicit dedup/merge
+   rule for the same physical line appearing in more than one overlapping strip.** Overlap between
+   strips is deliberate (it's what lets a line near a seam get read at all) and reliably produces
+   duplicate reads at the boundary; this must be resolved by region-adjacency or by requiring the
+   model to name the single strip its best evidence came from even when a line appears in two, not
+   left to a generic "duplicates" check that can't distinguish a strip-seam echo from a genuinely
+   repeated household item (e.g. two real, separate milk lines at different quantities). This is not
    new — `2026-08-11-list-reconciliation-blocks-browser-build.md` already concluded "a plausibility
    check would have caught this" about the Richmond ×16 misread. This closes that finding.
 4. **One batched follow-up call, only if checks find genuine uncertainty** — every flagged crop in a
    single request, not one call per line. A clean list costs one vision call; a hard one costs two.
-   Never more without a fresh decision.
+   Never more without a fresh decision. **The trigger is deliberately NOT model-reported confidence
+   alone.** This build already has a live, on-record failure of trusting self-reported confidence in
+   isolation — the Gate Zero defect was exactly the model's own per-line confidence being solicited
+   and then silently discarded, and separately, a "confidently wrong" read is precisely what
+   production experienced tonight (Terra's single-pass run was not flagged as uncertain by itself; the
+   errors were only visible against independently-verified ground truth). **A re-read triggers on
+   EITHER low model confidence OR a deterministic reconciliation anomaly from step 3 (implausible
+   quantity, unresolved cross-strip duplicate, no catalogue match, no evidence locator)** — the
+   deterministic checks are a real, independent trigger, not a formality sitting after a confidence
+   gate that already did the real work.
 5. **Durable photo-truth persisted before enrichment.** Every line answerable: "why is this in the
    shop?" — photo, Regulars, standing rule, or Warwick's explicit decision this week. Never
    "somewhere in the pipeline."
@@ -117,15 +146,34 @@ accommodates some other way, or does AsdAIr's runtime genuinely sit outside GL-0
 need reconciling — a question for Larry and Warwick, not something a subagent should infer its way
 past.**
 
+**Amendment 3 — Pax's independent research (`2026-08-11-pax-vision-pipeline-and-luna-sol-terra-research.md`)
+partially pre-answers this, from public sources, without touching the live gateway:** Luna, Terra and
+Sol are confirmed-real, GA-since-9-July-2026 GPT-5.6 tiers (Sol=flagship, Terra=balanced,
+Luna=cost-efficient) — Warwick's recollection was correct, and this specific question is now CLOSED,
+not to be re-litigated. **What is NOT answered by that research, and still requires the live probe
+below:** whether THIS gateway's model_list currently exposes `sol`/`luna` aliases at all — a local
+config fact, not a public one. **Also from Pax, independently: public OCR/text-extraction benchmarks
+show only a small, non-monotonic gain from Terra to Sol** (roughly 88.8%→90.7% mean similarity,
+79.4%→82.5% text extraction — smaller than this build's actual 9-error/9-miss problem, and in one
+metric Sol didn't clearly beat the PRIOR generation). This is independent evidence, not just Warwick's
+instinct, that fixing input quality is more likely to be the real fix than a model swap — reinforcing,
+not just repeating, item 5 below.
+
 **Research task, to run with AsdAIr's own gateway credentials once the surface question above is
 settled:**
 1. Fresh `GET {gateway}/v1/models` (or gateway-appropriate equivalent) — does Luna or Sol exist on
-   the registered roster now?
-2. If yes: what are their stated capabilities/cost relative to Terra?
+   *this* registered roster now? (Their existence as models is no longer in question — see Amendment 3.)
+2. If yes: confirm current cost/capability against Pax's public-source findings above rather than
+   re-researching from scratch — a fresh pricing check is still worthwhile, since GPT-5.6 pricing has
+   already moved once (a cut noted in Pax's research) in the month since release.
 3. **Test protocol, not a swap:** apply the improved single-call pipeline (rotation + strips +
    context, still on Terra) to the one photograph this build already knows the correct answer for.
    If Terra-with-better-input matches the verified trolley, the model was never the problem —
-   stop there, no model change needed.
+   stop there, no model change needed. **Per Pax's recommendation, add one explicit A/B line item
+   here: also test the flagged/uncertain strips as separate individual follow-up calls rather than
+   only the single bundled page+strips call, and compare accuracy on the same known-answer photo** —
+   published evidence is genuinely mixed on whether bundling or individual-crop calls read better,
+   and this build already has the cheapest possible way to settle it empirically rather than guess.
 4. Only if Terra-with-better-input still materially misses, run the same prepared input through Sol
    (or the next capable option) and compare.
 5. **Do not build a Terra-then-Sol cascade** unless Terra's improved-input success rate is high
