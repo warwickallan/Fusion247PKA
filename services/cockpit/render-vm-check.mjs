@@ -304,7 +304,21 @@ const PACKET_BAD_SORT = {
 
 const ASDAIR_PLAN = [
     ['OVERVIEW (live shop)', 'overview', { asdairWs: WS, asdairWsErr: null }],
-    ['DETAILS (live shop)', 'details', { asdairWs: WS, asdairWsErr: null }],
+    // The two questions checks below are the regression this scenario exists to catch: the fixture
+    // used to carry field names (question_display, answered_display...) that DO NOT EXIST on the
+    // real assembleWorkspace.js payload, so a real drift in the template's field names would have
+    // rendered "unknown" everywhere and passed silently — the harness could not see it because the
+    // fixture was already wrong in the same way. It is now keyed field-for-field to the real payload.
+    ['DETAILS (live shop)', 'details', { asdairWs: WS, asdairWsErr: null }, {}, [
+      ['still-open question renders its real text, not a raw id',
+        (p) => hasText(p, 'Is "placeholder juice" the Placeholder Orange Juice 1L you usually get?')],
+      ['a RESOLVED question shows Warwick\'s own answer verbatim',
+        (p) => hasText(p, 'You said: “Placeholder Sausages 400g”')],
+      ['a RESOLVED question with a decision shows the plain-language resolution',
+        (p) => hasText(p, 'Resolved to Placeholder Sausages 400g.')],
+      ['the resolved count is shown next to the section, not just the open one',
+        (p) => hasText(p, 'Resolved') && hasText(p, '1')],
+    ]],
     ['DETAILS (shop present, every section empty)', 'details', { asdairWs: BARE_WS, asdairWsErr: null }],
     ['DETAILS (service down)', 'details', { asdairWs: null, asdairWsErr: 'service down' }],
     ['RULES (live rulebook)', 'rules', { asdairRules: RULES, asdairRulesErr: null }],

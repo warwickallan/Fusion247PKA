@@ -61,6 +61,20 @@ const PLAN_BUCKETS = Object.freeze({
   excluded_this_week: 'excluded'
 });
 
+// asdair.shop_decision.decision_kind (migration 017) -> a plain-English
+// sentence fragment. Never the raw enum on a primary reading path - see
+// resolutionSentence() below, where these are assembled into a full sentence
+// alongside the decided product/quantity/name looked up from OUR OWN
+// catalogue, never from model prose.
+const DECISION_KIND_LABELS = Object.freeze({
+  existing_regular: 'matched to a product already in the catalogue',
+  quantity_change: 'the quantity was changed',
+  variant_choice: 'a variant was chosen',
+  new_item: 'added as a new item',
+  skip_this_week: 'skipped this week',
+  clarification_required: 'needs a follow-up question'
+});
+
 const OUTCOME_LABELS = Object.freeze({
   as_planned: 'as planned',
   added_after_planning: 'added after planning',
@@ -306,17 +320,78 @@ function buildPlan(input, cat) {
 }
 
 // ---------------------------------------------------------------------
-// OPEN QUESTIONS - candidates, plus the three replies the control surface
-// allows: choose a candidate, type a correction, "Search ASDA", "Skip this
-// week". All four go through answerQuestion.
+// QUESTIONS - what AsdAIr is still waiting on, and what has already been
+// settled. OPEN questions carry candidates plus the three replies the
+// control surface allows: choose a candidate, type a correction, "Search
+// ASDA", "Skip this week" - all four go through answerQuestion. RESOLVED
+// questions (answered or skipped) carry Warwick's own words verbatim
+// (answer_text - never edited, never summarised away) plus, when a durable
+// asdair.shop_decision row exists for that question (migration 017), a
+// plain-language sentence for what it was interpreted to mean. A MISSING
+// decision row is never treated as "nothing happened" - it means "decided
+// before this table existed" or "not yet decided", so the fallback is the
+// raw answer, not silence.
 // ---------------------------------------------------------------------
+function decisionSummary(d, cat) {
+  if (!d) return null;
+  const regular = cat.get(d.decided_regular_id);
+  return {
+    kind: d.decision_kind || null,
+    kind_display: DECISION_KIND_LABELS[d.decision_kind] || P.text(d.decision_kind),
+    decided_product_name_display: P.text(regular ? regular.name : null),
+    decided_quantity_display: P.count(d.decided_quantity),
+    decided_item_name_display: P.text(d.decided_item_name),
+    clarification_reason_display: P.text(d.clarification_reason),
+    forward_intent_display: P.text(d.forward_intent),
+    interpreted_by_display: P.text(d.interpreted_by),
+    interpreted_at_display: P.when(d.interpreted_at)
+  };
+}
+
+// ONE sentence, in Warwick's language, for what a settled question now means.
+// Never invents a fact the decision row does not carry - an unrecognised or
+// absent decision_kind falls through to null, and the caller shows the raw
+// answer_text on its own rather than a guessed sentence.
+function resolutionSentence(status, decision) {
+  if (!decision) return status === 'skipped' ? 'Skipped — not bought this week.' : null;
+  switch (decision.kind) {
+    case 'existing_regular':
+    case 'variant_choice':
+      return decision.decided_product_name_display !== P.UNKNOWN
+        ? 'Resolved to ' + decision.decided_product_name_display + '.'
+        : 'Resolved to a product already in the catalogue.';
+    case 'quantity_change':
+      return 'Quantity set to ' + decision.decided_quantity_display
+        + (decision.decided_product_name_display !== P.UNKNOWN ? ' for ' + decision.decided_product_name_display : '') + '.';
+    case 'new_item':
+      return 'Added as a new item: ' + decision.decided_item_name_display + '.';
+    case 'skip_this_week':
+      return 'Skipped — not bought this week.';
+    case 'clarification_required':
+      return 'Needs a follow-up: ' + decision.clarification_reason_display + '.';
+    default:
+      return null;
+  }
+}
+
 function buildQuestions(input, cat) {
-  const open = arr(input.questions).filter(function (q) {
+  const all = arr(input.questions);
+  const open = all.filter(function (q) {
     return q.status === undefined || q.status === 'open';
+  });
+  const resolved = all.filter(function (q) {
+    return q.status === 'answered' || q.status === 'skipped';
+  });
+
+  const decisionsByQuestion = new Map();
+  arr(input.decisions).forEach(function (d) {
+    const k = idKey(d.question_id);
+    if (k !== null && !decisionsByQuestion.has(k)) decisionsByQuestion.set(k, d);
   });
 
   return {
     open_count_display: P.count(open.length),
+    resolved_count_display: P.count(resolved.length),
     items: open.map(function (q) {
       return {
         id: q.id === undefined ? null : q.id,
@@ -340,6 +415,30 @@ function buildQuestions(input, cat) {
           { key: 'search', label: 'Search ASDA', command: 'answerQuestion' },
           { key: 'skip', label: 'Skip this week', command: 'answerQuestion' }
         ]
+      };
+    }),
+    // RESOLVED — what Warwick has already settled. Newest first, so the most
+    // recently answered question is the one nearest the top when he reopens
+    // the app after answering in Telegram.
+    resolved: resolved.slice().reverse().map(function (q) {
+      const decision = decisionSummary(decisionsByQuestion.get(idKey(q.id)), cat);
+      return {
+        id: q.id === undefined ? null : q.id,
+        question_key: q.question_key,
+        question_text_display: P.text(q.question_text),
+        list_item_id: q.list_item_id === undefined ? null : q.list_item_id,
+        status: q.status,
+        status_display: q.status === 'skipped' ? 'skipped' : 'answered',
+        // Warwick's own words, verbatim - never edited, never replaced by the
+        // interpreted resolution below.
+        answer_text_display: P.text(q.answer_text),
+        answer_source_display: P.text(q.answer_source),
+        answered_at_display: P.when(q.answered_at),
+        // The plain-language "what this meant" line. null when no durable
+        // decision is on record — the UI shows the raw answer on its own
+        // rather than a sentence this module has no grounds for.
+        resolution_display: resolutionSentence(q.status, decision),
+        decision: decision
       };
     })
   };
@@ -656,12 +755,15 @@ module.exports = {
   INTERPRETATION_LABELS: INTERPRETATION_LABELS,
   PLAN_BUCKETS: PLAN_BUCKETS,
   OUTCOME_LABELS: OUTCOME_LABELS,
+  DECISION_KIND_LABELS: DECISION_KIND_LABELS,
   _internal: {
     indexCatalogue: indexCatalogue,
     buildLine: buildLine,
     buildInterpretation: buildInterpretation,
     buildPlan: buildPlan,
     buildQuestions: buildQuestions,
+    decisionSummary: decisionSummary,
+    resolutionSentence: resolutionSentence,
     buildBrowser: buildBrowser,
     buildOrder: buildOrder,
     buildHistory: buildHistory

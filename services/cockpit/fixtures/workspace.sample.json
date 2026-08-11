@@ -132,8 +132,26 @@
   },
   "questions": {
     "open_count_display": "1",
+    "resolved_count_display": "1",
     "items": [
-      { "id_display": "1", "line_no_display": "3", "question_display": "Is \"placeholder juice\" the Placeholder Orange Juice 1L you usually get?", "asked_at_display": "1 Jan 2026, 09:40", "answered_display": "no", "answer_display": "unknown", "status_display": "open" }
+      { "id": 1, "question_key": "q_placeholder_1", "question_text_display": "Is \"placeholder juice\" the Placeholder Orange Juice 1L you usually get?", "list_item_id": 103,
+        "candidates": [ { "index": 0, "regular_id_display": "12", "label_display": "Placeholder Orange Juice 1L", "from_catalogue": true } ],
+        "allowed_replies": [
+          { "key": "choose", "label": "Choose this one", "command": "answerQuestion" },
+          { "key": "typed", "label": "Type a correction", "command": "answerQuestion" },
+          { "key": "search", "label": "Search ASDA", "command": "answerQuestion" },
+          { "key": "skip", "label": "Skip this week", "command": "answerQuestion" }
+        ] }
+    ],
+    "resolved": [
+      { "id": 2, "question_key": "q_placeholder_2", "question_text_display": "Which product is \"placeholder sausages\"?", "list_item_id": 104,
+        "status": "answered", "status_display": "answered",
+        "answer_text_display": "Placeholder Sausages 400g", "answer_source_display": "typed", "answered_at_display": "1 Jan 2026, 09:41",
+        "resolution_display": "Resolved to Placeholder Sausages 400g.",
+        "decision": { "kind": "existing_regular", "kind_display": "matched to a product already in the catalogue",
+          "decided_product_name_display": "Placeholder Sausages 400g", "decided_quantity_display": "unknown",
+          "decided_item_name_display": "unknown", "clarification_reason_display": "unknown",
+          "forward_intent_display": "unknown", "interpreted_by_display": "terra", "interpreted_at_display": "1 Jan 2026, 09:41" } }
     ]
   },
   "browser": {

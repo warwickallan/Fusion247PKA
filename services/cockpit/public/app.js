@@ -148,6 +148,20 @@ createApp({
       // One small CAPAE read at start, so Home can answer "what needs my attention?" without
       // Warwick having to go and ask System first. Reuses capRequested, so System never re-reads.
       ensureCapaeSignal();
+      // OPTIONAL deep link: ?app=<key>&view=<key>, e.g. from a Telegram card (the checklistPath
+      // precedent in runPipeline.js hands Warwick a cockpit URL already — this lets that URL land
+      // straight on an app's own view instead of Home). Silently ignored when absent or unknown;
+      // never throws, never blocks the normal Home load above.
+      try {
+        const qp = new URLSearchParams(window.location.search);
+        const wantApp = qp.get('app');
+        if (wantApp && APPS.some((a) => a.key === wantApp)) {
+          go('apps');
+          openApp(wantApp);
+          const wantView = qp.get('view');
+          if (wantView) nextTick(() => goView(wantView));
+        }
+      } catch (ignore) { /* deep link is a courtesy, never a requirement */ }
     });
 
     const attn = computed(() => state.value.attention || []);
@@ -362,15 +376,23 @@ createApp({
       return list.filter((s) => String(s.id) !== String(curId));
     });
     // "What's waiting on you" is derived ONLY from fields the API actually reports (failure,
-    // is_terminal, needs_review_display, stage) — never a guessed sentence for a stage we don't have
-    // grounds for. Anything not covered here falls back to the raw stage_label_display, which the
-    // Overview always shows anyway, per the brief: unsure → show the raw label, don't invent English.
-    function asdairWaitingOn(shop) {
+    // is_terminal, needs_review_display, stage, and — where NEEDS_DECISION — the real open-question
+    // count) — never a guessed sentence for a stage we don't have grounds for. Anything not covered
+    // here falls back to the raw stage_label_display, which the Overview always shows anyway, per the
+    // brief: unsure → show the raw label, don't invent English. `openCount` is the API's own
+    // questions.open_count_display, passed in rather than re-derived — a string, or "unknown".
+    function asdairWaitingOn(shop, openCount) {
       if (!shop) return '';
       if (shop.failure) return 'Something went wrong — check Telegram.' + (typeof shop.failure === 'string' ? ' ' + shop.failure : '');
       if (shop.is_terminal) return `This shop has reached its end (${shop.stage_label_display}) — nothing needed from you.`;
       if (shop.stage === 'RECEIVED' && shop.needs_review_display === 'yes') return 'Waiting for you to tell AsdAIr to build this shop — reply in Telegram.';
-      if (shop.stage === 'NEEDS_DECISION') return 'Waiting for you — there’s a decision to make in Telegram.';
+      if (shop.stage === 'NEEDS_DECISION') {
+        const n = Number(openCount);
+        if (Number.isFinite(n) && n > 0) {
+          return `Waiting on ${n} ${n === 1 ? 'answer' : 'answers'} in Telegram before this shop can go ahead.`;
+        }
+        return 'Waiting for you — there’s a decision to make in Telegram.';
+      }
       if (shop.needs_review_display === 'yes') return 'Waiting on you — check Telegram for what AsdAIr needs.';
       return 'AsdAIr is working on it — nothing needed from you right now.';
     }
@@ -1397,15 +1419,15 @@ createApp({
                   <div class="as-body"><b>{{ asdairShop.stage_label_display }}</b><span> — {{ asdairShop.shop_ref_display }}</span></div>
                   <button class="act" :disabled="asdairWsLoading" @click="loadAsdairWorkspace()">{{ asdairWsLoading ? '…' : 'Refresh' }}</button>
                 </div>
-                <p class="app-blurb">{{ asdairWaitingOn(asdairShop) }}</p>
+                <p class="app-blurb">{{ asdairWaitingOn(asdairShop, asdairWs.questions && asdairWs.questions.open_count_display) }}</p>
 
                 <div class="grp">
                   <h2>This shop</h2>
                   <div class="item grey">
                     <div class="i-main"><div class="i-eyebrow">Lines</div><div class="i-title">{{ asdairShop.lines_summary.resolved_display }} resolved of {{ asdairShop.lines_summary.total_display }} · {{ asdairShop.lines_summary.open_display }} open</div></div>
                   </div>
-                  <div class="item grey">
-                    <div class="i-main"><div class="i-eyebrow">Questions</div><div class="i-title">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || 'unknown' }} open</div></div>
+                  <div class="item" :class="(asdairWs.questions && Number(asdairWs.questions.open_count_display) > 0) ? 'amber' : 'grey'">
+                    <div class="i-main"><div class="i-eyebrow">Questions</div><div class="i-title">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || 'unknown' }} still waiting on you<span v-if="asdairWs.questions && asdairWs.questions.resolved_count_display !== '0'"> · {{ asdairWs.questions.resolved_count_display }} resolved</span></div></div>
                   </div>
                   <div class="item grey">
                     <div class="i-main"><div class="i-eyebrow">Previous order</div>
@@ -1602,13 +1624,16 @@ createApp({
                 </div>
 
                 <!-- Questions read the API's real field names (question_text_display / candidates),
-                     not a guessed q.text that was always undefined and fell through to a JSON blob. -->
+                     not a guessed q.text that was always undefined and fell through to a JSON blob.
+                     STILL WAITING and RESOLVED are two lists, not one flat table, because "what's
+                     outstanding" and "what's already settled" are different questions Warwick asks
+                     when he opens this page. -->
                 <div class="grp">
-                  <h2>Open questions<span class="g-count">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || '0' }}</span></h2>
-                  <p class="empty" v-if="!asdairWs.questions || !asdairWs.questions.items || !asdairWs.questions.items.length">No open questions — AsdAIr is not waiting on an answer.</p>
+                  <h2>Still waiting on you<span class="g-count">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || '0' }}</span></h2>
+                  <p class="empty" v-if="!asdairWs.questions || !asdairWs.questions.items || !asdairWs.questions.items.length">Nothing open — AsdAIr is not waiting on an answer.</p>
                   <div v-else v-for="(q,i) in asdairWs.questions.items" :key="i" class="item as-stack amber">
                     <div class="i-main">
-                      <div class="i-eyebrow decision">{{ q.question_key || 'question' }}<span v-if="q.list_item_id"> · line item {{ q.list_item_id }}</span></div>
+                      <div class="i-eyebrow decision">Needs your answer<span v-if="q.list_item_id"> · line item {{ q.list_item_id }}</span></div>
                       <div class="as-raw">{{ q.question_text_display }}</div>
                       <div v-if="q.candidates && q.candidates.length">
                         <div class="as-sub">Candidates offered:</div>
@@ -1617,6 +1642,20 @@ createApp({
                         </div>
                       </div>
                       <div class="as-note">Answer it in Telegram — the cockpit shows this question, it does not answer it.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- RESOLVED — Warwick's own words, verbatim, plus (where a durable decision exists)
+                     the plain-language translation of what it meant. Newest first. -->
+                <div class="grp" v-if="asdairWs.questions && asdairWs.questions.resolved && asdairWs.questions.resolved.length">
+                  <h2>Resolved<span class="g-count">{{ asdairWs.questions.resolved_count_display }}</span></h2>
+                  <div v-for="(q,i) in asdairWs.questions.resolved" :key="'r'+i" class="item as-stack" :class="q.status==='skipped' ? 'grey' : 'green'">
+                    <div class="i-main">
+                      <div class="i-eyebrow">{{ q.status_display === 'skipped' ? 'Skipped' : 'Answered' }}<span v-if="asdairKnown(q.answered_at_display)"> · {{ q.answered_at_display }}</span><span v-if="q.list_item_id"> · line item {{ q.list_item_id }}</span></div>
+                      <div class="as-raw">{{ q.question_text_display }}</div>
+                      <div class="as-sub" v-if="asdairKnown(q.answer_text_display)">You said: “{{ q.answer_text_display }}”</div>
+                      <div class="as-sub strong" v-if="q.resolution_display">→ {{ q.resolution_display }}</div>
                     </div>
                   </div>
                 </div>
