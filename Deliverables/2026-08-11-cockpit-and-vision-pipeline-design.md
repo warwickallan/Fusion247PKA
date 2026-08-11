@@ -57,14 +57,20 @@ Telegram image → deterministic image prep (free, local, no API call)
 ```
 
 1. **Deterministic image prep** — correct orientation, deskew, trim borders, keep the full-resolution
-   original, generate a few overlapping horizontal strips for a long/dense handwritten page. No model
-   call, no added cost.
-2. **One multimodal call**, page + strips together, with the household's Regulars/Favourites/aliases
-   context already proven to matter (removing it makes results worse — established this build).
-   Per-line output required: literal text seen, quantity, best product match if any, confidence,
-   **and — amendment 1 — an evidence locator** (which strip/region the line came from). "No line
-   without visible evidence" is a prompt request; the locator is what lets the next stage actually
-   check that, in code, rather than trust the model said so.
+   original, generate a few overlapping horizontal strips for a long/dense handwritten page,
+   **numbered** (region 1, 2, 3…). No model call, no added cost.
+2. **One multimodal call**, page + numbered strips together, with the household's
+   Regulars/Favourites/aliases context already proven to matter (removing it makes results worse —
+   established this build). Per-line output required: literal text seen, quantity, best product match
+   if any, confidence, **and — amendment 1, tightened per Warwick's review — a `source_region`
+   referencing one of the application-supplied region numbers**, not a model-asserted freeform
+   bounding box. **The application creates the regions; the model may only point at one that exists.**
+   This does not prove the model read the pixels correctly inside that region — it cannot — but it
+   closes the much worse failure class: a line materialising with no visual source at all (the exact
+   shape of the Route B / Lane A D-1 defect already on this build's record, where content reached the
+   plan with nothing tying it back to what was actually said). "No line without visible evidence" is a
+   prompt request; a `source_region` that must resolve against a real, application-owned region list
+   is what lets the next stage enforce that in code.
 3. **Deterministic sanity checks, no LLM.** Implausible quantities (16 sausage packs), duplicates,
    lines with no catalogue match, lines with no evidence locator, model-invented lines. This is not
    new — `2026-08-11-list-reconciliation-blocks-browser-build.md` already concluded "a plausibility
@@ -77,6 +83,16 @@ Telegram image → deterministic image prep (free, local, no API call)
    "somewhere in the pipeline."
 6. **Enrichment (Regulars/rules) stays a separate stage** — this is exactly the 39 + 3 − 1 = 41 split
    this session proved matters; do not re-blend it.
+
+**The four-way provenance rule, made explicit (Warwick's review, tightening the point above):**
+a line's origin is one of exactly four values, and they are never silently interchangeable:
+- **PHOTO** — MUST carry a valid `source_region` resolving against an application-supplied region.
+  A photo-origin line with no valid region is a defect, not a low-confidence result.
+- **REGULARS** — no image evidence required or expected; labelled "Added from Regulars."
+- **RULE** — no image evidence; labelled as household-rule-derived.
+- **WARWICK** — no image evidence; labelled as this week's explicit decision.
+A line asserting PHOTO provenance without a resolvable region must be rejected by the deterministic
+sanity-check stage, not passed through with a low confidence score.
 
 **Amendment 2 — model question resolved by research, not assumption.** Warwick identified that
 "Sol" (the open question in last night's blocker doc — "is Sol capable enough, and what did Warwick
@@ -133,12 +149,20 @@ notification channel only — not retired, not the application.
 - Structure: photo understood (N lines) → shop prepared (Regulars added, skips, final product/unit
   count) → **needs you** (count + one button) or **nothing waiting on you** with the next action
   (build basket) or **AsdAIr is working** (what it's doing).
-- **One rule above all: every screen derives its status from the same computed state.** Before
-  redesigning the render layer to guarantee this, verify whether tonight's observed contradiction
-  (differing resolved-counts on Overview vs Details) is the already-documented stale-process hazard
-  (`services/cockpit/README.md`: `capae.mjs`/`rotation-report.mjs` load once at startup, need a
-  restart) rather than a genuine multi-source-of-truth bug. Cheap to check, and it changes whether
-  this is a render-layer fix or a state-model rearchitecture.
+- **Cheaply rule out the stale-process hazard first** (`services/cockpit/README.md`:
+  `capae.mjs`/`rotation-report.mjs` load once at startup, need a restart) — but do not let "a restart
+  fixed the number" close the UX finding. **Precisely restated per Warwick's review:** "0 resolved of
+  41 lines" and "11 questions resolved" are not inherently contradictory — they count different
+  entities (lines vs. questions) and can coexist honestly. **The genuine contradiction** is
+  human-facing status text disagreeing with itself on the same screen — "Waiting on you — check
+  Telegram" beside "0 still waiting on you," or "waiting for browser runner" beside 41 still-open
+  lines. That's a state-model gap, not just a stale-cache symptom, and needs fixing regardless of what
+  the restart check finds.
+- **One canonical human-facing state, computed once in the pipeline and consumed by both Cockpit and
+  Telegram — never recalculated independently by each surface.** Exactly six values:
+  `Needs Warwick` / `AsdAIr working` / `Ready for Warwick` / `Browser working` / `Complete` /
+  `Failed`. Every other screen and every Telegram message renders FROM this value; nothing derives its
+  own competing read of "what's the state" from raw counts.
 - "Other shops" (cancelled/historical) moves off the front page entirely, into History.
 - Do not surface an inferred/unpriced total (e.g. "£140.97 — inferred, not an ASDA price")
   prominently on the front page — that's developer evidence, not user information. Historical spend
@@ -181,6 +205,52 @@ notification channel only — not retired, not the application.
   usually 4×2L," "Vanish — prefer Gold," "Richmond sausages — skinless 319g unless told otherwise."
   Each editable/forgettable. This is the same durable-learning intent already in BUILD-015's DEFECT
   history (D-1/D-2 in the Wayfinder's Lane A) given a face Warwick can actually read.
+
+### Cockpit is a write-capable decision surface, not a better read-only report
+
+**Explicit requirement, per Warwick's review:** the redesign is not display-only. Required actions,
+all from the Question board:
+- answer every outstanding question from one screen;
+- type a free-text answer;
+- accept a suggested match with one tap;
+- change an already-resolved answer;
+- mark an item "not this week" (a one-off skip, distinct from a standing exclusion — see Bloo,
+  already a live example of this exact distinction mattering);
+- distinguish "use this now" from "remember this going forward" wherever that isn't already obvious;
+- view the relevant photo region for any questionable line;
+- see, immediately after saving, exactly what remains unresolved;
+- build the basket only once nothing actually blocks it.
+
+**"Something looks wrong."** Any resolved line — not only flagged ones — must be tappable with a
+plain "Change" action. Exception-first stays the default view; this is the escape hatch for when
+Warwick notices something the pipeline was confident about but got wrong, without having to go
+through Telegram or Larry to fix it.
+
+**Every write goes through the existing accountable command surface — this is not optional.**
+Free-text answers route through the same interpretation call Telegram answers already use (the
+`answer()` gateway role); corrections route through `correctLine`, the same durable command path
+already established. **A new Cockpit-only write path that reaches the database directly, bypassing
+that interpretation/provenance chain, would be a second instance of the exact defect already on this
+build's record** — `shopLines.markCorrected` existing with zero production callers, a correct command
+nobody actually invoked. Cockpit gets a UI; it does not get a second, divergent way to mutate a shop.
+
+### Navigation
+
+Four primary tabs, collapsed from the current Overview/Details split: **Shop** (current state,
+counts, exceptions, source list, additions/skips, expandable decision history) · **Questions** (the
+focused interaction board above) · **Basket** (planned + post-build ASDA reconciliation) ·
+**Rules** (durable household knowledge). Diagnostics, About and History move behind a settings/cog
+icon — not a fifth tab competing for space on a phone screen.
+
+### What the primary surface must never show
+
+Shop identifiers (`SHOP-2026-08-11-M93`), raw catalogue counts ("109 products in household
+catalogue"), match-method internals ("matched by approximate alias"), runtime ports, database
+connectivity status, raw confidence decimals, and internal event/state names all belong in
+Diagnostics, never on Shop/Questions/Basket/Rules. The product-facing line is never more than:
+*"Cravendale Semi-Skimmed Milk 2L ×4 — from Mum's list · recognised from your Regulars."* Anything
+more technical than that on the primary surface is the same failure this build's CAPAE record already
+names elsewhere: exposing developer/diagnostic truth as if it were the user-facing answer.
 
 ### Telegram's new role
 
