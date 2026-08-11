@@ -706,6 +706,14 @@ async function stepInterpret(deps, snapshot) {
       raw_reading: l.raw_reading,
       quantity: l.quantity ?? null,
       forced_review: false,
+      // GATE ZERO (WP-B15-22): carried through to resolveByCatalogue.js's
+      // vision-confidence gate, keyed exactly as resolveAll expects. Present
+      // ONLY on the photo path - a typed line was never read by a vision
+      // model and must not be gated as though it were (see
+      // applyVisionConfidenceGate's own doc comment on why `undefined` here
+      // is load-bearing, not an oversight).
+      vision_confidence: l.confidence ?? null,
+      vision_status: l.model_status ?? null,
     }));
   } else {
     if (!shop.raw_text) {
@@ -783,6 +791,12 @@ async function stepInterpret(deps, snapshot) {
     quantity: l.quantity,
     matched_regular_id: l.matched_regular_id,
     match_basis: l.match_basis,
+    // GATE ZERO (WP-B15-22): the model's own per-line confidence, threaded
+    // through resolveAll (resolveByCatalogue.js) unchanged - a real column
+    // this had never been populated. `null` for a typed line (never vision-
+    // graded); the model's raw value (or a gate-forced 0 already reflected in
+    // `status` above) for a photo line.
+    match_confidence: l.match_confidence ?? null,
     alternatives: (l.alternatives || []).map((a) => ({ regular_id: a.id, name: a.name })),
     status: l.status,
   })));

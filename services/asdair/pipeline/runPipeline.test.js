@@ -140,6 +140,83 @@ test('THE GROUNDED PATH: the model reads, the CATALOGUE names, the human is aske
 });
 
 // =====================================================================
+// GATE ZERO (WP-B15-22) - THE END-TO-END PROOF, THROUGH THE REAL PRODUCTION
+// PATH: deps.interpretPhoto -> resolveAll -> shopLines.upsertLines ->
+// asdair.shop_line.match_confidence. This is what SHOP-2026-08-10-M64 needed
+// and did not have: the model's own per-line confidence, threaded through and
+// enforced, rather than dropped between the model reply and the durable row.
+// =====================================================================
+
+test('GATE ZERO END TO END: match_confidence is durably populated by a fresh interpret run', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.92 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1, confidence: 0.55 },
+      { line_no: 3, raw_reading: 'fruit splits', quantity: null, confidence: 0.4 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+
+  const line1 = h.db.shop_line.find((l) => l.line_no === 1);
+  const line2 = h.db.shop_line.find((l) => l.line_no === 2);
+  assert.equal(line1.match_confidence, 0.92,
+    'the model\'s own confidence never reached the durable row before WP-B15-22 - this is the fix');
+  assert.equal(line2.match_confidence, 0.55);
+  assert.ok(line1.match_confidence !== null, 'match_confidence must be a real number, not null, when the model supplied one');
+});
+
+test('GATE ZERO END TO END: a confident catalogue match on a line the MODEL was unsure about is forced to needs_confirmation - this is the exact SHOP-2026-08-10-M64 shape', async () => {
+  // Line 1 is EXACTLY the shape that resolves cleanly by catalogue alone
+  // (it is regular 11's own exact alias, per MODEL_LINES elsewhere in this
+  // file) - the ONLY thing making it dangerous here is the model's own low
+  // confidence about what it read. Before this gate, a confident catalogue
+  // match would have won outright and this would have silently reached
+  // Warwick's basket - which is what actually happened on 2026-08-10.
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.3 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  const interpret = await runPipeline(HANDLE, h.deps);   // interpret
+  assert.equal(interpret.ok, true);
+
+  const line1 = h.db.shop_line.find((l) => l.line_no === 1);
+  assert.equal(line1.match_confidence, 0.3);
+  assert.equal(line1.status, 'needs_confirmation',
+    'a strong catalogue match must never override the model\'s own low confidence about the reading - '
+    + 'a confident catalogue match on a line the model was unsure about is what caused the real incident');
+  assert.equal(line1.matched_regular_id, null,
+    'a held line must not carry a matched identity either - "needs_confirmation" must mean genuinely unresolved');
+
+  // The shop must still make real, visible progress - a question, not a crash
+  // and not a silent basket item.
+  const plan = await runPipeline(HANDLE, h.deps);
+  assert.equal(plan.to, 'NEEDS_DECISION', 'a gated line must reach a human decision, never a silent basket item');
+});
+
+test('GATE ZERO END TO END: the model\'s own "unreadable" status survives to the durable row, even where the catalogue offered a match', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, status: 'unreadable', confidence: 0.1 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  const line1 = h.db.shop_line.find((l) => l.line_no === 1);
+  assert.equal(line1.status, 'unreadable', 'the model\'s own "unreadable" verdict must reach the durable row unchanged');
+  assert.equal(line1.matched_regular_id, null);
+});
+
+// =====================================================================
 // THE LIVE INCIDENT (SHOP-2026-08-03), CLOSED
 //
 // Two independent defects combined to crash the real shop: (1) an id-type

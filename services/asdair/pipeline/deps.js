@@ -226,6 +226,18 @@ async function realInterpretPhoto({ prompt, imagePath }) {
     line_no: l.line_no ?? i + 1,
     raw_reading: String(l.raw_reading ?? '').trim(),
     quantity: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : null,
+    // ── GATE ZERO (WP-B15-22) ────────────────────────────────────────────
+    // groundedPrompt.js EXPLICITLY asks for these two fields per line
+    // (confidence 0.0-1.0, and status "unreadable" when the model cannot
+    // read something) and until this fix they were dropped here, before
+    // ever reaching resolveByCatalogue.js or shop_line.match_confidence -
+    // asked for, almost certainly returned, and thrown away in this mapping.
+    // Passed through FAITHFULLY: a missing/non-numeric confidence becomes
+    // `null` (never invented, never defaulted to 1.0 - that decision belongs
+    // to whoever GATES on it, not to this pass-through), and the model's own
+    // status string is carried as-is rather than re-interpreted here.
+    confidence: Number.isFinite(Number(l.confidence)) ? Number(l.confidence) : null,
+    model_status: typeof l.status === 'string' && l.status.trim() !== '' ? l.status.trim() : null,
   }));
 }
 
