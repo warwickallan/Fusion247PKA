@@ -1573,6 +1573,59 @@ its evidence so it can be re-established or falsified in minutes.**
 
 ---
 
+### 🟢 RE-CUT 2026-08-11 (later again) — PAX'S RESEARCH LANDED; VISION PIPELINE IS THE PRIORITY, COCKPIT IS PARALLEL/SECONDARY. STILL NO SHOP, STILL NO BROWSER BUILD.
+
+> **Corrects the block immediately below (also 2026-08-11, "no shop is pending"), which listed the
+> vision-pipeline design and the Cockpit design as one bundled item.** Warwick corrected that
+> directly, this session, verbatim intent: *"if [the Wayfinder frontier] has become primarily
+> 'Cockpit redesign', [Larry] has lost the plot slightly. Vision/source truth remains the first
+> dependency. Everything in the Cockpit is just a nicer way of displaying rubbish if that bit isn't
+> fixed."* **Restated so it cannot drift again: Part 1 of
+> `2026-08-11-cockpit-and-vision-pipeline-design.md` (vision pipeline) is the critical-path
+> dependency. Part 2 (Cockpit) is parallel, secondary work — an exception-resolution surface, never a
+> substitute.**
+>
+> **Also new this session: the commissioned Pax research landed** —
+> `Deliverables/2026-08-11-pax-vision-pipeline-and-luna-sol-terra-research.md`. Headline findings,
+> folded into the design doc: (1) Luna/Terra/Sol are confirmed-real GPT-5.6 tiers, GA since 9 July
+> 2026 — that question is CLOSED; whether *this build's gateway* currently registers Sol/Luna is
+> still open and still GL-012-blocked, unaffected by this research; (2) a genuine design gap found —
+> bundling the full page + all strips into one multimodal call runs against published evidence that
+> individually-processed crops generally read better, and the design hadn't specified how a duplicate
+> read of one physical line across two overlapping strips gets reconciled — both now fixed in the
+> design doc, with an explicit A/B test added to the acceptance protocol; (3) independent evidence
+> (public OCR benchmarks) that Sol barely beats Terra on text extraction specifically — supporting the
+> design's existing "fix input, test, only escalate model if that genuinely fails" sequencing rather
+> than justifying a model swap as the first move.
+>
+> **The success criterion, restated so it doesn't erode into something looser:** *"On a normal list,
+> one household-aware vision call produces trustworthy source truth. A difficult list costs at most
+> one additional batched reread."*
+>
+> **THE ACTUAL FRONTIER, in order, priority-ranked not just listed:**
+> 1. **(Primary, blocking) The vision-pipeline improvement itself is designed, cross-sourced and
+>    reviewed twice — Larry, then Pax independently — and is ready for a scoped Work Order to Keel,
+>    pending only Warwick's authorisation to proceed.** Nothing else in this build should get
+>    implementation attention ahead of this.
+> 2. **(Parallel, secondary) The Cockpit redesign** is likewise designed and captured, and may proceed
+>    ALONGSIDE (1) once authorised, as an exception-resolution surface — but never instead of, and
+>    never claimed as progress on, the vision-pipeline fix.
+> 3. **(Blocking research, separate from both) The GL-012 private-surface question** for
+>    `C:/.fusion247/asdair/**` still needs settling before the Luna/Sol live-gateway probe can run —
+>    unaffected by Pax's research, which deliberately did not touch the gateway.
+> 4. **What "Pax's OCR/pipeline report" originally referred to remains genuinely unresolved** — this
+>    session commissioned and received a fresh one (item above); whether Warwick meant a DIFFERENT,
+>    prior commission this repository never received is still an open question for him, not assumed
+>    answered by the fresh one landing.
+>
+> **No shop, no basket, no browser action is pending or blocked by anything.**
+>
+> **Closing head at time of writing: `b60d284`.**
+
+---
+
+### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
+
 ### 🟢 RE-CUT 2026-08-11 (later still) — NO SHOP IS PENDING. THE FRONTIER IS DESIGN/RESEARCH WORK ONLY, NOT A BROWSER BUILD OF ANY KIND.
 
 > **⛔ Corrects the block immediately below this one (also 2026-08-11, "late session"), which was
