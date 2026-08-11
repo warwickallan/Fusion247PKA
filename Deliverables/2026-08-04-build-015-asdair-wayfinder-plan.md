@@ -1621,6 +1621,21 @@ its evidence so it can be re-established or falsified in minutes.**
 > **No shop, no basket, no browser action is pending or blocked by anything.**
 >
 > **Closing head at time of writing: `b60d284`.**
+>
+> **⛔ SUPERSEDED BY EXECUTION, same session, moments later: Warwick authorised proceeding with BOTH
+> Part 1 and Part 2, explicitly in parallel** ("Get on with both....the vision pipeline and the
+> cockpit, run them in parralel"). Two Work Orders dispatched to separate Keel instances, each in an
+> isolated worktree, disjoint file surfaces, a shared contract (the six-value canonical state; the
+> four-value provenance enum) published identically to both so neither drifts from the other while
+> working independently: **WO-2026-08-11-B15-VISION-01** (`services/asdair/pipeline/**`,
+> `services/obsidiwikai/src/core/models.mjs` vision()/gatewayChat, a new forward-only migration under
+> `services/asdair/db/**`) and **WO-2026-08-11-B15-COCKPIT-01** (`services/cockpit/**`,
+> `services/asdair/cockpit-api/**`, `services/asdair/bot/renderMessages.js` +
+> `sendShopperMessage.js`). Both are, per Keel's standing contract, holding after their read-back for
+> Larry's explicit acceptance before any implementation begins — neither has written product code yet
+> at the time this line was recorded. The vision-pipeline order explicitly excludes Keel from running
+> the live gateway acceptance test itself (no credentials, none sought) — that run is a separate,
+> later step for whoever has the correct scoped access once code lands.
 
 ---
 
