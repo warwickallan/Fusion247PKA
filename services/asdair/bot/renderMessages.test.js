@@ -12,6 +12,7 @@ import {
   renderConfirmInterpretation,
   renderConfirmationReceived,
   renderFailure,
+  renderPhotoRead,
   renderPlanReady,
   renderProgress,
   renderQuestionCard,
@@ -98,6 +99,11 @@ const SAMPLES = {
   },
   // WP-B15-09 AC8. He replied with nothing left open: not an answer, not a list.
   reply_not_taken: { shopRef: REF, answeredAlready: 'Richmond 12 Skinless Pork Sausages 319g' },
+  // WP-B15-22 (Gate Zero). Confirms what was actually READ from a photo, with
+  // real counts - Warwick's explicit new requirement, and the direct payoff
+  // of the confidence gate: the first card that can honestly say how many
+  // lines the model itself was unsure about.
+  photo_read: { shopRef: REF, productsRead: 41, itemsKnown: 58, needsClarification: 3, implausiblyLow: false },
 };
 
 function everyButton(rendered) {
@@ -129,8 +135,8 @@ test('the catalogue covers every message the directive specifies', () => {
   // and the fallback was a journal line he will never read.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
     'basket_ready', 'clarification_deferred', 'confirm_interpretation', 'confirmation_received',
-    'control_refused', 'failure', 'lines_unresolved', 'plan_ready', 'progress', 'question',
-    'question_board', 'receipt', 'reconciliation_summary', 'reply_not_taken', 'status',
+    'control_refused', 'failure', 'lines_unresolved', 'photo_read', 'plan_ready', 'progress',
+    'question', 'question_board', 'receipt', 'reconciliation_summary', 'reply_not_taken', 'status',
   ]);
 });
 
@@ -176,6 +182,55 @@ test('no renderer emits a checkout or payment action', () => {
       assert.ok(!['checkout', 'pay', 'order', 'slot'].includes(action), `${name} offers ${action}`);
     }
   }
+});
+
+// ── WP-B15-22: the photo read confirmation card ─────────────────────────────
+
+test('renderPhotoRead: the rendered TEXT actually contains the real counts, not just a case that exists', () => {
+  // Larry's own instruction: prove the text, not merely that MESSAGES has an
+  // entry. The exact wording Warwick asked for: "Shopping list read — 41
+  // products, 58 items, 3 lines need clarification."
+  const out = renderPhotoRead({
+    shopRef: REF, productsRead: 41, itemsKnown: 58, needsClarification: 3, implausiblyLow: false,
+  });
+  assert.match(out.text, /\b41\b/, 'the product count never reached the rendered text');
+  assert.match(out.text, /\b58\b/, 'the known-item count never reached the rendered text');
+  assert.match(out.text, /\b3\b/, 'the needs-clarification count never reached the rendered text');
+  assert.match(out.text, new RegExp(REF), 'the shop ref never reached the rendered text');
+  assert.match(out.text, /read/i, 'the card must say what it is confirming - that the list was READ');
+  assert.equal(out.text.includes('⚠️'), false, 'an ORDINARY read must not carry the implausibly-low warning');
+});
+
+test('renderPhotoRead: a MISSING count renders "unknown", never a fabricated 0', () => {
+  // The shop ref fixture itself contains digits ('shop-2026-07-28'), so this
+  // checks each COUNT LINE specifically rather than the whole text for a
+  // bare '0' - the fabrication this guards against is a count rendering as
+  // "0" where nothing was actually counted, not the digit appearing anywhere.
+  const out = renderPhotoRead({ shopRef: REF });
+  assert.match(out.text, /Products:\s*unknown/i);
+  assert.match(out.text, /Items[^:]*:\s*unknown/i);
+  assert.match(out.text, /clarification:\s*unknown/i);
+  assert.equal(/Products:\s*0\b/.test(out.text), false, 'an absent product count must never render as a counted zero');
+  assert.equal(/Items[^:]*:\s*0\b/.test(out.text), false, 'an absent item count must never render as a counted zero');
+  assert.equal(/clarification:\s*0\b/i.test(out.text), false, 'an absent clarification count must never render as a counted zero');
+});
+
+test('renderPhotoRead: implausiblyLow adds a VISIBLE warning line, never silent', () => {
+  const quiet = renderPhotoRead({ shopRef: REF, productsRead: 41, itemsKnown: 58, needsClarification: 3, implausiblyLow: false });
+  const loud = renderPhotoRead({ shopRef: REF, productsRead: 1, itemsKnown: 1, needsClarification: 1, implausiblyLow: true });
+  assert.equal(quiet.text.includes('⚠️'), false);
+  assert.ok(loud.text.includes('⚠️'), 'a near-total interpretation failure must be visible on the card itself');
+  assert.match(loud.text, /weekly shop/i);
+});
+
+test('renderPhotoRead: the exact shape Warwick asked for is representable in one line', () => {
+  // Not asserting byte-identical wording (the module owns its own phrasing),
+  // only that every number he named is present and attached to the right
+  // label - proving the CONTENT, not a fixed string.
+  const out = renderPhotoRead({ shopRef: REF, productsRead: 41, itemsKnown: 58, needsClarification: 3 });
+  assert.match(out.text, /Products:\s*41/);
+  assert.match(out.text, /Items[^:]*:\s*58/);
+  assert.match(out.text, /clarification:\s*3/i);
 });
 
 // ── never fabricate ──────────────────────────────────────────────────────────

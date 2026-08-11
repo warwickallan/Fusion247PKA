@@ -1068,6 +1068,57 @@ export function renderClarificationDeferred({ shopRef, items, reason, messageNot
   };
 }
 
+// ── 13. Photo read confirmation (WP-B15-22, Gate Zero) ───────────────────────
+
+/**
+ * PURE. Confirms what was actually READ from a photographed list, with real
+ * counts — Warwick's own explicit requirement, and the direct payoff of Gate
+ * Zero's confidence gate: this is the first card ever built that can honestly
+ * say how many lines the model itself was unsure about.
+ *
+ * ── NEVER SENT ON FILE RECEIPT ALONE ─────────────────────────────────────────
+ * `runPipeline.js` only queues this once `stepInterpret`'s own transition has
+ * produced real counts from real interpreted lines — never when the photo
+ * merely arrived. That discipline lives entirely on the caller's side
+ * (`messageForTransition`'s `result.interpreted` discriminator); this function
+ * only renders whatever counts it is given, honestly, per the module's own
+ * purity contract.
+ *
+ * ── `implausiblyLow` IS SAID OUT LOUD, NOT ONLY LOGGED ───────────────────────
+ * `runPipeline.js` already writes the same signal to an advisory log at
+ * plan_ready (WP-B15-22 §4) — an engineer's channel Warwick never reads. A
+ * near-total interpretation failure belongs on the one card he actually sees,
+ * which is the whole reason Gate Zero exists: SHOP-2026-08-10-M64 was a
+ * plausible-looking, silently wrong list, and "plausible-looking" is exactly
+ * what a card with no warning line would still be.
+ *
+ * @param {{shopRef:string, productsRead?:number, itemsKnown?:number,
+ *          needsClarification?:number, implausiblyLow?:boolean}} spec
+ */
+export function renderPhotoRead({
+  shopRef, productsRead, itemsKnown, needsClarification, implausiblyLow,
+} = {}) {
+  assertShopRef(shopRef);
+  const lines = [
+    '📷 Shopping list read',
+    `Ref: ${value(shopRef)}`,
+    `Products: ${count(productsRead)}`,
+    `Items (known quantities): ${count(itemsKnown)}`,
+    `Need clarification: ${count(needsClarification)}`,
+  ];
+  if (implausiblyLow === true) {
+    lines.push('');
+    lines.push('⚠️ That looks like very few lines for a weekly shop — check the');
+    lines.push('photograph was read correctly before trusting this plan.');
+  }
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      [button('View status', ACTIONS.STATUS, shopRef)],
+    ]),
+  };
+}
+
 /**
  * The catalogue, by name. Lets a caller (and the test suite) enumerate every
  * renderer without importing them one at a time — the shape test in
@@ -1198,4 +1249,5 @@ export const MESSAGES = Object.freeze({
   confirmation_received: renderConfirmationReceived,
   reconciliation_summary: renderReconciliationSummary,
   clarification_deferred: renderClarificationDeferred,
+  photo_read: renderPhotoRead,
 });

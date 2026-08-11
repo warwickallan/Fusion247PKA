@@ -46,6 +46,83 @@ function tokensContain(haystack, needle) {
   return need.every((t) => hay.indexOf(t) !== -1);
 }
 
+// ── THE VISION-CONFIDENCE GATE (WP-B15-22, GATE ZERO) ──────────────────────
+//
+// groundedPrompt.js explicitly asks the model for a per-line `confidence`
+// (0.0-1.0) and permits `status:"unreadable"` - and until this Work Package
+// that signal was dropped on the floor between the model's reply and this
+// module (deps.js `realInterpretPhoto` mapped only {line_no, raw_reading,
+// quantity}), so a confident CATALOGUE match could reach a real basket on a
+// line the MODEL ITSELF was unsure about. That is precisely SHOP-2026-08-10-
+// M64's incident (Deliverables/2026-08-11-GATE-ZERO-source-truth-established.md):
+// ~17 real items missing, 7 invented, because a large closed candidate list
+// pressures the model into picking a plausible candidate rather than using
+// the escape hatch the prompt itself offers.
+//
+// THE THRESHOLD, AND WHY IT IS 0.6. Below "plausible but uncertain" (0.5,
+// a coin flip) and clearly below "the model is basically sure". A judgement
+// call, not a derived constant - documented here rather than left silent.
+const VISION_CONFIDENCE_THRESHOLD = 0.6;
+
+/**
+ * PURE. Does this catalogue verdict survive the model's OWN confidence about
+ * the reading it was derived from? A confident catalogue match on a line the
+ * model itself flagged as unreadable, or scored below the threshold, is
+ * exactly the failure mode this gate exists to close - REGARDLESS of how
+ * strong the catalogue match looked, which is the whole point: catalogue
+ * strength and reading confidence are independent signals, and either one
+ * being weak is enough to hold a line for a human.
+ *
+ * A line carrying NO vision signal at all (`visionConfidence` and
+ * `visionStatus` both `undefined` - a TYPED line, which was never read by a
+ * vision model) is untouched: the gate answers "was the MODEL sure it read
+ * this correctly", which has no meaning for text that was never read by a
+ * model in the first place.
+ *
+ * A vision-graded line with a MISSING or non-numeric confidence is treated
+ * as the WORST case (0), never defaulted to 1.0 - the model was asked for
+ * this field and a caller that cannot supply it gets no benefit of the
+ * doubt (Warwick, ruling on this Work Order: "a missing confidence on a
+ * line should itself be treated as low-confidence, not as 1.0").
+ *
+ * @param {object} verdict           the catalogue-only resolveReading result
+ * @param {{visionConfidence?: number|null, visionStatus?: string|null}} opts
+ */
+function applyVisionConfidenceGate(verdict, opts) {
+  const graded = opts && (opts.visionConfidence !== undefined || opts.visionStatus !== undefined);
+  if (!graded) return verdict;
+
+  if (opts.visionStatus === 'unreadable') {
+    return {
+      matched_regular_id: null, matched_product_name: null, match_basis: null,
+      alternatives: verdict.alternatives || [], status: 'unreadable',
+    };
+  }
+
+  const confidence = Number.isFinite(Number(opts.visionConfidence)) ? Number(opts.visionConfidence) : 0;
+  if (confidence < VISION_CONFIDENCE_THRESHOLD && verdict.status === 'matched') {
+    // GENUINELY UNRESOLVED, NOT MERELY RELABELLED. A "needs_confirmation"
+    // line must not still carry a matched identity - shop_line's own CHECK
+    // only requires the reverse (a 'matched' row needs an id; it says nothing
+    // about a held one), so this was NOT caught by the schema, only by a
+    // dedicated proof. The catalogue's best guess is preserved as a single
+    // candidate in `alternatives` rather than discarded outright - the same
+    // shape a genuinely ambiguous match already uses elsewhere in this file,
+    // so the human is asked "is it this?" rather than starting from nothing.
+    const suggestion = verdict.matched_regular_id !== null && verdict.matched_regular_id !== undefined
+      ? [{ id: verdict.matched_regular_id, name: verdict.matched_product_name }]
+      : (verdict.alternatives || []);
+    return {
+      matched_regular_id: null,
+      matched_product_name: null,
+      match_basis: `${verdict.match_basis || 'catalogue match'} (held: model confidence ${confidence} below ${VISION_CONFIDENCE_THRESHOLD})`,
+      alternatives: suggestion,
+      status: 'needs_confirmation',
+    };
+  }
+  return verdict;
+}
+
 /**
  * Resolve ONE raw reading against the household catalogue.
  *
@@ -54,14 +131,26 @@ function tokensContain(haystack, needle) {
  * guessed, because two active regulars answering one term is precisely the
  * case that silently breaks a shop every week.
  *
+ * THE RESULT THEN PASSES THROUGH `applyVisionConfidenceGate` (WP-B15-22)
+ * before being returned - a confident catalogue match never overrides the
+ * model's own uncertainty about the reading it came from. See that
+ * function's doc comment for the full rule.
+ *
  * @param {string} rawReading
  * @param {Array<object>} regulars - active regulars for the household
- * @param {{lastOrderNames?: string[]}} [opts]
+ * @param {{lastOrderNames?: string[], visionConfidence?: number|null,
+ *          visionStatus?: string|null}} [opts]
  * @returns {{matched_regular_id: number|null, matched_product_name: string|null,
  *            match_basis: string|null, alternatives: Array<{id:number,name:string}>,
  *            status: string}}
  */
 function resolveReading(rawReading, regulars, opts = {}) {
+  return applyVisionConfidenceGate(resolveReadingByCatalogue(rawReading, regulars, opts), opts);
+}
+
+/** The catalogue-only resolution, unchanged in every particular except its
+ *  name - see `resolveReading` above for the gate now wrapped around it. */
+function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
   const term = stripLeadingQuantity(rawReading);
   const none = { matched_regular_id: null, matched_product_name: null, match_basis: null, alternatives: [], status: 'unmatched_new_item' };
   if (!term) return { ...none, status: 'unreadable' };
@@ -165,17 +254,45 @@ function resolveReading(rawReading, regulars, opts = {}) {
 /**
  * Resolve a whole interpreted list. Marks a repeat of an already-resolved
  * regular as possible_duplicate rather than silently ordering it twice.
+ *
+ * ── PER-LINE VISION SIGNAL, NEVER SHARED ACROSS THE BATCH (WP-B15-22) ──────
+ * `opts` may carry `lastOrderNames` (batch-wide, unchanged), but
+ * `visionConfidence`/`visionStatus` are read OFF EACH LINE, never off `opts`
+ * itself - confidence is a property of one reading, not of the whole list,
+ * and sharing it would gate every line by whichever line happened to be
+ * least sure. A line that never carried the key at all (a typed line) passes
+ * `undefined` through untouched, which `applyVisionConfidenceGate` reads as
+ * "not vision-graded" and leaves alone.
+ *
+ * The RAW confidence (never the gated verdict) is also attached to the
+ * output as `match_confidence` - the column `shop_line.match_confidence`
+ * already has and nothing previously populated - so the signal is durable
+ * even when the gate did not need to fire.
  */
 function resolveAll(lines, regulars, opts = {}) {
   const seen = new Set();
   return lines.map((l, i) => {
-    const r = resolveReading(l.raw_reading, regulars, opts);
+    const lineOpts = {
+      ...opts,
+      visionConfidence: l && Object.prototype.hasOwnProperty.call(l, 'vision_confidence') ? l.vision_confidence : undefined,
+      visionStatus: l && Object.prototype.hasOwnProperty.call(l, 'vision_status') ? l.vision_status : undefined,
+    };
+    const r = resolveReading(l.raw_reading, regulars, lineOpts);
     if (r.matched_regular_id != null) {
       if (seen.has(r.matched_regular_id)) r.status = 'possible_duplicate';
       seen.add(r.matched_regular_id);
     }
-    return { line_no: l.line_no ?? i + 1, raw_reading: l.raw_reading, quantity: l.quantity ?? null, ...r };
+    const match_confidence = lineOpts.visionConfidence === undefined
+      ? null
+      : (Number.isFinite(Number(lineOpts.visionConfidence)) ? Number(lineOpts.visionConfidence) : null);
+    return {
+      line_no: l.line_no ?? i + 1, raw_reading: l.raw_reading, quantity: l.quantity ?? null,
+      match_confidence, ...r,
+    };
   });
 }
 
-module.exports = { resolveReading, resolveAll, normaliseTerm, stripLeadingQuantity, BASIS };
+module.exports = {
+  resolveReading, resolveAll, normaliseTerm, stripLeadingQuantity, BASIS,
+  VISION_CONFIDENCE_THRESHOLD, applyVisionConfidenceGate,
+};

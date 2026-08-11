@@ -59,6 +59,28 @@
 // asserted by this module.
 // =====================================================================
 
+// ── THE ONE SHARED MATCHER, REACHED OUTWARD (WP-B15-20) ────────────────────
+//
+// `squashMatchText` is WP-B15-13's separator-blind normal form, and it is the
+// household's ONE notion of "the same product spelled differently". It is
+// IMPORTED, never reimplemented: a second copy in this file - whose entire
+// defect was that a second normaliser existed - would be the same mistake
+// wearing a third hat (skill/termMatch.js:20-22, migration 018:128-133).
+//
+// The direction is forced, exactly as runPipeline.js:85-91 records it: skill/
+// is CommonJS and pipeline/ is ESM, so the shared rule lives on the skill side
+// and is imported outward through createRequire.
+//
+// ⚠️ LOOKUP ONLY. Nothing below ever WRITES a squashed value: `choice_term` is
+// still minted by keys.normaliseTerm and still stamped TERM_NORMALISER, and
+// migration 018's remembered_choice_term_normalised CHECK still governs it.
+// The KEY did not become fuzzy - the SEARCH became aware of one already-ruled
+// equivalence. See `loadRememberedChoices`.
+import { createRequire } from 'node:module';
+
+const requireCjs = createRequire(import.meta.url);
+const { squashMatchText } = requireCjs('../skill/termMatch.js');
+
 /**
  * The standing authorisation these rows are written under. Closed vocabulary,
  * mirroring 018's remembered_choice_authorised_by_known.
@@ -123,15 +145,40 @@ const SELECT_BY_DECISION_SQL =
 // THE READ PATH, AND IT IS "NEWEST WINS" IN ONE STATEMENT.
 //
 // `distinct on (choice_term)` with `order by choice_term, chosen_at desc,
-// id desc` returns exactly one row per term - the most recent preference -
-// which is Silas's per-term read generalised to the whole set of terms a plan
-// still needs, without N round trips. The index
-// remembered_choice_lookup_idx (household_id, choice_term, chosen_at desc,
-// id desc) is ordered to serve precisely this.
-const SELECT_NEWEST_BY_TERMS_SQL =
+// id desc` returns exactly one row per term - the most recent preference. The
+// index remembered_choice_lookup_idx (household_id, choice_term, chosen_at
+// desc, id desc) is ordered to serve precisely this, and household_id is still
+// its leading column so this statement still uses it.
+//
+// ── WHY THE TERM PREDICATE WENT (WP-B15-20) ────────────────────────────────
+//
+// This used to carry `AND choice_term = ANY($2::text[])`. It cannot any more,
+// and the reason is worth keeping: the terms this plan wants are matched
+// SEPARATOR-BLIND, and `squashMatchText`'s one exception - a separator between
+// two DIGITS is never removed, so "1.5L" never becomes "15L" - is not
+// expressible in SQL without writing a THIRD copy of the rule. Copying the
+// rule into SQL is the defect this Work Package exists to stop, so the
+// comparison happens in process instead and the statement fetches the
+// household's own rows.
+//
+// ── THE BOUND, STATED RATHER THAN ASSUMED ──────────────────────────────────
+//
+// Rows returned = the number of DISTINCT choice_terms this household has ever
+// recorded, not the number of rows in the table: `distinct on` collapses the
+// history server-side, so a household that changes its mind weekly for a year
+// still returns one row per term. It is ONE statement per plan, not one per
+// line. Measured live 2026-08-10: the whole table holds 1 row. It grows by one
+// term the first time a NEW ambiguity is answered, and by one more per distinct
+// SPELLING of that ambiguity until this lookup covers them - which is now
+// separator-blind, so the spelling axis largely stops growing.
+//
+// If a household ever reached a size where fetching its terms is wasteful, the
+// answer is a stored squashed column and an index on it - a SILAS DECISION and
+// a migration, deliberately NOT taken here (WO-2026-08-11-03 AC5).
+const SELECT_NEWEST_FOR_HOUSEHOLD_SQL =
   `SELECT DISTINCT ON (choice_term) ${SELECT_LIST} ` +
   'FROM asdair.remembered_choice ' +
-  'WHERE household_id = $1 AND choice_term = ANY($2::text[]) ' +
+  'WHERE household_id = $1 ' +
   'ORDER BY choice_term, chosen_at DESC, id DESC';
 
 function fail(message) { throw new Error(`rememberedChoice: ${message}`); }
@@ -416,10 +463,57 @@ export async function rememberChoice(deps, spec) {
 }
 
 /**
+ * PURE. Newer of two remembered rows, by the statement's OWN precedence.
+ *
+ * `chosen_at` descending, then `id` descending - byte-for-byte the ordering
+ * `SELECT_NEWEST_FOR_HOUSEHOLD_SQL` already applies. Squashing can make two
+ * DIFFERENT stored terms compete for one lookup ("ariel pods" and "arielpods"),
+ * and this decides that contest by INHERITING the existing rule rather than
+ * inventing a second one. Ruled by Larry, 2026-08-10 (Amendment 1, ruling 2).
+ */
+function newerOf(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const at = String(a.chosen_at ?? '');
+  const bt = String(b.chosen_at ?? '');
+  if (at !== bt) return at > bt ? a : b;
+  return Number(b.id) > Number(a.id) ? b : a;
+}
+
+/**
  * The newest remembered choice for each of the supplied normalised terms.
  *
- * ONE statement, never one per line. Returns a Map keyed by `choice_term`, so
- * the pure half below never has to know how the rows were fetched.
+ * ONE statement, never one per line. Returns a Map keyed by the term the
+ * CALLER ASKED FOR - never by the stored `choice_term` - so the pure half below
+ * never has to know how the rows were fetched, nor which spelling they were
+ * filed under.
+ *
+ * ── WHY THE MAP IS KEYED ON THE REQUEST (WP-B15-20) ────────────────────────
+ *
+ * THIS IS THE WHOLE FIX, AND IT IS EASY TO GET HALF RIGHT. The lookup lives in
+ * TWO places, not one: this statement, and `applyRememberedToPlan`'s
+ * `memories.get(term)` / `memories.has(term)`, which read by the term the PLAN
+ * LINE normalises to. This function used to key the Map on `row.choice_term` -
+ * the STORED spelling - so making only the fetch separator-blind would find the
+ * row and then MISS IT AGAIN on the Map, one line later, looking exactly like
+ * a fix that works.
+ *
+ * Keying on the requested term means the pure half is UNCHANGED and stays
+ * exact-equality: it asks for the term it computed and gets the memory that
+ * belongs to it. `applyRememberedToPlan` needed no edit for this Work Package.
+ *
+ * AND IT IS WHAT MAKES THE MISS VISIBLE. `applyRememberedToPlan:588` only
+ * reports a refusal when `memories.has(term)` - so under the old keying a
+ * separator miss emitted NO `refused` entry and vanished. (It never even got
+ * that far: runPipeline.js short-circuits on an empty Map, so the inner branch
+ * was never reached at all.) A memory that is found and then honestly refused
+ * now travels as a reported refusal, because the key it is filed under is the
+ * key the caller looks for.
+ *
+ * ⛔ STILL NOT FUZZY. Two terms agree here only if they carry the SAME letters
+ * and digits in the SAME order; a misspelling is still a miss, and a separator
+ * between two digits is still never removed. There is no score, no threshold
+ * and no exception list to loosen.
  *
  * An empty term list issues NO statement at all - a plan with nothing left
  * unresolved must not spend a query proving it.
@@ -431,13 +525,24 @@ export async function loadRememberedChoices(deps, householdId, terms) {
     if (s !== '' && !wanted.includes(s)) wanted.push(s);
   }
   if (wanted.length === 0) return new Map();
-  const res = await deps.readQuery(SELECT_NEWEST_BY_TERMS_SQL, [householdId, wanted]);
-  const byTerm = new Map();
+
+  const res = await deps.readQuery(SELECT_NEWEST_FOR_HOUSEHOLD_SQL, [householdId]);
+
+  // The household's memories, indexed by the shared matcher's normal form.
+  // `distinct on` already collapsed each exact term's history; this collapses
+  // the terms that squash together, by the same precedence.
+  const bySquashed = new Map();
   for (const row of (res && res.rows) || []) {
     if (!row) continue;
-    // `distinct on` already returned one row per term; first-wins here is
-    // belt-and-braces and matches the statement's own ordering.
-    if (!byTerm.has(row.choice_term)) byTerm.set(row.choice_term, row);
+    const key = squashMatchText(row.choice_term);
+    if (key === '') continue;
+    bySquashed.set(key, newerOf(bySquashed.get(key) || null, row));
+  }
+
+  const byTerm = new Map();
+  for (const term of wanted) {
+    const hit = bySquashed.get(squashMatchText(term));
+    if (hit) byTerm.set(term, hit);
   }
   return byTerm;
 }
@@ -669,7 +774,7 @@ export function applyRememberedToPlan({
 export const _internal = {
   INSERT_SQL,
   SELECT_BY_DECISION_SQL,
-  SELECT_NEWEST_BY_TERMS_SQL,
+  SELECT_NEWEST_FOR_HOUSEHOLD_SQL,
   INSERT_COLUMNS,
   SELECT_LIST,
 };

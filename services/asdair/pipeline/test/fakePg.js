@@ -803,11 +803,34 @@ export function createFakeClient(store, options = {}) {
     // reason the insert's column list above is: this pattern used to match
     // openHandoff's supersede statement too, and answered it by looking for the
     // row id in a progress parameter - finding nothing, and returning no row.
-    [/^UPDATE asdair\.browser_build_request SET progress = \$1::jsonb/i, (sql, p) => {
+    //
+    // ── WP-B15-19 AC6, TAUGHT HERE (WP-B15-22) ──────────────────────────────
+    // The real statement grew a THIRD guard beyond status:
+    //   AND (progress->'handoff' IS NULL OR jsonb_exists($1::jsonb, 'handoff'))
+    // - Postgres itself now refuses a write that would silently DESTROY a
+    // handoff artefact (see shopStore.js's own comment on this statement for
+    // why). Before this, the fake accepted exactly that write: a test could
+    // wipe `progress.handoff` here and the fake would happily comply, proving
+    // nothing about the guard the real database now enforces. Modelled as a
+    // WHERE predicate, not a merge, matching the real statement's own shape -
+    // a target whose CURRENT row carries `progress.handoff` and whose
+    // INCOMING object does not is refused (rowCount 0), exactly like Postgres.
+    //
+    // An optional trailing `AND claimed_by = $3` is also modelled, because the
+    // real statement grows it whenever updateBrowserProgress is called with a
+    // claimed_by option - matched the same way `foreignClaimPredicate` reads
+    // an optional predicate above: from the statement's own text, not assumed.
+    [/^UPDATE asdair\.browser_build_request SET progress = \$1::jsonb, status = 'running' WHERE id = \$2/i, (sql, p) => {
+      const hasClaimedBy = /\bAND claimed_by = \$3\b/i.test(sql);
       const target = db.browser_build_request.find((b) => String(b.id) === String(p[1])
-        && ['claimed', 'running'].includes(b.status));
+        && ['claimed', 'running'].includes(b.status)
+        && (!hasClaimedBy || String(b.claimed_by) === String(p[2])));
       if (!target) return none();
-      try { target.progress = JSON.parse(p[0]); } catch { target.progress = {}; }
+      const incoming = asJson(p[0]) || {};
+      const currentCarriesHandoff = !!(target.progress && typeof target.progress === 'object' && target.progress.handoff);
+      const incomingCarriesHandoff = !!incoming.handoff;
+      if (currentCarriesHandoff && !incomingCarriesHandoff) return none();
+      target.progress = incoming;
       target.status = 'running';
       return rows([target]);
     }],
@@ -1110,6 +1133,55 @@ export function createFakeClient(store, options = {}) {
       rows((db.households || []).filter((h) => h.name === p[0] || h.display_name === p[0]))],
     [/^select id from asdair\.households order by id/i, () =>
       rows((db.households || []).map((h) => ({ id: h.id })).sort((a, b) => a.id - b.id))],
+    // ── RECLAIM, taught WP-B15-22, MATCHED BEFORE THE TWO GENERIC HANDLERS
+    // BELOW ─────────────────────────────────────────────────────────────────
+    // Both reclaim SELECTs share their exact prefix with the two unanchored
+    // handlers directly under this comment (`^select id from
+    // asdair.shopping_lists where household_id=$1 and status='next_week_draft'
+    // [and list_date=$2]`), and this file is FIRST-MATCH-WINS, so these two
+    // are placed ahead of them to answer with the REAL statement's own
+    // `and shop_id is null` filter rather than silently ignoring it.
+    //
+    // WITHOUT the UPDATE handler below, EVERY B15-10/B15-15 test that seeds an
+    // existing list threw ("no handler") the moment asdairCommands.mjs's
+    // reclaim logic started issuing these statements at all - that failure is
+    // real, observed, and what these three handlers exist to fix.
+    //
+    // The SELECT ordering claim above IS NOT independently mutation-proven:
+    // removing only these two SELECT handlers (leaving the UPDATE handler in
+    // place) does not currently redden any test, because the UPDATE's own
+    // `shop_id is null` re-check is a second, independent guard - if the
+    // fallen-through general SELECT ever did hand back an ALREADY-OWNED
+    // list's id, the UPDATE would still correctly refuse to write it and this
+    // function would still correctly fall through to minting a fresh list.
+    // Kept anyway because they are the CORRECT, faithful model of the real
+    // statement (Do not delete them on the strength of "nothing failed" -
+    // that observation is about the depth of this suite's fixtures, not
+    // about whether the real SQL needs the filter it plainly has).
+    [/^select id from asdair\.shopping_lists where household_id=\$1 and status='next_week_draft' and list_date=\$2 and shop_id is null/i, (sql, p) => {
+      const hits = db.shopping_lists.filter((l) => String(l.household_id) === String(p[0])
+        && l.status === 'next_week_draft' && l.list_date === p[1]
+        && (l.shop_id === null || l.shop_id === undefined)).sort((a, b) => b.id - a.id);
+      return rows(hits.slice(0, 1).map((l) => ({ id: l.id })));
+    }],
+    [/^select id from asdair\.shopping_lists where household_id=\$1 and status='next_week_draft' and shop_id is null/i, (sql, p) => {
+      const hits = db.shopping_lists.filter((l) => String(l.household_id) === String(p[0])
+        && l.status === 'next_week_draft' && (l.shop_id === null || l.shop_id === undefined))
+        .sort((a, b) => b.id - a.id);
+      return rows(hits.slice(0, 1).map((l) => ({ id: l.id })));
+    }],
+    // The claiming UPDATE - re-checks shop_id is null at write time, exactly
+    // as the real statement does (sequential-exclusion proof:
+    // add-list-item.dbtest.mjs #16h against real Postgres; this fake mirrors
+    // the same predicate rather than re-deriving different semantics).
+    [/^update asdair\.shopping_lists set shop_id=\$2 where id=\$1 and shop_id is null/i, (sql, p) => {
+      const target = db.shopping_lists.find((l) => String(l.id) === String(p[0])
+        && (l.shop_id === null || l.shop_id === undefined));
+      if (!target) return none();
+      target.shop_id = p[1];
+      return rows([{ id: target.id }]);
+    }],
+
     [/^select id from asdair\.shopping_lists where household_id=\$1 and status='next_week_draft' and list_date=\$2/i, (sql, p) => {
       const hits = db.shopping_lists.filter((l) => String(l.household_id) === String(p[0])
         && l.status === 'next_week_draft' && l.list_date === p[1]).sort((a, b) => b.id - a.id);
@@ -1125,6 +1197,44 @@ export function createFakeClient(store, options = {}) {
       db.shopping_lists.push(row);
       return rows([{ id: row.id }]);
     }],
+
+    // ── THE SHOP-OWNED LANE (migration 019 / WP-B15-16, taught WP-B15-22) ──
+    //
+    // findOrCreateDraftList's shopId branch was previously UNREACHED by this
+    // suite: runPipeline.js never emitted shop_id on an add_list_item intent
+    // before WP-B15-21, so every call took the date-keyed lane below and these
+    // three statements had no handler. WP-B15-21 makes every shop supply its
+    // own id, which means EVERY add_list_item call in the whole pipeline suite
+    // now takes this branch first - reported as the reason B15-21's merge
+    // reddened the suite (473 -> 371/102) until this was taught.
+    //
+    // Read FIRST (by owner), matching asdairCommands.mjs's own precedence: the
+    // owning shop is asked before any date-keyed row is ever consulted.
+    [/^select id from asdair\.shopping_lists where shop_id=\$1/i, (sql, p) =>
+      rows(db.shopping_lists.filter((l) => String(l.shop_id) === String(p[0])).map((l) => ({ id: l.id })))],
+    // Insert WITH an explicit list_date - three real params (household, date, shop).
+    [/^insert into asdair\.shopping_lists \(household_id, status, list_date, shop_id\) values \(\$1,'next_week_draft',\$2,\$3\)/i, (sql, p) => {
+      const row = {
+        id: id('shopping_lists'), household_id: p[0], status: 'next_week_draft',
+        list_date: p[1] ?? null, shop_id: p[2] ?? null,
+      };
+      db.shopping_lists.push(row);
+      return rows([{ id: row.id }]);
+    }],
+    // Insert with NO list_date - the DB computes (current_date+7). Two real
+    // params (household, shop); list_date is left null here exactly as the
+    // existing no-date 3-column form above already does - this fake has no
+    // real clock semantics for that literal and none of its callers read
+    // list_date back off a freshly-created shop-owned row.
+    [/^insert into asdair\.shopping_lists \(household_id, status, list_date, shop_id\) values \(\$1,'next_week_draft',\(current_date\+7\),\$2\)/i, (sql, p) => {
+      const row = {
+        id: id('shopping_lists'), household_id: p[0], status: 'next_week_draft',
+        list_date: null, shop_id: p[1] ?? null,
+      };
+      db.shopping_lists.push(row);
+      return rows([{ id: row.id }]);
+    }],
+
     [/^select id, requested_qty, status, note from asdair\.shopping_list_items where list_id=\$1 and lower\(item_name\)=lower\(\$2\)/i, (sql, p) => {
       const hit = db.shopping_list_items.find((i) => String(i.list_id) === String(p[0])
         && String(i.item_name).toLowerCase() === String(p[1]).toLowerCase());

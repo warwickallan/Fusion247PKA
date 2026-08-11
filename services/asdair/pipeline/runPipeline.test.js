@@ -140,6 +140,294 @@ test('THE GROUNDED PATH: the model reads, the CATALOGUE names, the human is aske
 });
 
 // =====================================================================
+// GATE ZERO (WP-B15-22) - THE END-TO-END PROOF, THROUGH THE REAL PRODUCTION
+// PATH: deps.interpretPhoto -> resolveAll -> shopLines.upsertLines ->
+// asdair.shop_line.match_confidence. This is what SHOP-2026-08-10-M64 needed
+// and did not have: the model's own per-line confidence, threaded through and
+// enforced, rather than dropped between the model reply and the durable row.
+// =====================================================================
+
+test('GATE ZERO END TO END: match_confidence is durably populated by a fresh interpret run', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.92 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1, confidence: 0.55 },
+      { line_no: 3, raw_reading: 'fruit splits', quantity: null, confidence: 0.4 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+
+  const line1 = h.db.shop_line.find((l) => l.line_no === 1);
+  const line2 = h.db.shop_line.find((l) => l.line_no === 2);
+  assert.equal(line1.match_confidence, 0.92,
+    'the model\'s own confidence never reached the durable row before WP-B15-22 - this is the fix');
+  assert.equal(line2.match_confidence, 0.55);
+  assert.ok(line1.match_confidence !== null, 'match_confidence must be a real number, not null, when the model supplied one');
+});
+
+test('GATE ZERO END TO END: a confident catalogue match on a line the MODEL was unsure about is forced to needs_confirmation - this is the exact SHOP-2026-08-10-M64 shape', async () => {
+  // Line 1 is EXACTLY the shape that resolves cleanly by catalogue alone
+  // (it is regular 11's own exact alias, per MODEL_LINES elsewhere in this
+  // file) - the ONLY thing making it dangerous here is the model's own low
+  // confidence about what it read. Before this gate, a confident catalogue
+  // match would have won outright and this would have silently reached
+  // Warwick's basket - which is what actually happened on 2026-08-10.
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.3 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  const interpret = await runPipeline(HANDLE, h.deps);   // interpret
+  assert.equal(interpret.ok, true);
+
+  const line1 = h.db.shop_line.find((l) => l.line_no === 1);
+  assert.equal(line1.match_confidence, 0.3);
+  assert.equal(line1.status, 'needs_confirmation',
+    'a strong catalogue match must never override the model\'s own low confidence about the reading - '
+    + 'a confident catalogue match on a line the model was unsure about is what caused the real incident');
+  assert.equal(line1.matched_regular_id, null,
+    'a held line must not carry a matched identity either - "needs_confirmation" must mean genuinely unresolved');
+
+  // The shop must still make real, visible progress - a question, not a crash
+  // and not a silent basket item.
+  const plan = await runPipeline(HANDLE, h.deps);
+  assert.equal(plan.to, 'NEEDS_DECISION', 'a gated line must reach a human decision, never a silent basket item');
+});
+
+test('GATE ZERO END TO END: the model\'s own "unreadable" status survives to the durable row, even where the catalogue offered a match', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, status: 'unreadable', confidence: 0.1 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  const line1 = h.db.shop_line.find((l) => l.line_no === 1);
+  assert.equal(line1.status, 'unreadable', 'the model\'s own "unreadable" verdict must reach the durable row unchanged');
+  assert.equal(line1.matched_regular_id, null);
+});
+
+test('GATE ZERO END TO END: asdair.shop.transcript_provider/transcript_model/transcript_confidence are populated after a photo interpretation', async () => {
+  // Before WP-B15-22, buildShopCreate COULD set these three columns, but only
+  // at shop creation - stepInterpret runs long after a shop exists and had no
+  // writer for them at all, so every photo shop's transcript columns stayed
+  // empty (Deliverables/2026-08-11-GATE-ZERO-source-truth-established.md §1).
+  const h = makeHarness({
+    visionModel: 'test-vision-model-x',
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.92 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1, confidence: 0.55 },
+      { line_no: 3, raw_reading: 'fruit splits', quantity: null, confidence: 0.4 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING
+
+  const shop = h.db.shop.find((s) => s.shop_ref === REF);
+  assert.equal(shop.transcript_provider, 'fusion-gateway');
+  assert.equal(shop.transcript_model, 'test-vision-model-x',
+    'the model id must be RESOLVED at call time (deps.visionModel), never a literal frozen in this test or the code');
+  // MINIMUM across lines, not the average - a single badly-read line is
+  // exactly what caused SHOP-2026-08-10-M64, and a mean would hide it.
+  assert.equal(shop.transcript_confidence, 0.4);
+});
+
+test('GATE ZERO END TO END: a TEXT shop never acquires transcript provenance - it was never read by a vision model', async () => {
+  const h = makeHarness();
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING for a text shop
+
+  const shop = h.db.shop.find((s) => s.shop_ref === REF);
+  assert.equal(shop.transcript_provider, null,
+    'a typed list was never read by a vision model - inventing provenance for it would be dishonest');
+  assert.equal(shop.transcript_model, null);
+  assert.equal(shop.transcript_confidence, null);
+});
+
+test('GATE ZERO §4: the plan_ready advisory log flags an IMPLAUSIBLY LOW line count on a photo shop', async () => {
+  // No priced comparator is cheaply available at plan_ready (SOP-021's own
+  // GBP 120-150 band is "structurally inoperative" - no price column exists;
+  // Larry narrowed this to line-count-only, logged, never a new pricing call).
+  // A weekly photo shop returning ONE usable line is implausible on its face -
+  // exactly the shape of a near-total interpretation failure.
+  const logs = [];
+  const h = makeHarness({
+    modelLines: [{ line_no: 1, raw_reading: 'fruit splits', quantity: null, confidence: 0.9 }],
+  });
+  h.deps.log = (event, detail) => logs.push({ event, detail });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan -> NEEDS_DECISION
+
+  const advisory = logs.find((l) => l.event === 'plan_ready_line_count_advisory');
+  assert.ok(advisory, 'the advisory log never fired at plan_ready');
+  assert.equal(advisory.detail.total_requested, 1);
+  assert.equal(advisory.detail.implausibly_low, true,
+    'a single-line photo interpretation must be flagged, not silently accepted as a normal week');
+  assert.equal(advisory.detail.shop_ref, REF);
+
+  // ADVISORY MEANS ADVISORY: the shop still makes real progress and the real
+  // plan_ready message still queues, unaltered - nothing here ever blocks.
+  assert.equal(h.db.shop.find((s) => s.shop_ref === REF).status, 'NEEDS_DECISION');
+  assert.equal(h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'plan_ready').length, 1,
+    'the plan_ready message must still be queued - advisory logging must never withhold it');
+});
+
+test('GATE ZERO §4: the plan_ready advisory log does NOT flag an ordinary multi-line interpretation', async () => {
+  const logs = [];
+  const h = makeHarness({ modelLines: MODEL_LINES });
+  h.deps.log = (event, detail) => logs.push({ event, detail });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan
+
+  const advisory = logs.find((l) => l.event === 'plan_ready_line_count_advisory');
+  assert.ok(advisory, 'the advisory log never fired at plan_ready');
+  assert.equal(advisory.detail.total_requested, 3);
+  assert.equal(advisory.detail.implausibly_low, false, 'an ordinary 3-line week must never be flagged');
+});
+
+test('GATE ZERO §4: a TEXT shop never fires the advisory log - it was never read by a vision model', async () => {
+  const logs = [];
+  const h = makeHarness();
+  h.deps.log = (event, detail) => logs.push({ event, detail });
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING
+  await runPipeline(HANDLE, h.deps);   // plan
+
+  const advisory = logs.find((l) => l.event === 'plan_ready_line_count_advisory');
+  assert.equal(advisory, undefined, 'the line-count sanity signal exists to catch vision misreads, not typed lists');
+});
+
+// =====================================================================
+// THE PHOTO READ CONFIRMATION CARD (WP-B15-22, Warwick's explicit new
+// requirement). Note: this only proves the card is CONSTRUCTED and QUEUED
+// (the outbox row this Work Order owns). Rendering it into Telegram text
+// needs a `photo_read` case in services/asdair/bot/renderMessages.js's
+// MESSAGES table - outside this Work Order's file_surface. Reported, not
+// built here; see the final evidence pack.
+// =====================================================================
+
+test('PHOTO READ CARD: constructed and queued with real counts after a real interpretation, never on file-receipt alone', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.95 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1, confidence: 0.55 }, // gated -> needs_confirmation
+      { line_no: 3, raw_reading: 'fruit splits', quantity: null, confidence: 0.9 },     // unmatched -> not 'matched'
+    ],
+  });
+  await receivePhoto(h);
+  // FILE RECEIPT ALONE - no interpretation has happened yet. The card must
+  // not exist at this point; it exists to confirm what was READ, and
+  // nothing has been read yet.
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length, 0,
+    'the card must never be queued merely because the photo file was received',
+  );
+
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe - still no interpretation
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length, 0,
+    'the card must never be queued before the model has actually answered',
+  );
+
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING - NOW it exists
+  const queued = h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read');
+  assert.equal(queued.length, 1, 'exactly one card must be queued once real interpretation completes');
+
+  const payload = typeof queued[0].args === 'string' ? JSON.parse(queued[0].args) : queued[0].args;
+  assert.equal(payload.shopRef, REF);
+  assert.equal(payload.productsRead, 3, 'three distinct lines were interpreted');
+  assert.equal(payload.itemsKnown, 4, '3 (gourmet) + 1 (weetabix); fruit splits carries no known quantity');
+  assert.equal(payload.needsClarification, 2,
+    'the gated weetabix line (confidence 0.55) and the unmatched fruit splits line both need clarification');
+  assert.equal(payload.implausiblyLow, false);
+});
+
+test('PHOTO READ CARD: the implausiblyLow flag is visible on the card itself, not only in the advisory log', async () => {
+  const h = makeHarness({
+    modelLines: [{ line_no: 1, raw_reading: 'fruit splits', quantity: null, confidence: 0.9 }],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  const queued = h.db.pipeline_command.find((c) => c.kind === 'outbox' && c.command === 'photo_read');
+  assert.ok(queued, 'the card was never queued');
+  const payload = typeof queued.args === 'string' ? JSON.parse(queued.args) : queued.args;
+  assert.equal(payload.productsRead, 1);
+  assert.equal(payload.implausiblyLow, true,
+    'a near-total interpretation failure must be visible on the durable message record, not silently swallowed');
+});
+
+test('PHOTO READ CARD: never fired for a TEXT shop - it was never read by a vision model', async () => {
+  const h = makeHarness();
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING for a text shop
+
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length, 0,
+    'a typed list was never "read" in the sense this card confirms',
+  );
+});
+
+test('PHOTO READ CARD: never re-fired by the re-plan-to-PROCESSING transition after every question is answered', async () => {
+  // The re-plan step also transitions a shop TO 'PROCESSING' (once every
+  // question is answered) - this card must fire ONLY from stepInterpret's
+  // own transition, discriminated by `result.interpreted`, which the re-plan
+  // step's return does not carry. Proven via the held-line/answer/replan
+  // route used elsewhere in this file.
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.95 },
+      { line_no: 2, raw_reading: 'qqzz unreadable scrawl', quantity: null, confidence: 0.9 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING (the card fires once, here)
+  await runPipeline(HANDLE, h.deps);   // plan -> NEEDS_DECISION
+
+  const afterFirstInterpret = h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length;
+  assert.equal(afterFirstInterpret, 1);
+
+  const q = h.db.shop_question.find((row) => row.status === 'open');
+  assert.ok(q, 'the fixture never opened a real question');
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: q.question_key, skip: true,
+  }, h.deps);
+  for (let i = 0; i < 4; i += 1) await runPipeline(HANDLE, h.deps);   // re-plan -> PROCESSING -> ...
+
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length,
+    afterFirstInterpret,
+    'the re-plan-to-PROCESSING transition (every question answered) must never re-queue this card - '
+    + 'nothing was newly "read"',
+  );
+});
+
+// =====================================================================
 // THE LIVE INCIDENT (SHOP-2026-08-03), CLOSED
 //
 // Two independent defects combined to crash the real shop: (1) an id-type
@@ -519,6 +807,42 @@ test('WP-B15-14: the return leg is IDEMPOTENT - re-running it cannot double-adva
     assert.equal(r.stepped, false, 'a shop at BASKET_READY waits for a human; it must not step again');
   }
   assert.equal(JSON.stringify(h.db.shop[0]), before);
+});
+
+test('WP-B15-19 AC6, taught to fakePg (WP-B15-22): a progress write that would DESTROY the handoff artefact is refused', async () => {
+  // shopStore.updateBrowserProgress's WRITE is a whole-object REPLACE, not a
+  // merge, and became a footgun the moment openHandoff started writing the
+  // operating contract onto progress.handoff: a caller passing a progress
+  // object without it would silently DELETE the artefact. The real statement
+  // now carries a WHERE predicate that refuses that write outright; this
+  // proves fakePg enforces the SAME predicate, against the REAL shopStore
+  // code (test/harness.js binds shopStore.updateBrowserProgress unmodified
+  // over the fake client) - not a re-description of the guard.
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+  const row = h.db.browser_build_request[0];
+  assert.ok(row.progress && row.progress.handoff, 'fixture must start carrying a handoff artefact');
+  Object.assign(row, { status: 'claimed', claimed_by: 'runner-1' });
+
+  // A caller passing a progress object with NO handoff key must be refused -
+  // real Postgres would refuse it via the jsonb_exists guard, and the row
+  // must be left completely untouched (never partially applied).
+  await assert.rejects(
+    () => h.deps.shopStore.updateBrowserProgress(row.id, { counters: { step: 1 } }, {}),
+    /carries a handoff artefact and this progress object does not/,
+  );
+  assert.deepEqual(h.db.browser_build_request[0].progress, row.progress,
+    'a refused write must leave the row byte-identical, not partially applied');
+  assert.equal(h.db.browser_build_request[0].status, 'claimed', 'a refused write must not flip status to running');
+
+  // A caller that legitimately carries the artefact through (the CDP runner's
+  // own progress counters, alongside the untouched handoff) succeeds.
+  const carried = { ...row.progress, counters: { step: 1 } };
+  const result = await h.deps.shopStore.updateBrowserProgress(row.id, carried, {});
+  assert.equal(result.changed, true);
+  assert.deepEqual(h.db.browser_build_request[0].progress.handoff, row.progress.handoff,
+    'the handoff artefact must survive a write that carried it through');
+  assert.equal(h.db.browser_build_request[0].status, 'running');
 });
 
 test('IDEMPOTENCY: calling runPipeline repeatedly on a parked shop changes nothing at all', async () => {
@@ -2264,12 +2588,36 @@ async function planWithDeadWeek(seedOverride) {
   return { h, handed };
 }
 
-test('B15-10: the fresh shop binds the SHARED list row - unique (household_id, list_date) leaves no alternative', async () => {
+test('WP-B15-22 RECLAIM: the fresh shop ADOPTS the pre-existing unowned date-keyed list rather than orphaning it, and stays SAFE because exclusion still runs', async () => {
+  // ── THIS TEST'S THIRD NAME, AND THE FULL HISTORY BELONGS HERE ────────────
+  // Round 1 (pre-019): "the fresh shop binds the SHARED list row" - true, and
+  // it was the 2026-08-10 defect itself: date alone could not distinguish two
+  // shops, so sharing was forced and unprotected.
+  // Round 2 (WP-B15-21 integrated, no reclaim yet): rewritten to assert the
+  // fresh shop gets its OWN separate list - correct for that intermediate
+  // state, where findOrCreateDraftList's shop-owned branch never looked at a
+  // pre-existing unowned list at all.
+  // Round 3 (WP-B15-22 reclaim fix, THIS state): findOrCreateDraftList now
+  // RECLAIMS a pre-existing UNOWNED same-date list instead of stranding it
+  // behind a fresh one (asdairCommands.mjs's own `reclaimUnownedList`) - so
+  // list 20 (unowned in this fixture - the dead shop 99 only ever CLAIMED
+  // item 210 via a shop_line row, it never OWNED the list via shop_id) is
+  // adopted by the fresh shop again. This is SAFE, unlike round 1, because
+  // ownership and the foreign-claims exclusion mechanism are BOTH still live:
+  // shop 99's shop_line claim on item 210 still excludes it from THIS shop's
+  // plan (proven by the AC1 tests below, which still pass), and Postgres's
+  // `uq_lists_shop` still refuses a second list for the SAME shop_id. Sharing
+  // a list is no longer dangerous BECAUSE something excludes what does not
+  // belong, not because sharing itself became impossible.
   const { h } = await planWithDeadWeek();
   assert.equal(h.db.shopping_lists.length, 1,
-    'a second list row was minted for the same household and date. Real Postgres refuses that on '
-    + 'unique (household_id, list_date); only a double that does not model the constraint would pass');
-  assert.equal(String(h.db.shop[0].list_id), '20', 'the shop did not bind the list on its own date');
+    'the pre-existing unowned list should be RECLAIMED, not left behind while a second one is minted');
+  assert.equal(String(h.db.shop[0].list_id), '20',
+    'the fresh shop must adopt the pre-existing unowned list for this exact date');
+  const ownList = h.db.shopping_lists.find((l) => String(l.id) === String(h.db.shop[0].list_id));
+  assert.ok(ownList, 'the shop points at a list row that does not exist');
+  assert.equal(String(ownList.shop_id), String(h.db.shop[0].id),
+    'the reclaimed list must now be OWNED by this shop\'s shop_id, not merely coincide on date');
 });
 
 test('B15-10 AC7: the dead week item is PRESERVED EVIDENCE - never deleted, never mutated', async () => {
@@ -2306,11 +2654,16 @@ test('B15-10 AC2: a re-interpret of the SAME message mints no second list and no
 });
 
 test('B15-10 AC2: the shop own items are all present exactly once after the re-run', async () => {
+  // list_id is read off the shop rather than assumed, so this stays correct
+  // whichever of the two WP-B15-22 mechanisms is in play (reclaim of the
+  // pre-existing list 20, or a fresh one, should that mechanism ever change
+  // again) - the fixture's own constant is never trusted directly.
   const { h } = await planWithDeadWeek();
   h.db.shop[0].status = 'TRANSCRIBING';
   await runPipeline(HANDLE, h.deps);
+  const ownListId = String(h.db.shop[0].list_id);
   const names = h.db.shopping_list_items
-    .filter((i) => String(i.list_id) === '20')
+    .filter((i) => String(i.list_id) === ownListId)
     .map((i) => String(i.item_name).toLowerCase());
   const dupes = names.filter((n, i) => names.indexOf(n) !== i);
   assert.deepEqual(dupes, [], `the same item exists twice on one list: ${JSON.stringify(dupes)}`);
@@ -2461,6 +2814,34 @@ test('B15-10 AC4 END TO END: the question card carries the id, so the printed an
 // =====================================================================
 // WP-B15-10 - THE WORKING SET: EXCLUDE ONLY WHAT ANOTHER SHOP PROVABLY OWNS
 //
+// ⚠️ WP-B15-22 NOTE, READ BEFORE TOUCHING ANYTHING BELOW - THIS IS THE THIRD
+// AND CURRENT STATE, superseding two earlier versions of this note. Read the
+// per-test history comments below for the full three-round story; the
+// summary:
+//
+//   Round 1 (pre-019): two DIFFERENT shops on one date were FORCED to share
+//   one list, unprotected - the actual 2026-08-10 incident.
+//   Round 2 (WP-B15-21 integrated, no reclaim): findOrCreateDraftList's
+//   shop-owned branch never looked at a pre-existing unowned same-date list
+//   at all - sharing became structurally impossible, but a genuine NEW gap
+//   opened: an item added via the cockpit (or left on the unowned lane)
+//   before this week's shop-owned list existed was durably ORPHANED. Reported
+//   to Larry rather than fixed outside this Work Order's original surface.
+//   Round 3 (THIS state - Larry extended file_surface to services/
+//   control-plane/wp-d-proof/asdairCommands.mjs specifically to close it):
+//   findOrCreateDraftList now RECLAIMS a pre-existing unowned same-date list
+//   (reclaimUnownedList) rather than orphaning it. `sharedListSeed()`'s list
+//   20 IS reclaimed by the fresh shop again - sharing is BACK, deliberately,
+//   and it is SAFE this time because ownership (shop_id) and the foreign-
+//   claims exclusion mechanism below are BOTH still fully live: a claim made
+//   by ANOTHER shop's shop_line row is still excluded from THIS shop's plan
+//   regardless of which list the item physically sits on. Round 1's danger
+//   was sharing with NOTHING protecting it; round 3's sharing is protected
+//   twice over (ownership prevents a genuinely different week's list from
+//   ever colliding across two DIFFERENT dates; exclusion prevents a
+//   genuinely foreign claim on the SAME list from ever reaching the plan).
+//
+
 // THE LIVE FAILURE, 2026-08-10. SHOP-2026-08-10-M64 bound to list_id 20, the
 // list of the CANCELLED SHOP-2026-08-10, and item 210 from the dead week became
 // an unanswerable question in Warwick's live shop.
@@ -2553,14 +2934,28 @@ test('B15-10 AC1: Warwick is never ASKED about the dead shop item', async () => 
     `an unanswerable question from a cancelled week reached him: ${JSON.stringify(asked)}`);
 });
 
-test('B15-10 AC1 REGRESSION THAT KILLED THE ALLOWLIST: an UNCLAIMED item still reaches the plan', async () => {
-  // The cockpit's add_regular_to_next_week has no shop context and can never
-  // link, so this row is claimed by nobody. Unclaimed belongs to nobody and
-  // STAYS. An allowlist dropped it, which is Warwick silently not getting what
-  // he asked for.
-  const { last } = await planOnSharedList();
+test('WP-B15-22 GAP CLOSED: a cockpit item added to the UNOWNED lane before this week\'s shop-owned list exists SURVIVES - reclaimed, not orphaned', async () => {
+  // ── THIS TEST'S HISTORY, IN FULL ──────────────────────────────────────────
+  // 1. "AC1 REGRESSION THAT KILLED THE ALLOWLIST: an UNCLAIMED item still
+  //    reaches the plan" - true while every shop shared one date-keyed list
+  //    unconditionally (no ownership concept at all).
+  // 2. "KNOWN GAP, REPORTED NOT FIXED" - WP-B15-21 alone (no reclaim yet)
+  //    gave the fresh shop its OWN separate list and never looked at what was
+  //    on the old unowned one - "Cockpit Added Regular" was genuinely,
+  //    durably stranded. Reported to Larry rather than fixed outside surface.
+  // 3. THIS STATE - Larry extended file_surface to
+  //    services/control-plane/wp-d-proof/asdairCommands.mjs specifically to
+  //    close this. findOrCreateDraftList now RECLAIMS a pre-existing unowned
+  //    same-date list (reclaimUnownedList) rather than orphaning it: the item
+  //    Warwick added from the cockpit lands on the SAME list his photo shop's
+  //    own items land on, because that list is now his shop's list.
+  const { last, h } = await planOnSharedList();
   assert.ok(last().some((n) => /Cockpit Added Regular/i.test(n)),
     `an item Warwick added from the cockpit was silently dropped: ${JSON.stringify(last())}`);
+  const item = h.db.shopping_list_items.find((i) => /Cockpit Added Regular/i.test(String(i.item_name)));
+  assert.ok(item, 'the cockpit item must still exist, not deleted');
+  assert.equal(String(item.list_id), String(h.db.shop[0].list_id),
+    'the cockpit item must be on THIS shop\'s own (reclaimed) list, not stranded on an orphaned one');
 });
 
 test('B15-10 AC1 REGRESSION THAT KILLED THE ALLOWLIST: a CORRECTED line still reaches the plan', async () => {
@@ -2613,6 +3008,15 @@ test('B15-10 AC1: the shop own items all reach the plan', async () => {
 });
 
 test('B15-10 FAIL OPEN: a claim read that FAILS filters NOTHING, and says so', async () => {
+  // ── RESTORED TO ITS ORIGINAL MEANING, WP-B15-22 RECLAIM FIX ──────────────
+  // With the reclaim fix (asdairCommands.mjs's reclaimUnownedList), the fresh
+  // shop genuinely adopts list 20 - shop.list_id IS '20' again, so a failed
+  // foreign-claims read is genuinely a read against THIS shop's own list, one
+  // that DOES carry another shop's claim (item 210, claimed by dead shop 99's
+  // shop_line row). That is exactly what "FAIL OPEN" needs to prove: with the
+  // read broken, nothing can be excluded, so the dead shop's item is NOT
+  // filtered out - the degraded path is the UNFILTERED one, on purpose, in
+  // preference to risking a wrongful drop while the database is unhappy.
   const { h, last, logs } = await planOnSharedList({
     wire: (harness) => {
       const inner = harness.deps.readQuery;
@@ -2635,6 +3039,8 @@ test('B15-10 FAIL OPEN: a claim read that FAILS filters NOTHING, and says so', a
   assert.equal(failed.length > 0, true, 'the degradation was silent - a drop nobody can see is a drop nobody fixes');
   assert.match(String(failed[0].detail.detail), /connection reset by peer/, 'the reason must travel');
   assert.equal(String(failed[0].detail.shop_ref), REF);
+  assert.equal(String(failed[0].detail.list_id), '20',
+    'the read that failed must genuinely be against the shop\'s own (reclaimed) list 20');
   assert.ok(h.db.shop_question.length > 0, 'the shop must still make progress on a degraded read');
 });
 

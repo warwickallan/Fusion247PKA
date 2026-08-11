@@ -902,12 +902,23 @@ export async function readSnapshot(deps, handle) {
  * The right long-term fix is a `list_id` parameter on the public `transition`,
  * which belongs to the shop work package, not to this one.
  */
-export async function advanceWithList(deps, { shopId, fromStatus, toStatus, listId, description }) {
+export async function advanceWithList(deps, {
+  shopId, fromStatus, toStatus, listId, description,
+  transcriptProvider, transcriptModel, transcriptConfidence,
+}) {
   const shopStore = deps.shopStore;
   const { inTransaction, applyTransition } = shopStore._internal;
   return inTransaction({}, async (client) => {
     const set = { status: toStatus };
     if (listId !== null && listId !== undefined) set.list_id = listId;
+    // WP-B15-22 (Gate Zero) - provenance for a photo interpretation, in the
+    // SAME transaction and the SAME row update as the TRANSCRIBING ->
+    // PROCESSING transition it belongs to. Optional and additive: a text
+    // shop (or any other caller of advanceWithList) that supplies none of
+    // these three leaves the columns exactly as untouched as before.
+    if (transcriptProvider !== null && transcriptProvider !== undefined) set.transcript_provider = transcriptProvider;
+    if (transcriptModel !== null && transcriptModel !== undefined) set.transcript_model = transcriptModel;
+    if (transcriptConfidence !== null && transcriptConfidence !== undefined) set.transcript_confidence = transcriptConfidence;
     const applied = await applyTransition(client, {
       shop_id: shopId,
       from_status: fromStatus,

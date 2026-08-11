@@ -2873,12 +2873,24 @@ test('B15-15 AC4 BEHAVIOURAL: THIS shop\'s own lines still reach the planner', a
     `the shop's own interpreted line was excluded from its own plan: ${JSON.stringify(last())}`);
 });
 
-test('B15-15 AC4 BEHAVIOURAL: an UNCLAIMED item still reaches the plan', async () => {
-  // Unclaimed belongs to nobody and STAYS. Neither direction of the statement
-  // returns it, so this pins that the handler is not simply keeping everything.
-  const { last } = await planOnSharedListThroughFakePg();
+test('WP-B15-22 GAP CLOSED: a cockpit item added to the UNOWNED lane before this week\'s shop-owned list exists SURVIVES - reclaimed, not orphaned', async () => {
+  // ── WAS: "an UNCLAIMED item still reaches the plan", then "KNOWN GAP,
+  // REPORTED NOT FIXED" ─────────────────────────────────────────────────────
+  // Larry extended this Work Order's file_surface to services/control-plane/
+  // wp-d-proof/asdairCommands.mjs specifically to close the reported gap:
+  // findOrCreateDraftList now RECLAIMS a pre-existing unowned same-date list
+  // (reclaimUnownedList) instead of stranding it behind a freshly-minted one.
+  // Answered through fakePg's OWN dispatch (this file proves the real SQL is
+  // read, not a hand-written closure's idea of it - see the section header
+  // above `sharedListSeedForFakePg`), so the fake's new reclaim handlers
+  // (test/fakePg.js) are exercised here too, not only in runPipeline.test.js.
+  const { last, h } = await planOnSharedListThroughFakePg();
   assert.ok(last().some((n) => /Cockpit Added Regular/i.test(n)),
     `an item Warwick added from the cockpit was silently dropped: ${JSON.stringify(last())}`);
+  const item = h.db.shopping_list_items.find((i) => /Cockpit Added Regular/i.test(String(i.item_name)));
+  assert.ok(item, 'the cockpit item must still exist, not deleted');
+  assert.equal(String(item.list_id), String(h.db.shop[0].list_id),
+    'the cockpit item must be on THIS shop\'s own (reclaimed) list, not stranded on an orphaned one');
 });
 
 test('B15-15 AC4: fakePg REFUSES a foreign-claims statement whose predicate it cannot read', async () => {
@@ -2903,4 +2915,623 @@ test('B15-15 AC4: fakePg REFUSES a foreign-claims statement whose predicate it c
     false,
     'the handler cannot see the inversion, so every test built on it is blind to the statement',
   );
+});
+
+// =====================================================================
+// WP-B15-18 - A NUMBERED ANSWER LANDS ON THE QUESTION HE WAS LOOKING AT.
+//
+// THE DEFECT IN ONE LINE: "which question is this?" was asked of every open
+// question in the ESTATE, keyed by a number that is only unique WITHIN a shop.
+//
+// Two shops are simultaneously active whenever last week's has not reconciled
+// and this week's has arrived - the ordinary state, not an edge case. Every
+// board numbers from 1. The open list is ordered by shop id ASC and the Map is
+// last-write-wins, so the HIGHER shop id silently took every contested number.
+// The surviving mapping carried its OWN shopRef all the way into
+// commands.answerQuestion, which resolved the shop by that ref and wrote the
+// answer to a row he was not looking at. It succeeded. It logged success.
+//
+// FOUR HOLES, NOT ONE, and the reported one is the least dangerous:
+//   step 0  the board ordinal            reported
+//   step 1  the exact candidate label    same leak
+//   step 2  "only one open question"     THE WORST - it needs no number in the
+//                                        message at all, so nothing is left
+//                                        afterwards for anyone to blame
+//   step 3  Terra, keyed by question_key which carries NO shop component
+//           (keys.js:260-274 hashes the item name), so two shops asking about
+//           the same item mint the IDENTICAL key
+//
+// Every test below is RED against the source that shipped before this package.
+// =====================================================================
+
+/** Shop B's ref shares no PREFIX with shop A's, on purpose. 'SHOP-2026-08-03-B'
+ *  is found INSIDE 'SHOP-2026-08-03' by a substring test, so a fixture built on
+ *  one would identify the wrong board and prove nothing. */
+const REF_B = 'SHOP-2026-09-14';
+
+/**
+ * A shop row that is ACTIVE right now, seeded rather than minted.
+ *
+ * createOrResumeShop RESUMES on (household, shop_ref) and this suite's clock is
+ * frozen, so two lists arriving in one frozen week are ONE shop - intake cannot
+ * mint a second active shop here. Seeding is not a way around the real writer:
+ * it is the only way to reproduce the LIVE shape, which is two rows in one
+ * table (shop 7 READY_TO_SHOP beside shop 14 NEEDS_DECISION, 2026-08-10).
+ *
+ * THE EXPLICIT id IS LOAD-BEARING. fakePg assigns max(id)+1, listActiveShops
+ * orders by id ASC, and the collision under test is LAST-WRITE-WINS - so which
+ * shop holds the lower id decides which one silently loses. The mirrored test
+ * swaps them for exactly that reason; without the swap one direction would pass
+ * by accident of ordering rather than by the fix.
+ */
+function activeShopSeed({ id, shopRef, messageId }) {
+  return {
+    ...terminalShopSeed(),
+    id,
+    shop_ref: shopRef,
+    status: 'NEEDS_DECISION',
+    telegram_message_id: String(messageId),
+    raw_text: 'a shop that is still waiting on him',
+  };
+}
+
+/** Open `items` as questions on one shop, in order, returning their keys. */
+async function openQuestionsOn(h, shopId, items) {
+  const keys = [];
+  for (const s of items) {
+    const questionKey = questionKeyFor(s.item);
+    await h.deps.shopStore.openQuestion({
+      shop_id: shopId,
+      question_key: questionKey,
+      question_text: 'Which product is "' + s.item + '"?',
+      candidates: s.candidates || [],
+    });
+    keys.push(questionKey);
+  }
+  return keys;
+}
+
+/**
+ * The Telegram message_id of the board belonging to ONE named shop.
+ *
+ * The fake sender numbers its messages by send order, so a board's id IS its
+ * 1-based position - but with two boards on the wire, position alone cannot say
+ * WHICH shop's board it is. The board's own reply markup carries its shop ref,
+ * so the identification comes from the message rather than from the order the
+ * outbox happened to drain.
+ */
+function boardMessageIdFor(bot, shopRef) {
+  const at = bot.sent.findIndex((s) => /still need from you/i.test(s.message.text)
+    && JSON.stringify(s.message.reply_markup || {}).includes(shopRef));
+  assert.notEqual(at, -1,
+    'no board was ever sent for ' + shopRef + ' - the FIXTURE is broken, not the product');
+  return at + 1;
+}
+
+/** The stored question row for one shop and key. Located by BOTH, because the
+ *  whole point of this package is that a key alone does not name a row. */
+function rowOf(h, shopId, questionKey) {
+  return h.db.shop_question.find(
+    (q) => String(q.shop_id) === String(shopId) && q.question_key === questionKey,
+  );
+}
+
+/** Two active shops, each carrying the same set of open questions, each with a
+ *  board on his phone. Returns the ids and the question keys per ref. */
+async function twoBoardedShops(h, bot, { lowerRef, higherRef, items }) {
+  h.db.shop.push(activeShopSeed({ id: 1, shopRef: lowerRef, messageId: 401 }));
+  h.db.shop.push(activeShopSeed({ id: 2, shopRef: higherRef, messageId: 402 }));
+  const ids = { [lowerRef]: 1, [higherRef]: 2 };
+  const keys = {
+    [lowerRef]: await openQuestionsOn(h, 1, items),
+    [higherRef]: await openQuestionsOn(h, 2, items),
+  };
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  return { ids, keys };
+}
+
+/** He replies to ONE shop's board, through the real loop. Not a unit call to
+ *  the correlator - the whole claim seam has to run for this to mean anything. */
+async function replyOnBoard(h, bot, { shopRef, text, updateId }) {
+  return runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([replyToCard({
+      messageId: boardMessageIdFor(bot, shopRef),
+      updateId,
+      text,
+    })]),
+  });
+}
+
+const TWO_ITEMS = [{ item: 'richmond pork sausages' }, { item: 'ariel 4in1 pods 33' }];
+
+test('B15-18 AC2: a numbered reply answers the board he replied to - and the other shop keeps its question', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  // He is looking at the LOWER-id shop, which is the one the unfixed Map throws
+  // away. This is the direction that is live today.
+  const { ids, keys } = await twoBoardedShops(h, bot, {
+    lowerRef: REF, higherRef: REF_B, items: TWO_ITEMS,
+  });
+
+  await replyOnBoard(h, bot, { shopRef: REF, text: '1: the 12 skinless ones', updateId: 181 });
+
+  const his = rowOf(h, ids[REF], keys[REF][0]);
+  const other = rowOf(h, ids[REF_B], keys[REF_B][0]);
+  assert.equal(his.status, 'answered',
+    'he answered question 1 on the board in front of him and his own question is still open');
+  assert.equal(his.answer_text, 'the 12 skinless ones');
+  assert.equal(other.status, 'open',
+    'his answer landed on a DIFFERENT shop - this is the defect, and nothing errored');
+  assert.equal(other.answer_text, null,
+    'a shop he was not looking at now carries words he never aimed at it');
+});
+
+test('B15-18 AC2 MIRRORED: the same holds with the shops reversed, so nothing passes by accident of id order', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  // THE SHOPS ARE REVERSED, not the reply. Last-write-wins always favours the
+  // higher id, so a mirror that only moved the reply would go green today with
+  // no fix at all - which is the "higher shop id happens to win" evidence this
+  // test exists to refuse.
+  const { ids, keys } = await twoBoardedShops(h, bot, {
+    lowerRef: REF_B, higherRef: REF, items: TWO_ITEMS,
+  });
+
+  await replyOnBoard(h, bot, { shopRef: REF_B, text: '1: the 33 pack', updateId: 182 });
+
+  const his = rowOf(h, ids[REF_B], keys[REF_B][0]);
+  const other = rowOf(h, ids[REF], keys[REF][0]);
+  assert.equal(his.status, 'answered', 'the mirrored direction leaks exactly as the first one does');
+  assert.equal(his.answer_text, 'the 33 pack');
+  assert.equal(other.status, 'open');
+  assert.equal(other.answer_text, null);
+});
+
+test('B15-18 AC2: replying to the HIGHER-id board still works - the fix must not break what accidentally worked', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  // This one is GREEN before the fix, by accident: the higher id wins the
+  // collision and happens to be the shop he meant. It is here so the scoping
+  // cannot buy the two tests above by breaking this one.
+  const { ids, keys } = await twoBoardedShops(h, bot, {
+    lowerRef: REF_B, higherRef: REF, items: TWO_ITEMS,
+  });
+
+  await replyOnBoard(h, bot, { shopRef: REF, text: '2: the 33 pack', updateId: 183 });
+
+  assert.equal(rowOf(h, ids[REF], keys[REF][1]).answer_text, 'the 33 pack');
+  assert.equal(rowOf(h, ids[REF_B], keys[REF_B][1]).status, 'open');
+});
+
+test('B15-18 AC2b EXACT CANDIDATE: a label only the OTHER shop offers must not pull his answer across', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  // Only the higher-id shop offers this label. He is looking at the lower-id
+  // shop's board and types it. exact.length === 1 is TRUE across the estate, so
+  // today the deterministic step resolves it - to the wrong shop.
+  const LABEL = 'Richmond 12 Skinless Pork Sausages 319g';
+  h.db.shop.push(activeShopSeed({ id: 1, shopRef: REF, messageId: 401 }));
+  h.db.shop.push(activeShopSeed({ id: 2, shopRef: REF_B, messageId: 402 }));
+  const aKeys = await openQuestionsOn(h, 1, [{ item: 'batchelors mac n cheese' }]);
+  const bKeys = await openQuestionsOn(h, 2, [
+    { item: 'richmond pork sausages', candidates: [{ regular_id: 11, label: LABEL }] },
+  ]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  await replyOnBoard(h, bot, { shopRef: REF, text: LABEL, updateId: 184 });
+
+  assert.equal(rowOf(h, 2, bKeys[0]).status, 'open',
+    'a label offered by a shop he was NOT looking at swallowed his answer');
+  assert.equal(rowOf(h, 2, bKeys[0]).answer_text, null);
+  assert.equal(rowOf(h, 1, aKeys[0]).answer_text, LABEL,
+    'scoped to his own board there is exactly one open question, so his words belong to it');
+});
+
+test('B15-18 AC2b EXACT CANDIDATE: a label offered by BOTH shops resolves against the board he replied to', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  // Offered by both, so today exact.length === 2 and the deterministic step
+  // declines - correctly refusing to guess, but with no shop binding to fall
+  // back on, his answer reaches nothing at all and becomes a shopping list.
+  const LABEL = 'Richmond 12 Skinless Pork Sausages 319g';
+  const shared = [
+    { item: 'richmond pork sausages', candidates: [{ regular_id: 11, label: LABEL }] },
+    { item: 'ariel 4in1 pods 33' },
+  ];
+  const { ids, keys } = await twoBoardedShops(h, bot, {
+    lowerRef: REF, higherRef: REF_B, items: shared,
+  });
+
+  await replyOnBoard(h, bot, { shopRef: REF, text: LABEL, updateId: 185 });
+
+  assert.equal(rowOf(h, ids[REF], keys[REF][0]).answer_text, LABEL,
+    'his own board names exactly one question offering that label - there was nothing to guess');
+  assert.equal(rowOf(h, ids[REF_B], keys[REF_B][0]).status, 'open');
+  assert.equal(rowOf(h, ids[REF_B], keys[REF_B][0]).answer_text, null);
+});
+
+test('B15-18 AC2b SINGLE OPEN QUESTION: the worst hole, because the message carries no number to blame', async () => {
+  // Shop B holds one open question. Shop A - the one he is looking at - has
+  // every question settled. He replies to A's board. Today open.length === 1 is
+  // true ACROSS THE ESTATE, so step 2 says "there is nothing to choose between"
+  // and writes his words onto B. No number, no error, no notice.
+  const h = makeHarness({ seed: { shop: [activeShopSeed({ id: 1, shopRef: REF_B, messageId: 401 })] } });
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  const bKeys = await openQuestionsOn(h, 1, [{ item: 'batchelors mac n cheese' }]);
+
+  // Shop A is minted the ordinary way, so its settled-question path is the real
+  // one rather than a seeded approximation.
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]) });
+  const a = h.db.shop.find((s) => s.shop_ref === REF);
+  const aKeys = await openQuestionsOn(h, a.id, [{ item: 'richmond pork sausages' }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+  await h.deps.shopStore.answerQuestion({
+    shop_id: a.id, question_key: aKeys[0], answer_text: 'Richmond 12 Skinless', answer_source: 'typed',
+  });
+
+  await replyOnBoard(h, bot, { shopRef: REF, text: 'actually make it the 24 pack', updateId: 186 });
+  await drainOutbox(h.deps, { bot });
+
+  assert.equal(rowOf(h, 1, bKeys[0]).status, 'open',
+    'words aimed at a settled board were written onto a different shop, with no number in the message');
+  assert.equal(rowOf(h, 1, bKeys[0]).answer_text, null);
+  const told = bot.sent.filter((s) => /not taken|NOT recorded|not been taken|have not taken/i.test(s.message.text));
+  assert.ok(told.length >= 1,
+    'the board he replied to has nothing open, so he must be TOLD - a silent refusal is the drop this build keeps closing');
+});
+
+test('B15-18 AC2b TERRA byKey: a question_key carries no shop, so the model mapping must resolve inside his board', async () => {
+  // Both shops ask about the SAME item, so questionKeyFor mints the IDENTICAL
+  // key for both - it hashes the item name and nothing else, and that
+  // derivation is pinned to live rows, so the LOOKUP is what gets scoped.
+  const SHARED = 'richmond pork sausages';
+  const sharedKey = questionKeyFor(SHARED);
+  const h = makeHarness({
+    depsOverride: {
+      correlateAnswer: async () => ({
+        mappings: [{ question_key: sharedKey, confidence: 'high', answer_text: 'the 12 skinless ones' }],
+      }),
+    },
+  });
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  const { ids } = await twoBoardedShops(h, bot, {
+    lowerRef: REF, higherRef: REF_B, items: [{ item: SHARED }, { item: 'ariel 4in1 pods 33' }],
+  });
+
+  // Free text: no number, no candidate label, and two questions open on his own
+  // board - so steps 0, 1 and 2 all decline and Terra is genuinely reached.
+  await replyOnBoard(h, bot, { shopRef: REF, text: 'the big ones please', updateId: 187 });
+
+  assert.equal(rowOf(h, ids[REF], sharedKey).answer_text, 'the 12 skinless ones',
+    'the model named a question KEY, and an identical key on another shop won the lookup');
+  assert.equal(rowOf(h, ids[REF_B], sharedKey).status, 'open');
+  assert.equal(rowOf(h, ids[REF_B], sharedKey).answer_text, null);
+});
+
+/** A reply to a specific card whose OWN message id can vary. replyToCard pins
+ *  its message_id at 7777, which is right everywhere else and wrong here: two
+ *  copies of one reply inside a single pass need two inbound identities, or the
+ *  inbound unique index collapses them before routing ever sees the second. */
+function replyToCardAs({ messageId, text, updateId, msgId, chatId = 555 }) {
+  return {
+    update_id: updateId,
+    message: {
+      message_id: msgId,
+      from: { id: chatId },
+      chat: { id: chatId, type: 'private' },
+      text,
+      reply_to_message: { message_id: messageId, chat: { id: chatId } },
+    },
+  };
+}
+
+test('B15-18 AC5b: the duplicate check reads the row on HIS shop, not the first row sharing the key', async () => {
+  // recordedAnswerMatches answers exactly one question: did these words actually
+  // LAND? It matters because answerQuestion is a compare-and-set - a second copy
+  // of the same reply is refused by the row and comes back `duplicate: true`,
+  // and claiming on that receipt without checking would record his words
+  // nowhere. So a redelivery must be recognised, or it becomes a shopping list.
+  //
+  // The entry was found by questionKey ALONE. A key hashes the item name and
+  // carries no shop, so with two shops asking about the same thing the LOWER id
+  // won - and the check then read a stranger's row, saw his words were not in
+  // it, and refused a redelivery of his own answer.
+  //
+  // ONE PASS, TWO COPIES. That is the shape this function exists for and the
+  // only one it can serve: the open list is read once at the top of a pass, so
+  // a copy arriving in a LATER pass finds the question already settled and
+  // absent from that list. (See the return - that is a separate, pre-existing
+  // defect, reported and deliberately not fixed here.)
+  const SHARED = 'richmond pork sausages';
+  const sharedKey = questionKeyFor(SHARED);
+  const WORDS = 'the 12 skinless ones';
+  const h = makeHarness({ seed: { shop: [activeShopSeed({ id: 1, shopRef: REF_B, messageId: 401 })] } });
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  // Shop B holds an OPEN question under the identical key, on the lower id.
+  await openQuestionsOn(h, 1, [{ item: SHARED }]);
+
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]) });
+  const a = h.db.shop.find((s) => s.shop_ref === REF);
+  await openQuestionsOn(h, a.id, [{ item: SHARED }, { item: 'ariel 4in1 pods 33' }]);
+  // Per-question cards, so a reply can name ONE question through its own card.
+  await queueShopCards(h.deps, { perQuestionCards: true });
+  await drainOutbox(h.deps, { bot });
+
+  const card = h.db.shop_question.find(
+    (q) => String(q.shop_id) === String(a.id) && q.question_key === sharedKey && q.card_message_id,
+  );
+  assert.ok(card, 'the fixture never sealed a card for the question under test');
+
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([
+      replyToCardAs({ messageId: Number(card.card_message_id), updateId: 600, msgId: 7801, text: WORDS }),
+      replyToCardAs({ messageId: Number(card.card_message_id), updateId: 601, msgId: 7802, text: WORDS }),
+    ]),
+  });
+
+  // NOT asserted on the shop count. This suite's clock is frozen, so intake
+  // RESUMES the existing week rather than minting a second shop - a count
+  // assertion would be green whatever happened, which is the vacuous proof this
+  // build keeps refusing. The reported answers carry the refusal verbatim.
+  const mine = report.answers.filter((x) => x.question_key === sharedKey);
+  assert.equal(mine.length, 2, 'both copies must reach the answer path, settled ' + mine.length);
+  assert.equal(mine[0].duplicate, false, 'the first copy is the real answer');
+  assert.equal(mine[1].error, undefined,
+    'the second copy was measured against ANOTHER shop row and refused: ' + String(mine[1].error));
+  assert.equal(mine[1].duplicate, true,
+    'a redelivery must be recognised against HIS shop, not the first row sharing the key');
+  assert.equal(rowOf(h, 1, sharedKey).answer_text, null,
+    'the shop he never addressed must not carry his words');
+});
+
+test('WP-B15-22 F1: a reply redelivered in a LATER pass is recognised, not refused as "different words"', async () => {
+  // recordedAnswerMatches used to resolve the shop from `open` (openQuestions),
+  // read ONCE at the top of a pass. The one case this function exists for - a
+  // duplicate receipt on an ALREADY-SETTLED question - is exactly the case
+  // where the question has LEFT `open`, possibly on an earlier pass entirely:
+  // it stopped being open the moment PASS 1 settled it. The AC5b test above
+  // deliberately does not cover this (both copies arrive in ONE pass, so
+  // `open` still carries the question when the second copy is checked); this
+  // is the pre-existing gap that test's own comment named and left open.
+  //
+  // Reproduced with ONE shop, no cross-shop element, words on the redelivered
+  // copy IDENTICAL to the first: before the fix this was refused with "not
+  // recorded - the question was already answered with different words", which
+  // is false - the words are the same, `open` just could not see the row.
+  const SHARED = 'richmond pork sausages';
+  const sharedKey = questionKeyFor(SHARED);
+  const WORDS = 'the 12 skinless ones';
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]) });
+  const shop = h.db.shop.find((s) => s.shop_ref === REF);
+  await openQuestionsOn(h, shop.id, [{ item: SHARED }]);
+  await queueShopCards(h.deps, { perQuestionCards: true });
+  await drainOutbox(h.deps, { bot });
+
+  const card = h.db.shop_question.find(
+    (q) => String(q.shop_id) === String(shop.id) && q.question_key === sharedKey && q.card_message_id,
+  );
+  assert.ok(card, 'the fixture never sealed a card for the question under test');
+
+  // PASS 1 - the real answer, settling the question. `open` at the top of
+  // THIS pass still carries it, so this is the ordinary path either way.
+  const report1 = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([
+      replyToCardAs({ messageId: Number(card.card_message_id), updateId: 700, msgId: 8801, text: WORDS }),
+    ]),
+  });
+  const first = report1.answers.find((x) => x.question_key === sharedKey);
+  assert.ok(first, 'the first copy never reached the answer path');
+  assert.equal(first.duplicate, false, 'the first copy is the real answer');
+  assert.equal(rowOf(h, shop.id, sharedKey).answer_text, WORDS);
+
+  // PASS 2 - a SEPARATE runOnce, same words, redelivering the SAME message.
+  // openQuestions is re-read fresh at the top of THIS pass and no longer
+  // carries the now-answered question - the exact condition F1 exists to
+  // prove, and the one the AC5b test above could not reach in a single pass.
+  const report2 = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([
+      replyToCardAs({ messageId: Number(card.card_message_id), updateId: 701, msgId: 8802, text: WORDS }),
+    ]),
+  });
+  const second = report2.answers.find((x) => x.question_key === sharedKey);
+  assert.ok(second, 'the redelivered copy never reached the answer path');
+  assert.equal(second.error, undefined,
+    'the redelivery was refused as "different words" even though the words are identical: ' + String(second.error));
+  assert.equal(second.duplicate, true,
+    'a genuine cross-pass redelivery must be recognised, not silently dropped through to intake');
+  assert.equal(rowOf(h, shop.id, sharedKey).answer_text, WORDS,
+    'the original answer must survive the redelivery unchanged');
+});
+
+// ── AC3 / AC5a - WHEN THERE IS NO BOARD TO BIND TO ───────────────────────────
+//
+// A BARE typed message is not a reply to anything, so it carries no evidence at
+// all about which shop he meant. Everything above is scoped by the board he
+// replied to; these are the cases where that evidence does not exist.
+//
+// THE RULE IS TARGETED, NOT STRICT, and that distinction is the whole of AC5a.
+// Refusing every unbound message would have been simpler and would have deleted
+// capability that works correctly today - the exact-candidate and Terra paths
+// resolve unbound messages perfectly well whenever only one shop offers the
+// thing they matched on. So ambiguity is dropped TOKEN BY TOKEN: contested ones
+// are refused, unique ones still resolve.
+//
+// These tests exist because the mutation proof found that they did not. Every
+// test above replies to a board, so the candidate set is always already one
+// shop, and the ambiguity drop is a no-op in all of them - the guard could be
+// deleted and every one of them stayed green.
+
+/** A bare typed message - no reply target, so no shop binding. */
+function bareMessage({ text, updateId }) {
+  return textUpdate({ updateId, text });
+}
+
+test('B15-18 AC3: an unbound numbered reply that two shops both answer to is REFUSED, not guessed', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  const { ids, keys } = await twoBoardedShops(h, bot, {
+    lowerRef: REF, higherRef: REF_B, items: TWO_ITEMS,
+  });
+
+  const events = [];
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    log: (event, detail) => events.push({ event, detail }),
+    // Typed straight into the chat. Both boards print a "1", and nothing in the
+    // message says which one he was reading.
+    intake: makeIntake([bareMessage({ updateId: 190, text: '1: the 12 skinless ones' })]),
+  });
+
+  assert.equal(rowOf(h, ids[REF], keys[REF][0]).answer_text, null,
+    'a number that names two different questions was resolved to one of them anyway');
+  assert.equal(rowOf(h, ids[REF_B], keys[REF_B][0]).answer_text, null,
+    'a number that names two different questions was resolved to one of them anyway');
+  assert.equal(rowOf(h, ids[REF], keys[REF][0]).status, 'open');
+  assert.equal(rowOf(h, ids[REF_B], keys[REF_B][0]).status, 'open');
+  assert.ok(events.some((e) => e.event === 'board_reply_shop_ambiguous'),
+    'the refusal must be visible in the journal - a silent drop is the failure this build keeps closing');
+});
+
+test('B15-18 AC5a: an unbound number only ONE shop offers still resolves - the rule is targeted, not strict', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  // Shop A: two rows, both open      -> its open board numbers are 1 and 2.
+  // Shop B: three rows, the first     -> its open board numbers are 2 and 3.
+  //         already settled
+  // So 1 belongs only to A, 3 belongs only to B, and 2 is contested.
+  h.db.shop.push(activeShopSeed({ id: 1, shopRef: REF, messageId: 401 }));
+  h.db.shop.push(activeShopSeed({ id: 2, shopRef: REF_B, messageId: 402 }));
+  const aKeys = await openQuestionsOn(h, 1, TWO_ITEMS);
+  const bKeys = await openQuestionsOn(h, 2, [
+    { item: 'batchelors mac n cheese' }, { item: 'richmond pork sausages' }, { item: 'ariel 4in1 pods 33' },
+  ]);
+  await h.deps.shopStore.answerQuestion({
+    shop_id: 2, question_key: bKeys[0], answer_text: 'the cheese one', answer_source: 'typed',
+  });
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  const events = [];
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    log: (event, detail) => events.push({ event, detail }),
+    // One message naming all three: two he can only have meant one way, and one
+    // that is genuinely ambiguous. The ambiguous one must not poison the others.
+    intake: makeIntake([bareMessage({
+      updateId: 191, text: '1: the 12 skinless ones\n2: no idea\n3: the 33 pack',
+    })]),
+  });
+
+  assert.equal(rowOf(h, 1, aKeys[0]).answer_text, 'the 12 skinless ones',
+    'number 1 belongs to exactly one shop, so refusing it deletes capability that worked');
+  assert.equal(rowOf(h, 2, bKeys[2]).answer_text, 'the 33 pack',
+    'number 3 belongs to exactly one shop, so refusing it deletes capability that worked');
+  assert.equal(rowOf(h, 1, aKeys[1]).answer_text, null,
+    'number 2 names a question in BOTH shops and must be dropped');
+  assert.equal(rowOf(h, 2, bKeys[1]).answer_text, null,
+    'number 2 names a question in BOTH shops and must be dropped');
+  assert.ok(events.some((e) => e.event === 'board_reply_shop_ambiguous'),
+    'the one number that was dropped must be reported, even though the message otherwise succeeded');
+});
+
+test('B15-18 AC3: an unbound model mapping onto a key TWO shops hold is refused, not guessed', async () => {
+  // Both shops ask about the same item, so both rows carry the identical key.
+  // The model names that key. It is telling the truth about the QUESTION and
+  // saying nothing about the SHOP, because a question_key does not carry one.
+  const SHARED = 'richmond pork sausages';
+  const sharedKey = questionKeyFor(SHARED);
+  const h = makeHarness({
+    depsOverride: {
+      correlateAnswer: async () => ({
+        mappings: [{ question_key: sharedKey, confidence: 'high', answer_text: 'the 12 skinless ones' }],
+      }),
+    },
+  });
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  const { ids } = await twoBoardedShops(h, bot, {
+    lowerRef: REF, higherRef: REF_B, items: [{ item: SHARED }, { item: 'ariel 4in1 pods 33' }],
+  });
+
+  const events = [];
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    log: (event, detail) => events.push({ event, detail }),
+    intake: makeIntake([bareMessage({ updateId: 192, text: 'the big ones please' })]),
+  });
+
+  assert.equal(rowOf(h, ids[REF], sharedKey).answer_text, null,
+    'the model named a key that exists on two shops and one of them was picked');
+  assert.equal(rowOf(h, ids[REF_B], sharedKey).answer_text, null,
+    'the model named a key that exists on two shops and one of them was picked');
+  assert.ok(events.some((e) => e.event === 'answer_correlation_shop_ambiguous'),
+    'a dropped model mapping must be reported rather than vanishing');
+});
+
+test('B15-18 AC5a: an unbound model mapping onto a key only ONE shop holds still resolves', async () => {
+  // The counterpart, and the reason strict refusal was rejected: this message
+  // is unbound too, but the key the model returned exists on exactly one shop,
+  // so there is nothing to choose between and nothing to refuse.
+  const ONLY_B = 'batchelors mac n cheese';
+  const onlyBKey = questionKeyFor(ONLY_B);
+  const h = makeHarness({
+    depsOverride: {
+      correlateAnswer: async () => ({
+        mappings: [{ question_key: onlyBKey, confidence: 'high', answer_text: 'the four pack' }],
+      }),
+    },
+  });
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+  h.db.shop.push(activeShopSeed({ id: 1, shopRef: REF, messageId: 401 }));
+  h.db.shop.push(activeShopSeed({ id: 2, shopRef: REF_B, messageId: 402 }));
+  await openQuestionsOn(h, 1, TWO_ITEMS);
+  await openQuestionsOn(h, 2, [{ item: ONLY_B }, { item: 'ariel 4in1 pods 33' }]);
+  await queueShopCards(h.deps, {});
+  await drainOutbox(h.deps, { bot });
+
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([bareMessage({ updateId: 193, text: 'the four pack please' })]),
+  });
+
+  assert.equal(rowOf(h, 2, onlyBKey).answer_text, 'the four pack',
+    'refusing this would delete a path that resolves correctly today - strict was rejected for exactly this');
 });

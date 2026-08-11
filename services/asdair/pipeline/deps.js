@@ -191,6 +191,20 @@ async function realLoadCatalogue(householdId) {
 }
 
 /**
+ * The vision model id ACTUALLY resolved for a grounded photo interpretation -
+ * read at call time, exactly as `answerModel()` (services/obsidiwikai/src/
+ * core/models.mjs) already does for the answer role, and for the same
+ * reason: a durable provenance row must say what actually answered, not a
+ * literal frozen at some earlier point that env resolution could since have
+ * moved past. Never hardcoded (WP-B15-22 Gate Zero - Warwick: do not write
+ * "gpt-5-mini" here, resolve it the same way the codebase already does).
+ */
+async function realVisionModel() {
+  const { ROLE_ALIAS } = await import('../../obsidiwikai/src/core/models.mjs');
+  return ROLE_ALIAS.vision;
+}
+
+/**
  * ONE grounded vision request. Not a daemon, not a conversation, not an agent.
  *
  * The prompt is built from the catalogue by groundedPrompt.js and asks the model
@@ -226,6 +240,18 @@ async function realInterpretPhoto({ prompt, imagePath }) {
     line_no: l.line_no ?? i + 1,
     raw_reading: String(l.raw_reading ?? '').trim(),
     quantity: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : null,
+    // ── GATE ZERO (WP-B15-22) ────────────────────────────────────────────
+    // groundedPrompt.js EXPLICITLY asks for these two fields per line
+    // (confidence 0.0-1.0, and status "unreadable" when the model cannot
+    // read something) and until this fix they were dropped here, before
+    // ever reaching resolveByCatalogue.js or shop_line.match_confidence -
+    // asked for, almost certainly returned, and thrown away in this mapping.
+    // Passed through FAITHFULLY: a missing/non-numeric confidence becomes
+    // `null` (never invented, never defaulted to 1.0 - that decision belongs
+    // to whoever GATES on it, not to this pass-through), and the model's own
+    // status string is carried as-is rather than re-interpreted here.
+    confidence: Number.isFinite(Number(l.confidence)) ? Number(l.confidence) : null,
+    model_status: typeof l.status === 'string' && l.status.trim() !== '' ? l.status.trim() : null,
   }));
 }
 
@@ -747,6 +773,7 @@ export function createDeps(overrides = {}) {
     loadCatalogue: realLoadCatalogue,
     buildGroundedPrompt,
     interpretPhoto: realInterpretPhoto,
+    visionModel: realVisionModel,
     resolveAll,
 
     // list -> intents -> real rows

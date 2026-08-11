@@ -706,6 +706,14 @@ async function stepInterpret(deps, snapshot) {
       raw_reading: l.raw_reading,
       quantity: l.quantity ?? null,
       forced_review: false,
+      // GATE ZERO (WP-B15-22): carried through to resolveByCatalogue.js's
+      // vision-confidence gate, keyed exactly as resolveAll expects. Present
+      // ONLY on the photo path - a typed line was never read by a vision
+      // model and must not be gated as though it were (see
+      // applyVisionConfidenceGate's own doc comment on why `undefined` here
+      // is load-bearing, not an oversight).
+      vision_confidence: l.confidence ?? null,
+      vision_status: l.model_status ?? null,
     }));
   } else {
     if (!shop.raw_text) {
@@ -783,6 +791,12 @@ async function stepInterpret(deps, snapshot) {
     quantity: l.quantity,
     matched_regular_id: l.matched_regular_id,
     match_basis: l.match_basis,
+    // GATE ZERO (WP-B15-22): the model's own per-line confidence, threaded
+    // through resolveAll (resolveByCatalogue.js) unchanged - a real column
+    // this had never been populated. `null` for a typed line (never vision-
+    // graded); the model's raw value (or a gate-forced 0 already reflected in
+    // `status` above) for a photo line.
+    match_confidence: l.match_confidence ?? null,
     alternatives: (l.alternatives || []).map((a) => ({ regular_id: a.id, name: a.name })),
     status: l.status,
   })));
@@ -791,7 +805,9 @@ async function stepInterpret(deps, snapshot) {
   // already confirmed refuses the re-read, and the list must follow the stored
   // truth rather than the fresh guess.
   const stored = shopLines.withCanonicalNames(lineWrites.map((w) => w.line), catalogue);
-  const intents = buildGroundedIntents(stored, { sourceId, listDate, requestedBy: 'asdair:pipeline' });
+  const intents = buildGroundedIntents(stored, {
+    sourceId, listDate, requestedBy: 'asdair:pipeline', shopId: shop.id,
+  });
   deps.assertAllowedIntents(intents);
 
   // Materialise the real list rows. add_list_item upserts on (list_id,
@@ -806,6 +822,34 @@ async function stepInterpret(deps, snapshot) {
     if (itemId) await shopLines.linkListItem(deps, shop.id, stored[i].line_no, itemId);
   }
 
+  // ── PROVENANCE FOR A PHOTO INTERPRETATION (WP-B15-22, GATE ZERO) ─────────
+  // shopState.js's buildShopCreate could already SET these three columns, but
+  // only at shop creation - stepInterpret runs long after a shop exists, and
+  // had no writer for them at all, so every photo shop's transcript columns
+  // stayed empty (Deliverables/2026-08-11-GATE-ZERO-source-truth-established.md
+  // §1). Photo shops only: a typed list was never read by a vision model, so
+  // "which model read this" and "how confident was the read" have no meaning
+  // for it. METADATA ONLY - provenance and a confidence SUMMARY, never the
+  // raw reading, the prompt or the photograph; store.recordGroundingEvidence's
+  // deliberate privacy sanitisation is untouched by this.
+  //
+  // transcript_confidence is the MINIMUM across every line, not the average -
+  // a single badly-read line is exactly what caused SHOP-2026-08-10-M64, and
+  // a mean would dilute it into invisibility. A line with no vision signal at
+  // all cannot occur here (this whole block is photo-only); a gated line's
+  // own low confidence is exactly what should pull this summary down.
+  let transcriptFields = {};
+  if (shop.source_kind === 'photo') {
+    const confidences = resolved
+      .map((l) => (Number.isFinite(Number(l.match_confidence)) ? Number(l.match_confidence) : 0));
+    const transcriptConfidence = confidences.length ? Math.min(...confidences) : null;
+    transcriptFields = {
+      transcriptProvider: 'fusion-gateway',
+      transcriptModel: await deps.visionModel(),
+      transcriptConfidence,
+    };
+  }
+
   // The list_id rides the transition, in one transaction with its audit event.
   await store.advanceWithList(deps, {
     shopId: shop.id,
@@ -813,6 +857,7 @@ async function stepInterpret(deps, snapshot) {
     toStatus: 'PROCESSING',
     listId: written.listId,
     description: `interpreted ${intents.length} line(s) against a catalogue of ${catalogue.candidates.length} known products`,
+    ...transcriptFields,
   });
 
   return {
@@ -845,7 +890,7 @@ async function stepInterpret(deps, snapshot) {
  * When the line did not resolve, the raw reading is used and the item is stored
  * `needs_decision` - never dropped, never guessed at.
  */
-export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy }) {
+export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy, shopId = null }) {
   return lines.map((l, i) => {
     const matched = l.matched_regular_id !== null && l.matched_regular_id !== undefined;
     const readable = String(l.raw_reading || '').trim();
@@ -887,6 +932,13 @@ export function buildGroundedIntents(lines, { sourceId, listDate, requestedBy })
       args: {
         context: 'shopping',
         list_date: listDate,
+        // THE OWNING SHOP (migration 019, applied 2026-08-10). Without this the
+        // insert takes findOrCreateDraftList's DATE-keyed lane and a second shop
+        // on one date silently lands on the first shop's list - which is how a
+        // CANCELLED week's item reached Warwick's real shop on 2026-08-10.
+        // `listDateOf` strips the -M<n> suffix by design, so the date CANNOT
+        // distinguish two shops of the same day; only this can.
+        shop_id: shopId,
         item_name: name,
         requested_qty: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : null,
         note: notes.length ? notes.join('; ') : null,
@@ -1740,6 +1792,9 @@ async function stepApplyCorrections(deps, snapshot) {
       args: {
         context: 'shopping',
         list_date: listDate,
+        // Same reason as buildGroundedIntents: a correction must land on THIS
+        // shop's list, not on whichever list happens to share the date.
+        shop_id: shop.id,
         item_name: c.payload.item_name,
         requested_qty: c.payload.requested_qty ?? null,
         note: c.payload.note ?? `corrected by ${c.payload.actor}`,
@@ -2463,6 +2518,35 @@ async function queueMilestoneMessage(deps, snapshot, result) {
   const shop = snapshot.shop;
   const spec = messageForTransition(shop, result);
   if (!spec) return null;
+
+  // ── SOURCE-VS-DERIVED SANITY, ADVISORY ONLY (WP-B15-22, GATE ZERO §4) ────
+  // SOP-021's own known-good comparators (the GBP 120-150 weekly band, the
+  // last real basket total) are BOTH priced numbers, and SOP-021 itself
+  // already records that the price band is "structurally inoperative - no
+  // price column exists anywhere in the schema" (Larry, narrowing this
+  // Work Order's scope: do not build a pricing call that does not exist yet
+  // to manufacture one). At plan_ready there is genuinely no priced
+  // comparator available cheaply - `messageForTransition` above is PURE and
+  // reads nothing else, so a real comparison would be new plumbing this
+  // Work Order was explicitly told not to build.
+  //
+  // What IS free: the derived line count itself, against nothing but common
+  // sense - a photo interpretation of a weekly shop returning one or zero
+  // usable lines is implausible on its face, exactly the shape of a
+  // near-total interpretation failure Gate Zero exists to make visible
+  // rather than silently accepted. LOGGED, never blocking: this never
+  // withholds the message or stops the shop, it only leaves a record a human
+  // or a later pass can go and look at.
+  if (spec.kind === 'plan_ready' && shop.source_kind === 'photo' && typeof deps.log === 'function') {
+    const totalRequested = spec.payload.listLines;
+    deps.log('plan_ready_line_count_advisory', {
+      shop_ref: shop.shop_ref,
+      total_requested: totalRequested,
+      needs_decision: spec.payload.needDecision,
+      implausibly_low: Number.isFinite(Number(totalRequested)) && Number(totalRequested) <= 1,
+    });
+  }
+
   return store.enqueueMessage(deps, {
     householdId: shop.household_id,
     shopId: shop.id,
@@ -2474,6 +2558,48 @@ async function queueMilestoneMessage(deps, snapshot, result) {
 
 /** PURE. Which card (if any) a completed step earns. */
 export function messageForTransition(shop, result) {
+  // ── THE PHOTO READ CONFIRMATION CARD (WP-B15-22, Warwick's explicit new
+  // requirement) ─────────────────────────────────────────────────────────
+  // Fired ONLY from stepInterpret's own PROCESSING transition on a PHOTO
+  // shop, discriminated by `result.interpreted` being present - the field
+  // ONLY that step's return carries (the re-plan-to-PROCESSING step, reached
+  // once every question is answered, returns `decisions`/`answer_learning`
+  // instead, and must never re-trigger this card). This is the one thing
+  // this card must never be: sent merely because the photo file was
+  // received - it only fires after `stored.length` real interpreted lines
+  // exist, which cannot happen before the model has actually answered.
+  if (result.to === 'PROCESSING' && shop.source_kind === 'photo' && Array.isArray(result.interpreted)) {
+    const lines = result.interpreted;
+    const productsRead = lines.length;
+    // "total item/unit count where quantities are known" - lines whose
+    // quantity was not visibly written (null) contribute nothing, exactly
+    // as null already means "ask a human", never a guessed 1.
+    const itemsKnown = lines.reduce(
+      (sum, l) => sum + (Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : 0), 0,
+    );
+    // "how many lines are uncertain... and need clarification" - the SAME
+    // count stepInterpret's own return already computes as `unresolved`
+    // (every status other than 'matched'), which is exactly the confidence
+    // gate's own output: a gated line is forced out of 'matched' by
+    // resolveByCatalogue.js's applyVisionConfidenceGate (WP-B15-22 Part B).
+    const needsClarification = result.unresolved ?? lines.filter((l) => l.status !== 'matched').length;
+    return {
+      kind: 'photo_read',
+      discriminator: 'photo_read',
+      payload: {
+        shopRef: shop.shop_ref,
+        productsRead,
+        itemsKnown,
+        needsClarification,
+        // VISIBLE, NOT SILENTLY SWALLOWED (WO explicit): the same signal the
+        // advisory log records at plan_ready, carried here too so a reader
+        // of the durable message record - not only the log - can see a
+        // near-total interpretation failure.
+        implausiblyLow: productsRead <= 1,
+      },
+    };
+  }
+
   switch (result.to) {
     case 'NEEDS_DECISION':
     case 'READY_TO_SHOP':

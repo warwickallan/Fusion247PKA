@@ -142,16 +142,54 @@ export function makeHarness(script = {}) {
     },
 
     /** The ONE model call, faked. It returns raw READINGS only - never a
-     *  product name it invented - exactly as the grounded contract requires. */
+     *  product name it invented - exactly as the grounded contract requires.
+     *
+     * ── DEFAULT CONFIDENCE, WP-B15-22 GATE ZERO ─────────────────────────────
+     * The real model is asked for a per-line `confidence` (groundedPrompt.js)
+     * and resolveByCatalogue.js's vision-confidence gate now reads it - a
+     * missing/low value forces `needs_confirmation` REGARDLESS of catalogue
+     * match strength (Warwick's own incident: a confident catalogue match on
+     * a line the model itself was unsure about). Every `modelLines` fixture
+     * across this suite predates that field and never set one, so defaulting
+     * a MISSING `confidence` to a HIGH value here - rather than letting it
+     * fall through to the gate's own "missing means 0" production rule - is
+     * what keeps ~500 existing tests describing an ordinary confident read,
+     * not a newly-injected uncertainty none of them asked for. A test that
+     * wants to exercise the gate sets `confidence` (and/or `status`)
+     * explicitly on its own `modelLines` entries, which this never overrides. */
     async interpretPhoto({ catalogue: cat, prompt }) {
       calls.push({ dep: 'interpretPhoto', promptChars: prompt.length, candidates: cat.candidates.length });
       if (script.modelThrows) throw new Error(script.modelThrows);
-      return script.modelLines || [];
+      return (script.modelLines || []).map((l) => {
+        // A fixture writes `status` because that is the MODEL's own field
+        // name (groundedPrompt.js) - the natural word for someone authoring
+        // "what the model said". This function stands in for the WHOLE of
+        // deps.interpretPhoto though, so its OUTPUT must match what the real
+        // realInterpretPhoto returns: `model_status`, not `status` - the same
+        // rename that function performs. Getting this wrong is silent: the
+        // gate simply never sees the model's status and falls through to
+        // treating the line as an ordinary catalogue match.
+        const { status, model_status, ...rest } = l;
+        return {
+          confidence: 1,
+          ...rest,
+          model_status: model_status !== undefined ? model_status : (typeof status === 'string' ? status : null),
+        };
+      });
     },
 
     resolveAll(lines, regulars) {
       calls.push({ dep: 'resolveAll', lines: lines.length, regulars: regulars.length });
       return resolveAll(lines, regulars);
+    },
+
+    /** WP-B15-22 (Gate Zero): the resolved vision model id, faked as a fixed,
+     *  obviously-synthetic string so a test asserting on it never depends on
+     *  a real env var. A test that cares which value was recorded overrides
+     *  this on its own harness instance, exactly like every other dep here. */
+    async visionModel() {
+      calls.push({ dep: 'visionModel' });
+      return script.visionModel !== undefined ? script.visionModel : 'fake-vision-model';
     },
 
     async shopperRoute(payload, opts) {

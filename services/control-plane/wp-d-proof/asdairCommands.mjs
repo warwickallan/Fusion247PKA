@@ -49,13 +49,67 @@ async function resolveHousehold(client, household) {
 // If listDate is given, resolve/create the draft list for THAT date exactly (so an item is never added
 // to a different week's list around a boundary); otherwise fall back to the latest next_week_draft or
 // create one dated next week. listDate must be an ISO YYYY-MM-DD when provided.
+//
+// WP-B15-22 (Gate Zero integration) -- RECLAIM, NEVER ORPHAN, A PRE-EXISTING UNOWNED LIST.
+//
+// Found by BUILD-015 Keel while integrating WP-B15-21: the shop-owned branch below, on finding no list
+// of its own, used to go STRAIGHT to minting a brand new row -- never once looking at whether an
+// unowned list for the SAME household+date already existed. A real Warwick journey hits this exactly:
+// he taps "add to next week" from the cockpit BEFORE this week's photo shop exists (add_regular_to_next_
+// week's own resolveCockpitTargetList finds no live shop yet and correctly falls back to the unowned
+// lane), then his photo shop starts, stepInterpret supplies its OWN shop_id, and this function minted a
+// SECOND, SEPARATE list -- stranding his cockpit addition on a row no shop will ever look at again. A
+// shopping list item silently vanishing is a genuine data-loss defect, not a theoretical one.
+//
+// THE FIX RECLAIMS RATHER THAN MOVES, mirroring exactly what migration 019's own backfill already does
+// for historical data: the unowned list's `shop_id` is set (an UPDATE), and every shopping_list_items
+// row already on it STAYS on it -- list_id never changes for a single item. That is deliberate and
+// load-bearing: `list_item_id` links already minted elsewhere (shop_line.list_item_id, a question's
+// list_item_id) point at the ITEM row, not at the list, so moving items to a fresh list_id would orphan
+// those links instead of the list. Reclaiming the LIST (not moving the items) is the only shape that
+// cannot break something else.
+//
+// THE UPDATE RE-CHECKS `shop_id is null` AT WRITE TIME, the same compare-and-set discipline this
+// codebase already uses everywhere a row's state might have moved between a read and a write
+// (shopStore.js's `status = <expected>` transition guard, answerQuestion's `status='open'` guard). If
+// another writer claimed the same unowned list between this function's SELECT and its UPDATE, the
+// predicate matches 0 rows and this function falls through to minting a fresh list for THIS shop
+// rather than fighting over one row. Proven here by SEQUENTIAL exclusion only (add-list-item.dbtest.mjs
+// #16h: a list already claimed before this call runs is correctly skipped) -- genuine concurrent
+// interleaving (two live connections racing the SAME SELECT-then-UPDATE window) is NOT exercised by
+// that test and would need two coordinated connections to prove; not built here as disproportionate to
+// this narrow, already-conventional guard. The safety net if it were ever wrong is structural, not this
+// test: `uq_lists_household_date_unowned` and `uq_lists_shop` make a double-claim a 23505, never a
+// silent data corruption, whatever this function does.
+async function reclaimUnownedList(client, householdId, listDate, shopId) {
+  const unowned = listDate
+    ? await client.query(
+      `select id from asdair.shopping_lists where household_id=$1 and status='next_week_draft' and list_date=$2 and shop_id is null order by id desc limit 1`,
+      [householdId, listDate])
+    : await client.query(
+      `select id from asdair.shopping_lists where household_id=$1 and status='next_week_draft' and shop_id is null order by id desc limit 1`,
+      [householdId]);
+  if (!unowned.rowCount) return null;
+  const claimed = await client.query(
+    `update asdair.shopping_lists set shop_id=$2 where id=$1 and shop_id is null returning id`,
+    [unowned.rows[0].id, shopId]);
+  return claimed.rowCount ? claimed.rows[0].id : null;
+}
+
 async function findOrCreateDraftList(client, householdId, listDate = null, shopId = null) {
   if (shopId !== null && shopId !== undefined) {
     if (listDate && !/^\d{4}-\d{2}-\d{2}$/.test(listDate)) throw new Error(`invalid list_date "${listDate}" (want YYYY-MM-DD)`);
     const byShop = await client.query('select id from asdair.shopping_lists where shop_id=$1', [shopId]);
     if (byShop.rowCount) return byShop.rows[0].id;
-    // The owning shop has no list yet. list_date stays MEANINGFUL -- it is the week the list is for,
-    // and the read path still renders it; it simply is no longer the identity.
+
+    // RECLAIM before CREATE. A pre-existing unowned same-date list is adopted
+    // into this shop's ownership rather than left stranded behind a fresh row.
+    const reclaimed = await reclaimUnownedList(client, householdId, listDate, shopId);
+    if (reclaimed) return reclaimed;
+
+    // No list of its own, and nothing unowned to reclaim. list_date stays
+    // MEANINGFUL -- it is the week the list is for, and the read path still
+    // renders it; it simply is no longer the identity.
     const insShop = listDate
       ? await client.query(
         `insert into asdair.shopping_lists (household_id, status, list_date, shop_id) values ($1,'next_week_draft',$2,$3) returning id`, [householdId, listDate, shopId])
