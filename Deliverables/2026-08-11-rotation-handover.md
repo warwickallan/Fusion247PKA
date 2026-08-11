@@ -42,7 +42,7 @@ supersedes_as_entry_point: Deliverables/2026-08-10-rotation-handover.md
 | **THE REMOTE BRANCH HOLDING TONIGHT'S TRUTH** | **`origin/build-015/durable/2026-08-11-rotation`** — every rotation document and every commit on local `main`. Verified by SHA comparison against local `HEAD`, not assumed. **If this machine is lost, recover from there.** |
 | Worker branches, all SHA-verified on origin | `build-015/b15-18-cross-shop-answer-routing` @ `8181db4` · `b15-19-supervised-completion` @ `cf59894` · `b15-20-remembered-choice-lookup` @ `602caea` · `b15-21-shop-id-emission` @ `6416c0a` |
 | Worktrees still on disk | `C:/Fusion247PKA-b1513`, `-b1518`, `-b1519`, `-b1520`, `-b1521`. **Each carries REAL COPIES of `node_modules`, not junctions** — deliberate, so a red in one is a real red. Safe to delete normally; none carries a junction to destroy the primary through |
-| Runtime | **PID 12204, started 2026-08-10 21:40:57, still on PRE-CHANGE bytes.** Command line, recorded exactly: `"C:\Program Files\nodejs\node.exe" C:\Fusion247PKA\services\asdair\pipeline\runtime.js --watch`. It runs from the **PRIMARY CHECKOUT**, so a restart picks up whatever is on `main` at that moment. Scheduled task `MyPKA-AsdAIr-Runtime` state `Ready`. **No cutover was performed tonight** |
+| Runtime | ✅ **PID 12204, started 2026-08-10 21:40:57 — BYTE-CURRENT WITH `main` PRODUCT CODE.** Verified by execution: `fb58882` was committed **21:39:31**, i.e. **86 seconds before** the process started, and `git diff --name-only fb58882..HEAD -- services/` returns **ZERO**. It therefore **CARRIES B15-07 through B15-16.** It does **NOT** carry B15-18/19/20/21, which are unintegrated. It runs `services/asdair/pipeline/runtime.js --watch` from the **PRIMARY CHECKOUT**, so a restart picks up whatever is on `main` at that moment. Scheduled task `MyPKA-AsdAIr-Runtime` state `Ready`. **A cutover is needed only AFTER B15-18/19/20/21 integrate.** *(Corrected 2026-08-11 on the fourth cold-start pass: an earlier "still on PRE-CHANGE bytes" claim here was FALSE, and a commit asserting it had been corrected had not in fact touched this file.)* |
 | Working checkout | clean of product code — Larry's own `shop_id` edit was reverted out and banked to a branch |
 | Live DB | migration 019 applied, ledger `20260810215203`; `asdair.regulars` gained 6 rows (114–119) and 2 enriched (37, 85) |
 
@@ -58,11 +58,11 @@ supersedes_as_entry_point: Deliverables/2026-08-10-rotation-handover.md
 | **B15-21** shop_id emission | `build-015/b15-21-shop-id-emission` @ `6416c0a` | **NO** | yes | **PROVEN on real PostgreSQL 32/0**, all 7 Silas assertions. ⚠️ reddens offline suite 473→371/102 — **fake fidelity, NOT a regression** | **NO** | **YES — teach `fakePg` the `shop_id` lane, then integrate** |
 | **migration 019** | applied live | **N/A — LIVE** | n/a | verified live + re-proven on throwaway PG 32/0 | **YES (schema)** | **partially — see below** |
 | **B15-13** grounding normalisation | merged | **YES** | yes | in `main`; 0 commits outside | yes (bytes on main) | no |
-| One editable question board (B15-09) | merged | YES | yes | suite | **NO — runtime predates it** | needs cutover |
-| Board blocked-state truth (B15-15) | merged | YES | yes | suite | **NO** | needs cutover |
-| Answer-is-not-a-list (B15-08) | merged | YES | yes | suite | **NO** | needs cutover |
-| Quantity / pack-size safety (B15-11) | merged | YES | yes | suite | **NO** | needs cutover |
-| CLI offset / data-loss protection (B15-12) | merged | YES | yes | suite | **NO** | needs cutover |
+| One editable question board (B15-09) | merged | YES | yes | suite | ✅ **YES — in the runtime** | no |
+| Board blocked-state truth (B15-15) | merged | YES | yes | suite | ✅ **YES — in the runtime** | no |
+| Answer-is-not-a-list (B15-08) | merged | YES | yes | suite | ✅ **YES — in the runtime** | no |
+| Quantity / pack-size safety (B15-11) | merged | YES | yes | suite | ✅ **YES — in the runtime** | no |
+| CLI offset / data-loss protection (B15-12) | merged | YES | yes | suite | ✅ **YES — in the runtime** | no |
 | Fresh-list / shop ownership (B15-07/10/16) | merged | YES | yes | suite + 019 live | partial | **shop_id emission still out** |
 | Handoff / checklist | built | YES | yes | fixtures only | n/a | **no real handoff artefact has EVER been written** |
 | Browser completion route | B15-19, above | NO | yes | offline only | NO | **YES** |
@@ -80,7 +80,7 @@ Silas assertions PASS.** Every other HOLD stands.
 - **BUILT** — B15-18, 19, 20, 21 all yes.
 - **INTEGRATED** — **none of the four.**
 - **PROVEN** — offline only, except B15-21 which is proven on real PostgreSQL.
-- **LIVE / PRODUCTION-REACHABLE** — **none of the four.** The runtime predates all of them.
+- **LIVE / PRODUCTION-REACHABLE** — **none of the four.** The runtime started before any of them existed. **It DOES carry B15-07..B15-16**, which merged before it started.
 - **USER-EXERCISED** — nothing. Tonight's trolley bypassed the pipeline entirely.
 - **VERITAS-PASSED** — **nothing.** Both gates HOLD and no gate has run since.
 
