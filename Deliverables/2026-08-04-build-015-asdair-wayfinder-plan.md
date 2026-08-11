@@ -1573,7 +1573,56 @@ its evidence so it can be re-established or falsified in minutes.**
 
 ---
 
-### 🔴 STOP — RE-CUT 2026-08-11 ~20:40. THE FRONTIER IS LIST RECONCILIATION, NOT A BROWSER BUILD.
+### 🟡 RE-CUT 2026-08-11 (late session) — LIST RECONCILIATION IS RESOLVED. THE FRONTIER IS NOW: OPEN PRODUCT DECISIONS, THEN A VISION/COCKPIT DESIGN DECISION. NOT YET A BROWSER BUILD.
+
+> **The STOP block immediately below this one (~20:40, "THE FRONTIER IS LIST RECONCILIATION") is
+> HISTORY as a direction — its underlying facts stand, its "what to do next" no longer does.**
+>
+> **What actually happened, this same session, later:** Warwick sent a fresh photograph of the
+> identical shopping list. A direct catalogue-grounded re-read (rotate → zoom-crop every disputed
+> line → re-read → cross-check against the independently human-verified 41-product trolley in
+> `2026-08-11-trolley-reconciliation-41-lines.md`) produced **38 of 39 lines matching the verified
+> trolley exactly on product and quantity.** The one non-match (Bloo) is not a misread — the trolley
+> doc itself records Bloo as a one-week stock-driven skip, not a standing exclusion.
+>
+> **The 39-vs-41 gap is fully explained, not merely counted:** 39 photo lines − 1 (Bloo, explained
+> stock skip) + 3 (Batchelors Mac 'n' Cheese, Vanish Pre-Treat Gel, Ariel 4in1 Pods — all confirmed,
+> from the trolley doc's own build notes, as Regulars-review additions never written on this
+> photograph) = 41. **List reconciliation, as a blocking question, is CLOSED.** Full detail:
+> this session's transcript and `2026-08-11-list-reconciliation-blocks-browser-build.md` (retained,
+> now historical evidence rather than an open blocker).
+>
+> **What is now open, and IS the frontier, in order:**
+>
+> 1. **Four product decisions, still Warwick's to make** (unchanged from the block below — re-stated
+>    here so they are not lost under the newer heading): Richmond sausage pack size (6-pack vs the
+>    usual 12-pack), Arla milk size/brand (literal 4pt vs the usual Cravendale 2L), Birds Eye vs ASDA
+>    quarter pounders (literal brand vs last week's substitution), Bloo toilet rim (fresh stock check
+>    needed, not an automatic skip).
+> 2. **A vision-pipeline and Cockpit redesign has been DESIGNED and CAPTURED, but NOT build-authorised
+>    and NOT started.** Full spec: `Deliverables/2026-08-11-cockpit-and-vision-pipeline-design.md`.
+>    Summary: deterministic image pre-processing (rotate/crop/strip) + one household-aware vision call
+>    + deterministic sanity checks + one batched follow-up call only if needed, keeping photo-read and
+>    Regulars-enrichment as separate durable stages; Cockpit becomes the control surface (single
+>    source of truth for status, a question board replacing scattered Telegram cards, exception-first
+>    list view, two distinct basket views, Telegram demoted to three notification shapes only).
+> 3. **A research task is authorised (Warwick, this session: "yes research") but NOT YET DISPATCHED
+>    at the time this block was written:** live-probe the fusion gateway's actual model registry for
+>    "Luna" and "Sol" (Warwick: these are real models, part of a family with the already-used
+>    "Terra"). The last confirmed probe (`D-2026-08-03-05`, over a week old) found neither registered.
+>    Must run with AsdAIr's own gateway credentials, not Larry's (Larry's shell has no
+>    `FUSION_GATEWAY_URL` — by design). Test protocol, not a blind swap: apply the improved pipeline
+>    to the ONE photograph this build already knows the correct answer for; only escalate model choice
+>    if Terra-with-better-input still misses. Full detail in the design doc above.
+> 4. **`Build ASDA basket` is still not authorised** — the four product decisions in (1) must be
+>    settled first, same prohibition as the block below, for the same reason (a plausible, well-formed
+>    wrong trolley is not a solved problem).
+>
+> **Closing head at time of writing: `c268198`.**
+
+---
+
+### ⛔ SUPERSEDED 2026-08-11 ~20:40 (earlier this session) — list reconciliation was the frontier; now resolved, see the block above. Retained for its full discrepancy detail.
 
 > **Everything in the block below this one (Gate Zero CLOSED / Gate 1 / Gate 2 PASS) is CORRECT and
 > STANDS — it is not superseded, only insufficient.** Reaching those gates and reaching
