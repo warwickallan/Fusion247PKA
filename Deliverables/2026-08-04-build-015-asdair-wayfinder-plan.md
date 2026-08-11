@@ -1637,6 +1637,38 @@ its evidence so it can be re-established or falsified in minutes.**
 > the live gateway acceptance test itself (no credentials, none sought) — that run is a separate,
 > later step for whoever has the correct scoped access once code lands.
 
+**⛔ CORRECTION, same session, moments later: both hand-authored Work Orders above were correctly
+REFUSED by their workers.** Root causes, found by the workers' own SOP-022 preflight, not by Larry
+catching it first: (1) neither order carried the mandatory `tools/wo/envelope.mjs` generation marker
+(SOP-022 J1-1 — "no exceptions, no 'obvious' orders") — a NAMED, RECURRING CAPAE family ("Work Order
+issued outside the generated envelope route"), and this is a genuine qualified exposure of it,
+recorded honestly rather than hidden; (2) the Cockpit order gave Keel the whole `services/cockpit/**`
+surface undivided, conflicting with Keel's own contract routing UI under `services/cockpit/public/**`
+to Felix; (3) **the `isolation:"worktree"` dispatch mechanism cut Keel's vision-pipeline worktree from
+`origin/main` (stale, 243+ commits behind local main by design — Warwick's `merge-decision`), not
+from local HEAD** — confirmed by the worker's own preflight finding its assigned worktree at HEAD
+`6eaf0dc8`, exactly `origin/main`'s SHA from this session's start probe, unable to see the governance
+head or any design doc. **Durable operational finding for future dispatches on this build: do not
+trust `isolation:"worktree"` to cut from local HEAD while local main sits ahead of origin/main — cut
+worktrees manually via `git worktree add` from verified local HEAD instead.** Also found in the same
+pass: `2026-08-11-pax-vision-pipeline-and-luna-sol-terra-research.md` had never been committed — fixed
+directly.
+
+**Fix applied:** three worktrees cut manually from verified local HEAD (`bdd41d5`) —
+`C:/Fusion247PKA-b15vision` (`build-015/b15-24-vision-pipeline`), `C:/Fusion247PKA-cockpit-be`
+(`build-015/b15-25-cockpit-backend`), `C:/Fusion247PKA-cockpit-ui` (`build-015/b15-26-cockpit-ui`).
+Two Work Orders properly generated via `tools/wo/envelope.mjs` and issued:
+`Deliverables/2026-08-11-wo-b15-25-cockpit-backend-order.md` (Keel) and
+`Deliverables/2026-08-11-wo-b15-26-cockpit-ui-order.md` (Felix, which also discloses a real, unfixed
+gap in Felix's own contract — no git-authority section — resolved per-order as local-commits-only,
+since editing any `AGENTS.md` needs Warwick's separate explicit approval). Both dispatched and holding
+at read-back. **The vision-pipeline order could not yet be properly reissued** — Keel's contract
+requires a `schema_decision` citation for the new migration this WP needs, which Larry cannot author
+himself; Silas is commissioned (background) to produce it. The vision-pipeline Work Order issues only
+once that decision lands.
+
+**Closing head at time of writing: `0aaaa23`.**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
