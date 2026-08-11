@@ -274,7 +274,9 @@ function sameWords(a, b) {
  * words landed, and the safe direction here is to not claim - the worst case is
  * the pre-existing behaviour, never a silently discarded message.
  */
-async function recordedAnswerMatches(deps, { open, questionKey, shopRef = null, words, log = () => {} } = {}) {
+async function recordedAnswerMatches(deps, {
+  open, questionKey, shopId = null, shopRef = null, words, log = () => {},
+} = {}) {
   // ── SCOPED BY SHOP (WP-B15-18) ────────────────────────────────────────────
   // A question_key is derived from the ITEM NAME and carries no shop component
   // (keys.js questionKeyFor), so two active shops asking about the same item
@@ -287,11 +289,34 @@ async function recordedAnswerMatches(deps, { open, questionKey, shopRef = null, 
   // `shopRef` comes from the CARD he replied to, which is positive evidence
   // about which shop he meant. It stays optional so a caller with no such
   // evidence gets exactly today's behaviour rather than a silent refusal.
-  const entry = (Array.isArray(open) ? open : []).find((q) => q.questionKey === questionKey
-    && (shopRef === null || shopRef === undefined || q.shopRef === shopRef));
-  if (!entry) return false;
+  //
+  // ── RESOLVED WITHOUT `open` WHEN THE CALLER ALREADY KNOWS (WP-B15-22, F1) ──
+  // `open` is `openQuestions`, read ONCE at the top of this pass. The one case
+  // this function exists for - a duplicate receipt on a question that is
+  // ALREADY settled - is EXACTLY the case where that question is no longer in
+  // `open`: it left the open set the moment it was answered, possibly on an
+  // EARLIER pass entirely. Looking it up in `open` therefore finds nothing,
+  // `entry` is undefined, and this function returned `false` unconditionally -
+  // even when the words on the row are byte-identical to his redelivered
+  // message. Proven with ONE shop, no cross-shop element at all: PASS 1 records
+  // the answer; PASS 2's `open` no longer carries it; the redelivery is refused
+  // with a message calling his own identical words "different".
+  //
+  // `commands.dispatch`'s receipt for `answerQuestion` already carries the
+  // shop it resolved (`receipt.shop_id` - see commands.js `receipt()`), which
+  // is positive evidence independent of `open`'s staleness. When a caller
+  // supplies it, the `open` lookup is skipped entirely and the row is read
+  // straight from that shop. `open`/`shopRef` remain the fallback for a caller
+  // with no resolved shop id, and the function still fails towards `false`.
+  let resolvedShopId = shopId;
+  if (resolvedShopId === null || resolvedShopId === undefined) {
+    const entry = (Array.isArray(open) ? open : []).find((q) => q.questionKey === questionKey
+      && (shopRef === null || shopRef === undefined || q.shopRef === shopRef));
+    if (!entry) return false;
+    resolvedShopId = entry.shopId;
+  }
   try {
-    const rows = await store.listQuestions(deps, entry.shopId);
+    const rows = await store.listQuestions(deps, resolvedShopId);
     const row = rows.find((q) => q.question_key === questionKey);
     return row ? sameWords(row.answer_text, words) : false;
   } catch (err) {
@@ -1939,9 +1964,12 @@ export async function runOnce(deps, wiring = {}) {
           recorded = await recordedAnswerMatches(deps, {
             open: openQuestions,
             questionKey: replyMapped.spec.questionKey,
-            // The card he replied to resolved to exactly one shop, so the check
-            // is made against THAT shop's row rather than the first row in the
-            // estate that happens to share the key (WP-B15-18).
+            // The command we just dispatched RESOLVED a shop and told us which
+            // one (replyReceipt.shop_id) - that is stronger evidence than
+            // `open`, which may no longer carry this question at all if it was
+            // settled on an earlier pass (WP-B15-22, F1). Falls back to the
+            // shopRef-scoped `open` lookup only if the receipt carries none.
+            shopId: replyReceipt.shop_id,
             shopRef: replyMapped.spec.shopRef,
             words: replyMapped.spec.answerText,
             log,
@@ -2150,7 +2178,17 @@ export async function runOnce(deps, wiring = {}) {
           let recorded = !duplicate;
           if (duplicate) {
             recorded = await recordedAnswerMatches(deps, {
-              open: openQuestions, questionKey: c.spec.questionKey, words: c.spec.answerText, log,
+              open: openQuestions,
+              questionKey: c.spec.questionKey,
+              // Same reasoning as the cardRow branch above: the receipt just
+              // returned by THIS dispatch names the shop it resolved, which
+              // survives `open` no longer carrying an already-settled question
+              // (WP-B15-22, F1). shopRef is also passed as the `open`-lookup
+              // fallback for a receipt that somehow carries no shop_id.
+              shopId: receipt.shop_id,
+              shopRef: c.spec.shopRef,
+              words: c.spec.answerText,
+              log,
             });
             if (!recorded) {
               answers.push({

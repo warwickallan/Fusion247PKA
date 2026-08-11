@@ -3289,6 +3289,75 @@ test('B15-18 AC5b: the duplicate check reads the row on HIS shop, not the first 
     'the shop he never addressed must not carry his words');
 });
 
+test('WP-B15-22 F1: a reply redelivered in a LATER pass is recognised, not refused as "different words"', async () => {
+  // recordedAnswerMatches used to resolve the shop from `open` (openQuestions),
+  // read ONCE at the top of a pass. The one case this function exists for - a
+  // duplicate receipt on an ALREADY-SETTLED question - is exactly the case
+  // where the question has LEFT `open`, possibly on an earlier pass entirely:
+  // it stopped being open the moment PASS 1 settled it. The AC5b test above
+  // deliberately does not cover this (both copies arrive in ONE pass, so
+  // `open` still carries the question when the second copy is checked); this
+  // is the pre-existing gap that test's own comment named and left open.
+  //
+  // Reproduced with ONE shop, no cross-shop element, words on the redelivered
+  // copy IDENTICAL to the first: before the fix this was refused with "not
+  // recorded - the question was already answered with different words", which
+  // is false - the words are the same, `open` just could not see the row.
+  const SHARED = 'richmond pork sausages';
+  const sharedKey = questionKeyFor(SHARED);
+  const WORDS = 'the 12 skinless ones';
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  bot.editMessage = async () => ({});
+
+  await runOnce(h.deps, { householdId: HOUSEHOLD_ID, intake: makeIntake([textUpdate({ updateId: 1 })]) });
+  const shop = h.db.shop.find((s) => s.shop_ref === REF);
+  await openQuestionsOn(h, shop.id, [{ item: SHARED }]);
+  await queueShopCards(h.deps, { perQuestionCards: true });
+  await drainOutbox(h.deps, { bot });
+
+  const card = h.db.shop_question.find(
+    (q) => String(q.shop_id) === String(shop.id) && q.question_key === sharedKey && q.card_message_id,
+  );
+  assert.ok(card, 'the fixture never sealed a card for the question under test');
+
+  // PASS 1 - the real answer, settling the question. `open` at the top of
+  // THIS pass still carries it, so this is the ordinary path either way.
+  const report1 = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([
+      replyToCardAs({ messageId: Number(card.card_message_id), updateId: 700, msgId: 8801, text: WORDS }),
+    ]),
+  });
+  const first = report1.answers.find((x) => x.question_key === sharedKey);
+  assert.ok(first, 'the first copy never reached the answer path');
+  assert.equal(first.duplicate, false, 'the first copy is the real answer');
+  assert.equal(rowOf(h, shop.id, sharedKey).answer_text, WORDS);
+
+  // PASS 2 - a SEPARATE runOnce, same words, redelivering the SAME message.
+  // openQuestions is re-read fresh at the top of THIS pass and no longer
+  // carries the now-answered question - the exact condition F1 exists to
+  // prove, and the one the AC5b test above could not reach in a single pass.
+  const report2 = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([
+      replyToCardAs({ messageId: Number(card.card_message_id), updateId: 701, msgId: 8802, text: WORDS }),
+    ]),
+  });
+  const second = report2.answers.find((x) => x.question_key === sharedKey);
+  assert.ok(second, 'the redelivered copy never reached the answer path');
+  assert.equal(second.error, undefined,
+    'the redelivery was refused as "different words" even though the words are identical: ' + String(second.error));
+  assert.equal(second.duplicate, true,
+    'a genuine cross-pass redelivery must be recognised, not silently dropped through to intake');
+  assert.equal(rowOf(h, shop.id, sharedKey).answer_text, WORDS,
+    'the original answer must survive the redelivery unchanged');
+});
+
 // ── AC3 / AC5a - WHEN THERE IS NO BOARD TO BIND TO ───────────────────────────
 //
 // A BARE typed message is not a reply to anything, so it carries no evidence at
