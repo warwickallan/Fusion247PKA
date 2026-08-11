@@ -505,6 +505,78 @@ test('progress may only be reported on a request the runner holds', async functi
   assert.equal(statements(client).pop(), 'ROLLBACK');
 });
 
+// =====================================================================
+// WP-B15-19 - updateBrowserProgress CANNOT SILENTLY DESTROY A HANDOFF
+//
+// `SET progress = $1::jsonb` replaces the whole object. Once openHandoff began
+// writing the operating contract onto `progress.handoff`, a progress write that
+// did not carry it DELETED the only artefact the operator's report can ever be
+// checked against - and the failure surfaced two steps later, in the pipeline,
+// as "carries a completion report but no handoff to check it against".
+//
+// The guard is a WHERE predicate, so it is proven here the way this file proves
+// every other guarantee: by the SHAPE of the statement that was actually sent.
+// =====================================================================
+
+test('WP-B15-19: the progress UPDATE carries the artefact predicate, so Postgres refuses the destructive write', async function () {
+  const client = makeClient([
+    { match: 'UPDATE asdair.browser_build_request', rows: [{ id: 3, status: 'running', progress: {} }] }
+  ]);
+  await store.updateBrowserProgress(3, { basket_product_count: 40 }, { client: client });
+
+  const update = statements(client).find(function (s) { return s.indexOf('UPDATE asdair.browser_build_request') === 0; });
+
+  // The pinned prefix is unchanged ON PURPOSE - pipeline/test/fakePg.js matches
+  // on it, and this writer still REPLACES rather than merges.
+  assert.ok(update.indexOf("SET progress = $1::jsonb, status = 'running'") !== -1,
+    'the statement must still be a whole-object replace - the fix is a refusal, not a merge');
+
+  assert.ok(update.indexOf("progress->'handoff' IS NULL OR jsonb_exists($1::jsonb, 'handoff')") !== -1,
+    'without this predicate a progress write silently deletes progress.handoff, and the loss is UNRECOVERABLE '
+    + '- replanning consults a model, so the packet the operator shopped from cannot be rebuilt');
+});
+
+test('WP-B15-19: a write that would drop an existing handoff is REFUSED, and says why', async function () {
+  const client = makeClient([
+    // Postgres matches zero rows because of the artefact predicate.
+    { match: 'UPDATE asdair.browser_build_request', rows: [] },
+    { match: 'FROM asdair.browser_build_request WHERE id = $1',
+      rows: [{ id: 3, status: 'running', claimed_by: 'runner-a', progress: { handoff: { packet_fingerprint: 'abc123' } } }] }
+  ]);
+
+  await assert.rejects(function () {
+    return store.updateBrowserProgress(3, { basket_product_count: 40 }, { client: client });
+  }, function (e) {
+    assert.match(e.message, /would DESTROY it/,
+      'the operator must be told the artefact was the reason, not sent to look at the lease');
+    assert.match(e.message, /handoffCli/, 'and told where a supervised basket report actually belongs');
+    assert.match(e.message, /Nothing was written/);
+    return true;
+  });
+
+  assert.equal(statements(client).pop(), 'ROLLBACK');
+});
+
+test('WP-B15-19: the fence is narrow - it stops destruction, not ordinary progress', async function () {
+  // (a) A row with NO artefact is the CDP runner's ordinary case, and is untouched.
+  const plain = makeClient([
+    { match: 'UPDATE asdair.browser_build_request', rows: [{ id: 3, status: 'running', progress: { step: 4 } }] }
+  ]);
+  const a = await store.updateBrowserProgress(3, { step: 4 }, { client: plain });
+  assert.equal(a.changed, true);
+
+  // (b) A caller that DOES carry the artefact through is allowed. The predicate
+  //     asks whether the artefact SURVIVES, never who the caller is.
+  const carrying = makeClient([
+    { match: 'UPDATE asdair.browser_build_request',
+      rows: [{ id: 3, status: 'running', progress: { handoff: { packet_fingerprint: 'abc123' }, step: 5 } }] }
+  ]);
+  const b = await store.updateBrowserProgress(3, { handoff: { packet_fingerprint: 'abc123' }, step: 5 }, { client: carrying });
+  assert.equal(b.changed, true);
+  assert.equal(countMatching(carrying, 'FROM asdair.browser_build_request WHERE id = $1'), 0,
+    'a successful write must not go looking for a reason it did not need');
+});
+
 test('a failed browser build must carry a reason, or it cannot be resumed from', async function () {
   const client = makeClient([]);
   await assert.rejects(function () {

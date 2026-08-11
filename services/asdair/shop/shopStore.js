@@ -710,6 +710,31 @@ async function claimBrowserBuild(shopId, claimedBy, options) {
 // updateBrowserProgress - progress reporting from the supervised runner.
 // Only a request the runner already holds may be progressed, so a stale runner
 // cannot resurrect a finished one.
+//
+// ── WP-B15-19: IT CAN NO LONGER SILENTLY DESTROY A HANDOFF ──────────────────
+// `SET progress = $1::jsonb` is a WHOLE-OBJECT REPLACE, not a merge. That is
+// correct and wanted for the CDP runner's own progress counters, which own the
+// whole object. It became a footgun the moment `handoff/claim.js openHandoff`
+// started writing the operating contract onto `progress.handoff`: any caller
+// passing a progress object without it DELETES the artefact, and the next
+// pipeline pass then refuses the shop with "carries a completion report but no
+// handoff to check it against". The loss is not recoverable - since WP-B15-3
+// replanning consults a model, so the packet the operator shopped from is
+// genuinely gone rather than re-derivable.
+//
+// THE GUARD IS A WHERE PREDICATE, NOT A MERGE, AND THAT IS DELIBERATE. Merging
+// would change both the statement's shape and this writer's semantics for the
+// caller it already has. So the statement still replaces; it simply REFUSES to
+// replace a row whose artefact the incoming object does not carry.
+//
+// `jsonb_exists($1::jsonb, 'handoff')` is the function form of
+// `$1::jsonb ? 'handoff'`. The function form is used so a bare `?` never sits
+// in a JavaScript SQL string, where a reader could mistake it for a placeholder.
+//
+// A caller that legitimately owns the artefact may carry it through in
+// `progress`. A caller reporting a supervised BASKET should not be here at all:
+// that is `handoff/handoffCli.js`, which routes to `completeHandoff` and
+// preserves the packet by construction.
 async function updateBrowserProgress(requestId, progress, options) {
   const id = toDbId(requestId, 'updateBrowserProgress: requestId');
   if (progress !== null && progress !== undefined && (typeof progress !== 'object' || Array.isArray(progress))) {
@@ -717,6 +742,7 @@ async function updateBrowserProgress(requestId, progress, options) {
   }
   const opts = options || {};
   const claimedBy = opts.claimed_by === undefined ? null : opts.claimed_by;
+  const carriesHandoff = !!(progress && progress.handoff);
 
   return inTransaction(options, async function (client) {
     const params = [jsonParam(progress || {}), id];
@@ -728,11 +754,22 @@ async function updateBrowserProgress(requestId, progress, options) {
 
     const sql = 'UPDATE asdair.browser_build_request ' +
       "SET progress = $1::jsonb, status = 'running' " +
-      'WHERE ' + where + " AND status IN ('claimed','running') RETURNING " + BROWSER_SELECT_LIST;
+      'WHERE ' + where + " AND status IN ('claimed','running')" +
+      " AND (progress->'handoff' IS NULL OR jsonb_exists($1::jsonb, 'handoff'))" +
+      ' RETURNING ' + BROWSER_SELECT_LIST;
 
     const res = await client.query(sql, params);
     if (rowCount(res) !== 1) {
       const current = firstRow(await client.query(SELECT_BROWSER_REQUEST_BY_ID_SQL, [id]));
+      // Say WHICH guard refused. "not claimed/running" would be a lie about a
+      // live row that was stopped by the artefact predicate, and a misleading
+      // error here sends the operator looking at the lease instead of the write.
+      if (current && current.progress && current.progress.handoff && !carriesHandoff) {
+        fail('browser build request ' + String(id) + ' carries a handoff artefact and this progress object does ' +
+          'not, so the write would DESTROY it. `progress` is replaced wholesale here, never merged. To report a ' +
+          'supervised basket use handoff/handoffCli.js (claimHandoff -> completeHandoff), which preserves the ' +
+          'packet. Nothing was written.');
+      }
       fail('browser build request ' + String(id) + ' is not claimed/running' +
         (current ? ' (it is "' + current.status + '")' : ' (no such request)') +
         (claimedBy === null ? '' : ' by ' + String(claimedBy)) + '. Nothing was written.');
