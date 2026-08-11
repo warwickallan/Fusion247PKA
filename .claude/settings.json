@@ -11,16 +11,6 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:/Fusion247PKA/.claude/hooks/idle-ding-check.mjs"
-          }
-        ]
-      }
-    ]
+    "Stop": []
   }
 }
