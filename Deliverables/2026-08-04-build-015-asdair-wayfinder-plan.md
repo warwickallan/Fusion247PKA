@@ -1573,7 +1573,47 @@ its evidence so it can be re-established or falsified in minutes.**
 
 ---
 
-### 🔴 STOP — RE-CUT 2026-08-11. THE FRONTIER IS SOURCE TRUTH, NOT THE WORK PACKAGES BELOW.
+### ⛔ SUPERSEDED 2026-08-11 (later same day) — Gate Zero CLOSED, Gate 1 PASS, Gate 2 preflight PASS. DIRECTS NOTHING BELOW THIS POINT.
+
+> **The STOP block immediately below (timestamped earlier on 2026-08-11) is HISTORY, not the
+> frontier.** Retained for its detail — it correctly describes the state *at the time it was
+> written*, before this session's repair work. It no longer directs the next action.
+>
+> **What actually happened, in order, later the same day:**
+> 1. **Gate Zero CLOSED by live reproduction, not guessed** —
+>    `Deliverables/2026-08-11-GATE-ZERO-source-truth-established.md`. The vision call is real and
+>    does read the photograph; the failure was non-deterministic unreliability on a dense
+>    multi-column handwritten image, compounded by a concrete code bug: the model's own per-line
+>    confidence was solicited and silently discarded before reaching `shop_line.match_confidence`.
+> 2. **B15-18/19/20/21 integrated into `main`**, plus the confidence-gating repair, transcript
+>    provenance persistence, the Photo Read Confirmation Card (constructed AND rendered), a
+>    pre-existing HIGH cross-pass answer-redelivery defect (F1), two `fakePg` gaps, and a
+>    newly-found cockpit-orphaning data-loss defect — all fixed, all tested. Full estate suite:
+>    **2178 pass / 0 fail across 14 packages.**
+> 3. **The AsdAIr cockpit app restored** (WO-B15-23) — a genuine human-readable read/interpret/
+>    resolved view, Vera-passed after one round of fix-and-reinspect.
+> 4. **Veritas Gate 1: PASS** (all 8 numbered requirements) —
+>    `Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/veritas-b15-22-gate1-eb7c7ad.md`
+>    + addendum.
+> 5. **The live runtime cut over ONCE**, verified by execution (process identity, zero byte drift
+>    against `main`), and the AsdAIr cockpit read-service separately restarted after Veritas caught
+>    it serving stale pre-restoration bytes via Node's `require()` cache.
+> 6. **Veritas Gate 2 CURRENT-STATE PREFLIGHT: PASS** —
+>    `Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/veritas-b15-gate2-preflight-7bc23ca.md`
+>    + addendum. The live production system is confirmed ready to receive a photograph.
+>
+> **`SHOP-2026-08-10-M64` remains PRESERVED EVIDENCE and is still NOT to be used as the acceptance
+> vehicle** — that instruction from the earlier STOP block stands unchanged. A fresh photo today
+> (2026-08-11) lands on a genuinely new, uncontaminated shop identity — confirmed against the live
+> database, not inferred.
+>
+> **THE NEXT ACTION: ask Warwick for one completely fresh photograph, then run the Gate 2
+> live-journey review once he sends it.** This is now permitted — it was the one thing Gate Zero
+> prohibited, and Gate Zero is closed.
+
+---
+
+### 🔴 STOP — RE-CUT 2026-08-11 (earlier that day). HISTORY — see the supersession block above.
 
 > **Everything in the ACTIVE SESSION WORK PACKAGE block below is SUPERSEDED as the frontier.** It is
 > retained for its detail. It no longer directs the next action.
@@ -1595,7 +1635,7 @@ its evidence so it can be re-established or falsified in minutes.**
 >
 > **THE NEXT ACTION IS NOT A WORK PACKAGE.** It is: establish why the transcript is empty and where
 > those 35 lines came from. **No photograph acceptance journey may be attempted until input truth is
-> proven (Gate Zero).**
+> proven (Gate Zero).** *(⛔ Superseded above — this prohibition has been satisfied and lifted.)*
 >
 > **B15-18, B15-19, B15-20, B15-21 are all BUILT and PUSHED and NONE ARE INTEGRATED OR LIVE.**
 > Migration 019 IS live — but the write path that supplies `shop_id` is NOT, so shop ownership is
@@ -1603,6 +1643,7 @@ its evidence so it can be re-established or falsified in minutes.**
 > product code and CARRIES B15-07..B15-16** — it started 86s after `fb58882` and
 > `git diff fb58882..HEAD -- services/` is empty. It does **NOT** carry B15-18/19/20/21, so a cutover
 > is needed only once those integrate. Both Veritas gates remain **HOLD**.
+> *(⛔ Superseded above — all four integrated, runtime cut over, both gates now PASS.)*
 
 ---
 
