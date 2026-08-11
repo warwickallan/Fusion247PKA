@@ -317,6 +317,117 @@ test('GATE ZERO §4: a TEXT shop never fires the advisory log - it was never rea
 });
 
 // =====================================================================
+// THE PHOTO READ CONFIRMATION CARD (WP-B15-22, Warwick's explicit new
+// requirement). Note: this only proves the card is CONSTRUCTED and QUEUED
+// (the outbox row this Work Order owns). Rendering it into Telegram text
+// needs a `photo_read` case in services/asdair/bot/renderMessages.js's
+// MESSAGES table - outside this Work Order's file_surface. Reported, not
+// built here; see the final evidence pack.
+// =====================================================================
+
+test('PHOTO READ CARD: constructed and queued with real counts after a real interpretation, never on file-receipt alone', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.95 },
+      { line_no: 2, raw_reading: '1 weetabix protein', quantity: 1, confidence: 0.55 }, // gated -> needs_confirmation
+      { line_no: 3, raw_reading: 'fruit splits', quantity: null, confidence: 0.9 },     // unmatched -> not 'matched'
+    ],
+  });
+  await receivePhoto(h);
+  // FILE RECEIPT ALONE - no interpretation has happened yet. The card must
+  // not exist at this point; it exists to confirm what was READ, and
+  // nothing has been read yet.
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length, 0,
+    'the card must never be queued merely because the photo file was received',
+  );
+
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe - still no interpretation
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length, 0,
+    'the card must never be queued before the model has actually answered',
+  );
+
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING - NOW it exists
+  const queued = h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read');
+  assert.equal(queued.length, 1, 'exactly one card must be queued once real interpretation completes');
+
+  const payload = typeof queued[0].args === 'string' ? JSON.parse(queued[0].args) : queued[0].args;
+  assert.equal(payload.shopRef, REF);
+  assert.equal(payload.productsRead, 3, 'three distinct lines were interpreted');
+  assert.equal(payload.itemsKnown, 4, '3 (gourmet) + 1 (weetabix); fruit splits carries no known quantity');
+  assert.equal(payload.needsClarification, 2,
+    'the gated weetabix line (confidence 0.55) and the unmatched fruit splits line both need clarification');
+  assert.equal(payload.implausiblyLow, false);
+});
+
+test('PHOTO READ CARD: the implausiblyLow flag is visible on the card itself, not only in the advisory log', async () => {
+  const h = makeHarness({
+    modelLines: [{ line_no: 1, raw_reading: 'fruit splits', quantity: null, confidence: 0.9 }],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  await runPipeline(HANDLE, h.deps);
+
+  const queued = h.db.pipeline_command.find((c) => c.kind === 'outbox' && c.command === 'photo_read');
+  assert.ok(queued, 'the card was never queued');
+  const payload = typeof queued.args === 'string' ? JSON.parse(queued.args) : queued.args;
+  assert.equal(payload.productsRead, 1);
+  assert.equal(payload.implausiblyLow, true,
+    'a near-total interpretation failure must be visible on the durable message record, not silently swallowed');
+});
+
+test('PHOTO READ CARD: never fired for a TEXT shop - it was never read by a vision model', async () => {
+  const h = makeHarness();
+  await receiveText(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING for a text shop
+
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length, 0,
+    'a typed list was never "read" in the sense this card confirms',
+  );
+});
+
+test('PHOTO READ CARD: never re-fired by the re-plan-to-PROCESSING transition after every question is answered', async () => {
+  // The re-plan step also transitions a shop TO 'PROCESSING' (once every
+  // question is answered) - this card must fire ONLY from stepInterpret's
+  // own transition, discriminated by `result.interpreted`, which the re-plan
+  // step's return does not carry. Proven via the held-line/answer/replan
+  // route used elsewhere in this file.
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3, confidence: 0.95 },
+      { line_no: 2, raw_reading: 'qqzz unreadable scrawl', quantity: null, confidence: 0.9 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING (the card fires once, here)
+  await runPipeline(HANDLE, h.deps);   // plan -> NEEDS_DECISION
+
+  const afterFirstInterpret = h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length;
+  assert.equal(afterFirstInterpret, 1);
+
+  const q = h.db.shop_question.find((row) => row.status === 'open');
+  assert.ok(q, 'the fixture never opened a real question');
+  await commands.answerQuestion({
+    shopRef: REF, actor: ACTOR, questionKey: q.question_key, skip: true,
+  }, h.deps);
+  for (let i = 0; i < 4; i += 1) await runPipeline(HANDLE, h.deps);   // re-plan -> PROCESSING -> ...
+
+  assert.equal(
+    h.db.pipeline_command.filter((c) => c.kind === 'outbox' && c.command === 'photo_read').length,
+    afterFirstInterpret,
+    'the re-plan-to-PROCESSING transition (every question answered) must never re-queue this card - '
+    + 'nothing was newly "read"',
+  );
+});
+
+// =====================================================================
 // THE LIVE INCIDENT (SHOP-2026-08-03), CLOSED
 //
 // Two independent defects combined to crash the real shop: (1) an id-type

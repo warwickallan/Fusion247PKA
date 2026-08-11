@@ -2558,6 +2558,48 @@ async function queueMilestoneMessage(deps, snapshot, result) {
 
 /** PURE. Which card (if any) a completed step earns. */
 export function messageForTransition(shop, result) {
+  // ── THE PHOTO READ CONFIRMATION CARD (WP-B15-22, Warwick's explicit new
+  // requirement) ─────────────────────────────────────────────────────────
+  // Fired ONLY from stepInterpret's own PROCESSING transition on a PHOTO
+  // shop, discriminated by `result.interpreted` being present - the field
+  // ONLY that step's return carries (the re-plan-to-PROCESSING step, reached
+  // once every question is answered, returns `decisions`/`answer_learning`
+  // instead, and must never re-trigger this card). This is the one thing
+  // this card must never be: sent merely because the photo file was
+  // received - it only fires after `stored.length` real interpreted lines
+  // exist, which cannot happen before the model has actually answered.
+  if (result.to === 'PROCESSING' && shop.source_kind === 'photo' && Array.isArray(result.interpreted)) {
+    const lines = result.interpreted;
+    const productsRead = lines.length;
+    // "total item/unit count where quantities are known" - lines whose
+    // quantity was not visibly written (null) contribute nothing, exactly
+    // as null already means "ask a human", never a guessed 1.
+    const itemsKnown = lines.reduce(
+      (sum, l) => sum + (Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : 0), 0,
+    );
+    // "how many lines are uncertain... and need clarification" - the SAME
+    // count stepInterpret's own return already computes as `unresolved`
+    // (every status other than 'matched'), which is exactly the confidence
+    // gate's own output: a gated line is forced out of 'matched' by
+    // resolveByCatalogue.js's applyVisionConfidenceGate (WP-B15-22 Part B).
+    const needsClarification = result.unresolved ?? lines.filter((l) => l.status !== 'matched').length;
+    return {
+      kind: 'photo_read',
+      discriminator: 'photo_read',
+      payload: {
+        shopRef: shop.shop_ref,
+        productsRead,
+        itemsKnown,
+        needsClarification,
+        // VISIBLE, NOT SILENTLY SWALLOWED (WO explicit): the same signal the
+        // advisory log records at plan_ready, carried here too so a reader
+        // of the durable message record - not only the log - can see a
+        // near-total interpretation failure.
+        implausiblyLow: productsRead <= 1,
+      },
+    };
+  }
+
   switch (result.to) {
     case 'NEEDS_DECISION':
     case 'READY_TO_SHOP':
