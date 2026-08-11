@@ -88,8 +88,21 @@ gpt-5-mini, gpt-5-nano, text-embedding-3-large` — **no Luna or Sol alias regis
 which is now over a week old and known stale. Larry's own shell has no `FUSION_GATEWAY_URL`
 configured (by design — AsdAIr's credentials are not Larry's), so this cannot be probed from here.
 
-**Research task, not yet dispatched at time of writing, to run with AsdAIr's own gateway
-credentials:**
+**Research task status: BLOCKED, not merely undone.** A first dispatch attempt (this session) correctly
+`REFUSE`d rather than reach for the gateway credentials, because they require access to
+`C:\.fusion247\**`, which `Team Knowledge/Guidelines/GL-012-secrets-store-access-boundary.md` denies
+by default absent an explicit `private_surface` declaration — which this task never carried. **A
+genuine structural snag surfaced in the process, not just a missing field:** AsdAIr's runtime state
+lives at `C:/.fusion247/asdair/**` (per `services/asdair/pipeline-runtime/runtime-paths.mjs`), but
+GL-012 §4 only permits grants shaped `C:/.fusion247/private/<project>/**`. That path does not fit the
+pattern as written. **Before this research task can be legitimately re-dispatched, the private-surface
+question needs settling — is `C:/.fusion247/asdair/**` the correct existing convention GL-012 already
+accommodates some other way, or does AsdAIr's runtime genuinely sit outside GL-012's stated shape and
+need reconciling — a question for Larry and Warwick, not something a subagent should infer its way
+past.**
+
+**Research task, to run with AsdAIr's own gateway credentials once the surface question above is
+settled:**
 1. Fresh `GET {gateway}/v1/models` (or gateway-appropriate equivalent) — does Luna or Sol exist on
    the registered roster now?
 2. If yes: what are their stated capabilities/cost relative to Terra?
