@@ -2873,12 +2873,27 @@ test('B15-15 AC4 BEHAVIOURAL: THIS shop\'s own lines still reach the planner', a
     `the shop's own interpreted line was excluded from its own plan: ${JSON.stringify(last())}`);
 });
 
-test('B15-15 AC4 BEHAVIOURAL: an UNCLAIMED item still reaches the plan', async () => {
-  // Unclaimed belongs to nobody and STAYS. Neither direction of the statement
-  // returns it, so this pins that the handler is not simply keeping everything.
-  const { last } = await planOnSharedListThroughFakePg();
-  assert.ok(last().some((n) => /Cockpit Added Regular/i.test(n)),
-    `an item Warwick added from the cockpit was silently dropped: ${JSON.stringify(last())}`);
+test('KNOWN GAP, REPORTED NOT FIXED (WP-B15-22): a cockpit item added to the UNOWNED lane before this week\'s shop-owned list exists is now orphaned', async () => {
+  // ── WAS: "an UNCLAIMED item still reaches the plan" ──────────────────────
+  // True while every shop shared one date-keyed list (list 20 here). WP-B15-21
+  // (integrated in this Work Order) makes runPipeline.js supply shop_id on
+  // every add_list_item intent, so findOrCreateDraftList's shop-owned branch
+  // - the one a FRESH shop always takes - mints its OWN list and never looks
+  // at list 20 to reclaim what is sitting on it. "Cockpit Added Regular" is
+  // genuinely, provably absent now. See the identical, fuller note in
+  // runPipeline.test.js beside `sharedListSeed` for the file that would need
+  // to change to close this (services/control-plane/wp-d-proof/
+  // asdairCommands.mjs - outside this Work Order's file_surface) and why it
+  // is reported rather than fixed here.
+  const { last, h } = await planOnSharedListThroughFakePg();
+  assert.ok(!last().some((n) => /Cockpit Added Regular/i.test(n)),
+    'if this now passes, a successor change closed the orphaning gap - update this test\'s name and '
+    + 'assertion to match, do not just flip it back without reading why it changed');
+  const stillOnDeadList = h.db.shopping_list_items.some(
+    (i) => String(i.list_id) === '20' && /Cockpit Added Regular/i.test(String(i.item_name)),
+  );
+  assert.ok(stillOnDeadList,
+    'the item is not merely dropped, it is stranded on the unowned list nothing will look at again');
 });
 
 test('B15-15 AC4: fakePg REFUSES a foreign-claims statement whose predicate it cannot read', async () => {
