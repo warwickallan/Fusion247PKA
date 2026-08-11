@@ -152,19 +152,27 @@ function installRememberedChoiceTable(h) {
       return { rows: [{ ...created }], rowCount: 1 };
     }
 
+    // WP-B15-20: the statement no longer carries a term predicate - it selects
+    // the household's rows and `distinct on (choice_term)` collapses each
+    // term's history to its newest. The model follows the statement exactly,
+    // INCLUDING the fact that it no longer filters by term: a model that kept
+    // filtering would hide the very miss this Work Package fixes.
     if (/^SELECT DISTINCT ON \(choice_term\)/i.test(text)) {
-      const [household, terms] = params;
-      const wanted = Array.isArray(terms) ? terms.map(String) : [];
-      const out = [];
-      for (const term of wanted) {
-        const hits = rows
-          .filter((r) => String(r.household_id) === String(household) && r.choice_term === term)
-          // ORDER BY choice_term, chosen_at DESC, id DESC - NEWEST WINS.
-          .sort((a, b) => (a.chosen_at === b.chosen_at
-            ? Number(b.id) - Number(a.id)
-            : (a.chosen_at < b.chosen_at ? 1 : -1)));
-        if (hits.length > 0) out.push({ ...hits[0] });
+      assert.doesNotMatch(text, /choice_term = ANY/i,
+        'the model must track the statement: a term predicate here would defeat the separator-blind lookup');
+      const [household] = params;
+      const mine = rows.filter((r) => String(r.household_id) === String(household));
+      const newestByTerm = new Map();
+      for (const r of mine) {
+        const prev = newestByTerm.get(r.choice_term);
+        // ORDER BY choice_term, chosen_at DESC, id DESC - NEWEST WINS.
+        const beats = !prev || (r.chosen_at === prev.chosen_at
+          ? Number(r.id) > Number(prev.id)
+          : r.chosen_at > prev.chosen_at);
+        if (beats) newestByTerm.set(r.choice_term, r);
       }
+      const out = [...newestByTerm.keys()].sort()
+        .map((term) => ({ ...newestByTerm.get(term) }));
       return { rows: out, rowCount: out.length };
     }
 
@@ -743,4 +751,298 @@ test('the normalisation guard agrees with keys.normaliseTerm on the terms this m
   }
   assert.equal(isNormalisedTerm('Ariel Pods'), false);
   assert.equal(MIN_CANDIDATES, 2);
+});
+
+// =====================================================================
+// WP-B15-20 - THE MEMORY MUST AGREE WITH THE MATCHER
+//
+// WP-B15-13 made product MATCHING separator-blind, so "VANISH PRETREAT GEL"
+// and "Vanish Pre-Treat Gel" name the same product. It did not touch pipeline/,
+// so the MEMORY still disagreed:
+//
+//   normaliseTerm('VANISH PRETREAT GEL')  -> 'vanish pretreat gel'
+//   normaliseTerm('Vanish Pre-Treat Gel') -> 'vanish pre treat gel'
+//
+// Same product, two keys, SQL exact equality - so the answer Warwick gave under
+// one spelling was not found under the other and he was asked again.
+//
+// ⛔ THE KEY IS NOT FUZZY AND MUST NOT BECOME FUZZY. keys.normaliseTerm is
+// untouched - it is data-shaped and mints question_key and idempotency_key, and
+// migration 018:128 says "DO NOT MAKE THIS KEY FUZZY TO CLOSE THAT". What
+// changed is the LOOKUP, and it applies the ONE shared matcher's own rule
+// (skill/termMatch.js squashMatchText) rather than a second notion of sameness.
+// =====================================================================
+
+// TWO GENUINE VARIANTS BEHIND ONE ALIAS - the same shape as the ARIEL pair
+// above, so the ambiguity is real and grounded rather than manufactured.
+const VANISH_A = {
+  id: 31, name: 'Vanish Pre-Treat Gel 500ml', brand: 'Vanish', category: 'laundry',
+  aka: ['vanish pre-treat gel'], typical_qty: 1, asda_product_id: 'A31', substitutes_allowed: false,
+};
+const VANISH_B = {
+  id: 32, name: 'Vanish Pre-Treat Gel 1L', brand: 'Vanish', category: 'laundry',
+  aka: ['vanish pre-treat gel'], typical_qty: 1, asda_product_id: 'A32', substitutes_allowed: false,
+};
+const VANISH_CATALOGUE = () => makeCatalogue({ regulars: [CAT_FOOD, VANISH_A, VANISH_B] });
+
+// THE TWO SPELLINGS, AS WARWICK ACTUALLY WROTE THEM (2026-08-10).
+const SPELLING_CATALOGUE_WAY = 'Vanish Pre-Treat Gel';
+const SPELLING_AS_HE_TYPED_IT = 'VANISH PRETREAT GEL';
+
+/** `runShop`, but the list wording is the variable under test. */
+async function runShopSpelled(h, { ref, listDate, messageId, spelling }) {
+  await commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate, sourceKind: 'text', rawText: `3 gourmet cat food\n${spelling}`,
+    actor: ACTOR, telegramChatId: '555', telegramMessageId: String(messageId),
+  }, h.deps);
+  await commands.buildShop({ shopRef: ref, actor: ACTOR }, h.deps);
+  return drain(h, ref);
+}
+
+test('B15-20 FIXTURE: both spellings ground to the SAME candidate set, so the memory key is the only variable', async () => {
+  // If this ever fails, the journey tests below stop proving what they claim -
+  // a question in shop 2 would mean the RESOLVER missed, not the MEMORY.
+  const h = makeHarness({ catalogue: VANISH_CATALOGUE() });
+  installRememberedChoiceTable(h);
+
+  for (const [i, spelling] of [SPELLING_CATALOGUE_WAY, SPELLING_AS_HE_TYPED_IT].entries()) {
+    const ref = `SHOP-2026-09-0${i + 1}`;
+    await runShopSpelled(h, { ref, listDate: `2026-09-0${i + 1}`, messageId: 950 + i, spelling });
+    const q = questionsOf(h, ref);
+    assert.equal(q.length, 1, `"${spelling}" did not reach a human as a two-variant ambiguity`);
+    assert.deepEqual(groundedCandidateIds(q[0]).sort(), [31, 32],
+      `"${spelling}" must offer BOTH grounded variants - B15-13's separator-blind matching`);
+  }
+
+  // AND THE KEYS GENUINELY DIFFER - which is the whole defect.
+  assert.notEqual(normaliseTerm(SPELLING_AS_HE_TYPED_IT), normaliseTerm(SPELLING_CATALOGUE_WAY),
+    'the two spellings must produce DIFFERENT memory keys, or this Work Package fixes nothing');
+});
+
+test('AC2 B15-20 JOURNEY: the choice he made under one spelling is FOUND under the other, and no question is opened', async () => {
+  const h = makeHarness({ catalogue: VANISH_CATALOGUE() });
+  const rows = installRememberedChoiceTable(h);
+
+  // ── SHOP 1. He writes it the catalogue way, and answers. ─────────────────
+  const REF1 = 'SHOP-2026-08-03';
+  await runShopSpelled(h, {
+    ref: REF1, listDate: '2026-08-03', messageId: 900, spelling: SPELLING_CATALOGUE_WAY,
+  });
+  const q1 = questionsOf(h, REF1);
+  assert.equal(q1.length, 1, 'shop 1 must ask');
+  await commands.answerQuestion({
+    shopRef: REF1, actor: ACTOR, questionKey: q1[0].question_key,
+    answerText: VANISH_B.name, answerSource: 'button',
+  }, h.deps);
+  await drain(h, REF1);
+
+  assert.equal(rows.length, 1, 'shop 1 must have left a remembered choice behind');
+  assert.equal(rows[0].choice_term, 'vanish pre treat gel',
+    'the stored key is keys.normaliseTerm output and is NOT squashed - the KEY did not become fuzzy');
+  assert.equal(rows[0].term_normaliser, TERM_NORMALISER);
+
+  // ── SHOP 2. THE SAME PRODUCT, SPELLED THE WAY HE ACTUALLY TYPED IT. ──────
+  const REF2 = 'SHOP-2026-08-10';
+  const steps = await runShopSpelled(h, {
+    ref: REF2, listDate: '2026-08-10', messageId: 901, spelling: SPELLING_AS_HE_TYPED_IT,
+  });
+
+  assert.equal(questionsOf(h, REF2).length, 0,
+    'HE WAS ASKED A QUESTION HE HAD ALREADY ANSWERED - the memory missed across the separator difference');
+
+  const planStep = steps.find((s) => s.plan_summary);
+  assert.ok(planStep, 'shop 2 never reached a plan');
+  assert.equal(planStep.lines_unresolved.length, 0, 'nothing may still be held for a human');
+  assert.equal(planStep.remembered_choices.length, 1, 'the remembered choice was not applied');
+  assert.equal(planStep.remembered_choices[0].regular_id, 32,
+    'it must resolve to the product he actually chose, by id');
+  assert.equal(planStep.remembered_choices[0].reason, REMEMBERED_FLAG);
+  assert.equal(String(planStep.remembered_choices[0].remembered_choice_id), String(rows[0].id),
+    'and it must name the row it came from - provenance, not a guess');
+
+  // THE LIST RESOLVED BEFORE BROWSER EXECUTION - Warwick's actual requirement.
+  assert.equal(shopOf(h, REF2).status, 'READY_TO_SHOP');
+  assert.equal(planStep.plan_summary.needs_decision, 0);
+  assert.equal(rows.length, 1, 'a found memory must not mint a second, competing row');
+});
+
+test('AC3 + AC6 B15-20 JOURNEY: a refusal STILL refuses through the new lookup - and is now REPORTED, not silent', async () => {
+  // The refusal must fire on the SEPARATOR-BLIND path, not only on the old
+  // exact one: the memory is filed under "vanish pre treat gel", the list says
+  // "VANISH PRETREAT GEL", and the remembered product is GONE this week.
+  const h = makeHarness({ catalogue: VANISH_CATALOGUE() });
+  const rows = installRememberedChoiceTable(h);
+
+  const REF1 = 'SHOP-2026-08-03';
+  await runShopSpelled(h, {
+    ref: REF1, listDate: '2026-08-03', messageId: 900, spelling: SPELLING_CATALOGUE_WAY,
+  });
+  await commands.answerQuestion({
+    shopRef: REF1, actor: ACTOR, questionKey: questionsOf(h, REF1)[0].question_key,
+    answerText: VANISH_B.name, answerSource: 'button',
+  }, h.deps);
+  await drain(h, REF1);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].choice_term, 'vanish pre treat gel');
+  assert.equal(Number(rows[0].chosen_regular_id), 32);
+
+  // ── THE 1L IS WITHDRAWN AND A NEAR-MATCH REPLACES IT. ────────────────────
+  // Same product to a human, a different row to the catalogue.
+  const NEAR = {
+    id: 33, name: 'Vanish Pre-Treat Gel 1 Litre', brand: 'Vanish', category: 'laundry',
+    aka: ['vanish pre-treat gel'], typical_qty: 1, asda_product_id: 'A33', substitutes_allowed: false,
+  };
+  const nextCatalogue = makeCatalogue({ regulars: [CAT_FOOD, VANISH_A, NEAR] });
+  h.deps.loadCatalogue = async () => nextCatalogue;
+  h.deps.loadPlanningInputs = async () => ({
+    rules: [], products: [], regulars: [...nextCatalogue.regularsById.values()],
+    budget: null, lastOrder: null, priorAnswers: [],
+  });
+
+  const REF2 = 'SHOP-2026-08-10';
+  const steps = await runShopSpelled(h, {
+    ref: REF2, listDate: '2026-08-10', messageId: 901, spelling: SPELLING_AS_HE_TYPED_IT,
+  });
+
+  // THE REFUSAL EXECUTED: a question, not a guess.
+  const q2 = questionsOf(h, REF2);
+  assert.equal(q2.length, 1, 'the shop must ASK AGAIN when the remembered product is gone');
+  assert.deepEqual(groundedCandidateIds(q2[0]).sort(), [31, 33], "and about THIS WEEK'S candidates");
+
+  const planStep = steps.find((s) => s.plan_summary);
+  assert.equal(planStep.remembered_choices.length, 0, 'nothing may be resolved from a withdrawn memory');
+  assert.equal(planStep.lines_unresolved.length, 1, 'the line must still be held for a human');
+
+  // ── AC6. THIS IS THE ASSERTION THE OLD CODE COULD NOT PASS. ──────────────
+  // Under exact-equality keying the memory was never found, `memories.has`
+  // was false, and NO refused entry was emitted - the miss was invisible, which
+  // is how it survived unnoticed. It must now be reported.
+  assert.equal(planStep.remembered_refused.length, 1,
+    'a memory that exists and is not used must be REPORTED - a silent miss is how this survived');
+  assert.match(planStep.remembered_refused[0].reason, /not a grounded candidate/i);
+
+  // AND ABOVE ALL: NO FABRICATED MATCH.
+  assert.notEqual(shopOf(h, REF2).status, 'READY_TO_SHOP',
+    'a shop must never become ready on a near-match the human did not choose');
+  assert.equal(rows.length, 1, 'no second memory may be minted from a guess');
+});
+
+// =====================================================================
+// WP-B15-20 UNIT PROOFS - the lookup itself, with an injected readQuery.
+// No harness, no database, no statement modelling: `loadRememberedChoices`
+// takes `deps.readQuery`, so the boundary is the injection point.
+// =====================================================================
+
+/** A `deps` whose read returns exactly these stored rows, counting its calls. */
+function storeOf(rows) {
+  const calls = [];
+  return {
+    calls,
+    deps: {
+      readQuery: async (sql, params) => {
+        calls.push({ sql: String(sql).replace(/\s+/g, ' ').trim(), params });
+        return { rows: rows.map((r) => ({ ...r })), rowCount: rows.length };
+      },
+    },
+  };
+}
+
+const memRow = (over) => ({
+  id: 1, household_id: HOUSEHOLD_ID, choice_term: 'vanish pre treat gel',
+  term_normaliser: TERM_NORMALISER, chosen_regular_id: 32, candidate_regular_ids: [31, 32],
+  authorised_by: AUTHORISED_BY, source_decision_kind: 'variant_choice',
+  chosen_at: '2026-08-03T10:00:00Z', source_shop_id: 1, source_decision_id: 601, ...over,
+});
+
+test('B15-20: the Map is keyed on the REQUESTED term, never on the stored spelling', async () => {
+  const { deps } = storeOf([memRow()]);
+  const asked = normaliseTerm(SPELLING_AS_HE_TYPED_IT); // 'vanish pretreat gel'
+  const found = await loadRememberedChoices(deps, HOUSEHOLD_ID, [asked]);
+
+  assert.equal(found.size, 1, 'the separator difference must not hide the memory');
+  assert.ok(found.has(asked),
+    'applyRememberedToPlan reads by the term the PLAN LINE produced - the Map must answer to that key');
+  assert.equal(found.has('vanish pre treat gel'), false,
+    'keying on the STORED spelling is the half-fix: it finds the row and then misses it on the Map');
+  assert.equal(Number(found.get(asked).chosen_regular_id), 32);
+  // The stored row is handed back UNCHANGED - nothing squashed is written.
+  assert.equal(found.get(asked).choice_term, 'vanish pre treat gel',
+    'the stored key must travel intact; only the SEARCH is separator-blind');
+});
+
+test('B15-20 AC4: a digit-to-digit separator is NEVER removed, so 1.5L is not 15L', async () => {
+  // The guard belongs to squashMatchText (termMatch.js:164-176). This asserts
+  // it survives THROUGH the lookup, so a future edit here cannot quietly lose
+  // it and start resolving a 15 litre drum from a 1.5 litre memory.
+  const { deps } = storeOf([memRow({ choice_term: 'coca cola 1 5l', chosen_regular_id: 41 })]);
+
+  const wrong = await loadRememberedChoices(deps, HOUSEHOLD_ID, [normaliseTerm('Coca Cola 15L')]);
+  assert.equal(wrong.size, 0,
+    'a 1.5 litre bottle and a 15 litre drum are not the same purchase');
+
+  const right = await loadRememberedChoices(deps, HOUSEHOLD_ID, [normaliseTerm('Coca-Cola 1.5L')]);
+  assert.equal(right.size, 1, 'and the genuine separator difference must still resolve');
+  assert.equal(Number(right.get('coca cola 1 5l').chosen_regular_id), 41);
+});
+
+test('B15-20: SEPARATOR-BLIND IS NOT FUZZY - a misspelling is still a miss', async () => {
+  const { deps } = storeOf([memRow()]);
+  for (const miss of ['vanish pretreet gel', 'vanish pre treat', 'vanish gel', 'vanish pre treat gels']) {
+    const found = await loadRememberedChoices(deps, HOUSEHOLD_ID, [miss]);
+    assert.equal(found.size, 0, `"${miss}" must NOT resolve - this is a lookup, not a similarity measure`);
+  }
+});
+
+test('B15-20: when two stored spellings collide, the NEWEST wins - the statement\'s own precedence', async () => {
+  // Squashing can make two DIFFERENT stored terms compete for one lookup.
+  // Ruled: inherit ORDER BY chosen_at DESC, id DESC rather than invent a rule.
+  const older = memRow({
+    id: 5, choice_term: 'vanish pre treat gel', chosen_regular_id: 31, chosen_at: '2026-08-03T10:00:00Z',
+  });
+  const newer = memRow({
+    id: 6, choice_term: 'vanish pretreat gel', chosen_regular_id: 32, chosen_at: '2026-08-10T10:00:00Z',
+  });
+
+  for (const rows of [[older, newer], [newer, older]]) {
+    const { deps } = storeOf(rows);
+    const found = await loadRememberedChoices(deps, HOUSEHOLD_ID, ['vanish pre treat gel']);
+    assert.equal(Number(found.get('vanish pre treat gel').chosen_regular_id), 32,
+      'the most recent preference must win regardless of the order rows arrive in');
+  }
+
+  // Same instant - the higher id is the later row.
+  const sameA = memRow({ id: 8, choice_term: 'vanish pre treat gel', chosen_regular_id: 31, chosen_at: 'T' });
+  const sameB = memRow({ id: 9, choice_term: 'vanishpretreat gel', chosen_regular_id: 32, chosen_at: 'T' });
+  const { deps } = storeOf([sameB, sameA]);
+  const tie = await loadRememberedChoices(deps, HOUSEHOLD_ID, ['vanish pre treat gel']);
+  assert.equal(Number(tie.get('vanish pre treat gel').chosen_regular_id), 32, 'id desc breaks the tie');
+});
+
+test('B15-20: the statement carries NO term predicate, and still scopes to the household', async () => {
+  const { calls, deps } = storeOf([memRow()]);
+  await loadRememberedChoices(deps, HOUSEHOLD_ID, ['vanish pretreat gel']);
+
+  assert.equal(calls.length, 1, 'ONE statement per plan, never one per line');
+  assert.doesNotMatch(calls[0].sql, /choice_term = ANY/i,
+    'a SQL term predicate cannot express the digit guard without a third copy of the rule');
+  assert.match(calls[0].sql, /WHERE household_id = \$1/i,
+    "there is no global scope in Warwick's rule, and the index's leading column is household_id");
+  assert.match(calls[0].sql, /DISTINCT ON \(choice_term\)/i);
+  assert.match(calls[0].sql, /ORDER BY choice_term, chosen_at DESC, id DESC/i);
+  assert.deepEqual(calls[0].params, [HOUSEHOLD_ID], 'the household is the only parameter now');
+});
+
+test('B15-20: the shared matcher is IMPORTED, not reimplemented', async () => {
+  // The defect being fixed was a SECOND normaliser. A third one - even a
+  // correct one - would be the same mistake again, so this pins the source.
+  const src = fs.readFileSync(path.join(HERE, 'rememberedChoice.js'), 'utf8');
+  assert.match(src, /requireCjs\('\.\.\/skill\/termMatch\.js'\)/,
+    'the separator-blind rule must come from skill/termMatch.js, the ONE shared matcher');
+  assert.doesNotMatch(src, /function squashMatchText/,
+    'a local copy of squashMatchText is the defect wearing a third hat');
+
+  // And keys.normaliseTerm is untouched: the KEY did not become fuzzy.
+  const keysSrc = fs.readFileSync(path.join(HERE, 'keys.js'), 'utf8');
+  assert.match(keysSrc, /\.replace\(\/\[\^a-z0-9&\\s\]\/g, ' '\)/,
+    'keys.normaliseTerm must still flatten punctuation to SPACES - it mints question_key and idempotency_key');
 });
