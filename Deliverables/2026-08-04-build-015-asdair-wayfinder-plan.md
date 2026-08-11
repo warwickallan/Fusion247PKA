@@ -1686,6 +1686,16 @@ not chased tonight.
 
 **Closing head at time of writing: `8866659`.**
 
+**Cockpit-backend WP (`WO-2026-08-11-B15-COCKPIT-BE-01`) COMPLETED, same session** — all 5 acceptance
+criteria MET with executed evidence (cockpit-api 163/163, bot 196/196, secret-scan clean across 74
+files). Pushed to `build-015/b15-25-cockpit-backend` @ `82e7618`. **This is builder self-test evidence,
+not independent review** — no Veritas gate has run, and it is NOT integrated into `main`. The maximum
+honest statement right now is: built, tested, pushed to its own branch. Residuals correctly carried
+forward rather than silently closed: `canonicalState.js` is a fixture-evidenced placeholder never
+proven against a live DB; the three new Telegram renderers exist and pass tests but nothing yet
+enqueues them (no `runtime.js`/`runPipeline.js` caller); the `correctLine`/`markCorrected`
+identifier-space mismatch and the missing "not this week" command remain open, flagged follow-ons.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
