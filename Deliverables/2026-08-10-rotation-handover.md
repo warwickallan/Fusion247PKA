@@ -1,5 +1,8 @@
 ---
-title: ROTATION HANDOVER — 2026-08-10 evening. Read this first.
+title: "⛔ SUPERSEDED — 2026-08-10 handover. DO NOT START HERE."
+superseded_by: Deliverables/2026-08-11-rotation-handover.md
+superseded_on: 2026-08-11
+superseded_why: "Its next action was ask Warwick for a fresh photograph. That is now PROHIBITED until input truth is proven - see Deliverables/2026-08-11-BLOCKER-input-truth-failure.md"
 date: 2026-08-10
 author: Larry
 build: BUILD-015 AsdAIr

@@ -69,6 +69,25 @@ no better informed than the last.
 
 ## 1. Intake
 
+> ## 🔴 STOP — INPUT TRUTH. Added 2026-08-11. THIS IS THE STEP THAT FAILED.
+>
+> **On 2026-08-10 this stage produced NO durable transcription — empty text, null provider, null
+> model, null confidence — and the pipeline carried on anyway, generating ~35 plausible shop lines
+> that did NOT come from Warwick's photograph.** ~17 of his items were missing and 7 products he
+> never asked for were present. Questions were asked about invented items, he answered them, and a
+> browser built a real trolley from the fiction. **Every other control in the estate was green.**
+>
+> **Canonical record and the GATE ZERO rule: `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md`.
+> Read it before running this step.**
+>
+> **The invariant:** SOURCE PHOTO → DURABLE TRANSCRIPTION WITH PROVENANCE → SHOP LINES DERIVED FROM
+> IT → RECONCILIATION BACK TO SOURCE → only then planning, questions, rules, browser.
+>
+> **A missing transcription is a STOP, not a warning.** If there is no durable record of what was
+> read, nothing downstream may be trusted however plausible it looks. Plausible-but-unsourced is
+> more dangerous than obviously broken.
+
+
 The request arrives on the **Fusion 247 Shopper bot** — a *separate* bot with its own monitored inbox, distinct
 from the dev bot and the Tower bot. **Never cross the tokens.**
 
