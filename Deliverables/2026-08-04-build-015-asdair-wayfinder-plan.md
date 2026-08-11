@@ -1696,6 +1696,14 @@ proven against a live DB; the three new Telegram renderers exist and pass tests 
 enqueues them (no `runtime.js`/`runPipeline.js` caller); the `correctLine`/`markCorrected`
 identifier-space mismatch and the missing "not this week" command remain open, flagged follow-ons.
 
+**Vision-pipeline WP (`WO-2026-08-11-B15-VISION-01`) — CLARIFY then amended, same pattern as Cockpit-
+backend.** Keel's preflight found `services/asdair/interpret/groundedPrompt.js` (the actual canonical
+prompt-builder, not the file named in `file_surface`) must carry the region-citation contract, and
+`services/obsidiwikai/package.json` needs widening solely to register a new test file. AMENDMENT 1
+widened the surface by exactly those two files and approved a disposable local Postgres plan for AC3's
+database-level proof (no Docker available here; a throwaway instance substitutes, matching the CI
+job's own allowance). Implementation now proceeding.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
