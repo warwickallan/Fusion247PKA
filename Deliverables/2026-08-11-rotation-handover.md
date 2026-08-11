@@ -116,8 +116,8 @@ flagged that "41/41 correct" was asserted with no itemised record anywhere in th
 > **⚠️ TWO SOP-021 § 5 STEPS WERE NOT PERFORMED, AND ONE OF THEM COULD CHANGE WHAT ARRIVES.**
 > **"Allow substitutions for all" is still TICKED** on the trolley and every line shows "Allow
 > substitutes" — **standing rule 6 is never auto-substitute**, and under the supervised adapter there
-> is no mechanical enforcement of that toggle. **No `asdair.orders` row was written** via
-> `recordShopOutcome.js` either. Neither affects what is currently in the basket; **the substitution
+> is no mechanical enforcement of that toggle. ~~No `asdair.orders` row was written~~ — **NOW WRITTEN, `asdair.orders` id 6 with 9 events** via
+> `recordShopOutcome.js`. **Only the substitution toggle remains open**; **the substitution
 > toggle should be closed before Warwick checks out.**
 
 **Corrections made during the rescue:** 10 wrong products removed (Mars, TRESemme ×2, Andrex, Wall's

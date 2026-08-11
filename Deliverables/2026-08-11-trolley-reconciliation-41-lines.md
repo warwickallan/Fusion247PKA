@@ -111,7 +111,7 @@ of number and should not be expected to match.
 4. **ASDA Sliced Ham on the Bone 400g** — ASDA also stocks a 120g "Cured Ham on the Bone"; the 400g
    is the unqualified name match.
 
-## ⚠️ TWO SOP-021 § 5 STEPS WERE NOT PERFORMED — verify before Warwick orders
+## ⚠️ SOP-021 § 5 — ONE STEP DONE, ONE STILL OPEN
 
 SOP-021 § 5 requires, as the last actions before hand-back:
 
@@ -120,11 +120,9 @@ SOP-021 § 5 requires, as the last actions before hand-back:
    line shows *"Allow substitutes"*. **Standing rule 6 is "never auto-substitute"** — leaving that
    toggle on invites ASDA to substitute at pick time. Under the supervised-Sonnet adapter there is
    **no mechanical enforcement** of this; it is instruction and supervision only.
-2. **Write an `asdair.orders` row via `recordShopOutcome.js`.** **This was NOT done.** The only
-   database writes from the rescue were to `asdair.regulars`.
+2. ~~**Write an `asdair.orders` row via `recordShopOutcome.js`.**~~ **✅ DONE 2026-08-11 — `asdair.orders` id 6 written** via the ruled writer `recordShopOutcome.js`: 42 requested / 41 added / 1 not added (Bloo) / £140.97 / `outside_budget_range: false` / `checked_out: false` (SQL literal, rule 8) / **9 order_events** recording the manual-rescue truth, the ten wrong products removed, the quantity trap, the duplicate Dettol, Warwick's decisions, the five already-answered products that never reached the basket, and the two open flags.
 
-**Neither omission affects what is in the basket. Both should be closed before Warwick checks out**,
-and the substitution toggle is the one that could change what actually arrives.
+**The orders row is now written. The SUBSTITUTION TOGGLE REMAINS OPEN** and is the one that could change what actually arrives — untick it before checking out.
 
 ## What this record is NOT
 
