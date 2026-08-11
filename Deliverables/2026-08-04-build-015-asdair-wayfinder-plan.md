@@ -1599,8 +1599,10 @@ its evidence so it can be re-established or falsified in minutes.**
 >
 > **B15-18, B15-19, B15-20, B15-21 are all BUILT and PUSHED and NONE ARE INTEGRATED OR LIVE.**
 > Migration 019 IS live — but the write path that supplies `shop_id` is NOT, so shop ownership is
-> **not** fixed end to end. The runtime still runs pre-change bytes (PID 12204, 2026-08-10 21:40:57).
-> Both Veritas gates remain **HOLD**.
+> **not** fixed end to end. **The runtime (PID 12204, 2026-08-10 21:40:57) IS byte-current with `main`
+> product code and CARRIES B15-07..B15-16** — it started 86s after `fb58882` and
+> `git diff fb58882..HEAD -- services/` is empty. It does **NOT** carry B15-18/19/20/21, so a cutover
+> is needed only once those integrate. Both Veritas gates remain **HOLD**.
 
 ---
 
