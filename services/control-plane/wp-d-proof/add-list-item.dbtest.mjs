@@ -37,7 +37,7 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  PASS', m)) : (fail++, console.log('  FAIL', m)); };
 
 // Silas's seven named assertions, tracked by letter so the return can report each one BY NAME.
-const NAMED = { a: null, b: null, c: null, d: null, e: null, f: null, g: null };
+const NAMED = { a: null, b: null, c: null, d: null, e: null, f: null, g: null, h: null };
 const okNamed = (letter, cond, m) => {
   NAMED[letter] = NAMED[letter] === 'FAIL' ? 'FAIL' : (cond ? 'PASS' : 'FAIL');
   ok(cond, `(${letter}) ${m}`);
@@ -273,6 +273,99 @@ async function main() {
     okNamed('g', listCount === 1, 'no list row was added, moved or orphaned by the migration');
     okNamed('g', notices.some((m) => m.includes('019:') && m.includes('more than one shop')),
       `the migration SAID SO rather than staying silent  [notice: ${notices.find((m) => m.includes('019:')) || 'NONE RAISED'}]`);
+  }
+
+  // ── WP-B15-22 — RECLAIM, NEVER ORPHAN, A PRE-EXISTING UNOWNED LIST ────────────────────────────
+  //
+  // Found by BUILD-015 Keel integrating WP-B15-21: findOrCreateDraftList's shop-owned branch used to
+  // go straight to minting a brand new list on finding none of its own — never checking whether an
+  // UNOWNED list already existed for the same household+date. The real journey: Warwick taps "add to
+  // next week" from the cockpit before this week's photo shop exists (lands on the unowned lane,
+  // exactly as designed), then his photo shop starts and supplies its OWN shop_id — and the item he
+  // already added was stranded on a list no shop would ever look at again. Genuine data loss, not
+  // theoretical: proven here against the REAL schema and REAL constraints, section (g)'s style.
+  console.log('16) (h) RECLAIM — a pre-existing unowned same-date list is adopted, not orphaned:');
+  if (WITHOUT_019) {
+    skipNamed('h', 'the reclaim fix operates on the shop_id column, which does not exist without 019');
+  } else {
+    // Re-apply the full chain cleanly (section (g) above deliberately rebuilt WITHOUT 019 partway
+    // through) so this reproduces the scenario against a known-clean schema, in its own household.
+    await applyChain({ include019: true });
+    const h3 = (await db.query(`insert into asdair.households (name, display_name) values ('household-h','H') returning id`)).rows[0].id;
+    const RECLAIM_DATE = '2026-09-21';
+
+    // STEP 1 — the cockpit adds an item BEFORE any shop exists this week. No shop_id is known yet, so
+    // this is exactly the unowned-lane write add_regular_to_next_week/add_list_item already make.
+    const cockpitList = (await db.query(
+      `insert into asdair.shopping_lists (household_id, status, list_date) values ($1,'next_week_draft',$2) returning id`,
+      [h3, RECLAIM_DATE])).rows[0].id;
+    await db.query(
+      `insert into asdair.shopping_list_items (list_id,item_name,requested_qty,status,note) values ($1,'Bread',1,'requested','added via cockpit')`,
+      [cockpitList]);
+    const cockpitItemId = (await db.query(
+      `select id from asdair.shopping_list_items where list_id=$1 and lower(item_name)='bread'`, [cockpitList])).rows[0].id;
+
+    // STEP 2 — this week's photo shop now starts and interprets its own line, supplying shop_id, for
+    // the SAME date. This is the exact call findOrCreateDraftList's shop-owned branch serves.
+    const shopH = await shop(h3, 'SHOP-2026-09-21-M1', 'PROCESSING');
+    const rH = await run('add_list_item', { item_name: 'Gourmet cat food', requested_qty: 3, status: 'requested', list_date: RECLAIM_DATE, shop_id: shopH });
+    ok(rH.ok, 'the shop-owned write itself succeeded');
+
+    const listCountH = (await db.query(
+      `select count(*)::int n from asdair.shopping_lists where household_id=$1 and list_date=$2`, [h3, RECLAIM_DATE])).rows[0].n;
+    okNamed('h', listCountH === 1,
+      `exactly ONE list exists for this household+date after the shop-owned write, not two  [observed ${listCountH}]`);
+    okNamed('h', rH.list_id === cockpitList,
+      `the shop-owned write landed on the SAME list the cockpit item was already on (reclaimed=${rH.list_id}, cockpit's=${cockpitList}), not a fresh one`);
+
+    const ownerAfter = (await db.query(`select shop_id from asdair.shopping_lists where id=$1`, [cockpitList])).rows[0].shop_id;
+    okNamed('h', String(ownerAfter) === String(shopH), `the reclaimed list is now OWNED by this week's shop  [owner=${ownerAfter}, shop=${shopH}]`);
+
+    const survivingItems = (await db.query(
+      `select id, item_name, requested_qty, list_id from asdair.shopping_list_items where list_id=$1 order by item_name`, [cockpitList])).rows;
+    const bread = survivingItems.find((i) => i.id === cockpitItemId);
+    okNamed('h', !!bread && Number(bread.requested_qty) === 1,
+      `the cockpit's own item (Bread, qty 1) survived UNCHANGED on the reclaimed list  [rows: ${survivingItems.map((i) => `${i.item_name}:${i.requested_qty}`).join(', ')}]`);
+    okNamed('h', survivingItems.some((i) => i.item_name.toLowerCase() === 'gourmet cat food'),
+      'the shop\'s own new item also landed on the same, now-shared-by-ownership list');
+    // The item ROW never moved list_id underneath any link that already names it (shop_line.list_item_id,
+    // a question's list_item_id) - only the LIST's ownership changed. Verified directly, not inferred.
+    const cockpitItemStillOnSameList = (await db.query(
+      `select list_id from asdair.shopping_list_items where id=$1`, [cockpitItemId])).rows[0].list_id;
+    okNamed('h', cockpitItemStillOnSameList === cockpitList,
+      'the cockpit item\'s own list_id never changed - the LIST was reclaimed, the ITEM was never moved');
+
+    // ISOLATION — an unrelated household/date's unowned list must never be touched by this reclaim.
+    const h4 = (await db.query(`insert into asdair.households (name, display_name) values ('household-i','I') returning id`)).rows[0].id;
+    const untouchedList = (await db.query(
+      `insert into asdair.shopping_lists (household_id, status, list_date) values ($1,'next_week_draft',$2) returning id`,
+      [h4, RECLAIM_DATE])).rows[0].id;
+    const shopI = await shop(h3, 'SHOP-2026-09-21-M2', 'PROCESSING');
+    await run('add_list_item', { item_name: 'Milk', requested_qty: 1, status: 'requested', list_date: RECLAIM_DATE, shop_id: shopI, household: h3 });
+    const untouchedOwner = (await db.query(`select shop_id from asdair.shopping_lists where id=$1`, [untouchedList])).rows[0].shop_id;
+    okNamed('h', untouchedOwner === null,
+      'a DIFFERENT household\'s unowned list for the same calendar date was never touched by this reclaim');
+
+    // SEQUENTIAL EXCLUSION, NOT A LIVE RACE. This proves a list ALREADY claimed
+    // (by the time this call's SELECT runs) is correctly skipped, never
+    // double-claimed - it does NOT exercise genuine concurrent interleaving of
+    // the SELECT and the UPDATE, which would need two coordinated live
+    // connections and is not built here (see the doc comment on the UPDATE
+    // itself for why that is a proportionate, not a missing, limit).
+    const raceList = (await db.query(
+      `insert into asdair.shopping_lists (household_id, status, list_date) values ($1,'next_week_draft',$2) returning id`,
+      [h3, '2026-09-28'])).rows[0].id;
+    const shopRaceWinner = await shop(h3, 'SHOP-2026-09-28-WINNER', 'PROCESSING');
+    const claimedFirst = await db.query('update asdair.shopping_lists set shop_id=$2 where id=$1 and shop_id is null returning id', [raceList, shopRaceWinner]);
+    ok(claimedFirst.rowCount === 1, 'setup: a list is claimed BEFORE the second shop\'s call runs');
+    const shopSecond = await shop(h3, 'SHOP-2026-09-28-SECOND', 'PROCESSING');
+    // `household` named explicitly: h4 (isolation household) also now exists,
+    // so an unqualified call would be ambiguous and refused, not a real
+    // exclusion failure - the same discipline resolveHousehold demands of
+    // every other multi-household caller in this file.
+    const rSecond = await run('add_list_item', { item_name: 'Butter', requested_qty: 1, status: 'requested', list_date: '2026-09-28', shop_id: shopSecond, household: h3 });
+    ok(rSecond.ok && rSecond.list_id !== raceList,
+      'a shop finding the only unowned list for its date ALREADY claimed gets its OWN fresh list, never errors, never double-claims');
   }
 
   console.log('\nSILAS ASSERTIONS (schema decision packet §8):');

@@ -2588,28 +2588,36 @@ async function planWithDeadWeek(seedOverride) {
   return { h, handed };
 }
 
-test('WP-B15-21 SUPERSEDES THIS TEST\'S OLD NAME: the fresh shop now binds its OWN list, never the shared date-keyed row', async () => {
-  // ── CORRECTED, WP-B15-22, NOT WEAKENED ─────────────────────────────────
-  // This test's old name and assertion pinned the EXACT live bug migration
-  // 019 + WP-B15-21 exist to remove: "unique (household_id, list_date) leaves
-  // no alternative" was true only while nothing supplied shop_id, so two
-  // shops on one date were FORCED to share row 20 - which is what actually
-  // happened on 2026-08-10 (SHOP-2026-08-10-M64 landed on the cancelled
-  // SHOP-2026-08-10's list). Once runPipeline.js supplies shop_id (WP-B15-21,
-  // integrated here), findOrCreateDraftList's shop-owned branch never even
-  // looks at row 20 - it creates a NEW row keyed on THIS shop's id. Asserting
-  // "still one shared row" would now be asserting the live incident is still
-  // reachable, which is false and would be the wrong kind of green.
+test('WP-B15-22 RECLAIM: the fresh shop ADOPTS the pre-existing unowned date-keyed list rather than orphaning it, and stays SAFE because exclusion still runs', async () => {
+  // ── THIS TEST'S THIRD NAME, AND THE FULL HISTORY BELONGS HERE ────────────
+  // Round 1 (pre-019): "the fresh shop binds the SHARED list row" - true, and
+  // it was the 2026-08-10 defect itself: date alone could not distinguish two
+  // shops, so sharing was forced and unprotected.
+  // Round 2 (WP-B15-21 integrated, no reclaim yet): rewritten to assert the
+  // fresh shop gets its OWN separate list - correct for that intermediate
+  // state, where findOrCreateDraftList's shop-owned branch never looked at a
+  // pre-existing unowned list at all.
+  // Round 3 (WP-B15-22 reclaim fix, THIS state): findOrCreateDraftList now
+  // RECLAIMS a pre-existing UNOWNED same-date list instead of stranding it
+  // behind a fresh one (asdairCommands.mjs's own `reclaimUnownedList`) - so
+  // list 20 (unowned in this fixture - the dead shop 99 only ever CLAIMED
+  // item 210 via a shop_line row, it never OWNED the list via shop_id) is
+  // adopted by the fresh shop again. This is SAFE, unlike round 1, because
+  // ownership and the foreign-claims exclusion mechanism are BOTH still live:
+  // shop 99's shop_line claim on item 210 still excludes it from THIS shop's
+  // plan (proven by the AC1 tests below, which still pass), and Postgres's
+  // `uq_lists_shop` still refuses a second list for the SAME shop_id. Sharing
+  // a list is no longer dangerous BECAUSE something excludes what does not
+  // belong, not because sharing itself became impossible.
   const { h } = await planWithDeadWeek();
-  assert.equal(h.db.shopping_lists.length, 2,
-    'the fresh shop must mint its OWN list row rather than reusing the pre-existing date-keyed one - '
-    + 'sharing one row is the exact 2026-08-10 defect this integration removes');
-  assert.notEqual(String(h.db.shop[0].list_id), '20',
-    'the shop bound the OLD shared list - shop_id emission (WP-B15-21) did not take effect');
+  assert.equal(h.db.shopping_lists.length, 1,
+    'the pre-existing unowned list should be RECLAIMED, not left behind while a second one is minted');
+  assert.equal(String(h.db.shop[0].list_id), '20',
+    'the fresh shop must adopt the pre-existing unowned list for this exact date');
   const ownList = h.db.shopping_lists.find((l) => String(l.id) === String(h.db.shop[0].list_id));
   assert.ok(ownList, 'the shop points at a list row that does not exist');
   assert.equal(String(ownList.shop_id), String(h.db.shop[0].id),
-    'the fresh shop\'s own list must be owned by shop_id, not merely coincide on date');
+    'the reclaimed list must now be OWNED by this shop\'s shop_id, not merely coincide on date');
 });
 
 test('B15-10 AC7: the dead week item is PRESERVED EVIDENCE - never deleted, never mutated', async () => {
@@ -2646,14 +2654,14 @@ test('B15-10 AC2: a re-interpret of the SAME message mints no second list and no
 });
 
 test('B15-10 AC2: the shop own items are all present exactly once after the re-run', async () => {
-  // list_id was hardcoded to '20' here, which was correct only while the
-  // fresh shop shared the dead week's row. WP-B15-21 gives it its own list -
-  // read it off the shop, never assume the fixture's constant (WP-B15-22).
+  // list_id is read off the shop rather than assumed, so this stays correct
+  // whichever of the two WP-B15-22 mechanisms is in play (reclaim of the
+  // pre-existing list 20, or a fresh one, should that mechanism ever change
+  // again) - the fixture's own constant is never trusted directly.
   const { h } = await planWithDeadWeek();
   h.db.shop[0].status = 'TRANSCRIBING';
   await runPipeline(HANDLE, h.deps);
   const ownListId = String(h.db.shop[0].list_id);
-  assert.notEqual(ownListId, '20', 'the shop must not have bound the dead week\'s list');
   const names = h.db.shopping_list_items
     .filter((i) => String(i.list_id) === ownListId)
     .map((i) => String(i.item_name).toLowerCase());
@@ -2806,30 +2814,34 @@ test('B15-10 AC4 END TO END: the question card carries the id, so the printed an
 // =====================================================================
 // WP-B15-10 - THE WORKING SET: EXCLUDE ONLY WHAT ANOTHER SHOP PROVABLY OWNS
 //
-// ⚠️ WP-B15-22 NOTE, READ BEFORE TOUCHING ANYTHING BELOW. Integrating WP-B15-21
-// (runPipeline.js now supplies shop_id on every add_list_item intent) makes
-// findOrCreateDraftList's shop-owned branch the one every FRESH shop takes -
-// and that branch never even LOOKS at an existing unowned same-date list row
-// like `sharedListSeed()`'s list 20 (services/control-plane/wp-d-proof/
-// asdairCommands.mjs - OUTSIDE this Work Order's file_surface). Two direct
-// consequences, both real and both reported here rather than quietly patched:
+// ⚠️ WP-B15-22 NOTE, READ BEFORE TOUCHING ANYTHING BELOW - THIS IS THE THIRD
+// AND CURRENT STATE, superseding two earlier versions of this note. Read the
+// per-test history comments below for the full three-round story; the
+// summary:
 //
-//   1. The scenario these fixtures model - TWO DIFFERENT SHOPS colliding on
-//      one date-keyed list - can no longer occur for a fresh shop at all
-//      (structurally, not by a filter). That is 019/B15-21 working, not a
-//      regression, and the tests below are updated to say so honestly rather
-//      than pin a bug that no longer exists.
-//   2. A NEWLY-EXPOSED, GENUINE GAP: an item added via the cockpit (or left
-//      over on the unowned lane) BEFORE this week's shop-owned list exists is
-//      now ORPHANED - the fresh shop's own list never merges or reclaims it.
-//      Before WP-B15-21 this accidentally worked because everything shared
-//      one list. PROVEN below, not silently avoided. THE FIX, if wanted,
-//      belongs in findOrCreateDraftList (reclaim/merge an unowned same-date
-//      row before minting a new one) - a file this Work Order does not grant
-//      write access to, and a design call (does a shop-owned list absorb a
-//      pre-existing unowned one, and how) that is Silas/Larry's to make, not
-//      mine to invent unilaterally. Reported, not fixed.
+//   Round 1 (pre-019): two DIFFERENT shops on one date were FORCED to share
+//   one list, unprotected - the actual 2026-08-10 incident.
+//   Round 2 (WP-B15-21 integrated, no reclaim): findOrCreateDraftList's
+//   shop-owned branch never looked at a pre-existing unowned same-date list
+//   at all - sharing became structurally impossible, but a genuine NEW gap
+//   opened: an item added via the cockpit (or left on the unowned lane)
+//   before this week's shop-owned list existed was durably ORPHANED. Reported
+//   to Larry rather than fixed outside this Work Order's original surface.
+//   Round 3 (THIS state - Larry extended file_surface to services/
+//   control-plane/wp-d-proof/asdairCommands.mjs specifically to close it):
+//   findOrCreateDraftList now RECLAIMS a pre-existing unowned same-date list
+//   (reclaimUnownedList) rather than orphaning it. `sharedListSeed()`'s list
+//   20 IS reclaimed by the fresh shop again - sharing is BACK, deliberately,
+//   and it is SAFE this time because ownership (shop_id) and the foreign-
+//   claims exclusion mechanism below are BOTH still fully live: a claim made
+//   by ANOTHER shop's shop_line row is still excluded from THIS shop's plan
+//   regardless of which list the item physically sits on. Round 1's danger
+//   was sharing with NOTHING protecting it; round 3's sharing is protected
+//   twice over (ownership prevents a genuinely different week's list from
+//   ever colliding across two DIFFERENT dates; exclusion prevents a
+//   genuinely foreign claim on the SAME list from ever reaching the plan).
 //
+
 // THE LIVE FAILURE, 2026-08-10. SHOP-2026-08-10-M64 bound to list_id 20, the
 // list of the CANCELLED SHOP-2026-08-10, and item 210 from the dead week became
 // an unanswerable question in Warwick's live shop.
@@ -2922,28 +2934,28 @@ test('B15-10 AC1: Warwick is never ASKED about the dead shop item', async () => 
     `an unanswerable question from a cancelled week reached him: ${JSON.stringify(asked)}`);
 });
 
-test('KNOWN GAP, REPORTED NOT FIXED (WP-B15-22): a cockpit item added to the UNOWNED lane before this week\'s shop-owned list exists is now orphaned', async () => {
-  // ── WAS: "AC1 REGRESSION THAT KILLED THE ALLOWLIST: an UNCLAIMED item still
-  // reaches the plan" ──────────────────────────────────────────────────────
-  // That name and assertion were true while every shop shared one date-keyed
-  // list, so an unclaimed row on that shared list naturally reached whichever
-  // shop planned from it. WP-B15-21 removes the sharing (see the block
-  // comment above): the fresh shop's OWN list is a DIFFERENT row, and
-  // findOrCreateDraftList never looks at list 20 to reclaim what is on it.
-  // "Cockpit Added Regular" is genuinely, provably absent from the fresh
-  // shop's plan now - this is the newly-exposed gap, characterised honestly
-  // rather than reasserted as fixed. See the block comment above this section
-  // for the file that would need to change and why it is not this order's to
-  // touch.
+test('WP-B15-22 GAP CLOSED: a cockpit item added to the UNOWNED lane before this week\'s shop-owned list exists SURVIVES - reclaimed, not orphaned', async () => {
+  // ── THIS TEST'S HISTORY, IN FULL ──────────────────────────────────────────
+  // 1. "AC1 REGRESSION THAT KILLED THE ALLOWLIST: an UNCLAIMED item still
+  //    reaches the plan" - true while every shop shared one date-keyed list
+  //    unconditionally (no ownership concept at all).
+  // 2. "KNOWN GAP, REPORTED NOT FIXED" - WP-B15-21 alone (no reclaim yet)
+  //    gave the fresh shop its OWN separate list and never looked at what was
+  //    on the old unowned one - "Cockpit Added Regular" was genuinely,
+  //    durably stranded. Reported to Larry rather than fixed outside surface.
+  // 3. THIS STATE - Larry extended file_surface to
+  //    services/control-plane/wp-d-proof/asdairCommands.mjs specifically to
+  //    close this. findOrCreateDraftList now RECLAIMS a pre-existing unowned
+  //    same-date list (reclaimUnownedList) rather than orphaning it: the item
+  //    Warwick added from the cockpit lands on the SAME list his photo shop's
+  //    own items land on, because that list is now his shop's list.
   const { last, h } = await planOnSharedList();
-  assert.ok(!last().some((n) => /Cockpit Added Regular/i.test(n)),
-    'if this now passes, WP-B15-21\'s successor closed the orphaning gap - update this test\'s name and '
-    + 'assertion to match, do not just flip it back without reading why it changed');
-  const stillOnDeadList = h.db.shopping_list_items.some(
-    (i) => String(i.list_id) === '20' && /Cockpit Added Regular/i.test(String(i.item_name)),
-  );
-  assert.ok(stillOnDeadList,
-    'the item is not merely dropped, it is stranded on the unowned list nothing will look at again');
+  assert.ok(last().some((n) => /Cockpit Added Regular/i.test(n)),
+    `an item Warwick added from the cockpit was silently dropped: ${JSON.stringify(last())}`);
+  const item = h.db.shopping_list_items.find((i) => /Cockpit Added Regular/i.test(String(i.item_name)));
+  assert.ok(item, 'the cockpit item must still exist, not deleted');
+  assert.equal(String(item.list_id), String(h.db.shop[0].list_id),
+    'the cockpit item must be on THIS shop\'s own (reclaimed) list, not stranded on an orphaned one');
 });
 
 test('B15-10 AC1 REGRESSION THAT KILLED THE ALLOWLIST: a CORRECTED line still reaches the plan', async () => {
@@ -2995,16 +3007,16 @@ test('B15-10 AC1: the shop own items all reach the plan', async () => {
   assert.ok(last().some((n) => /fruit splits/i.test(n)), 'an unresolved line of THIS shop went missing');
 });
 
-test('B15-10 FAIL OPEN: a claim read that FAILS filters NOTHING of THIS shop\'s own working set, and says so', async () => {
-  // ── UPDATED, WP-B15-22 - read the note above `sharedListSeed` first ──────
-  // workingListItems() reads foreign-claims against `shop.list_id` - the
-  // FRESH shop's OWN list under WP-B15-21, never list 20 - so this read is
-  // still genuinely exercised (allItems.length > 0 on the shop's own list),
-  // it is just no longer a read that could ever have surfaced HAM ON THE BONE
-  // (list 20's item, structurally unreachable from this shop's own list -
-  // see the orphaning gap documented above). The assertion that mattered -
-  // a FAILED read must never remove anything from the shop's OWN items, and
-  // must log rather than fail silently - is unchanged and still proven here.
+test('B15-10 FAIL OPEN: a claim read that FAILS filters NOTHING, and says so', async () => {
+  // ── RESTORED TO ITS ORIGINAL MEANING, WP-B15-22 RECLAIM FIX ──────────────
+  // With the reclaim fix (asdairCommands.mjs's reclaimUnownedList), the fresh
+  // shop genuinely adopts list 20 - shop.list_id IS '20' again, so a failed
+  // foreign-claims read is genuinely a read against THIS shop's own list, one
+  // that DOES carry another shop's claim (item 210, claimed by dead shop 99's
+  // shop_line row). That is exactly what "FAIL OPEN" needs to prove: with the
+  // read broken, nothing can be excluded, so the dead shop's item is NOT
+  // filtered out - the degraded path is the UNFILTERED one, on purpose, in
+  // preference to risking a wrongful drop while the database is unhappy.
   const { h, last, logs } = await planOnSharedList({
     wire: (harness) => {
       const inner = harness.deps.readQuery;
@@ -3016,19 +3028,19 @@ test('B15-10 FAIL OPEN: a claim read that FAILS filters NOTHING of THIS shop\'s 
     },
   });
 
-  // NOTHING is removed from THIS shop's own items on a read this code could
-  // not make. Filtering on a failed read would silently recreate the
-  // allowlist defect at the exact moment the database is already unhappy.
-  assert.ok(last().some((n) => /gourmet/i.test(n)),
-    'a failed claim read dropped one of this shop\'s own items - the degraded path MUST be the unfiltered one');
-  assert.ok(last().some((n) => /fruit splits/i.test(n)));
+  // NOTHING is removed on a read this code could not make. Filtering on a
+  // failed read would silently recreate the allowlist defect at the exact
+  // moment the database is already unhappy.
+  assert.ok(last().some((n) => /HAM ON THE BONE/i.test(n)),
+    'a failed claim read still filtered the working set - the degraded path MUST be the unfiltered one');
+  assert.ok(last().some((n) => /gourmet/i.test(n)));
 
   const failed = logs.filter((l) => l.event === 'foreign_claim_read_failed');
   assert.equal(failed.length > 0, true, 'the degradation was silent - a drop nobody can see is a drop nobody fixes');
   assert.match(String(failed[0].detail.detail), /connection reset by peer/, 'the reason must travel');
   assert.equal(String(failed[0].detail.shop_ref), REF);
-  assert.notEqual(String(failed[0].detail.list_id), '20',
-    'the read that failed was against list 20, not this shop\'s own list - the fixture drifted from what it claims to test');
+  assert.equal(String(failed[0].detail.list_id), '20',
+    'the read that failed must genuinely be against the shop\'s own (reclaimed) list 20');
   assert.ok(h.db.shop_question.length > 0, 'the shop must still make progress on a degraded read');
 });
 

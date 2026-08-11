@@ -2873,27 +2873,24 @@ test('B15-15 AC4 BEHAVIOURAL: THIS shop\'s own lines still reach the planner', a
     `the shop's own interpreted line was excluded from its own plan: ${JSON.stringify(last())}`);
 });
 
-test('KNOWN GAP, REPORTED NOT FIXED (WP-B15-22): a cockpit item added to the UNOWNED lane before this week\'s shop-owned list exists is now orphaned', async () => {
-  // ── WAS: "an UNCLAIMED item still reaches the plan" ──────────────────────
-  // True while every shop shared one date-keyed list (list 20 here). WP-B15-21
-  // (integrated in this Work Order) makes runPipeline.js supply shop_id on
-  // every add_list_item intent, so findOrCreateDraftList's shop-owned branch
-  // - the one a FRESH shop always takes - mints its OWN list and never looks
-  // at list 20 to reclaim what is sitting on it. "Cockpit Added Regular" is
-  // genuinely, provably absent now. See the identical, fuller note in
-  // runPipeline.test.js beside `sharedListSeed` for the file that would need
-  // to change to close this (services/control-plane/wp-d-proof/
-  // asdairCommands.mjs - outside this Work Order's file_surface) and why it
-  // is reported rather than fixed here.
+test('WP-B15-22 GAP CLOSED: a cockpit item added to the UNOWNED lane before this week\'s shop-owned list exists SURVIVES - reclaimed, not orphaned', async () => {
+  // ── WAS: "an UNCLAIMED item still reaches the plan", then "KNOWN GAP,
+  // REPORTED NOT FIXED" ─────────────────────────────────────────────────────
+  // Larry extended this Work Order's file_surface to services/control-plane/
+  // wp-d-proof/asdairCommands.mjs specifically to close the reported gap:
+  // findOrCreateDraftList now RECLAIMS a pre-existing unowned same-date list
+  // (reclaimUnownedList) instead of stranding it behind a freshly-minted one.
+  // Answered through fakePg's OWN dispatch (this file proves the real SQL is
+  // read, not a hand-written closure's idea of it - see the section header
+  // above `sharedListSeedForFakePg`), so the fake's new reclaim handlers
+  // (test/fakePg.js) are exercised here too, not only in runPipeline.test.js.
   const { last, h } = await planOnSharedListThroughFakePg();
-  assert.ok(!last().some((n) => /Cockpit Added Regular/i.test(n)),
-    'if this now passes, a successor change closed the orphaning gap - update this test\'s name and '
-    + 'assertion to match, do not just flip it back without reading why it changed');
-  const stillOnDeadList = h.db.shopping_list_items.some(
-    (i) => String(i.list_id) === '20' && /Cockpit Added Regular/i.test(String(i.item_name)),
-  );
-  assert.ok(stillOnDeadList,
-    'the item is not merely dropped, it is stranded on the unowned list nothing will look at again');
+  assert.ok(last().some((n) => /Cockpit Added Regular/i.test(n)),
+    `an item Warwick added from the cockpit was silently dropped: ${JSON.stringify(last())}`);
+  const item = h.db.shopping_list_items.find((i) => /Cockpit Added Regular/i.test(String(i.item_name)));
+  assert.ok(item, 'the cockpit item must still exist, not deleted');
+  assert.equal(String(item.list_id), String(h.db.shop[0].list_id),
+    'the cockpit item must be on THIS shop\'s own (reclaimed) list, not stranded on an orphaned one');
 });
 
 test('B15-15 AC4: fakePg REFUSES a foreign-claims statement whose predicate it cannot read', async () => {

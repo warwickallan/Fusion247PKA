@@ -1133,6 +1133,55 @@ export function createFakeClient(store, options = {}) {
       rows((db.households || []).filter((h) => h.name === p[0] || h.display_name === p[0]))],
     [/^select id from asdair\.households order by id/i, () =>
       rows((db.households || []).map((h) => ({ id: h.id })).sort((a, b) => a.id - b.id))],
+    // ── RECLAIM, taught WP-B15-22, MATCHED BEFORE THE TWO GENERIC HANDLERS
+    // BELOW ─────────────────────────────────────────────────────────────────
+    // Both reclaim SELECTs share their exact prefix with the two unanchored
+    // handlers directly under this comment (`^select id from
+    // asdair.shopping_lists where household_id=$1 and status='next_week_draft'
+    // [and list_date=$2]`), and this file is FIRST-MATCH-WINS, so these two
+    // are placed ahead of them to answer with the REAL statement's own
+    // `and shop_id is null` filter rather than silently ignoring it.
+    //
+    // WITHOUT the UPDATE handler below, EVERY B15-10/B15-15 test that seeds an
+    // existing list threw ("no handler") the moment asdairCommands.mjs's
+    // reclaim logic started issuing these statements at all - that failure is
+    // real, observed, and what these three handlers exist to fix.
+    //
+    // The SELECT ordering claim above IS NOT independently mutation-proven:
+    // removing only these two SELECT handlers (leaving the UPDATE handler in
+    // place) does not currently redden any test, because the UPDATE's own
+    // `shop_id is null` re-check is a second, independent guard - if the
+    // fallen-through general SELECT ever did hand back an ALREADY-OWNED
+    // list's id, the UPDATE would still correctly refuse to write it and this
+    // function would still correctly fall through to minting a fresh list.
+    // Kept anyway because they are the CORRECT, faithful model of the real
+    // statement (Do not delete them on the strength of "nothing failed" -
+    // that observation is about the depth of this suite's fixtures, not
+    // about whether the real SQL needs the filter it plainly has).
+    [/^select id from asdair\.shopping_lists where household_id=\$1 and status='next_week_draft' and list_date=\$2 and shop_id is null/i, (sql, p) => {
+      const hits = db.shopping_lists.filter((l) => String(l.household_id) === String(p[0])
+        && l.status === 'next_week_draft' && l.list_date === p[1]
+        && (l.shop_id === null || l.shop_id === undefined)).sort((a, b) => b.id - a.id);
+      return rows(hits.slice(0, 1).map((l) => ({ id: l.id })));
+    }],
+    [/^select id from asdair\.shopping_lists where household_id=\$1 and status='next_week_draft' and shop_id is null/i, (sql, p) => {
+      const hits = db.shopping_lists.filter((l) => String(l.household_id) === String(p[0])
+        && l.status === 'next_week_draft' && (l.shop_id === null || l.shop_id === undefined))
+        .sort((a, b) => b.id - a.id);
+      return rows(hits.slice(0, 1).map((l) => ({ id: l.id })));
+    }],
+    // The claiming UPDATE - re-checks shop_id is null at write time, exactly
+    // as the real statement does (sequential-exclusion proof:
+    // add-list-item.dbtest.mjs #16h against real Postgres; this fake mirrors
+    // the same predicate rather than re-deriving different semantics).
+    [/^update asdair\.shopping_lists set shop_id=\$2 where id=\$1 and shop_id is null/i, (sql, p) => {
+      const target = db.shopping_lists.find((l) => String(l.id) === String(p[0])
+        && (l.shop_id === null || l.shop_id === undefined));
+      if (!target) return none();
+      target.shop_id = p[1];
+      return rows([{ id: target.id }]);
+    }],
+
     [/^select id from asdair\.shopping_lists where household_id=\$1 and status='next_week_draft' and list_date=\$2/i, (sql, p) => {
       const hits = db.shopping_lists.filter((l) => String(l.household_id) === String(p[0])
         && l.status === 'next_week_draft' && l.list_date === p[1]).sort((a, b) => b.id - a.id);
