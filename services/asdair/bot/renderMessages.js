@@ -1121,36 +1121,30 @@ export function renderPhotoRead({
 
 // =====================================================================
 // ── 14. Cockpit notification shapes (WO-2026-08-11-B15-COCKPIT-BE-01 AC4,
-//         AMENDMENT 1 — additive only) ───────────────────────────────────
+//         AMENDMENT 1 additive-only, registered under AMENDMENT 2) ────────
 //
 // The design (`Deliverables/2026-08-11-cockpit-and-vision-pipeline-design.md`
 // Part 2, "Telegram's new role"): Telegram becomes notification-only —
 // "list read", "shop ready", "basket built", each linking to the Cockpit for
 // the actual decision. No card-per-question, no in-Telegram decision flow.
 //
-// THESE THREE FUNCTIONS ARE DELIBERATELY NOT REGISTERED IN `MESSAGES` BELOW.
-// Registering them broke the existing, already-passing, out-of-surface
-// `renderMessages.test.js` two independent ways, discovered by attempting it:
+// THESE THREE ARE NOW REGISTERED IN `MESSAGES` BELOW. They were built first
+// and deliberately left unregistered for one round: registering them broke
+// the then-out-of-surface `renderMessages.test.js` two independent ways -
+// its pinned exact key-set assertion, and its catalogue-wide loops assuming
+// every button is `callback_data`-shaped. Rather than force these renderers
+// into a `callback_data` shape just to satisfy that test (they correctly use
+// `urlButton()` - a real Telegram `url`, never a command this runtime would
+// dispatch, per the design's "link to Cockpit" requirement), `file_surface`
+// was widened by exactly that one file (AMENDMENT 2), which now carries the
+// matching key-set entries, SAMPLES fixtures, and a url-button branch in its
+// two callback_data-assuming loops.
 //
-//   1. `Object.keys(MESSAGES).sort()` is asserted against a PINNED, EXACT
-//      16-entry list at renderMessages.test.js:136-140 — "pinning the exact
-//      key set here, OUTSIDE renderMessages.js, is what makes an
-//      unregistered kind impossible to ship unnoticed" (that file's own
-//      comment). Adding a 17th/18th/19th key fails that assertion outright.
-//   2. The catalogue-wide loops (renderMessages.test.js:143-185) call
-//      `render(SAMPLES[name])` and then walk every button expecting
-//      `callback_data` (parsed via `parseCallbackData`) — these three
-//      renderers correctly use `urlButton()` (a real `url`, not a command)
-//      per the design's "link to Cockpit" requirement, so even fixing (1)
-//      would still fail (2) on a button shape those loops do not expect.
-//
-// `renderMessages.test.js` is NOT in this Work Order's `file_surface`
-// (only `renderMessages.js` and `sendShopperMessage.js` are named), so
-// fixing either failure is out of scope for THIS WP — it is not a defect in
-// these three functions, it is a one-file surface gap. See the final
-// handback for the exact recommended follow-up. Once that file is in scope,
-// registering these three is a two-line change: add the keys to `MESSAGES`
-// below, and extend `SAMPLES`/the pinned key list accordingly.
+// ADDITIVE ONLY, STILL. The existing ~12 message kinds above are untouched,
+// and so are their services/asdair/pipeline/runtime.js and runPipeline.js
+// enqueue callers (out of scope for this WP). Collapsing to exactly three is
+// a named follow-on for whichever WP next legitimately touches both the
+// Cockpit and pipeline layers together.
 //
 // Otherwise these follow every rule the rest of this module follows: PURE,
 // plain text, `count()`/`value()` for every dynamic field, nothing fabricated.
@@ -1258,10 +1252,10 @@ export function renderBasketBuilt({
  * automatically covered by the "every renderer returns {text, reply_markup}"
  * and "no secret leaks into rendered output" proofs.
  *
- * `renderListRead` / `renderShopReady` / `renderBasketBuilt` above are
- * DELIBERATELY NOT in this map yet — see the section header above them for
- * exactly why, and the final handback for the recommended one-file surface
- * widening that unblocks registering them.
+ * `renderListRead` / `renderShopReady` / `renderBasketBuilt` ARE registered
+ * below (WO-2026-08-11-B15-COCKPIT-BE-01 AC4, AMENDMENT 2) — see the section
+ * header above them for why they were built first and registered one round
+ * later, once `renderMessages.test.js` itself was in file_surface.
  *
  * ── A KIND WITH NO ENTRY HERE IS A SILENT DROP ──────────────────────────────
  * runtime.js drainOutbox resolves an outbox row whose `kind` is absent from this
@@ -1387,4 +1381,13 @@ export const MESSAGES = Object.freeze({
   reconciliation_summary: renderReconciliationSummary,
   clarification_deferred: renderClarificationDeferred,
   photo_read: renderPhotoRead,
+  // ADDITIVE (AC4, AMENDMENT 2) - the three-shape Cockpit-notification role.
+  // The 16 kinds above stay exactly as they are: their runtime.js/
+  // runPipeline.js callers are unchanged (out of scope for this WP), so
+  // removing any of them here would make drainOutbox silently abandon a
+  // still-enqueued kind. Collapsing to exactly these three is a named
+  // follow-on WP once both layers can legitimately be touched together.
+  list_read: renderListRead,
+  shop_ready: renderShopReady,
+  basket_built: renderBasketBuilt,
 });
