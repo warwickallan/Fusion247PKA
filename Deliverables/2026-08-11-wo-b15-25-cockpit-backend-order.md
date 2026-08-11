@@ -132,6 +132,35 @@ AC5: All touched-package tests pass with a non-zero executed count reported (`no
 - Any live gateway, live shop, browser, or basket-build action.
 - The GL-012 / Luna-Sol gateway-probe question — unrelated to this WP.
 
+---
+
+## AMENDMENT 1 — Larry, 2026-08-11, after Keel's read-back CLARIFY
+
+Keel's read-back correctly found that AC3 (`markCorrected` wiring) and half of AC4 (removing the
+existing ~12 message kinds, not just adding 3 new ones) both require touching
+`services/asdair/pipeline/**` and `services/asdair/pipeline/runtime.js` — this WP's own "Explicitly
+out of scope" surface, owned by the parallel vision-pipeline WP. Rather than widen this WP's
+`file_surface` to overlap that parallel worktree (real collision risk) or sequence the two WPs
+(breaks Warwick's explicit "run them in parallel" instruction), this WP's scope is narrowed to
+**additive-only**, amending `acceptance_property`, AC3 and AC4 as follows:
+
+- **`acceptance_property` (revised):** the Cockpit-side correction path is proven end-to-end up to
+  the `commandSurface` boundary, AND the exact pipeline-side call site `markCorrected` needs to be
+  wired into (file, function, line) is named precisely in the final report as a flagged follow-on —
+  not implemented in this WP.
+- **AC3 (revised):** unchanged goal, but "at least one real, exercised production caller" becomes
+  "the exact call site is named and the Cockpit-side path up to the command-surface boundary is
+  proven" — the pipeline-side wiring itself is out of scope for THIS WP.
+- **AC4 (revised):** add the three new notification shapes to `renderMessages.js`'s `MESSAGES` map;
+  the existing ~12 message kinds and their `runtime.js`/`runPipeline.js` callers stay exactly as they
+  are, fully functioning, NOT removed. Collapsing to exactly three is a named follow-on for whichever
+  WP next legitimately touches both the Cockpit and pipeline layers together (likely after the
+  vision-pipeline WP lands and stabilises `runtime.js`'s outbox handling).
+
+Everything else in this order (AC1, AC2, AC5, all "Required evidence," all "Explicitly out of scope")
+is unchanged. Proceed on the amended scope; no further read-back required per SOP-022's one-additional-
+fresh-read-back allowance — this amendment already reflects Larry's acceptance of Keel's finding.
+
 ## Sequencing
 
 1. Standard gate: read back (outcome, plan, what this order failed to settle, what looks wrong) and HOLD for Larry's explicit acceptance before writing any code.
