@@ -513,6 +513,161 @@ createApp({
       return g.filter((x) => x.items && x.items.length);
     });
 
+    // =====================================================================================
+    // BUILD-015 B15-26 — Cockpit UI: canonical state, exception-first Shop, Questions board,
+    // and the AsdAIr write path. See WO-2026-08-11-B15-COCKPIT-UI-01 and its accepted read-back.
+    // =====================================================================================
+
+    // ---- ONE canonical state, ONE derivation site (AC2) --------------------------------------
+    // This reads a single named field and NEVER recomputes a status from raw counts — that is the
+    // rule AC2 exists to hold. No other function in this file may derive a Shop-status sentence.
+    //
+    // ⚠️ PLACEHOLDER FIELD NAME — flagged at read-back (2026-08-11) and accepted by Larry the same
+    // session. `shop.cockpit_state` does not exist in the backend yet: WO-2026-08-11-B15-COCKPIT-BE-01
+    // (Keel) was amended to additive-only scope this round (AMENDMENT 1), so the real field may land
+    // under a different name later. When it does, this is the ONE line to change. Until then, an
+    // absent or unrecognised value renders as an honest "Status unknown" rail — never a guess, and
+    // never a value computed from asdairShop/asdairWs counts.
+    const ASDAIR_STATE_PRESENTATION = Object.freeze({
+      NEEDS_WARWICK: Object.freeze({ label: 'Needs you', tone: 'amber' }),
+      ASDAIR_WORKING: Object.freeze({ label: 'AsdAIr is working', tone: 'blue' }),
+      READY_FOR_WARWICK: Object.freeze({ label: 'Ready for you', tone: 'green' }),
+      BROWSER_WORKING: Object.freeze({ label: 'Building your basket', tone: 'blue' }),
+      COMPLETE: Object.freeze({ label: 'Complete', tone: 'green' }),
+      FAILED: Object.freeze({ label: 'Something went wrong', tone: 'red' }),
+    });
+    /** PURE. Six-value canonical state -> {label, tone}. Independently testable without a live
+     * backend — see the six-state evidence pasted in the final report. */
+    function asdairStatePresentation(raw) {
+      const key = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+      return ASDAIR_STATE_PRESENTATION[key] || { label: 'Status unknown', tone: 'grey' };
+    }
+    const asdairCanonicalState = computed(() => (asdairShop.value && asdairShop.value.cockpit_state) || null);
+    const asdairStatus = computed(() => asdairStatePresentation(asdairCanonicalState.value));
+
+    // ---- Exception-first line list — Shop screen defaults to "needs attention" + "changed" only;
+    // "All" is one tap away, never the default (design doc, "List screen"). ---------------------
+    const asdairLineFilter = ref('exceptions'); // 'exceptions' | 'all'
+    const asdairAllLines = computed(() => (asdairWs.value && asdairWs.value.interpretation && asdairWs.value.interpretation.lines) || []);
+    const asdairExceptionLines = computed(() => asdairAllLines.value.filter((ln) => ln.status !== 'matched'));
+    const asdairShopLines = computed(() => (asdairLineFilter.value === 'all' ? asdairAllLines.value : asdairExceptionLines.value));
+    // Plain-English provenance only (AC3) — never the raw status key.
+    const ASDAIR_LINE_PROVENANCE = Object.freeze({
+      matched: 'from the list', needs_confirmation: 'from the list — needs confirming',
+      possible_duplicate: 'from the list — looks like a duplicate', unmatched_new_item: 'from the list — new item',
+      unreadable: 'from the list — could not be read',
+    });
+    const asdairLineProvenance = (s) => ASDAIR_LINE_PROVENANCE[s] || 'from the list';
+
+    // ---- The photo: auto-rotated, shown small, never dominating by default (AC5) ---------------
+    const asdairMediaUrl = computed(() => (asdairShop.value ? '/api/asdair/media?shop=' + asdairShop.value.shop_id : null));
+
+    // ---- The AsdAIr action sheet — one small, self-contained modal for every write action AND the
+    // full-photo view, kept separate from the generic `detail` sheet (whose header is shared by
+    // idea/opp/output/doc and would need a fifth branch for no benefit — this owns its own markup).
+    /** @type {import('vue').Ref<null|{kind:'photo'}|{kind:'question',question:object}|{kind:'change',line:object}>} */
+    const asdairSheet = ref(null);
+    const asdairSheetBusy = ref(false);
+    const asdairSheetErr = ref(null);
+    const asdairChangeName = ref('');
+    const asdairChangeQty = ref('');
+    const asdairAnswerText = ref(''); // separate from asdairChangeName — a different field, a different sheet
+    // WCAG 2.4.3: opening a dialog MUST move focus in; closing MUST return it. asdairCloseSheet
+    // already returns focus to the workspace heading (mirrors focusSel's use elsewhere for level
+    // transitions); this is the matching "in" half.
+    function asdairOpenSheet(payload) { asdairSheetErr.value = null; asdairSheet.value = payload; nextTick(() => focusSel('.sheet-card .back')); }
+    async function asdairCloseSheet() { asdairSheet.value = null; asdairSheetErr.value = null; await focusSel('#app-workspace-h'); }
+    function asdairOpenPhoto() { asdairOpenSheet({ kind: 'photo' }); }
+    function asdairOpenQuestion(q) { asdairAnswerText.value = ''; asdairOpenSheet({ kind: 'question', question: q }); }
+    function asdairOpenChange(line) {
+      const l = line || {};
+      asdairChangeName.value = (asdairKnown(l.canonical_product_name_display) ? l.canonical_product_name_display : l.raw_reading_display) || '';
+      asdairChangeQty.value = '';
+      asdairOpenSheet({ kind: 'change', line: l });
+    }
+
+    // ---- The write path (AC4). Every write in this file goes through this ONE function, which
+    // calls ONE route, which the backend forwards to the shared command surface. There is no other
+    // write path here — grep for "fetch(" against '/api/asdair/command' to confirm.
+    //
+    // ⚠️ CROSS-WP GAP, flagged at read-back and accepted: `POST /api/asdair/command` does not exist
+    // in server.mjs yet (Keel's surface — additive-only this round, AMENDMENT 1). This call is built
+    // exactly against the documented contract (services/asdair/cockpit-api/httpApi.js `POST
+    // /asdair/command`, proxied the same way `/api/asdair/workspace` already is) so it is correct the
+    // moment that proxy route lands. Until then it fails with an honest error — never a silent no-op,
+    // and never a second write path that bypasses the command surface to compensate.
+    async function asdairCommand(name, args) {
+      const shopId = asdairShop.value && asdairShop.value.shop_id;
+      const body = {
+        command: name,
+        actor: 'warwick',
+        // httpApi.js only maps body.actor -> requested_by, not into args.actor, and
+        // commands.js's requireActor() reads spec.actor directly — so actor travels inside args too.
+        args: Object.assign({ actor: 'cockpit:warwick', shopId: shopId }, args || {}),
+      };
+      const r = await fetch('/api/asdair/command', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      });
+      let d = null;
+      try { d = await r.json(); } catch (e) { /* handled by the ok check below */ }
+      if (!r.ok || !d || d.ok === false) throw new Error((d && (d.message || d.error)) || ('http ' + r.status));
+      return d.result;
+    }
+
+    /**
+     * Answer, correct or skip a question — driven by the question's own `allowed_replies` rather
+     * than a client-invented action, per AC4.
+     * @param {object} q the open question row (from asdairWs.questions.items)
+     * @param {'choose'|'typed'|'search'|'skip'} replyKey
+     * @param {{candidate?:object, text?:string}} [opts]
+     */
+    async function asdairAnswerQuestion(q, replyKey, opts) {
+      const o = opts || {};
+      q._busy = true; q._error = null;
+      try {
+        const args = { questionKey: q.question_key };
+        if (replyKey === 'skip') {
+          args.skip = true;
+        } else if (replyKey === 'choose' && o.candidate) {
+          args.answerText = o.candidate.label_display; args.answerSource = 'button';
+        } else if (replyKey === 'typed' || replyKey === 'search') {
+          const text = (o.text || '').trim();
+          if (!text) { q._error = 'Type an answer first.'; q._busy = false; return; }
+          args.answerText = text; args.answerSource = 'typed';
+        } else {
+          q._error = 'Unrecognised reply.'; q._busy = false; return;
+        }
+        await asdairCommand('answerQuestion', args);
+        if (asdairSheet.value && asdairSheet.value.kind === 'question' && asdairSheet.value.question === q) await asdairCloseSheet();
+        await loadAsdairWorkspace();
+      } catch (e) {
+        q._error = e.message || 'failed';
+      } finally {
+        q._busy = false;
+      }
+    }
+
+    /** "Something looks wrong" — tappable on ANY line, resolved or not (design doc's escape hatch). */
+    async function asdairSubmitChange() {
+      const itemName = asdairChangeName.value.trim();
+      if (!itemName) { asdairSheetErr.value = 'Type what this line should say.'; return; }
+      const qtyRaw = asdairChangeQty.value.trim();
+      const qty = qtyRaw ? Number(qtyRaw) : null;
+      if (qty !== null && (!Number.isInteger(qty) || qty < 1 || qty > 99)) {
+        asdairSheetErr.value = 'Quantity must be a whole number from 1 to 99, or left blank.'; return;
+      }
+      asdairSheetBusy.value = true; asdairSheetErr.value = null;
+      try {
+        await asdairCommand('correctLine', { itemName: itemName, requestedQty: qty });
+        await asdairCloseSheet();
+        await loadAsdairWorkspace();
+      } catch (e) {
+        asdairSheetErr.value = e.message || 'failed';
+      } finally {
+        asdairSheetBusy.value = false;
+      }
+    }
+
     const openApp = (k) => { appViewKey.value = null; appKey.value = k; probeApp(APPS.find((a) => a.key === k)); if (k === 'asdair') loadAsdairWorkspace(); focusSel('#app-workspace-h'); };
     // `from` is the app we are leaving, so focus can return to its tile. When we are not leaving an
     // app (a plain area switch) the selector matches nothing and focus is left exactly where it is.
@@ -904,6 +1059,10 @@ createApp({
       asdairRules, asdairRulesErr, asdairRulesLoading, loadAsdairRules, asdairRuleGroups,
       asdairPacket, asdairPacketErr, asdairPacketLoading, loadAsdairPacket,
       asdairPacketDoc, asdairRecon, asdairPacketState, asdairReconState,
+      asdairStatus, asdairCanonicalState, asdairLineFilter, asdairAllLines, asdairExceptionLines, asdairShopLines, asdairLineProvenance,
+      asdairMediaUrl, asdairSheet, asdairSheetBusy, asdairSheetErr, asdairChangeName, asdairChangeQty, asdairAnswerText,
+      asdairOpenSheet, asdairCloseSheet, asdairOpenPhoto, asdairOpenQuestion, asdairOpenChange,
+      asdairAnswerQuestion, asdairSubmitChange,
       state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
       deliverables, openDeliverable, openBrief, copyDoc, downloadDoc, downloadTranscript, download, copyText,
@@ -1034,6 +1193,11 @@ createApp({
             <button class="back app-back" @click="closeApp()" aria-label="Back to all apps">‹</button>
             <!-- tabindex=-1 so focus can be MOVED here on entry; it is never in the tab order. -->
             <h1 id="app-workspace-h" tabindex="-1">{{ currentApp.label }}</h1><span class="lane-sub">{{ currentApp.desc }}</span>
+            <!-- The cog — AC1: Diagnostics/About/History reachable only here, never a competing tab.
+                 Generic to any app that carries a non-primary view; today that is AsdAIr's 'about'. -->
+            <button v-if="currentApp.views.some(v => v.primary === false)" class="act app-cog"
+              :aria-label="currentApp.label + ' diagnostics and about'"
+              :class="{on: currentView.primary === false}" @click="goView(currentApp.views.find(v => v.primary === false).key)">⚙</button>
           </header>
 
           <!-- Availability, measured. Never assumed, never dressed up. -->
@@ -1043,19 +1207,88 @@ createApp({
             <button v-if="currentApp.probe" class="act" @click="probeApp(currentApp)">Check again</button>
           </div>
 
-          <!-- The app's OWN navigation — the dashboard within the dashboard -->
+          <!-- The app's OWN navigation — the dashboard within the dashboard. Non-primary views
+               (AC1: Diagnostics/About/History) are excluded from the tab bar; the cog above reaches
+               them instead. currentView still resolves a non-primary key when goView routes there
+               (normaliseApp keeps it in views[]), so a direct cog-tap always renders correctly even
+               though it never appears as a tab here. -->
           <nav class="app-nav" :aria-label="currentApp.label + ' sections'">
-            <button v-for="v in currentApp.views" :key="v.key" class="app-nav-btn" :class="{on: v.key===currentView.key}"
+            <button v-for="v in currentApp.views.filter(v => v.primary !== false)" :key="v.key" class="app-nav-btn" :class="{on: v.key===currentView.key}"
               :aria-current="v.key===currentView.key ? 'page' : null" @click="goView(v.key)">{{ v.label }}</button>
           </nav>
 
           <div class="app-view">
             <p v-if="currentView.blurb" class="app-blurb">{{ currentView.blurb }}</p>
 
-            <!-- About = facts about the app itself, true whether or not its service is running. -->
-            <ul v-if="currentApp.about.length && currentView.key==='about'" class="read">
-              <li v-for="(f,i) in currentApp.about" :key="i">{{ f }}</li>
-            </ul>
+            <!-- About = facts about the app itself, true whether or not its service is running, PLUS
+                 (AsdAIr only) Diagnostics + History. Deliberately ONE v-if wrapper, not two siblings:
+                 v-else-if below must attach to a single element/template, and everything gated on
+                 currentView.key==='about' has to live inside it for that chain to stay valid. -->
+            <template v-if="currentView.key==='about'">
+              <ul v-if="currentApp.about.length" class="read">
+                <li v-for="(f,i) in currentApp.about" :key="i">{{ f }}</li>
+              </ul>
+              <!-- Never a silent blank screen: an app that defines an 'about' view with nothing to
+                   say (currently unreachable — only AsdAIr defines one, and it always has content)
+                   still gets an honest message rather than empty space. -->
+              <div v-if="!currentApp.about.length && currentApp.key!=='asdair'" class="empty big">
+                {{ currentApp.label }} has nothing recorded here yet.
+              </div>
+
+              <!-- DIAGNOSTICS + HISTORY — AsdAIr only, reached only via the cog (AC1). Everything
+                   AC3 keeps off Shop/Questions/Basket/Rules lives here instead: shop identifiers,
+                   raw catalogue counts, match-method internals, ports, DB status, confidence
+                   decimals and internal event/state names. Nothing is deleted — it moved. Gated on
+                   asdairWs/asdairRules/asdairPacket being loaded (any view visited this session
+                   loads its own data; opening Diagnostics first, before visiting Shop, honestly
+                   shows nothing to dump yet rather than fetching data this screen doesn't own). -->
+              <template v-if="currentApp.key==='asdair'">
+                <div class="grp" v-if="asdairOtherShops.length">
+                  <h2>Other shops (history)<span class="g-count">{{ asdairOtherShops.length }}</span></h2>
+                  <div v-for="s in asdairOtherShops" :key="s.id" class="item grey">
+                    <div class="i-main"><div class="i-eyebrow">{{ s.status }}</div><div class="i-title">{{ s.shop_ref }}</div></div>
+                  </div>
+                </div>
+
+                <div class="grp" v-if="asdairWs && asdairWs.timeline && asdairWs.timeline.length">
+                  <h2>What happened<span class="g-count">{{ asdairWs.timeline.length }}</span></h2>
+                  <div v-for="(ev,ei) in asdairWs.timeline" :key="'ev'+ei" class="item as-stack" :class="ev.is_failure ? 'red' : 'grey'">
+                    <div class="i-main">
+                      <div class="i-eyebrow" :class="{blocked: ev.is_failure}">{{ ev.event_type_display }}<span v-if="asdairKnown(ev.from_display) || asdairKnown(ev.to_display)"> · {{ ev.from_display }} → {{ ev.to_display }}</span></div>
+                      <div class="as-raw">{{ ev.description_display }}</div>
+                      <div class="as-chips">
+                        <span v-if="ev.is_failure" class="chip block"><span class="d" aria-hidden="true"></span>failure</span>
+                        <span class="chip neutral"><span class="d" aria-hidden="true"></span>{{ ev.occurred_at_display }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grp" v-if="asdairCanonicalState">
+                  <h2>Technical status</h2>
+                  <dl class="as-kv">
+                    <div><dt>Canonical state</dt><dd>{{ asdairCanonicalState }}</dd></div>
+                  </dl>
+                </div>
+
+                <div class="grp" v-if="asdairWs">
+                  <h2>Raw payloads (debugging only)</h2>
+                  <p class="as-note">Every screen above is rendered from named fields of these payloads. This drawer exists so a field with no UI yet can still be found — it is not the intended way to read a shop.</p>
+                  <details class="tech">
+                    <summary>Workspace</summary>
+                    <div class="tech-body"><div class="mono raw">{{ JSON.stringify(asdairWs, null, 2) }}</div></div>
+                  </details>
+                  <details class="tech" v-if="asdairRules">
+                    <summary>Rulebook</summary>
+                    <div class="tech-body"><div class="mono raw">{{ JSON.stringify(asdairRules, null, 2) }}</div></div>
+                  </details>
+                  <details class="tech" v-if="asdairPacket">
+                    <summary>Execution packet + reconciliation</summary>
+                    <div class="tech-body"><div class="mono raw">{{ JSON.stringify(asdairPacket, null, 2) }}</div></div>
+                  </details>
+                </div>
+              </template>
+            </template>
 
             <!-- BASKET — the Sonnet execution packet, and how the basket reconciled against it.
                  Above the workspace block for the same reason Rules is: its own read, its own
@@ -1080,7 +1313,7 @@ createApp({
 
                 <!-- ── THE PACKET ─────────────────────────────────────────────────────────── -->
                 <div class="grp">
-                  <h2>Execution packet<span class="g-count" v-if="asdairPacketDoc">{{ asdairPacketDoc.lines_count_display }}</span></h2>
+                  <h2>Planned basket<span class="g-count" v-if="asdairPacketDoc">{{ asdairPacketDoc.lines_count_display }}</span></h2>
 
                   <!-- Not produced. Said plainly, with WHICH kind of absent it is. -->
                   <div v-if="!asdairPacketDoc" class="item grey as-stack">
@@ -1179,7 +1412,7 @@ createApp({
 
                 <!-- ── RECONCILIATION ─────────────────────────────────────────────────────── -->
                 <div class="grp">
-                  <h2>Reconciliation</h2>
+                  <h2>ASDA trolley</h2>
 
                   <div v-if="!asdairRecon" class="item grey as-stack">
                     <div class="i-main">
@@ -1285,10 +1518,46 @@ createApp({
                   </template>
                 </div>
 
-                <details class="tech">
-                  <summary>Raw payload (debugging only)</summary>
-                  <pre class="mono">{{ JSON.stringify(asdairPacket, null, 2) }}</pre>
-                </details>
+                <!-- BROWSER BUILD — moved here from the old Overview/Details split (design doc's
+                     Basket screen covers the actual ASDA build, not just the plan). A request is a
+                     request — the payload says so and so does this. -->
+                <div class="grp" v-if="asdairWs && asdairWs.browser">
+                  <h2>Building it in ASDA</h2>
+                  <p class="empty" v-if="!asdairWs.browser.requested">No basket build has been requested for this shop.</p>
+                  <template v-else>
+                    <dl class="as-kv">
+                      <div><dt>Status</dt><dd>{{ asdairWs.browser.status_display }}<span v-if="asdairWs.browser.is_paused"> (paused)</span></dd></div>
+                      <div><dt>Requested</dt><dd>{{ asdairWs.browser.requested_at_display }}</dd></div>
+                      <div><dt>Finished</dt><dd>{{ asdairWs.browser.finished_at_display }}</dd></div>
+                      <div><dt>Basket lines</dt><dd>{{ asdairWs.browser.basket_lines_display }}</dd></div>
+                      <div><dt>Estimated total</dt><dd>{{ asdairMoney(asdairWs.browser.estimated_total) || 'unknown' }}</dd></div>
+                      <div v-if="asdairKnown(asdairWs.browser.last_error_display)"><dt>Last error</dt><dd class="err">{{ asdairWs.browser.last_error_display }}</dd></div>
+                    </dl>
+                    <template v-if="asdairWs.browser.held_items && asdairWs.browser.held_items.length">
+                      <h3 class="as-sec">Needs attention<span class="g-count">{{ asdairWs.browser.held_items.length }}</span></h3>
+                      <div v-for="(h,hi) in asdairWs.browser.held_items" :key="'h'+hi" class="item as-stack amber">
+                        <div class="i-main"><div class="i-title">{{ h.label_display }}</div><div class="i-why" v-if="asdairKnown(h.reason_display)">{{ h.reason_display }}</div></div>
+                      </div>
+                    </template>
+                    <p class="as-note">{{ asdairWs.browser.boundary }}</p>
+                  </template>
+                </div>
+
+                <!-- ORDER CONFIRMATION — moved here from the old Overview/Details split. Money always
+                     prints the display string that carries its basis (never an ASDA price dressed
+                     up from a derived one). -->
+                <div class="grp" v-if="asdairWs && asdairWs.order">
+                  <h2>Order confirmation</h2>
+                  <p class="empty" v-if="!asdairWs.order.received">No order confirmation has been received for this shop, so nothing has been reconciled.</p>
+                  <template v-else>
+                    <dl class="as-kv">
+                      <div><dt>Received</dt><dd>{{ asdairWs.order.received_at_display }}</dd></div>
+                      <div><dt>ASDA stated</dt><dd>{{ asdairMoney(asdairWs.order.stated_total) || 'unknown' }}</dd></div>
+                      <div><dt>Our figure</dt><dd>{{ asdairMoney(asdairWs.order.reported_total) || 'unknown' }}</dd></div>
+                    </dl>
+                    <p class="as-note" v-if="asdairKnown(asdairWs.order.price_basis_note)">{{ asdairWs.order.price_basis_note }}</p>
+                  </template>
+                </div>
               </div>
             </template>
 
@@ -1382,7 +1651,8 @@ createApp({
                   <p class="empty" v-if="!asdairRules.regulars.items.length">The household catalogue is empty.</p>
                   <div v-for="rg in asdairRules.regulars.items" :key="'rg'+rg.id_display" class="item as-stack" :class="rg.active ? 'green' : 'grey'">
                     <div class="i-main">
-                      <div class="i-eyebrow">#{{ rg.id_display }}<span v-if="asdairKnown(rg.category_display)"> · {{ rg.category_display }}</span><span v-if="!rg.active"> · not active</span></div>
+                      <!-- No catalogue id on this primary screen (AC3) — it moved to Diagnostics. -->
+                      <div class="i-eyebrow" v-if="asdairKnown(rg.category_display) || !rg.active">{{ rg.category_display }}<span v-if="!rg.active"> · not active</span></div>
                       <div class="as-raw">{{ rg.name_display }}</div>
                       <div class="as-chips">
                         <span class="chip" :class="rg.has_product_id ? 'neutral' : 'warn'"><span class="d" aria-hidden="true"></span>{{ rg.has_product_id ? 'ASDA ' + rg.asda_product_id_display : 'no ASDA id' }}</span>
@@ -1397,11 +1667,6 @@ createApp({
                     </div>
                   </div>
                 </div>
-
-                <details class="tech">
-                  <summary>Raw payload (debugging only)</summary>
-                  <div class="tech-body"><div class="mono raw">{{ JSON.stringify(asdairRules, null, 2) }}</div></div>
-                </details>
               </div>
             </template>
 
@@ -1412,267 +1677,113 @@ createApp({
               <div v-if="asdairWsLoading && !asdairWs" class="empty big">Loading AsdAIr’s workspace…</div>
               <div v-else-if="asdairWsErr || !asdairShop" class="empty big">{{ currentApp.offline }}</div>
 
-              <!-- OVERVIEW -->
-              <div v-else-if="currentView.key==='overview'" class="asdair-view">
-                <div class="app-status up" role="status" aria-live="polite">
+              <!-- SHOP — the one canonical state (AC2), then exceptions first (design doc's List
+                   screen folded in here, since AC1 caps AsdAIr at four primary tabs), then the rest
+                   resolved and compact. Nothing here is independently recomputed from raw counts —
+                   the status line traces to ONE field (asdairCanonicalState) or an honest fallback
+                   sentence, never a client-computed status string. -->
+              <div v-else-if="currentView.key==='shop'" class="asdair-view">
+                <div class="app-status" :class="asdairStatus.tone" role="status" aria-live="polite">
                   <span class="as-dot" aria-hidden="true"></span>
-                  <div class="as-body"><b>{{ asdairShop.stage_label_display }}</b><span> — {{ asdairShop.shop_ref_display }}</span></div>
+                  <div class="as-body">
+                    <b>{{ asdairStatus.label }}</b>
+                    <span v-if="!asdairCanonicalState"> — {{ asdairWaitingOn(asdairShop, asdairWs.questions && asdairWs.questions.open_count_display) }}</span>
+                  </div>
                   <button class="act" :disabled="asdairWsLoading" @click="loadAsdairWorkspace()">{{ asdairWsLoading ? '…' : 'Refresh' }}</button>
                 </div>
-                <p class="app-blurb">{{ asdairWaitingOn(asdairShop, asdairWs.questions && asdairWs.questions.open_count_display) }}</p>
+                <p v-if="!asdairCanonicalState" class="as-note">AsdAIr hasn’t reported one overall status yet — the line above falls back to what’s known. It becomes a single glance the moment that lands.</p>
 
                 <div class="grp">
-                  <h2>This shop</h2>
+                  <h2>This week</h2>
                   <div class="item grey">
-                    <div class="i-main"><div class="i-eyebrow">Lines</div><div class="i-title">{{ asdairShop.lines_summary.resolved_display }} resolved of {{ asdairShop.lines_summary.total_display }} · {{ asdairShop.lines_summary.open_display }} open</div></div>
+                    <div class="i-main"><div class="i-eyebrow">Photo understood</div><div class="i-title">{{ asdairShop.lines_summary.resolved_display }} of {{ asdairShop.lines_summary.total_display }} lines sorted<span v-if="asdairShop.lines_summary.open_display !== '0'"> · {{ asdairShop.lines_summary.open_display }} still open</span></div></div>
                   </div>
-                  <div class="item" :class="(asdairWs.questions && Number(asdairWs.questions.open_count_display) > 0) ? 'amber' : 'grey'">
-                    <div class="i-main"><div class="i-eyebrow">Questions</div><div class="i-title">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || 'unknown' }} still waiting on you<span v-if="asdairWs.questions && asdairWs.questions.resolved_count_display !== '0'"> · {{ asdairWs.questions.resolved_count_display }} resolved</span></div></div>
+                  <div class="item" :class="(asdairWs.questions && Number(asdairWs.questions.open_count_display) > 0) ? 'amber' : 'grey'" role="button" tabindex="0" @click="goView('questions')" @keydown.enter="goView('questions')" @keydown.space.prevent="goView('questions')">
+                    <div class="i-main"><div class="i-eyebrow">Needs you</div><div class="i-title">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || 'unknown' }} question{{ asdairWs.questions && asdairWs.questions.open_count_display === '1' ? '' : 's' }} waiting<span v-if="asdairWs.questions && asdairWs.questions.resolved_count_display !== '0'"> · {{ asdairWs.questions.resolved_count_display }} already answered</span></div></div>
+                    <span class="chev" aria-hidden="true">›</span>
                   </div>
-                  <div class="item grey">
-                    <div class="i-main"><div class="i-eyebrow">Previous order</div>
-                      <div class="i-title">{{ asdairPrevOrderTotal(asdairWs.history && asdairWs.history.previous_order) || (asdairWs.plan && asdairWs.plan.prior_order_known ? 'on file — see Technical below' : 'none on file') }}</div>
+                </div>
+
+                <!-- The photo — auto-rotated (the browser's own EXIF handling; no pipeline-computed
+                     rotation exists yet where the source carries no EXIF, e.g. most Telegram photos —
+                     flagged in the read-back), shown small, never dominating (AC5). No per-line
+                     region crop exists anywhere upstream yet — that is Part 1/vision-pipeline scope,
+                     still fog per the design doc — so the honest interim is one small thumbnail with
+                     a "view original" control, never a fabricated crop. -->
+                <div class="grp" v-if="asdairWs.evidence && asdairWs.evidence.has_media">
+                  <h2>The list</h2>
+                  <button class="asdair-photo-thumb" type="button" @click="asdairOpenPhoto()" :disabled="asdairMediaErr" aria-label="View the original photo of the list, full size">
+                    <img v-if="!asdairMediaErr" class="asdair-photo-sm" :src="asdairMediaUrl" alt="" aria-hidden="true" @error="asdairMediaErr = true" />
+                    <span class="as-note">{{ asdairMediaErr ? 'The photo could not be loaded.' : 'View original photo' }}</span>
+                  </button>
+                </div>
+
+                <!-- EXCEPTION-FIRST. Default: needs-attention + changed only. "All" is one tap away,
+                     never the default (design doc, "List screen"). Every line — resolved or not — is
+                     tappable with a plain "Change" action (design doc's "something looks wrong"
+                     escape hatch), routed through correctLine (AC4). -->
+                <div class="grp">
+                  <h2>Lines<span class="g-count">{{ asdairShopLines.length }}</span></h2>
+                  <div class="as-seg" role="group" aria-label="Filter lines">
+                    <button class="act" :class="{on: asdairLineFilter==='exceptions'}" :aria-pressed="asdairLineFilter==='exceptions'" @click="asdairLineFilter='exceptions'">Needs attention</button>
+                    <button class="act" :class="{on: asdairLineFilter==='all'}" :aria-pressed="asdairLineFilter==='all'" @click="asdairLineFilter='all'">All ({{ asdairAllLines.length }})</button>
+                  </div>
+                  <p class="empty" v-if="!asdairAllLines.length">Not interpreted yet — no lines have been read off the list.</p>
+                  <p class="empty" v-else-if="!asdairShopLines.length">Nothing needs attention — every line matched cleanly. Tap “All” to see the full list.</p>
+                  <div v-else v-for="(ln,i) in asdairShopLines" :key="ln.line_no != null ? ln.line_no : i" class="item as-stack" :class="asdairLineTone(ln.status)"
+                    role="button" tabindex="0" @click="asdairOpenChange(ln)" @keydown.enter="asdairOpenChange(ln)" @keydown.space.prevent="asdairOpenChange(ln)">
+                    <div class="i-main">
+                      <!-- Plain English only (AC3): no raw status key, no confidence decimal, no
+                           match-basis text, no catalogue id, no ASDA product id on this primary
+                           screen — those move to Diagnostics, behind the cog. -->
+                      <div class="i-title">{{ asdairKnown(ln.canonical_product_name_display) ? ln.canonical_product_name_display : ln.raw_reading_display }}<span v-if="asdairKnown(ln.quantity_display)"> ×{{ ln.quantity_display }}</span></div>
+                      <div class="i-why">{{ asdairLineProvenance(ln.status) }}<span v-if="asdairKnown(ln.canonical_product_name_display) && ln.raw_reading_display !== ln.canonical_product_name_display"> · written as “{{ ln.raw_reading_display }}”</span></div>
                     </div>
+                    <span class="chev" aria-hidden="true">›</span>
                   </div>
                 </div>
-
-                <div class="grp" v-if="asdairOtherShops.length">
-                  <h2>Other shops<span class="g-count">{{ asdairOtherShops.length }}</span></h2>
-                  <div v-for="s in asdairOtherShops" :key="s.id" class="item grey">
-                    <div class="i-main"><div class="i-eyebrow">{{ s.status }}</div><div class="i-title">{{ s.shop_ref }}</div></div>
-                  </div>
-                </div>
-
-                <details class="tech">
-                  <summary>Raw payload (debugging only)</summary>
-                  <div class="tech-body">
-                    <p class="as-note">The readable version of all of this is on the Details tab.</p>
-                    <div class="mono raw">{{ JSON.stringify({ history: asdairWs.history, plan: asdairWs.plan, browser: asdairWs.browser, order: asdairWs.order }, null, 2) }}</div>
-                  </div>
-                </details>
               </div>
 
-              <!-- DETAILS — the VERIFICATION screen. Every section below reads named fields the API
-                   actually reports; there is no JSON.stringify anywhere on a primary reading path.
-                   The raw drawer at the bottom is a debugging last resort, not the content. -->
-              <div v-else-if="currentView.key==='details'" class="asdair-view">
-                <div class="grp">
-                  <h2>Evidence</h2>
-                  <img v-if="asdairWs.evidence && asdairWs.evidence.has_media && !asdairMediaErr" class="asdair-photo"
-                    :src="'/api/asdair/media?shop=' + asdairShop.shop_id" :alt="'Photo of the list for ' + asdairShop.shop_ref_display"
-                    @error="asdairMediaErr = true" />
-                  <p v-if="asdairMediaErr" class="err">The photo could not be loaded.</p>
-                  <p v-if="!(asdairWs.evidence && asdairWs.evidence.has_media)" class="empty">No photo evidence on file for this shop.</p>
-                  <dl class="as-kv" v-if="asdairWs.evidence">
-                    <div><dt>Source</dt><dd>{{ asdairWs.evidence.source_kind_display }}</dd></div>
-                    <div><dt>Transcript</dt><dd>{{ asdairWs.evidence.transcript_display }}</dd></div>
-                    <div v-if="asdairKnown(asdairWs.evidence.transcript_provider_display)"><dt>Read by</dt><dd>{{ asdairWs.evidence.transcript_provider_display }}<span v-if="asdairKnown(asdairWs.evidence.transcript_model_display)"> · {{ asdairWs.evidence.transcript_model_display }}</span></dd></div>
-                    <div><dt>Confidence</dt><dd>{{ asdairWs.evidence.transcript_confidence_display }}</dd></div>
-                    <div><dt>Needs review</dt><dd>{{ asdairWs.evidence.needs_review_display }}</dd></div>
-                  </dl>
-                </div>
-
-                <!-- WHAT MUM WROTE vs WHAT IT MATCHED. The whole point of this screen. -->
-                <div class="grp">
-                  <h2>Every line<span class="g-count">{{ (asdairWs.interpretation && asdairWs.interpretation.total_lines_display) || '0' }}</span></h2>
-                  <div class="as-chips" v-if="asdairTally.length">
-                    <span v-for="t in asdairTally" :key="t.key" class="chip" :class="t.chip"><span class="d" aria-hidden="true"></span>{{ t.n }} {{ t.label }}</span>
-                  </div>
-                  <p class="as-sub" v-if="asdairWs.interpretation && asdairKnown(asdairWs.interpretation.catalogue_size_display)">
-                    Matched against {{ asdairWs.interpretation.catalogue_size_display }} products in the household catalogue.
-                  </p>
-                  <p class="empty" v-if="!asdairWs.interpretation || !asdairWs.interpretation.lines || !asdairWs.interpretation.lines.length">Not interpreted yet — no lines have been read off the list.</p>
-                  <div v-else v-for="(ln,i) in asdairWs.interpretation.lines" :key="i" class="item as-stack" :class="asdairLineTone(ln.status)">
-                    <div class="i-main">
-                      <div class="i-eyebrow">Line {{ ln.line_no }}<span v-if="asdairKnown(ln.quantity_display)"> · qty {{ ln.quantity_display }}</span></div>
-                      <!-- Verbatim, never truncated: this is the evidence being verified. -->
-                      <div class="as-raw">{{ ln.raw_reading_display }}</div>
-                      <div class="as-sub strong" v-if="asdairKnown(ln.canonical_product_name_display)">→ {{ ln.canonical_product_name_display }}</div>
-                      <div class="as-note" v-else>No catalogue match — nothing has been chosen for this line.</div>
-                      <div class="as-chips">
-                        <span class="chip" :class="asdairLineChip(ln.status)"><span class="d" aria-hidden="true"></span>{{ ln.status_label || ln.status }}</span>
-                        <span class="chip neutral" v-if="asdairKnown(ln.plan_status_display)"><span class="d" aria-hidden="true"></span>plan: {{ ln.plan_status_display }}</span>
-                        <span class="chip neutral" v-if="asdairKnown(ln.match_basis_display)"><span class="d" aria-hidden="true"></span>{{ ln.match_basis_display }}</span>
-                        <span class="chip neutral" v-if="asdairKnown(ln.confidence_display)"><span class="d" aria-hidden="true"></span>confidence {{ ln.confidence_display }}</span>
-                        <span class="chip neutral" v-if="asdairKnown(ln.matched_regular_id_display)"><span class="d" aria-hidden="true"></span>catalogue #{{ ln.matched_regular_id_display }}</span>
-                        <span class="chip neutral" v-if="asdairKnown(ln.asda_product_id_display)"><span class="d" aria-hidden="true"></span>ASDA {{ ln.asda_product_id_display }}</span>
-                      </div>
-                      <div class="as-sub" v-if="asdairKnown(ln.note_display)">Note: {{ ln.note_display }}</div>
-                      <div v-if="ln.alternatives && ln.alternatives.length">
-                        <div class="as-sub">Alternatives offered — none is chosen automatically:</div>
-                        <div class="as-tags">
-                          <span v-for="(a,ai) in ln.alternatives" :key="ai" class="as-tag">{{ a.alternative_name_display || a.label_display || a.alternative_name || a.name }}<span v-if="a.chosen"> ✓ chosen</span></span>
-                        </div>
-                      </div>
-                      <div class="as-sub" v-for="(w,wi) in (ln.integrity_warnings || [])" :key="'w'+wi">⚠ {{ w }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- THE PLAN. Three lists, each saying what it means. -->
-                <div class="grp" v-if="asdairWs.plan">
-                  <h2>The plan<span class="g-count">{{ asdairWs.plan.counts ? asdairWs.plan.counts.resolved_display + ' / ' + asdairWs.plan.counts.held_display + ' / ' + asdairWs.plan.counts.excluded_display : '' }}</span></h2>
-                  <p class="as-sub">Resolved = ready to add · Held = waiting on something · Excluded = deliberately left off.</p>
-                  <template v-for="grp in [
-                      {k:'resolved', h:'Resolved — ready to add', tone:'green', empty:'Nothing is resolved yet.'},
-                      {k:'held',     h:'Held — waiting on something', tone:'amber', empty:'Nothing is being held.'},
-                      {k:'excluded', h:'Excluded — deliberately left off', tone:'red', empty:'Nothing has been excluded.'},
-                      {k:'unclassified', h:'Unclassified', tone:'grey', empty:''}]" :key="grp.k">
-                    <template v-if="(asdairWs.plan[grp.k] || []).length || grp.empty">
-                      <h3 class="as-sec">{{ grp.h }}<span class="g-count">{{ (asdairWs.plan[grp.k] || []).length }}</span></h3>
-                      <p class="empty" v-if="!(asdairWs.plan[grp.k] || []).length">{{ grp.empty }}</p>
-                      <div v-for="(p,pi) in (asdairWs.plan[grp.k] || [])" :key="grp.k+pi" class="item as-stack" :class="grp.tone">
-                        <div class="i-main">
-                          <div class="i-eyebrow">Line {{ p.line_no }}<span v-if="asdairKnown(p.requested_qty_display)"> · asked for {{ p.requested_qty_display }}</span><span v-if="asdairKnown(p.added_qty_display)"> · added {{ p.added_qty_display }}</span></div>
-                          <div class="as-raw">{{ p.raw_reading_display }}</div>
-                          <div class="as-sub strong" v-if="asdairKnown(p.canonical_product_name_display)">→ {{ p.canonical_product_name_display }}</div>
-                          <div class="as-note" v-else>No catalogue match on this line.</div>
-                          <div class="as-chips">
-                            <span class="chip neutral" v-if="asdairKnown(p.plan_status_display)"><span class="d" aria-hidden="true"></span>{{ p.plan_status_display }}</span>
-                            <span class="chip" :class="p.in_prior_order ? 'ok' : 'neutral'"><span class="d" aria-hidden="true"></span>{{ p.prior_order_context }}</span>
-                            <span class="chip neutral" v-if="asdairKnown(p.applied_rule_id_display)"><span class="d" aria-hidden="true"></span>rule #{{ p.applied_rule_id_display }}</span>
-                          </div>
-                          <div class="as-sub" v-if="asdairKnown(p.applied_rule_display)">Why: {{ p.applied_rule_display }}</div>
-                        </div>
-                      </div>
-                    </template>
-                  </template>
-                </div>
-
-                <!-- THE TIMELINE. A real event list; failures are a red rail AND the word "failure". -->
-                <div class="grp" v-if="asdairWs.timeline && asdairWs.timeline.length">
-                  <h2>What happened<span class="g-count">{{ asdairWs.timeline.length }}</span></h2>
-                  <div v-for="(ev,ei) in asdairWs.timeline" :key="'ev'+ei" class="item as-stack" :class="ev.is_failure ? 'red' : 'grey'">
-                    <div class="i-main">
-                      <div class="i-eyebrow" :class="{blocked: ev.is_failure}">{{ ev.event_type_display }}<span v-if="asdairKnown(ev.from_display) || asdairKnown(ev.to_display)"> · {{ ev.from_display }} → {{ ev.to_display }}</span></div>
-                      <div class="as-raw">{{ ev.description_display }}</div>
-                      <div class="as-chips">
-                        <span v-if="ev.is_failure" class="chip block"><span class="d" aria-hidden="true"></span>failure</span>
-                        <span class="chip neutral"><span class="d" aria-hidden="true"></span>{{ ev.occurred_at_display }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- BROWSER. A request is a request — the payload says so and so does this. -->
-                <div class="grp" v-if="asdairWs.browser">
-                  <h2>Basket build</h2>
-                  <p class="empty" v-if="!asdairWs.browser.requested">No basket build has been requested for this shop.</p>
-                  <template v-else>
-                    <dl class="as-kv">
-                      <div><dt>Status</dt><dd>{{ asdairWs.browser.status_display }}<span v-if="asdairWs.browser.is_paused"> (paused)</span></dd></div>
-                      <div><dt>Requested</dt><dd>{{ asdairWs.browser.requested_at_display }}</dd></div>
-                      <div><dt>Claimed</dt><dd>{{ asdairWs.browser.claimed_at_display }}</dd></div>
-                      <div><dt>Finished</dt><dd>{{ asdairWs.browser.finished_at_display }}</dd></div>
-                      <div><dt>Runner</dt><dd>{{ asdairWs.browser.claimed_by_display }}</dd></div>
-                      <div><dt>Basket lines</dt><dd>{{ asdairWs.browser.basket_lines_display }}<span v-if="asdairKnown(asdairWs.browser.basket_lines_source_display)"> (from {{ asdairWs.browser.basket_lines_source_display }})</span></dd></div>
-                      <div><dt>Regulars added</dt><dd>{{ asdairWs.browser.regulars_added_display }}</dd></div>
-                      <div><dt>Searched added</dt><dd>{{ asdairWs.browser.searched_items_added_display }}</dd></div>
-                      <div><dt>Estimated total</dt><dd>{{ asdairMoney(asdairWs.browser.estimated_total) || 'unknown' }}</dd></div>
-                      <div v-if="asdairKnown(asdairWs.browser.last_error_display)"><dt>Last error</dt><dd class="err">{{ asdairWs.browser.last_error_display }}</dd></div>
-                    </dl>
-                    <template v-if="asdairWs.browser.held_items && asdairWs.browser.held_items.length">
-                      <h3 class="as-sec">Held by the runner<span class="g-count">{{ asdairWs.browser.held_items.length }}</span></h3>
-                      <div v-for="(h,hi) in asdairWs.browser.held_items" :key="'h'+hi" class="item as-stack amber">
-                        <div class="i-main"><div class="as-raw">{{ h.label_display }}</div><div class="as-sub" v-if="asdairKnown(h.reason_display)">{{ h.reason_display }}</div></div>
-                      </div>
-                    </template>
-                    <template v-if="asdairWs.browser.pending_actions && asdairWs.browser.pending_actions.length">
-                      <h3 class="as-sec">Still to do in the browser<span class="g-count">{{ asdairWs.browser.pending_actions.length }}</span></h3>
-                      <div v-for="(a,ai) in asdairWs.browser.pending_actions" :key="'pa'+ai" class="item as-stack amber">
-                        <div class="i-main">
-                          <div class="i-eyebrow">{{ a.action_type_display }}</div>
-                          <div class="as-raw">{{ a.action_key_display }}</div>
-                          <div class="as-sub" v-if="asdairKnown(a.note_display)">{{ a.note_display }}</div>
-                        </div>
-                      </div>
-                    </template>
-                    <p class="as-note">{{ asdairWs.browser.boundary }}</p>
-                  </template>
-                </div>
-
-                <!-- ORDER / RECONCILE. Money always prints the display string that carries its basis. -->
-                <div class="grp" v-if="asdairWs.order">
-                  <h2>Order confirmation</h2>
-                  <p class="empty" v-if="!asdairWs.order.received">No order confirmation has been received for this shop, so nothing has been reconciled.</p>
-                  <template v-else>
-                    <dl class="as-kv">
-                      <div><dt>Confirmation</dt><dd>{{ asdairWs.order.confirmation_id_display }}</dd></div>
-                      <div><dt>Source</dt><dd>{{ asdairWs.order.source_kind_display }}</dd></div>
-                      <div><dt>Received</dt><dd>{{ asdairWs.order.received_at_display }}</dd></div>
-                      <div><dt>Reconciled</dt><dd>{{ asdairWs.order.reconciled_at_display }}</dd></div>
-                      <div><dt>ASDA stated</dt><dd>{{ asdairMoney(asdairWs.order.stated_total) || 'unknown' }}</dd></div>
-                      <div><dt>Our figure</dt><dd>{{ asdairMoney(asdairWs.order.reported_total) || 'unknown' }}</dd></div>
-                      <div><dt>Lines</dt><dd>{{ asdairWs.order.lines_count_display }}</dd></div>
-                    </dl>
-                    <p class="as-note" v-if="asdairKnown(asdairWs.order.price_basis_note)">{{ asdairWs.order.price_basis_note }}</p>
-                    <template v-if="asdairWs.order.lines && asdairWs.order.lines.length">
-                      <h3 class="as-sec">Lines on the confirmation<span class="g-count">{{ asdairWs.order.lines.length }}</span></h3>
-                      <div v-for="(ol,oi) in asdairWs.order.lines" :key="'ol'+oi" class="item as-stack grey">
-                        <div class="i-main">
-                          <div class="i-eyebrow">Line {{ ol.line_no }}<span v-if="asdairKnown(ol.quantity_display)"> · qty {{ ol.quantity_display }}</span></div>
-                          <div class="as-raw">{{ ol.product_name_display }}</div>
-                          <div class="as-chips">
-                            <span class="chip neutral" v-if="asdairKnown(ol.outcome_display)"><span class="d" aria-hidden="true"></span>{{ ol.outcome_display }}</span>
-                            <span class="chip neutral" v-if="ol.line_price && ol.line_price.display"><span class="d" aria-hidden="true"></span>{{ ol.line_price.display }}</span>
-                          </div>
-                          <div class="as-sub" v-if="asdairKnown(ol.note_display)">{{ ol.note_display }}</div>
-                        </div>
-                      </div>
-                    </template>
-                  </template>
-                </div>
-
-                <!-- Questions read the API's real field names (question_text_display / candidates),
-                     not a guessed q.text that was always undefined and fell through to a JSON blob.
-                     STILL WAITING and RESOLVED are two lists, not one flat table, because "what's
-                     outstanding" and "what's already settled" are different questions Warwick asks
-                     when he opens this page. -->
+              <!-- QUESTIONS — the question board (design doc's "Question board"). One screen, every
+                   open decision: what AsdAIr read, a one-tap accept per candidate, a free-text
+                   override, and "not this week" — every one of them answerQuestion (AC4), driven
+                   by the question's own allowed_replies rather than a client-invented action.
+                   Answered items do not vanish: collapsed but openable, newest first. -->
+              <div v-else-if="currentView.key==='questions'" class="asdair-view">
                 <div class="grp">
                   <h2>Still waiting on you<span class="g-count">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || '0' }}</span></h2>
                   <p class="empty" v-if="!asdairWs.questions || !asdairWs.questions.items || !asdairWs.questions.items.length">Nothing open — AsdAIr is not waiting on an answer.</p>
-                  <div v-else v-for="(q,i) in asdairWs.questions.items" :key="i" class="item as-stack amber">
+                  <div v-else v-for="(q,i) in asdairWs.questions.items" :key="q.id != null ? q.id : ('q'+i)" class="item as-stack amber">
                     <div class="i-main">
-                      <div class="i-eyebrow decision">Needs your answer<span v-if="q.list_item_id"> · line item {{ q.list_item_id }}</span></div>
                       <div class="as-raw">{{ q.question_text_display }}</div>
-                      <div v-if="q.candidates && q.candidates.length">
-                        <div class="as-sub">Candidates offered:</div>
-                        <div class="as-tags">
-                          <span v-for="(c,ci) in q.candidates" :key="'c'+ci" class="as-tag">{{ c.label_display }}<span v-if="!c.from_catalogue"> (not in the catalogue)</span></span>
-                        </div>
+                      <div class="as-tags" v-if="q.candidates && q.candidates.length">
+                        <button v-for="c in q.candidates" :key="c.index" class="as-choice" type="button" :disabled="q._busy"
+                          @click="asdairAnswerQuestion(q, 'choose', {candidate: c})">✓ {{ c.label_display }}</button>
                       </div>
-                      <div class="as-note">Answer it in Telegram — the cockpit shows this question, it does not answer it.</div>
+                      <div class="i-act">
+                        <button class="act" :disabled="q._busy" @click="asdairOpenQuestion(q)">Type an answer</button>
+                        <button class="act decline" :disabled="q._busy" @click="asdairAnswerQuestion(q, 'skip')">{{ q._busy ? '…' : 'Not this week' }}</button>
+                      </div>
+                      <p class="err" v-if="q._error">{{ q._error }}</p>
                     </div>
                   </div>
                 </div>
 
-                <!-- RESOLVED — Warwick's own words, verbatim, plus (where a durable decision exists)
-                     the plain-language translation of what it meant. Newest first. -->
                 <div class="grp" v-if="asdairWs.questions && asdairWs.questions.resolved && asdairWs.questions.resolved.length">
-                  <h2>Resolved<span class="g-count">{{ asdairWs.questions.resolved_count_display }}</span></h2>
-                  <div v-for="(q,i) in asdairWs.questions.resolved" :key="'r'+i" class="item as-stack" :class="q.status==='skipped' ? 'grey' : 'green'">
-                    <div class="i-main">
-                      <div class="i-eyebrow">{{ q.status_display === 'skipped' ? 'Skipped' : 'Answered' }}<span v-if="asdairKnown(q.answered_at_display)"> · {{ q.answered_at_display }}</span><span v-if="q.list_item_id"> · line item {{ q.list_item_id }}</span></div>
+                  <h2>Answered<span class="g-count">{{ asdairWs.questions.resolved_count_display }}</span></h2>
+                  <details v-for="(q,i) in asdairWs.questions.resolved" :key="'r'+i" class="tech">
+                    <summary>{{ q.status_display === 'skipped' ? 'Skipped' : 'Answered' }}<span v-if="asdairKnown(q.answered_at_display)"> · {{ q.answered_at_display }}</span></summary>
+                    <div class="tech-body">
                       <div class="as-raw">{{ q.question_text_display }}</div>
                       <div class="as-sub" v-if="asdairKnown(q.answer_text_display)">You said: “{{ q.answer_text_display }}”</div>
                       <div class="as-sub strong" v-if="q.resolution_display">→ {{ q.resolution_display }}</div>
                     </div>
-                  </div>
+                  </details>
                 </div>
-
-                <!-- LAST RESORT. The raw payload is kept — nothing was deleted — but it is now a
-                     collapsed debugging drawer at the bottom, never the thing that greets the reader. -->
-                <details class="tech">
-                  <summary>Raw payload (debugging only)</summary>
-                  <div class="tech-body">
-                    <p class="as-note">Everything above is rendered from named fields of this payload. This drawer exists so a field that is missing UI can still be found — it is not the intended way to read a shop.</p>
-                    <div class="mono raw">{{ JSON.stringify(asdairWs, null, 2) }}</div>
-                  </div>
-                </details>
               </div>
 
-              <!-- Any asdair view that is neither overview nor details and still needs the shop
-                   workspace. Rules is handled ABOVE, independently of shop state. -->
+              <!-- Any asdair view that is neither shop nor questions and still needs the shop
+                   workspace. Basket, Rules and Diagnostics are handled elsewhere. -->
               <div v-else class="empty big">
                 {{ currentApp.label }} is answering, but this view is not wired to it yet — so nothing is shown here, and nothing is being made up.
               </div>
@@ -2464,6 +2575,55 @@ createApp({
         </details>
       </section>
     </main>
+  </div>
+
+  <!-- ASDAIR ACTION SHEET — every write action AND the full-photo view, in one small self-contained
+       modal (BUILD-015 B15-26, AC4/AC5). Kept separate from the generic detail sheet below, whose
+       header is shared by idea/opp/output/doc and would need a fifth branch for no benefit. -->
+  <div v-if="asdairSheet" class="sheet" @click.self="asdairCloseSheet()">
+    <div class="sheet-card" role="dialog" aria-modal="true"
+      :aria-label="asdairSheet.kind==='photo' ? 'Original photo' : asdairSheet.kind==='question' ? 'Answer this question' : 'Change this line'"
+      @keydown.esc="asdairCloseSheet()">
+      <button class="back" @click="asdairCloseSheet()">‹ Back</button>
+
+      <template v-if="asdairSheet.kind==='photo'">
+        <h1>Original photo</h1>
+        <p class="as-sub">Shown exactly as uploaded — the browser applies the photo's own rotation if it carries one.</p>
+        <img class="asdair-photo" :src="asdairMediaUrl" alt="The full, original photo of this week's list." />
+      </template>
+
+      <template v-else-if="asdairSheet.kind==='question'">
+        <h1>Answer this question</h1>
+        <div class="as-raw">{{ asdairSheet.question.question_text_display }}</div>
+        <div class="as-tags" v-if="asdairSheet.question.candidates && asdairSheet.question.candidates.length">
+          <button v-for="c in asdairSheet.question.candidates" :key="c.index" class="as-choice" type="button" :disabled="asdairSheet.question._busy"
+            @click="asdairAnswerQuestion(asdairSheet.question, 'choose', {candidate: c})">✓ {{ c.label_display }}</button>
+        </div>
+        <label class="lane-sub" for="asdair-answer-text">Or type your own answer</label>
+        <input id="asdair-answer-text" class="asdair-input" type="text" v-model="asdairAnswerText"
+          placeholder="e.g. Cravendale Semi-Skimmed 2L"
+          @keydown.enter="asdairAnswerQuestion(asdairSheet.question, 'typed', {text: asdairAnswerText})" />
+        <div class="i-act">
+          <button class="act accept" :disabled="asdairSheet.question._busy" @click="asdairAnswerQuestion(asdairSheet.question, 'typed', {text: asdairAnswerText})">{{ asdairSheet.question._busy ? '…' : 'Save answer' }}</button>
+          <button class="act" :disabled="asdairSheet.question._busy" @click="asdairAnswerQuestion(asdairSheet.question, 'search', {text: asdairAnswerText})">Search ASDA for this</button>
+          <button class="act decline" :disabled="asdairSheet.question._busy" @click="asdairAnswerQuestion(asdairSheet.question, 'skip')">Not this week</button>
+        </div>
+        <p class="err" v-if="asdairSheet.question._error">{{ asdairSheet.question._error }}</p>
+      </template>
+
+      <template v-else-if="asdairSheet.kind==='change'">
+        <h1>Something looks wrong?</h1>
+        <p class="as-sub">Tell AsdAIr what this line should say. This goes through the same correction path Telegram uses — nothing here writes to the database directly.</p>
+        <label class="lane-sub" for="asdair-change-name">Item</label>
+        <input id="asdair-change-name" class="asdair-input" type="text" v-model="asdairChangeName" placeholder="e.g. Cravendale Semi-Skimmed 2L" />
+        <label class="lane-sub" for="asdair-change-qty">Quantity (optional)</label>
+        <input id="asdair-change-qty" class="asdair-input" type="number" min="1" max="99" v-model="asdairChangeQty" placeholder="leave blank if unchanged" />
+        <div class="i-act">
+          <button class="act accept" :disabled="asdairSheetBusy" @click="asdairSubmitChange()">{{ asdairSheetBusy ? '…' : 'Save correction' }}</button>
+        </div>
+        <p class="err" v-if="asdairSheetErr">{{ asdairSheetErr }}</p>
+      </template>
+    </div>
   </div>
 
   <!-- DETAIL SHEET (L3 + L4) -->

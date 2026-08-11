@@ -96,6 +96,35 @@ button { font-family:inherit; }
 .asdair-view { margin-top:2px; }
 .asdair-photo { display:block; max-width:100%; border-radius:13px; border:1px solid var(--hair); background:var(--panel2); margin-bottom:8px; }
 
+/* BUILD-015 B15-26 — the small thumbnail entry point to the photo (AC5: shown small, never
+   dominating by default; the full auto-rotated photo is one tap away in the action sheet). Same
+   --hair/--panel2 vocabulary as .asdair-photo above, just smaller and inline. */
+.asdair-photo-thumb { display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  background:none; border:1px solid var(--hair); border-radius:13px; padding:6px 10px; cursor:pointer; }
+.asdair-photo-thumb:hover, .asdair-photo-thumb:focus-visible { border-color:var(--accent); }
+.asdair-photo-thumb:disabled { cursor:default; opacity:.7; }
+.asdair-photo-sm { display:block; width:56px; height:56px; object-fit:cover; border-radius:9px; background:var(--panel2); flex:0 0 auto; }
+
+/* The exception/all segmented filter (Shop screen). Reuses .act as its base — this is styling ON
+   TOP of .act, the same "on" language .app-nav-btn.on and .app-cog.on already use. */
+.as-seg { display:flex; gap:6px; margin:2px 0 12px; }
+.as-seg .act.on { background:var(--accent-w); color:var(--accent-ink); border-color:var(--accent); }
+
+/* A candidate choice — a REAL product name, so body font, never .as-tag's mono (GL-003 §3: mono
+   means "measurement or machine string", which a product name is not). Same pill shape as .as-tag
+   for visual family, different type. */
+.as-choice { font-size:12.5px; font-weight:650; color:var(--ink); background:var(--panel2);
+  border:1px solid var(--hair); padding:5px 12px; border-radius:20px; cursor:pointer; overflow-wrap:anywhere; }
+.as-choice:hover, .as-choice:focus-visible { border-color:var(--accent); }
+.as-choice:disabled { cursor:default; opacity:.6; }
+
+/* Text/number inputs in the AsdAIr action sheet — the only form fields this app has. Matches .act's
+   radius and border vocabulary so a sheet with a button and an input reads as one family. */
+.asdair-input { display:block; width:100%; font:inherit; font-size:14px; color:var(--ink);
+  background:var(--panel2); border:1px solid var(--hair); border-radius:9px; padding:9px 12px;
+  margin:4px 0 12px; }
+.asdair-input:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+
 /* ── AsdAIr readable Details + Rules ─────────────────────────────────────────────────────────────
    LAYOUT ONLY. Not one new colour token, and every text-on-surface pairing below is one GL-003 §2b
    already measured and PASSES in both schemes:
@@ -281,6 +310,15 @@ button { font-family:inherit; }
 .apps-pane .app-back { display:inline-flex; align-items:center; justify-content:center;
   min-width:44px; min-height:44px; padding:0; margin:0 2px 0 -6px; font-size:22px; line-height:1; border-radius:10px; }
 .apps-pane .app-back:hover { background:var(--panel2); }
+
+/* The settings/cog icon (AC1 — reaches Diagnostics/About/History, never a competing tab). Same
+   44x44 touch-target treatment as .app-back above, pushed to the far end of the flex header. The
+   ".on" state (currently viewing that non-primary screen) borrows the SAME --accent-w/--accent-ink
+   pairing .app-nav-btn.on already uses elsewhere on this page — one "currently here" language, not
+   a second one invented for this control. */
+.app-cog { display:inline-flex; align-items:center; justify-content:center;
+  min-width:44px; min-height:44px; padding:0; margin-left:auto; font-size:18px; line-height:1; border-radius:10px; }
+.app-cog.on { background:var(--accent-w); color:var(--accent-ink); border-color:var(--accent); }
 
 /* Visible focus for every control in this area — including .back and .act, which are reused
    primitives that these rules had NOT covered. Programmatic focus on the heading stays ringless

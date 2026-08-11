@@ -54,6 +54,12 @@
  * @property {string}  key              Stable id, unique within the app.
  * @property {string}  label            What Warwick taps.
  * @property {string} [blurb]           One line: what this view shows once the app is connected.
+ * @property {boolean} [primary]        Defaults to true. false = reachable (goView still routes to
+ *                                      it and `currentView` still resolves it) but NOT rendered as a
+ *                                      tab in `.app-nav` — reached instead via the settings/cog icon.
+ *                                      BUILD-015 B15-26: AsdAIr's nav must be exactly four primary
+ *                                      tabs, with Diagnostics/About/History behind a cog, never a
+ *                                      competing fifth tab (design doc, "Navigation").
  *
  * @typedef {Object} AppEntry           A registry entry AS AUTHORED.
  * @property {string}  key              Stable id. Matches APP_SERVICES in server.mjs if probed.
@@ -88,7 +94,7 @@
  * @property {string} icon
  * @property {Tone} tone
  * @property {boolean} probe
- * @property {ReadonlyArray<Required<AppView>>} views
+ * @property {ReadonlyArray<Required<Omit<AppView,'primary'>> & {primary:boolean}>} views
  * @property {ReadonlyArray<string>} about
  * @property {string} offline
  */
@@ -108,12 +114,19 @@ const APPS = [
     // name. Two module keys ('shopping' and this one) deliberately share one human name.
     moduleLabel: 'Shopping',
     lane: 'life',
+    // BUILD-015 B15-26: four primary tabs (design doc, "Navigation"), collapsed from the previous
+    // Overview/Details split. 'about' carries Diagnostics + About + History and is reachable only
+    // via the cog (primary:false) — never a competing fifth tab. Key RENAMES from the previous
+    // build ('overview'->'shop', 'details'->'questions' folded into 'shop'+'questions'): a deep
+    // link or bookmark carrying the old `?view=overview` / `?view=details` now falls back to the
+    // registry default (views[0], i.e. 'shop') via `currentView`'s own `|| a.views[0]` fallback —
+    // never a blank screen.
     views: [
-      { key: 'overview', label: 'Overview', blurb: 'Where this week’s shop has got to, and anything waiting on you.' },
-      { key: 'details', label: 'Details', blurb: 'Every line on the list — what it was read as, what it matched in the household catalogue, and the evidence behind the match — plus what’s still waiting on you and what you’ve already resolved.' },
-      { key: 'basket', label: 'Basket', blurb: 'The execution packet in Brand A–Z order — every product, its quantity, and WHY that quantity — and, once the basket has been built, how it reconciled against what was expected.' },
+      { key: 'shop', label: 'Shop', blurb: 'Where this week’s shop has got to, what’s changed, and anything waiting on you — the lines that need attention first.' },
+      { key: 'questions', label: 'Questions', blurb: 'Every open decision, in one place — what AsdAIr read, its best guess, and a one-tap way to answer or correct it.' },
+      { key: 'basket', label: 'Basket', blurb: 'The planned basket — every product, its quantity, and WHY that quantity — and, once it’s been built in ASDA, how the real trolley reconciled against the plan.' },
       { key: 'rules', label: 'Rules', blurb: 'The durable rulebook: the standing rules AsdAIr plans against, the decisions it has been given, and the household catalogue with its aliases. Read-only — this is what the system believes.' },
-      { key: 'about', label: 'About', blurb: 'What this app does, what it will never do, and where its data lives.' },
+      { key: 'about', label: 'Diagnostics', blurb: 'What this app does, what it will never do, where its data lives, other shops, and the raw technical detail behind every screen above.', primary: false },
     ],
     about: [
       'Runs the weekly household shop as a standing job: intake, planning against the durable rulebook, the needs-decision queue, reconcile, and the learning write-back.',
@@ -171,6 +184,9 @@ function normaliseApp(a) {
     key: String(v.key),
     label: String(v.label),
     blurb: v.blurb ? String(v.blurb) : '',
+    // Defaults true — every existing app/view keeps rendering as a tab exactly as before. Only an
+    // explicit false (AsdAIr's 'about', per the design doc) is hidden from .app-nav.
+    primary: v.primary !== false,
   }));
   return Object.freeze({
     key: String(a.key),
