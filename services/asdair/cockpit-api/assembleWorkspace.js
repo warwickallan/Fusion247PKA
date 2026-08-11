@@ -332,6 +332,21 @@ function buildPlan(input, cat) {
 // before this table existed" or "not yet decided", so the fallback is the
 // raw answer, not silence.
 // ---------------------------------------------------------------------
+// A small, LOCAL human-date formatter for the two fields this Work Order introduces
+// (resolved-question answered_at_display, decision interpreted_at_display) — NOT a change to
+// present.js's when(), which returns a raw ISO instant and is already used elsewhere on this page
+// (History, evidence, browser, order...). Retrofitting that formatter estate-wide is a separate,
+// larger decision for Iris; this fixes only the two call sites the "Resolved" section actually
+// renders, where a raw machine timestamp would sit right beside "You said: ..." / "-> Resolved to
+// ..." — the exact primary-content-must-be-human-readable rule this section exists to uphold.
+// (Vera, CONDITIONAL PASS, HIGH finding on 2026-08-11.)
+function humanWhen(value) {
+  if (value === null || value === undefined || value === '') return P.UNKNOWN;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return P.UNKNOWN;
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(d);
+}
+
 function decisionSummary(d, cat) {
   if (!d) return null;
   const regular = cat.get(d.decided_regular_id);
@@ -344,7 +359,7 @@ function decisionSummary(d, cat) {
     clarification_reason_display: P.text(d.clarification_reason),
     forward_intent_display: P.text(d.forward_intent),
     interpreted_by_display: P.text(d.interpreted_by),
-    interpreted_at_display: P.when(d.interpreted_at)
+    interpreted_at_display: humanWhen(d.interpreted_at)
   };
 }
 
@@ -433,7 +448,9 @@ function buildQuestions(input, cat) {
         // interpreted resolution below.
         answer_text_display: P.text(q.answer_text),
         answer_source_display: P.text(q.answer_source),
-        answered_at_display: P.when(q.answered_at),
+        // humanWhen(), not P.when() - see the comment on humanWhen() above. This is primary content
+        // sitting right beside "You said: ..." / "-> Resolved to ...", not a technical drawer.
+        answered_at_display: humanWhen(q.answered_at),
         // The plain-language "what this meant" line. null when no durable
         // decision is on record — the UI shows the raw answer on its own
         // rather than a sentence this module has no grounds for.
@@ -762,6 +779,7 @@ module.exports = {
     buildInterpretation: buildInterpretation,
     buildPlan: buildPlan,
     buildQuestions: buildQuestions,
+    humanWhen: humanWhen,
     decisionSummary: decisionSummary,
     resolutionSentence: resolutionSentence,
     buildBrowser: buildBrowser,

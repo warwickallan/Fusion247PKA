@@ -417,6 +417,22 @@ test('a resolved question shows Warwick\'s own answer verbatim, even with no dec
   assert.equal(r.resolution_display, null);
 });
 
+// REGRESSION — Vera, CONDITIONAL PASS, 2026-08-11. answered_at_display rendered as a raw
+// toISOString() instant (P.when()'s output) right beside "You said: ..." / "-> Resolved to ..." —
+// primary content in the exact section this Work Order exists to make human-readable. Scoped fix:
+// a local humanWhen() for this field and decisionSummary()'s interpreted_at_display only; every
+// OTHER P.when() call site on the page (History, evidence, browser, order...) is unchanged.
+test('a resolved question\'s answered_at is human-readable, never a raw ISO instant', () => {
+  const p = assembleWorkspace(input({
+    questions: [
+      { id: 6, list_item_id: 102, question_key: 'q2', question_text: 'Which sausages?', status: 'answered', answer_text: 'Richmond 12 Skinless Pork Sausages 319g', answer_source: 'typed', answered_at: '2026-07-28T10:05:00Z', candidates: [] }
+    ]
+  }));
+  const display = p.questions.resolved[0].answered_at_display;
+  assert.ok(!/^\d{4}-\d{2}-\d{2}T/.test(display), 'answered_at_display looks like a raw ISO instant: ' + display);
+  assert.equal(display, new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date('2026-07-28T10:05:00Z')));
+});
+
 test('a skipped question with no decision row still reads as skipped, in plain English', () => {
   const p = assembleWorkspace(input({
     questions: [
@@ -441,6 +457,10 @@ test('a decision row translates into a plain-language resolution, grounded in th
   assert.equal(r.decision.kind, 'existing_regular');
   assert.equal(r.decision.decided_product_name_display, 'Arla semi skimmed 4pt');
   assert.equal(r.resolution_display, 'Resolved to Arla semi skimmed 4pt.');
+  // Same regression, the decision's own timestamp: also primary content beside the resolution
+  // sentence, also must never be a raw ISO instant.
+  assert.ok(!/^\d{4}-\d{2}-\d{2}T/.test(r.decision.interpreted_at_display),
+    'decision.interpreted_at_display looks like a raw ISO instant: ' + r.decision.interpreted_at_display);
 });
 
 test('resolved questions come back newest-first', () => {

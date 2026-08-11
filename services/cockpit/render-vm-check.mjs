@@ -318,6 +318,12 @@ const ASDAIR_PLAN = [
         (p) => hasText(p, 'Resolved to Placeholder Sausages 400g.')],
       ['the resolved count is shown next to the section, not just the open one',
         (p) => hasText(p, 'Resolved') && hasText(p, '1')],
+      // REGRESSION — Vera, CONDITIONAL PASS, 2026-08-11: answered_at_display rendered as a raw
+      // toISOString() instant right beside "You said: ..." / "-> Resolved to ...". The checked-in
+      // fixture is now honest about the real formatter's output (see assembleWorkspace.js's
+      // humanWhen()), so this assertion is a genuine render-layer guard, not one the fixture masks.
+      ['no raw ISO timestamp anywhere in the Details view (a machine instant is never primary content)',
+        (p) => !p.some((s) => /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s))],
     ]],
     ['DETAILS (shop present, every section empty)', 'details', { asdairWs: BARE_WS, asdairWsErr: null }],
     ['DETAILS (service down)', 'details', { asdairWs: null, asdairWsErr: 'service down' }],
