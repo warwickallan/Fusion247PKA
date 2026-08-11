@@ -803,11 +803,34 @@ export function createFakeClient(store, options = {}) {
     // reason the insert's column list above is: this pattern used to match
     // openHandoff's supersede statement too, and answered it by looking for the
     // row id in a progress parameter - finding nothing, and returning no row.
-    [/^UPDATE asdair\.browser_build_request SET progress = \$1::jsonb/i, (sql, p) => {
+    //
+    // ── WP-B15-19 AC6, TAUGHT HERE (WP-B15-22) ──────────────────────────────
+    // The real statement grew a THIRD guard beyond status:
+    //   AND (progress->'handoff' IS NULL OR jsonb_exists($1::jsonb, 'handoff'))
+    // - Postgres itself now refuses a write that would silently DESTROY a
+    // handoff artefact (see shopStore.js's own comment on this statement for
+    // why). Before this, the fake accepted exactly that write: a test could
+    // wipe `progress.handoff` here and the fake would happily comply, proving
+    // nothing about the guard the real database now enforces. Modelled as a
+    // WHERE predicate, not a merge, matching the real statement's own shape -
+    // a target whose CURRENT row carries `progress.handoff` and whose
+    // INCOMING object does not is refused (rowCount 0), exactly like Postgres.
+    //
+    // An optional trailing `AND claimed_by = $3` is also modelled, because the
+    // real statement grows it whenever updateBrowserProgress is called with a
+    // claimed_by option - matched the same way `foreignClaimPredicate` reads
+    // an optional predicate above: from the statement's own text, not assumed.
+    [/^UPDATE asdair\.browser_build_request SET progress = \$1::jsonb, status = 'running' WHERE id = \$2/i, (sql, p) => {
+      const hasClaimedBy = /\bAND claimed_by = \$3\b/i.test(sql);
       const target = db.browser_build_request.find((b) => String(b.id) === String(p[1])
-        && ['claimed', 'running'].includes(b.status));
+        && ['claimed', 'running'].includes(b.status)
+        && (!hasClaimedBy || String(b.claimed_by) === String(p[2])));
       if (!target) return none();
-      try { target.progress = JSON.parse(p[0]); } catch { target.progress = {}; }
+      const incoming = asJson(p[0]) || {};
+      const currentCarriesHandoff = !!(target.progress && typeof target.progress === 'object' && target.progress.handoff);
+      const incomingCarriesHandoff = !!incoming.handoff;
+      if (currentCarriesHandoff && !incomingCarriesHandoff) return none();
+      target.progress = incoming;
       target.status = 'running';
       return rows([target]);
     }],

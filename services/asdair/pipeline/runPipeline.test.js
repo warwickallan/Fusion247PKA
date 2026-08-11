@@ -521,6 +521,42 @@ test('WP-B15-14: the return leg is IDEMPOTENT - re-running it cannot double-adva
   assert.equal(JSON.stringify(h.db.shop[0]), before);
 });
 
+test('WP-B15-19 AC6, taught to fakePg (WP-B15-22): a progress write that would DESTROY the handoff artefact is refused', async () => {
+  // shopStore.updateBrowserProgress's WRITE is a whole-object REPLACE, not a
+  // merge, and became a footgun the moment openHandoff started writing the
+  // operating contract onto progress.handoff: a caller passing a progress
+  // object without it would silently DELETE the artefact. The real statement
+  // now carries a WHERE predicate that refuses that write outright; this
+  // proves fakePg enforces the SAME predicate, against the REAL shopStore
+  // code (test/harness.js binds shopStore.updateBrowserProgress unmodified
+  // over the fake client) - not a re-description of the guard.
+  const h = makeHarness();
+  await toWaitingForBrowser(h);
+  const row = h.db.browser_build_request[0];
+  assert.ok(row.progress && row.progress.handoff, 'fixture must start carrying a handoff artefact');
+  Object.assign(row, { status: 'claimed', claimed_by: 'runner-1' });
+
+  // A caller passing a progress object with NO handoff key must be refused -
+  // real Postgres would refuse it via the jsonb_exists guard, and the row
+  // must be left completely untouched (never partially applied).
+  await assert.rejects(
+    () => h.deps.shopStore.updateBrowserProgress(row.id, { counters: { step: 1 } }, {}),
+    /carries a handoff artefact and this progress object does not/,
+  );
+  assert.deepEqual(h.db.browser_build_request[0].progress, row.progress,
+    'a refused write must leave the row byte-identical, not partially applied');
+  assert.equal(h.db.browser_build_request[0].status, 'claimed', 'a refused write must not flip status to running');
+
+  // A caller that legitimately carries the artefact through (the CDP runner's
+  // own progress counters, alongside the untouched handoff) succeeds.
+  const carried = { ...row.progress, counters: { step: 1 } };
+  const result = await h.deps.shopStore.updateBrowserProgress(row.id, carried, {});
+  assert.equal(result.changed, true);
+  assert.deepEqual(h.db.browser_build_request[0].progress.handoff, row.progress.handoff,
+    'the handoff artefact must survive a write that carried it through');
+  assert.equal(h.db.browser_build_request[0].status, 'running');
+});
+
 test('IDEMPOTENCY: calling runPipeline repeatedly on a parked shop changes nothing at all', async () => {
   const h = makeHarness();
   await receiveText(h);
