@@ -28,7 +28,7 @@
 - **Canonical-lineage bootstrap — the first move of every fresh BUILD-015 session:** resolve current
   canonical state **by execution** before trusting anything in this map — `git rev-parse HEAD` on
   `main`, `git status --porcelain`, `gh pr list --state open`, and the live-runtime probes in
-  § "THE PREPARED POST-JUMP PHASE" → Step 1. **Canonical `main` is the source lineage; a running
+> ⛔ **CORRECTED 2026-08-11:** run the live-runtime probes in § "The standing fresh-session bootstrap", and take the current state and next action from **§12 RESUMABLE STATE**. §10 is HISTORY and no longer contains those steps.
   process or old checkout is deployment evidence, never source authority.** *"Running code tells us
   what was deployed. Git tells us what source we own"* (Warwick, 2026-08-08).
 - Read the current phase, gate and evidence before acting.
@@ -139,7 +139,7 @@ The "comment says wired / executable path says unwired" pattern is **sufficientl
 | | |
 |---|---|
 | **PRODUCT OUTCOME** | **Warwick can answer AsdAIr naturally, without Larry, and that answer changes THIS WEEK'S shop.** |
-| **⛔ CLAIM FALSIFIED 2026-08-11 — see `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md`. Photo intake and catalogue-grounded interpretation are NOT proven: the durable transcript was EMPTY while 35 shop_line rows existed that did not match the photograph.** ~~PROVEN LIVE~~ | ~~Photo intake ·
+| ⛔ **CLAIM FALSIFIED 2026-08-11** | **Photo intake and catalogue-grounded interpretation are NOT proven.** On 2026-08-10 the durable transcript was EMPTY (no text, no provider, no model, no confidence) while 35 `shop_line` rows existed that did not match the photograph. See `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md`. |
 | **BROKEN** | 🔴 **D-1 `deps.interpretAnswer` HAS NO PRODUCTION BINDING** — a tap resolves; **free text CANNOT**. Larry's AC3 said "stub at the dep boundary" and never required the real caller, so this is a defect in the ORDER, not the build · 🔴 **D-2 the `wait:line_resolution` park is SILENT** — no outbox, no card, no event, ever; while D-1 stands it is the GUARANTEED destination of every free-text answer, so **the shop stops forever and nothing tells Warwick.** Shop 6's exact shape, re-created by this WP's own gate · **Question cards are never delivered** — all 11 of shop 6's questions have `card_chat_id`/`card_message_id` NULL, no render fingerprint · **an answer cannot reach the plan** — `runPipeline.js:638` writes `applies_going_forward:false`, `planner.js:1091` admits only `===true`, and `shopLines.markCorrected` has **zero production callers** · **`READY_TO_SHOP` never looks at a line** (`stages.js:306-318` counts open questions only) |
 | **ACTIVE** | **WP-B15-2 decision spine BUILT** (`72579cd`+`2d84dd1`, pipeline 205→264, five mutation demos) — **Veritas Gate 1 = HOLD on AC3 ALONE, and no longer for an engineering reason** — D-1 and D-2 both **DISCHARGED** at `cafa340` (re-executed and re-mutated independently). What remains is **one coupled PRODUCT DECISION for Warwick**: the seam is bound to the `reason` role, not Terra (`DEFECT-LEDGER.md:69` registers `fusion.reason`, `fusion.query` and `gpt-5.6-terra` as THREE separate aliases), while `runPipeline.js:899/:911` hard-code `interpreted_by: 'terra'` and 017's CHECK allows only `terra|human|rule`. **Every decision row would durably assert Terra interpreted it while the model field says `reason`.** ✅ **Migration 017 PROVEN against REAL PostgreSQL 17.4** — idempotent (3× apply, `pg_dump` byte-identical), all three `pg_constraint` guards mutation-tested and load-bearing, all 15 CHECKs made to fire across 25 negative cases, and insert-only proven real: `UPDATE`/`DELETE`/`TRUNCATE`/`ON CONFLICT DO UPDATE` all refused `42501`. **No defect in 017.** ⚠️ Five `fakePg` divergences found — highest: **a bigint returns as a STRING from `pg` and a NUMBER from the fake**, while `decided_quantity` (integer) agrees, so a live row is a MIXED bag invisible in the fake |
 | **READY NEXT** | Silas lands → regenerate WP-B15-2 through the envelope route ONCE → accept the read-back → Keel builds. Then Cockpit parity, which **must NOT hold Telegram autonomy hostage** |
@@ -348,7 +348,7 @@ and deleted.** Its rows are retained struck-through as evidence of the 2026-08-0
 | Source authority | **Canonical `main`.** All BUILD-015 source, this map, the build record and all four+1 assurance receipts live on `main`. No BUILD-015 branch exists |
 | Gate 3 position | **THREE reviews, all HOLD.** Live receipt: `veritas-gate3-truth-94f135f.md` — `D-G3-21`–`24` never corrected, `D-G3-26` open Warwick decision. Enumerate `Builds/BUILD-015-…/Assurance/` rather than trusting this row |
 | CI | ~~Root cause UNESTABLISHED~~ **RE-CUT at the bootstrap (2026-08-08 late): `asdair-tests.yml`'s `integration` job has NEVER passed in its recorded history (12/12 runs failed, 2026-08-05→08). Exact failure identified: `skill/test/integration.dbtest.js:266` — seeded `widget b` (household-scoped term match) plans `needs_decision` where the test requires `add`; the divergence is in the real `data.js` adapter ↔ planner contract, which unit fixtures never exercise. INHERITED BASELINE BREAKAGE — predates all 4E/bootstrap work. Do not weaken the assertion; the fix is routed work.** The path-filter warning stands: an unrun workflow looks exactly like a green one — check the last run PER WORKFLOW. Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §3 |
-| Live runtime | **⛔ STALE 2026-08-11 — the live runtime is PID 12204, started 2026-08-10 21:40:57, on PRE-CHANGE bytes. See §12.** ~~RUNNING, and OLDER than current source~~
+| Live runtime | **⛔ CORRECTED 2026-08-11 (third cold-start pass, verified by execution): the runtime IS BYTE-CURRENT with `main` product code.** PID 12204 started 2026-08-10 21:40:57, **86 seconds after `fb58882` was committed (21:39:31)**, and `git diff --name-only fb58882..HEAD -- services/` returns **ZERO**. It therefore CARRIES B15-07 through B15-16. What it does NOT carry is B15-18/19/20/21, which are unintegrated. A cutover is needed only AFTER those integrate. |
 | Live database | ~~UNVERIFIABLE from this reconciliation~~ **RE-CUT — ESTABLISHED read-only at the bootstrap (2026-08-08, `asdair_ro`, SELECTs only):** 26 live tables vs 23 repo-defined — **live-only: `command_request`, `previously_ordered`, `skill_steps` (the migration debt, now named); no packet table (015 never applied).** Rules: 40 by directive (exclude 3 · info 24 · map 10 · needs_decision 2 · rotate 1) — rule 32 is now a structured `rotate` WITH match_term; rule 10 (never-BOB) is still inert `info` while regular 69 (Arla BOB) is ACTIVE — fog 2 CONFIRMED LIVE. Regulars: 103/103 active, `source`={regular} only — fog 5 RESOLVED (no live Favourites source). **Real journey rows exist: 3 shops; shop 6 (2026-08-03) interpreted 35 lines against a 97-product catalogue, answered all 11 questions, replanned — and has sat at `PROCESSING` ever since: parked on the interpretation-confirmation gate (`needs_review=true`, zero confirm commands ever in `pipeline_command` — break 8 below), NOT the packet seam as first attributed.** Detail: [[Deliverables/2026-08-08-b15-bootstrap-evidence]] §4–§5 |
 | Suites | Not re-run during 4E (documentation-only phase). The last committed local claim is the 2026-08-04 green at 1,599–1,609; **the CI row above is newer and redder — believe it** |
 
@@ -676,7 +676,7 @@ independent review by the same model, never as external verification. Merge-to-m
 **Prepared 2026-08-08 during BUILD-020 Sub-phase 4E. ~~It becomes ACTIVE when the Build switch to
 BUILD-015 completes~~ — the switch COMPLETED 2026-08-08: the 4E preparation merged (PR #99, reviewed
 head `0511c0a`), convergence was proven, BUILD-020 parked at its 4F return frontier, and BUILD-015
-is the ACTIVE Build. THIS SECTION IS LIVE.** (Commission mirror §21–§22.) Implementation still
+is the ACTIVE Build. ⛔ THIS SECTION IS **HISTORY as at 2026-08-09** and directs nothing — see §12.** (Commission mirror §21–§22.) Implementation still
 begins only after the prepared sequence below reaches Warwick's decision at step 5.
 
 ### The phase and its gate question
@@ -1054,7 +1054,7 @@ signed the paper."* **`build-015/grounded-recognition` is NOT deleted yet.**
 > | | |
 > |---|---|
 > | **Converged head** | **`c4d74d2`**, on `main` AND pushed to `origin/b15-3/integration` |
-> | **Live runtime** | **⛔ STALE — now PID 12204 (2026-08-10 21:40:57) on PRE-CHANGE bytes.** ~~PID 26856~~
+| Live runtime | **⛔ CORRECTED 2026-08-11 (third cold-start pass, verified by execution): the runtime IS BYTE-CURRENT with `main` product code.** PID 12204 started 2026-08-10 21:40:57, **86 seconds after `fb58882` was committed (21:39:31)**, and `git diff --name-only fb58882..HEAD -- services/` returns **ZERO**. It therefore CARRIES B15-07 through B15-16. What it does NOT carry is B15-18/19/20/21, which are unintegrated. A cutover is needed only AFTER those integrate. |
 > | **Migration 018** | **APPLIED and verified** — `asdair.remembered_choice`, 0 rows, 8/8 constraints validated, `asdair_rw` SELECT+INSERT, **UPDATE/DELETE to nobody** |
 > | **Rules 31 & 36** | **ARCHIVED LIVE** (`active=false`). **Rule 37 RETAINED and executable** |
 > | **Suites at that head** | 1,265 tests. pipeline 366/366 · handoff 114 · packet 109 · browser-runner 75 · bot 165 · intake 34 · reconcile 106 · skill 296 run/287 pass/**7 pre-existing env failures by name** · mutation-proof **9/9** |
@@ -1549,7 +1549,7 @@ its evidence so it can be re-established or falsified in minutes.**
 > The 08-10 handover it names is **no longer the entry point** — `Deliverables/2026-08-11-rotation-handover.md` is.
 > Its "ask Warwick for a fresh photograph" instruction below is **the one action Gate Zero PROHIBITS**.
 
-> **THE NEXT REAL ACTION IS ONE SENTENCE: ask Warwick for a fresh photograph, and do NOTHING before
+> ⛔ **STRUCK 2026-08-11 — PROHIBITED.** ~~THE NEXT REAL ACTION IS ONE SENTENCE: ask Warwick for a fresh photograph, and do NOTHING before it.~~ **Gate Zero (input truth) now precedes any photograph.**
 > it.** That is the acceptance event, it is the only thing that proves the journey, and it is the
 > one thing only he can do. **`SHOP-2026-08-10-M64` is PRESERVED EVIDENCE and must NOT be used as
 > the acceptance vehicle** — the journey must be clean.
@@ -1604,7 +1604,7 @@ its evidence so it can be re-established or falsified in minutes.**
 
 ---
 
-### ⭐ ACTIVE SESSION WORK PACKAGE — RE-CUT 2026-08-10 EVENING. **WP-B15-3 IS NO LONGER THE FRONTIER.**
+### ⛔ SUPERSEDED 2026-08-11 — former ACTIVE SESSION WORK PACKAGE (re-cut 2026-08-10 evening). **The frontier is now SOURCE TRUTH — see §12 and `Deliverables/2026-08-11-rotation-handover.md`. Retained for its detail; directs nothing.**
 
 > **⛔ READ THIS BLOCK BEFORE THE ONE BELOW IT. The WP-B15-3 section that follows describes work
 > that is DONE and merged; it is retained as history and directs nothing.**
@@ -1659,7 +1659,7 @@ its evidence so it can be re-established or falsified in minutes.**
 > has never run) · **the remembered-choice normaliser mismatch** (his answer under one spelling is
 > not found under another) · **`asdairCommands` ignores `idempotency_key`** while `keys.js` mints one.
 >
-> **⚠️ THE LIVE RUNTIME IS DELIBERATELY BEHIND `main`, AND THIS IS A DECISION, NOT DRIFT.**
+> ⛔ **SUPERSEDED 2026-08-11.** **⛔ CORRECTED 2026-08-11 (third cold-start pass, verified by execution): the runtime IS BYTE-CURRENT with `main` product code.** PID 12204 started 2026-08-10 21:40:57, **86 seconds after `fb58882` was committed (21:39:31)**, and `git diff --name-only fb58882..HEAD -- services/` returns **ZERO**. It therefore CARRIES B15-07 through B15-16. What it does NOT carry is B15-18/19/20/21, which are unintegrated. A cutover is needed only AFTER those integrate.
 > PID 6592 started 2026-08-10T17:56:08Z and therefore predates the integrations of B15-11, B15-12,
 > B15-09 and B15-10. **It does not have the board.** Two reasons, both load-bearing:
 > **(1)** WP-B15-15 is fixing a KNOWN truthfulness defect in that board — it can render
@@ -1673,7 +1673,7 @@ its evidence so it can be re-established or falsified in minutes.**
 > **THE NEXT REAL ACTION.** Land B15-13, B15-14, B15-15 and B15-16; re-point `runPipeline`'s duplicate
 > pack-size rule; cut the runtime over **via the scheduled task** (`ASDAIR_COCKPIT_BASE_URL` comes
 > from the user environment, NOT the env files — a shell restart silently loses the checklist link);
-> then Veritas Gate 1 + Gate 2 under the **amended contract**. **Only then** ask Warwick for a fresh
+> ⛔ **STRUCK 2026-08-11 — a photograph is PROHIBITED until GATE ZERO (input truth) passes, and Gate 1 and Gate 2 do NOT grade input truth.** ~~then Veritas Gate 1 + Gate 2 under the amended contract. Only then ask Warwick for a fresh
 > photograph — a CLEAN acceptance journey. `SHOP-2026-08-10-M64` is **preserved evidence and is NOT
 > the acceptance vehicle.**
 >
@@ -2328,7 +2328,7 @@ immediately preceding head, read it first" — is folded into the bootstrap abov
 ~~**On `VERITAS_PASS`, phase 0 closes and phase 1 begins.** The six-phase route itself is authorised
 (2026-08-04 — see the authorisation block at the top of this map). **The whole route remains
 sequenced behind a Gate 3 PASS the estate does not hold.**~~ ⛔ **SUPERSEDED 2026-08-08 with the
-block above** — the route and frontier are now stated once, at the top of §10.
+> ⛔ **CORRECTED 2026-08-11: the route and frontier are stated in §12 RESUMABLE STATE, not §10. §10 is HISTORY.**
 
 **This is the only document permitted to state an exact next action.** If another document in
 `Deliverables/` appears to state one, that document is the defect — see the precedence block above.
@@ -2412,7 +2412,7 @@ exists.**
    *(Re-cut 2026-08-10 — Veritas pre-rotation assurance found this paragraph naming 017 only, with no
    mention of 018 or of convergence. Re-cut twice on 2026-08-09 before that; each recorded, none
    appended over.)*
-4. **Exact next action** — ⏸️ **WAIT FOR WARWICK'S FRESH PHOTOGRAPH.** It is the convergence target
+4. ~~**Exact next action**~~ — ⛔ **STRUCK 2026-08-11. THIS IS HISTORY AND IS THE PROHIBITED ACTION.** The real next action is §12 item 4 above: RESOLVE SOURCE TRUTH. ~~WAIT FOR WARWICK'S FRESH PHOTOGRAPH~~
    and **nothing precedes it.** `CONVERGE ✅ → MIGRATE ✅ → CUT OVER ✅ → VERIFY ✅ → PHOTO ⬅`.
    Larry told him to send it (FusionDevBot 469). **From the photo onward, product execution is
    SERIAL — no parallel mutation of the executable path while the live journey runs.**

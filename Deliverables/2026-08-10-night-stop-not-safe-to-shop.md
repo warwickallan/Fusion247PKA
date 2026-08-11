@@ -1,10 +1,13 @@
 ---
-title: STOP — NOT SAFE TONIGHT. Warwick shops manually. Read this first next session.
+title: "⛔ SUPERSEDED — 2026-08-10 night stop. DO NOT START HERE. DO NOT FOLLOW ITS RESUME PLAN."
+superseded_by: Deliverables/2026-08-11-rotation-handover.md
+superseded_on: 2026-08-11
+superseded_why: "Written BEFORE the input-truth failure was discovered. Its RESUME POINT ends at 'Only on Gate 1 PASS + Gate 2 PASS: ask Warwick for the photograph' - Gate Zero does not appear in it, and Gate 1/Gate 2 do NOT grade input truth. Following it reaches the PROHIBITED outcome by a compliant route."
 date: 2026-08-10
 author: Larry
 build: BUILD-015 AsdAIr
 status: clean stop under a Warwick timebox — NOT a completion claim, NOT a rotation handover
-supersedes_as_entry_point: Deliverables/2026-08-10-rotation-handover.md
+# supersedes_as_entry_point: REVOKED 2026-08-11 - this document is NOT an entry point
 ---
 
 # The stop, and exactly where to pick it up
@@ -37,7 +40,7 @@ combination is knowingly incomplete.* It is.
 |---|---|
 | Local `main` HEAD | `cfea559` — documents only; **no product code changed on `main` tonight** |
 | Working checkout | **CLEAN.** Larry's own `shop_id` edit was reverted out of it and banked to a branch, so a runtime restart cannot pick up a half-landed change |
-| Runtime | **PID 12204, started 2026-08-10 21:40:57, still up on pre-change bytes.** Not restarted tonight. No cutover was performed |
+| Runtime | **PID 12204, started 2026-08-10 21:40:57, CORRECTED 2026-08-11: "pre-change bytes" was FALSE.** It started 86s AFTER `fb58882` (21:39:31) and `git diff fb58882..HEAD -- services/` is EMPTY, so it IS byte-current with `main` and carries B15-07..B15-16. It does NOT carry B15-18/19/20/21 |
 | `origin/main` | still far behind local `main`. The push and the merge remain Warwick's (`merge-decision`) |
 | Migration 019 | **APPLIED to the live database**, ledger `20260810215203`. Behaviourally neutral on its own |
 
@@ -146,7 +149,13 @@ No harm reached the live system — the edit was reverted out of the working che
 never restarted — and the work is preserved on a pushed branch. But it cost time that was owed to a
 clean stop.
 
-## THE RESUME POINT — exact, in order
+## ⛔ THE RESUME POINT BELOW IS SUPERSEDED AND MUST NOT BE FOLLOWED
+
+> **It has no Gate Zero.** It ends at *"Only on Gate 1 PASS + Gate 2 PASS: ask Warwick for the photograph"*,
+> and Gate 1 and Gate 2 do **not** grade input truth. **The current resume point is
+> `Deliverables/2026-08-11-rotation-handover.md` § THE NEXT ACTIONS.** Retained as history only.
+
+### ⛔ HISTORY — the superseded resume point, as at 2026-08-10 23:23
 
 1. **Collect the two outstanding worker returns** (`b15-18`, `b15-19`) and read their evidence.
    ⚠️ `/clear` does NOT kill background workers. **Sample `git status` twice in each worktree before
