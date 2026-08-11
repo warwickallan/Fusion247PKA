@@ -1,0 +1,143 @@
+{
+  "session_date": "2026-08-11",
+  "branch": "main",
+  "worktree": "C:\\Fusion247PKA",
+  "host": "claude",
+  "host_version": null,
+  "model": "claude-opus-5[high]",
+  "opening_head": "b65c009810a916cfc78c09a466527450f5554dc0",
+  "closing_head": "d33e3afe7341d8890b05f471414e6f45f1479470",
+  "closing_head_note": "Confirmed as the final entry in .git/logs/refs/heads/main, message 'Subagent token ledger for tonight's AsdAIr Gate Zero + live acceptance session, input for Pax's report'. Also confirmed as the tip of .git/logs/HEAD.",
+  "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-11-session-report-gate-zero-live-acceptance.md",
+  "payload_path": "Deliverables/2026-08-11-session-report-payload.json",
+  "report_status": "DELIVERED by Pax. Same-runtime, separate-context review — NOT external verification. Written WITHOUT Bash/shell tool access (Read/Write/Grep/Glob/WebFetch/WebSearch only) — git facts read from .git/logs/HEAD and .git/logs/refs/heads/main directly; neither this file nor the Markdown report has been committed, and populate.mjs/capae-sync.mjs have NOT been run by Pax.",
+  "session_range_note": "13 commits, b65c009..d33e3af on local main. First commit is the one immediately after 9b45527, which is the exact HEAD recorded in this conversation's opening gitStatus snapshot (the prior session's rotation point). Remote push to origin/build-015/durable/2026-08-11-rotation stated by the commissioning agent (Larry); NOT independently verified by Pax (no git/network tool available).",
+  "elapsed_minutes": 1130.8,
+  "elapsed_note": "Full commit-span 01:50:56 -> 20:41:42 local (+0100), read from .git/logs/HEAD timestamps, cross-checked against the Wayfinder plan's own '~20:40' self-timestamp on commit 227a5a1 (exact match 20:40:04). NOT continuous: Cluster 1 (Gate Zero repair + integration + both assurance gates) 01:50:56-04:26:48 = 2h35m52s; a 14h01m12s DEAD GAP with zero commits; Cluster 2 (live acceptance run, notification incident, blocker discovery, rotation prep) 18:27:00-20:41:42 = 2h14m42s. Active-cluster total excluding the gap = 290.6 minutes. Cause of the gap not established from Git alone.",
+  "total_context_tokens_in": 326750,
+  "total_context_tokens_in_note": "CLOSING reading only, single sample, MEASURED: session_id d06526cd-868e-4a6f-9f9e-439c64f4bd2a, sampled_at 2026-08-11T19:34:21.894Z (20:34:21 local, 7 minutes before the final commit), model claude-opus-5 effort high, used_tokens 326750, from ~/.mypka/governor/health/C--Fusion247PKA/d06526cd-....json. Session-id attribution is PLAUSIBLE (timing + project path) but not independently confirmed. context_window_size/used_percentage not carried by this sample. OPENING reading UNESTABLISHED - no earlier sample for this session id survives (health store keeps one sample per session, as the 2026-08-09 report also found). TOTAL MOVEMENT therefore UNESTABLISHED.",
+  "total_context_tokens_out": null,
+  "total_subagent_tokens": 1871699,
+  "total_subagent_tokens_note": "Total A, deduplicated by agent ID, taken directly from Deliverables/2026-08-11-subagent-token-ledger-asdair-live-run.md (built by Larry per /rotate step 5b, not re-derived by Pax): keel 683173 + felix 351626 + vera 223749 + veritas-gate1 262755 + veritas-gate2-preflight 249733 + asdair 100663 = 1871699. Never added to Larry's own context level - occupancy is a level, subagent traffic is a flow.",
+  "subagent_footprint_note": "Total B: identical to the final-cumulative column - no agent in this session needed a separate peak reading from its own final one.",
+  "subagent_counts_note": "Total C: 12 dispatches across 6 distinct agents, 1003 tool uses, ~198.5 minutes of specialist wall-clock (98.6+33.7+23.8+19.4+20.5+2.5).",
+  "rate_limit_five_hour_pct": null,
+  "rate_limit_seven_day_pct": null,
+  "wo_total": 0,
+  "wo_first_dispatch_success": 4,
+  "wo_first_dispatch_note": "Of 6 specialist engagements (12 dispatches): Felix, Vera, Veritas-Gate1, Veritas-Gate2-preflight each began substantive product/QA/assurance work on their literal first dispatch (4). Keel's first dispatch was a mandatory contractual read-back (not a build) that Larry explicitly accepted before build began on dispatch 2 - graded as the contract working as designed, NOT a preventable delay or failure, and NOT counted in the 4. Asdair's single dispatch correctly REFUSED (wrong tool for the job - no browser/DB grant; SOP-021 assigns live basket writing to 'Sonnet in Claude for Chrome', never a subagent) - a GOOD refusal, not counted as a failure either. No numbered file-based Work Order (WO-NNN) envelope exists for either Work Package actually built this session (WP-B15-22, WP-B15-23) - Glob for **/*B15-22*, **/*B15-23*, **/GENERATED* returns zero files; dispatch happened directly via the Agent tool. wo_total is therefore a real, enumerated zero (not null) - the generation route was not used, which is itself the CAPAE work-order-not-generated finding below.",
+  "wo_amendments": 1,
+  "wo_refusals": 1,
+  "wo_clarifies": 1,
+  "wo_holds": 0,
+  "wo_preventability_note": "The one amendment (Keel's read-back surfacing handoff/** surface + migration-path gaps) was pre-authorised by Larry cleanly, zero wasted round-trips. The one refusal (Asdair) was correct and not preventable - it is the right outcome of asking the right question of the wrong tool. The one CLARIFY-shaped return (Keel's mandatory first-dispatch read-back) is contractual, not a defect.",
+  "dings_sent": 9,
+  "dings_failed_in_window": 0,
+  "dings_note": "From ~/.mypka/governor/ding-log.jsonl filtered to 2026-08-11: message ids 496-504, all exit 0. All 9 land inside Cluster 1 and the run-up to Cluster 2 (01:28-17:34 local), one per gate verdict/integration milestone - genuinely on-target, not routine narration. ZERO dings after 17:34:37 local despite the session continuing another 3h07m to 20:41:42 - correct, deliberate silence per Warwick's direct instruction to stop pinging, NOT a miss. The separately-reported harassment loop was NOT extra Telegram dings (the log proves this) - it was a Stop hook (idle-ding-check.mjs, .claude/settings.json Stop array, now confirmed empty) re-injecting its reminder into Larry's own context at every turn end because it could not distinguish 'forgot to ding' from 'was told not to ding'. Disabled at commit 674c8a7, 19:00:33 local; takes effect next session per the commit's own note.",
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+  "lines_note": "Line-level split UNESTABLISHED - no Bash/git-diff tool available to Pax. Commit-level split IS established from .git/logs/HEAD: 13 commits total - 2 large product-code merges (f3f3a570 gate-zero-repair-and-integration, eb7c7ad asdair-app-restoration, together spanning all 14 services/asdair/* packages per the Gate 1 receipt's own evidence table and exercising 2178 tests), 1 tiny config commit (674c8a7, .claude/settings.json only), and 10 documentation commits (Gate Zero writeup, both Veritas receipts + both addenda, three Wayfinder STOP/supersede edits, the live-acceptance checkpoint, the blocker doc, the subagent ledger). By commit count documentation-majority (10/13); by changed-file/tested-surface volume the two product merges dominate. Cluster 2 (final 2h14m) is 100% documentation/config by commit type - zero product commits land after 04:26 local.",
+  "allocation_product_pct": 67,
+  "allocation_admin_pct": null,
+  "allocation_evidence_pct": 32,
+  "allocation_rework_pct": null,
+  "allocation_waiting_pct": null,
+  "allocation_note": "The two percentages given are a REAL computed split of the 198.5-minute specialist-wall-clock total only: Implementation (Keel+Felix, 132.3 min) = 67%; Assurance (Vera + both Veritas gates, 63.7 min) = 32%; Investigation/refusal (Asdair, 2.5 min) = 1%, omitted from the two named fields for lack of a matching column. A precise product/admin/evidence/rework/waiting split across the WHOLE session (including Larry's own turns) is UNESTABLISHED - no per-minute activity log was available to Pax; inventing one would be the estimate the brief prohibits. The commit-cluster evidence (2h36m Cluster 1 tightly interleaving product merges and assurance gates; 2h15m Cluster 2 entirely live-interaction/documentation/config) is the honest qualitative substitute, recorded in the Markdown report.",
+  "specialists": {
+    "keel": {
+      "dispatches": 3,
+      "returns": 3,
+      "tokens": 683173,
+      "tool_uses": 423,
+      "notes": "Fresh + 2 resumed. Dispatch 1 = mandatory contractual read-back (not a build) - Larry accepted explicitly, zero wasted round-trip. Dispatch 2 = build (Gate Zero repair, 4-branch integration). Dispatch 3 = resumed closeout, self-found 2 more acceptance-critical fixes. Heaviest specialist by a wide margin, proportionate to owning the largest scope."
+    },
+    "felix": {
+      "dispatches": 2,
+      "returns": 2,
+      "tokens": 351626,
+      "tool_uses": 224,
+      "notes": "Fresh (WP-B15-23 build) + resumed (fix of Vera's one HIGH finding - raw ISO timestamp rendered as primary content). Both dispatches substantive first-turn work."
+    },
+    "vera": {
+      "dispatches": 2,
+      "returns": 2,
+      "tokens": 223749,
+      "tool_uses": 117,
+      "notes": "Pass 1: CONDITIONAL PASS with 1 HIGH finding (own six automated controls independently re-run, not trusted). Pass 2, after Felix's fix: PASS, verified the fix live rather than trusted from the report, plus surfaced one further non-blocking MEDIUM observation of the same defect class elsewhere."
+    },
+    "veritas_gate1": {
+      "dispatches": 2,
+      "returns": 2,
+      "tokens": 262755,
+      "tool_uses": 118,
+      "notes": "Initial: HOLD on requirement 7 alone (B15-20's promised mutation re-proof never had a durable home), 7/8 requirements PASS with real independent re-execution (2178/0 test suite re-run, real disposable-Postgres db test, two genuine isolated mutation kills). Narrow addendum: requirement 7 HOLD->PASS after the provenance note was committed and independently checked against Veritas's own original findings, not re-running the whole gate."
+    },
+    "veritas_gate2_preflight": {
+      "dispatches": 2,
+      "returns": 2,
+      "tokens": 249733,
+      "tool_uses": 107,
+      "notes": "Initial: HOLD on requirement 3 alone (cockpit read-service serving pre-restoration bytes due to require()-cache staleness - found by independent process-start-time cross-check, not trusted from Larry). 5/6 requirements PASS. Narrow addendum: requirement 3 HOLD->PASS after Larry's restart, independently re-verified via live process/port identity checks and a direct HTTP fetch of the real endpoint, sweeping the whole response array."
+    },
+    "asdair": {
+      "dispatches": 1,
+      "returns": 1,
+      "tokens": 100663,
+      "tool_uses": 14,
+      "notes": "Correctly REFUSED - zero mutations. No browser/DB tool grant; per SOP-021's own canonical ruling, live browser operation belongs to 'Sonnet in Claude for Chrome', never a Claude Code subagent. A good refusal, not a failure - caught a real capability/authority gap cheaply (2.5 min, 14 tool uses)."
+    }
+  },
+  "findings": [
+    {
+      "family": "work-order-not-generated",
+      "exposure": "recurrence",
+      "summary": "Two substantial Work Packages (WP-B15-22 Gate Zero repair + 4-branch integration; WP-B15-23 cockpit restoration) were dispatched this session with NO file-based Work Order envelope. Glob for **/*B15-22*, **/*B15-23*, **/GENERATED* across the whole repository returns zero matches, unlike every prior numbered WP in this build. Dispatch happened directly via the Agent tool with inline instructions. This is a different failure shape than the 2026-08-09 exposure of the same family (there, envelopes WERE generated but the read-back/ready-check half failed); tonight the generation step was skipped entirely, for the largest-scope work of the build so far. Loaded at session start with 2 prior occurrences and 0 clean exposures; this is a third. The prevention did not hold.",
+      "evidence_ref": "Deliverables/2026-08-11-session-report-gate-zero-live-acceptance.md"
+    },
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "recurrence",
+      "summary": "WO-B15-23's cockpit backend merged and tested green (153/153) at eb7c7ad, but its live consumer (MyPKA-AsdAIr-ReadService, a long-running require()-cached Node process) had not been restarted and was serving pre-restoration bytes - Veritas Gate 2 preflight independently proved this by cross-checking OS process start-time against the commit timestamps (Defect #2, HIGH), not trusted from Larry. Larry restarted the service; the addendum independently fetched the live HTTP endpoint directly and confirmed the correct shape, sweeping the whole response array rather than spot-checking. The underlying pattern (merge != live activation) recurred for a fourth-plus time, but this time Larry's OWN commissioned assurance step caught it before Warwick was exposed to it live - a real improvement over the 2026-08-09 exposure of this family, where Warwick himself caught and corrected Larry's premature claim. Root cause (require()-cache staleness has no owner) remains open and will recur again.",
+      "evidence_ref": "Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/veritas-b15-gate2-preflight-7bc23ca.md"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "clean",
+      "summary": "Multiple genuine qualified exposures, prevention held at every one. Veritas performed real isolated mutation testing on B15-20's remembered-choice fix (M1: revert Map-keying fix, 6/31 tests turned red; M2: disable the 'not a grounded candidate' refusal, 3/31 turned red; both restored byte-identical, sha256-verified, performed in a git-archive export outside the repository). The cockpit-api restart claim was independently re-derived via OS process/port identity commands rather than trusted, and the live endpoint was fetched directly by Veritas sweeping the full response array. render-vm-check.mjs's own self-test (7/7 mutation classes caught) was re-run fresh at both Vera passes. Clean count was already 2 of 5 required before tonight; this session adds further genuinely new clean exposures.",
+      "evidence_ref": "Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/veritas-b15-22-gate1-eb7c7ad.md"
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "clean",
+      "summary": "Heavy exposure - the Wayfinder plan was materially re-cut at least three times tonight, and both Veritas addenda explicitly overturned a standing HOLD verdict. Every instance names exactly what it supersedes and marks the superseded block 'HISTORY... DIRECTS NOTHING BELOW THIS POINT' rather than leaving it live and ambiguous; both Veritas addenda carry an explicit 'Corrected dimension verdicts' / 'Corrected overall verdict' section replacing the original rows rather than appending a contradicting opinion beside them. Already at 3 of 5 required clean exposures before tonight; this session adds further clean instances, moving this family close to its threshold.",
+      "evidence_ref": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md"
+    }
+  ],
+  "findings_without_family": [
+    {
+      "slug": null,
+      "severity": "material - named plainly per the commissioning instruction, not softened",
+      "summary": "A Stop hook (idle-ding-check.mjs) fired its notification-rule reminder into Larry's own context on every turn end late in the session, because no ACTUAL Telegram ding had gone out recently by its own clock, with no mechanism to distinguish 'Larry forgot to ding' from 'Larry was explicitly told not to ding' (Warwick had directly instructed him to stop pinging while out of signal). Larry responded to each firing with a database-check-and-reply cycle rather than recognising the pattern, and this itself consumed the turns needed for Warwick to type a response - reported by the commissioning agent as Warwick describing it as 'blocking him from being able to respond.' The ding-log evidence (zero actual Telegram sends after 17:34:37 local) proves this was NOT a spam-of-messages failure - it was a channel-blocking, in-context reminder loop. Disabled at commit 674c8a7 (19:00:33 local); takes effect next session. Does not share the same PREVENTION as any of the four loaded CAPAE families (no dispatch envelope, no stale artefact, the control DID reach what it checks - recency - which was simply the wrong thing to check, and no document/verdict is involved), so it is reported here rather than force-fit into an existing slug. Candidate name for Warwick/Nolan to accept or reject: state-blind-mechanical-reminder. Per /rotate's own rule an unrecognised slug is reported and skipped by capae-sync.mjs, never minted automatically.",
+      "evidence_ref": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md (STOP block, re-cut 2026-08-11 ~20:40) and ~/.mypka/governor/ding-log.jsonl"
+    },
+    {
+      "slug": null,
+      "severity": "non-blocking - open product/process question, not a defect",
+      "summary": "SHOP-2026-08-11-M93's resolved plan does not yet reconcile against Warwick's independently-verified 41-product trolley from the prior night's manual rescue: 9 quantity errors (most notably Richmond sausages read as 16 rather than 1 - a plausibility check would have caught this and did not exist), 9+ items missing entirely, 6 items of uncertain provenance. This is evidence of the vision model's real remaining limits on this specific hard source image, not a regression in the Gate Zero repair (which is independently Veritas-PASSed on its own narrower claim). Recorded as the session's own explicit STOP - do not build a live basket from this plan as it stands.",
+      "evidence_ref": "Deliverables/2026-08-11-list-reconciliation-blocks-browser-build.md"
+    }
+  ],
+  "unestablished": [
+    "opening context reading for Larry's session - no earlier sample survives for the identified session id",
+    "total context movement - follows from the missing opening reading",
+    "line-level documentation-vs-product diff stat - no Bash/git-diff tool available to Pax this dispatch",
+    "cause of the 14h01m commit-gap between 04:26 and 18:27 local - plausible but not confirmed as Warwick's working day alone",
+    "exact end time of Warwick's out-of-signal window and response latency across it - no inbound-message timestamp log was available to Pax",
+    "whether d33e3af is genuinely pushed to origin/build-015/durable/2026-08-11-rotation - stated by the commissioning agent, not independently verified by Pax (no git/network tool)",
+    "whether health-store session id d06526cd-868e-4a6f-9f9e-439c64f4bd2a is definitively Larry's active session - plausible by timing and project path, not confirmed by an independent identity marker",
+    "rate-limit five-hour and seven-day percentages - not carried by the one available health sample",
+    "whole-session allocation percentages across product/admin/evidence/rework/waiting - only the specialist-wall-clock-only split (67/32/1) is directly computable from available evidence"
+  ],
+  "notes": "TOOL-ACCESS DISCLOSURE, FIRST: this payload and its Markdown twin were produced by a Pax dispatch with Read/Write/Grep/Glob/WebFetch/WebSearch only - no Bash/shell tool. All git facts came from reading .git/logs/HEAD and .git/logs/refs/heads/main directly as plain text, not from executing git. Neither artefact has been committed, and neither tools/session-report/populate.mjs nor capae-sync.mjs has been run by Pax - both remain outstanding for a dispatch with shell access. HEADLINE: this was a genuinely strong specialist-dispatch session (4 of 6 engagements began substantive work on first turn; the other two were a contractual read-back correctly accepted, and a correct, cheap refusal) sandwiched around a real and serious process failure (the Stop-hook channel-blocking loop) and landing on an honest, undissolved open blocker (the M93 plan does not yet reconcile against the verified trolley). The work-order-not-generated family recurred a third time in a NEW shape (no envelope at all, for the largest-scope work yet) even though the specialist-side read-back discipline that substitutes for it worked cleanly. The built-tested-never-activated family recurred a fourth-plus time but was caught by Larry's own assurance commissioning rather than by Warwick, which is real, evidenced improvement in detection even though the underlying activation-ownership gap is unchanged. Both Gate 1 and Gate 2 closed via exactly the disciplined one-review-plus-one-narrow-addendum pattern this contract calls for, with zero recurrence of the earlier-cited 5h27m/eleven-verdict assurance-loop pathology. SAME-RUNTIME REVIEW - Pax is a separate context and a separate dispatch but the same model; this is not external verification and no document may describe it as such."
+}
