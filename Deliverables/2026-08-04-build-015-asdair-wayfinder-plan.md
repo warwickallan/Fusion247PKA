@@ -2037,6 +2037,39 @@ never calls the orchestrator at all) both missed it; existing coverage unaffecte
 + 53/53 interpret + 15/15 real-Postgres DB-gated, all non-vacuous. **Fifth live re-test dispatched to
 Asdair** — this is the one that decides whether the defect is actually closed.
 
+**⛔ ROUND 5's LIVE RE-TEST LANDED. THE NARROW FIX IS PROVEN. THE WIDER PROBLEM ISN'T.** `source_region`
+is no longer null anywhere — 67/67 lines across both runs carry a real value, confirmed directly, not
+inferred. **The exact Lenor/Febreze cross-region shape reproduced live and both lines now surface as
+`needs_confirmation`, neither silently deleted** — round 5's acceptance property holds on the real path,
+not just in Keel's mutation-tested unit coverage. This closes the wiring defect five rounds targeted.
+
+**A new, adjacent, NOT-yet-fixed finding**: the same two products, when read from the SAME region rather
+than different ones, still cause a silent loss — `resolveByCatalogue.js` matches both raw readings to
+the same regular (a genuine identity/alias-matching bug, not the wiring bug just fixed), and the
+already-correct same-region auto-collapse then drops the real, distinct Febreze item believing it's a
+duplicate. Same practical harm, different mechanism, out of round 5's scope.
+
+**Five-round running picture, real numbers:**
+
+| | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|
+| Quantity-assertion rate | ~78% | ~26% | ~29% | ~34% |
+| Omission rate (/39) | — | ~50% | ~46% | ~49% |
+| Real cost (2-3 runs) | $0.35 | $0.34 | $0.79 | $0.44 |
+
+**Omission has not moved because it has not yet been attempted** — round 3 fixed the zero-line case;
+rounds 4-5 correctly deferred the harder partial-miss case pending real calibration data, per Keel's own
+sound judgement against shipping an unproven heuristic. **That data now exists — five rounds of real
+captured runs with known ground truth.** Lucozade Raspberry remains unfixed across every round it's been
+checked (3, 4, 5) — a genuine invented-line problem, separate from omission, also not yet attempted.
+
+**Honest verdict against Warwick's own bar**: grounded-to-a-real-region is now MET, for the first time.
+Ambiguous-lines-surfaced-honestly is met for the specific shape targeted, not the newly-found adjacent
+one. No-invented-lines and low-omission remain NOT met. **Round 6 is now genuinely calibrated, not a
+guess**: the omission-density heuristic Keel correctly declined to ship blind in round 4, now buildable
+against real data; the newly-found same-region alias-mismatch bug; continued pursuit of the persistent
+Lucozade Raspberry invention. Continuing.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
