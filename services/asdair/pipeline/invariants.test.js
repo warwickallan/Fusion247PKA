@@ -415,6 +415,15 @@ test('this work package owns ONE folder: it emits SQL for shop_line and pipeline
     // AND to reshape its own SQL to dodge the regex - either would have made the
     // suite green while hiding a new writer from this very check.
     'asdair.remembered_choice',
+    // asdair.shop_image_region, asdair.shop_line_provenance - Silas's schema
+    // decision of 2026-08-12 (migration 020, WO-2026-08-11-B15-VISION-01). The
+    // application-owned region list and the four-way (PHOTO/REGULARS/RULE/
+    // WARWICK) provenance ledger both arrived for exactly this stage and have
+    // no other owner - same argument as shop_decision and remembered_choice
+    // above. ADDED BY LARRY, same precedent as remembered_choice: the
+    // implementing worker (services/asdair/pipeline/shopImageRegions.js,
+    // lineProvenance.js) correctly refused to self-edit this list.
+    'asdair.shop_image_region', 'asdair.shop_line_provenance',
   ];
   const writers = shippingFiles()
     // The backfill is the ONE deliberate exception - retiring the legacy
