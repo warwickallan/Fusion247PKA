@@ -2172,6 +2172,53 @@ before it. **Neither Larry nor Pax can substitute**: Larry has no gateway creden
 is the only agent in this build holding both live gateway access and script-execution capability.
 Awaiting its reconciliation.
 
+**Asdair proceeded** after the precedent was put to it — the role-boundary question resolved in favour
+of executing, consistent with all seven prior dispatches this session. Worth a standing note for future
+sessions: a fresh subagent instance can read the same contract text differently from a sibling instance
+minutes earlier with no memory of the precedent; citing the actual prior executions resolved it this
+time, but the underlying inconsistency (the contract wording itself) is unfixed and could recur.
+
+**⛔ THE DECISIVE RESULT LANDED. Real, structural progress — and a new dominant failure, not a vague
+"almost there."**
+
+**The shipped script does not run cleanly out of the box — a second, previously-undiscovered wiring bug
+blocks it, unrelated to the one just fixed.** `buildAgenticPrompt.js` invites the model to request
+"region 1" (the whole page) as a valid crop target; `agenticLoop.js`'s crop map deliberately excludes
+region 1 (handled separately as the full-page image) and throws when the model does exactly what the
+prompt invited. Reproduced in all 4 real gateway calls today. Asdair did not fix this itself (no writes
+under `services/**`, correctly) — it built a scratchpad-only diagnostic workaround to get past the crash
+and actually answer the real question, which is legitimate: the fix location is real and narrow (either
+stop advertising region 1 as a crop target, or supply it a crop), a clean next Work Order.
+
+**With that workaround, the round's own actual claim is confirmed live**: `function_call_output` is
+correctly constructed for every pending call, including simultaneous multi-region requests — the
+gateway accepted every continuation, both runs. The two bugs this round targeted are genuinely fixed.
+
+**The architecture's core promise is real: omission dropped from ~49% (prior baseline) to ~18% average
+(12.8%/23.1% across two runs)** — a 2.5-3x reduction, and the FIRST TIME in six-plus rounds of the old
+deterministic-trigger approach that this number has moved materially. This is the answer to Warwick's
+actual question: model-directed re-inspection beats post-hoc heuristics on visual coverage, real and
+demonstrated, not asserted.
+
+**But invention is now the dominant failure, worse than anything the old pipeline produced**: ~19-25%
+of the OUTPUT lines are hallucinated brands with no real counterpart anywhere on the photo (Nivea,
+Fairy, Hovis, Ferrero, M&S, Coccolino), plus duplicate lines for the same real item. This standalone
+prototype deliberately has none of the production pipeline's deterministic grounding/sanity-check/
+provenance discipline — it was scoped out as a minimal test of the coverage question alone. Recurring
+across both runs, not one-offs: the milk section still garbled into one line; Richmond sausages still
+asserted quantity 16 (this codebase doesn't inherit the production pipeline's quantity-semantics fix —
+separate code, separate bug, same shape); Birds Eye misidentified. Real cost per completed run:
+$0.097-$0.132 — comparable to, not worse than, the old approach's range.
+
+**Against Warwick's stated bar: NOT met** (not ~95%, not zero-invented — worse than any prior round on
+that specific measure — partial on no-silent-quantity-guesses, but genuinely met for the first time on
+no-large-silent-omission-class). **The honest synthesis**: this architecture solves the ONE problem six
+rounds of the old approach never touched (visual coverage), at the cost of surfacing that solving
+coverage alone doesn't reach trustworthy — grounding discipline (the production pipeline's other real
+strength) is still needed on top. The natural next shape, not yet built or authorised: the region-1 fix,
+plus porting the production pipeline's grounding/provenance checks onto this loop's higher-coverage
+output, rather than either architecture alone.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
