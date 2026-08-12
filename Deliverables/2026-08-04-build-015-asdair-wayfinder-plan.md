@@ -2223,7 +2223,85 @@ output, rather than either architecture alone.
 
 ## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (latest) — **REGION GRANULARITY + A TRUSTWORTHY MEASUREMENT.** Authorised by Warwick. **START HERE. This is the current frontier.**
 
-**Status: AUTHORISED, dispatched as WP-B15-30. The block below it (coverage + structural grounding, WP-B15-29) is COMPLETE and its A/B/C/D result table remains the accurate record — but it is no longer the frontier.**
+**Status: WP-B15-30 COMPLETE and pushed (`14d14dd`). ⭐ STEP CHANGE ACHIEVED ON COVERAGE — and the cause was NOT what the order predicted. ⛔ The bar is STILL NOT MET, on quantity. Result and its root cause below.**
+
+### ⭐ THE RESULT — and the finding that matters more than the numbers
+
+**Every arm re-scored on the same corrected instrument. Denominator 39 page lines. Builder self-test evidence, NOT independent review. No Veritas gate sought.**
+
+| Arm | Detected | Omit | **Invented** | Dup | Qty err | Identity (layer B) | Calls | Cost |
+|---|---|---|---|---|---|---|---|---|
+| **B** — loop, 3 horizontal regions *(baseline)* | 30/39 | 9 | 3 | 5 | 5 | 27/29 (93.1%) | 3 | $0.1375 |
+| **C** — correctly-oriented bands, **NO upscale** | 28/39 | 11 | 7 | 4 | 9 | 25/28 (89.3%) | 7 | $0.2979 |
+| **D** — same bands, **3× upscale** | **38/39** | **1** | **0** | **0** | 7 | 33/35 (94.3%) | 7 | $0.2671 |
+| **D2** — D plus the crop fix | 37/39 | 2 | 1 | 1 | 7 | 32/34 (94.1%) | 7 | $0.3532 |
+
+### ⛔ REGION GRANULARITY WAS NOT THE LEVER. RESOLUTION PER LINE WAS.
+
+**Arm C — smaller, fully-covered, correctly-oriented bands — made it WORSE than the baseline**: 28 detected
+against 30, more than twice the inventions, double the cost. **The ONLY difference between C and D is a
+deterministic 3× resize of the same crop**, and that took detection 28 → 38, omission 11 → 1, inventions
+7 → 0.
+
+**A crop is not a zoom.** `renderRegionCrop()` is a pure `extract` with no resize, so Arm C handed the model
+**exactly the pixels it already had, in more calls.** At ~15 px per handwritten line, **resolution per line
+was the binding constraint all along** — six rounds of prompt work, an agentic re-inspection loop and a
+structural grounding layer were all fighting a problem none of them could reach.
+
+**This was only attributable because the change was split into two arms.** Had upscaling been folded into
+the band change as one step, the record would now read "finer regions fixed it" — and the next photograph
+would have disproved it.
+
+**The coverage proof, run BEFORE any spend** (`agenticVisionPrototype/runs/coverage-proof.json`): a
+handwritten line occupies `y 192..990`; production strip 1 covers `y 26..689`, strip 2 covers `y 590..1253`.
+**Neither contains a whole line — 2 of 2 bands fail.** The rotated-axis diagnosis is confirmed by geometry.
+
+### ⛔ THE BAR IS NOT MET — quantity
+
+**7 quantity errors**, and Warwick's bar requires **ZERO silent quantity guesses**. Zero inventions and one
+omission are met; quantity is not.
+
+**Root cause, narrow and named — NOT a general accuracy fog:** the model **drops the leading count out of
+its verbatim reading** — returning `"BLOO TOILET RIM"` where the page reads `"2 BLOO TOILET Rim"`. The
+deterministic default-one rule then sees no quantity evidence and correctly applies the household default.
+**The rule is behaving exactly as specified; it is being starved of evidence upstream.**
+
+**Assessment (Keel's, and Larry agrees): this architecture CAN reach the bar, and coverage is no longer
+what stands in the way.** Pursuing the leading-count mechanism is Warwick's call, not a prompt round to
+start unasked.
+
+### Two defects Keel found in its OWN work, recorded rather than dropped
+
+1. **The crop was deleting the quantity digits** — the cross-axis ink trim cut the sparse leading counts off
+   the start of every line. Fixed; visible-text fidelity 78.6% → 92.1%. **But the diagnosis was only half
+   right and that is recorded: quantity errors stayed at 7.** The crop was destroying evidence *and* the
+   model drops leading counts.
+2. **The scorer charged twice for a spelling variant** — `SUPERGLUE` vs `SUPERGLU` scored as an omission
+   *and* an invention. Token equality is now edit-distance bounded, with a mutation guard.
+
+### 🔴 TWO HIGH FINDINGS, OUT OF SCOPE, UNFIXED
+
+- **`services/asdair/pipeline/imagePrep.js` carries the SAME axis defect IN PRODUCTION.** Any rotated
+  photograph gets strips that cut every line. **This will bite a real shop.** Outside the worker's surface.
+- **The 39-line denominator may itself be wrong** — page line 8 reads **16**, the list names the Richmond
+  **12** pack. Not adjusted. Every percentage ever quoted inherits any error in it.
+
+### Honest limits on the above
+
+Layer A's visible-text sub-metric is **NOT INDEPENDENTLY GRADED** — its `source_text` column was transcribed
+by a model. Detection, omission, invention, duplicate and identity counts do not depend on it. **Each arm is
+ONE sample of a non-deterministic model**; D vs D2 is inside noise, C vs D is not. Four-way provenance
+persistence remains absent by design — no database write was made. Nothing is wired to production; the
+agentic tool-loop is superseded on the band path, not deleted, and AC8's region-1 item is a module-level
+assertion the live path does not exercise.
+
+Evidence: prototype suite **197/197, 0 fail, 0 skipped**; whole package **888 tests / 885 pass / 0 fail /
+3 skipped**; secret scan **exit 0, 33 files** of the declared surface. 21 files touched, **0 outside
+`file_surface`**.
+
+---
+
+### ⛔ SUPERSEDED — the order's own prediction, recorded because it was WRONG and the correction is the lesson
 
 ### AMENDMENT — Warwick, 2026-08-12 (after the WP-B15-29 result). **His ruling, quoted. Larry's record-keeping is labelled Larry's and is NOT in this heading.**
 
