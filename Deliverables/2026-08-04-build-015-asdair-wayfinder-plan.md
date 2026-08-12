@@ -2221,7 +2221,85 @@ output, rather than either architecture alone.
 
 ---
 
-## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (later) — **AGENTIC VISUAL COVERAGE + STRUCTURAL GROUNDING.** Authorised by Warwick. **START HERE — this supersedes the rotation-close block's "exact next action", which is re-cut below in the same commit.**
+## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (latest) — **REGION GRANULARITY + A TRUSTWORTHY MEASUREMENT.** Authorised by Warwick. **START HERE. This is the current frontier.**
+
+**Status: AUTHORISED, dispatched as WP-B15-30. The block below it (coverage + structural grounding, WP-B15-29) is COMPLETE and its A/B/C/D result table remains the accurate record — but it is no longer the frontier.**
+
+### AMENDMENT — Warwick, 2026-08-12 (after the WP-B15-29 result). **His ruling, quoted. Larry's record-keeping is labelled Larry's and is NOT in this heading.**
+
+> **⛔ First, the calibration, because it governs how the next result is read:** *"do NOT treat the
+> recalculated 61.5% as remotely close to done."* And: *"**Do not come back celebrating another four
+> percentage points.** The purpose of region granularity is to determine whether the architecture can
+> move from 'roughly half right' into genuinely trustworthy territory... **Another result around 60–70%
+> is NOT convergence.** If smaller deterministic regions do not produce a large improvement, **say so
+> plainly and step out of the loop again** rather than starting another threshold/prompt round."
+>
+> **1. THE HOUSEHOLD QUANTITY RULE — decided.** *"YES: quantity default = ONE retail unit when Mum
+> writes an item with no explicit quantity."* Encode it deterministically. His examples are the
+> specification: *"Richmond 16 sausages" → 1 pack of the 16-count product · "Ariel Pods 33" → 1 pack of
+> the 33-count product · "Cravendale milk x4" → 4 bottles · "Cravendale milk" → 1 bottle.*
+> **"Product-pack numbers are PRODUCT IDENTITY, not purchase quantity."** Quantity comes only from
+> explicit evidence on the list, or an authorised household rule. *"Do not let Terra infer quantity
+> merely from a number embedded in the product name."* **And update the scorer so a null quantity is
+> NOT marked wrong where the page carries no explicit quantity and default-one applies.**
+>
+> **2. REGION GRANULARITY — proceed.** *"The remaining omission class is dominated by regions that are
+> too visually dense. **Do NOT create 39 individual routine calls.** Use smaller deterministic
+> application-owned regions/bands — something like **6–8 sensible regions rather than 3** — with modest
+> overlap so a line near a boundary cannot silently vanish. Then **inspect those regions individually**,
+> because the real A/B has already shown individual region inspection materially outperforms bundling on
+> this exact photograph."* The architecture stays simple: *prepared image → deterministic region coverage
+> → Terra region inspection with household context → constrained candidate ID / UNKNOWN → deterministic
+> reconciliation → provenance/sanity checks → final source truth.* *"Give Terra enough visual resolution
+> per handwritten line **without creating an API-call farm**."*
+>
+> **3. FIX THE MEASUREMENT BEFORE TRUSTING THE NEXT PERCENTAGE.** *"Your current scorer is materially
+> noisy. Three of five reported 'inventions' were join failures, not inventions. **That means the next
+> percentage is not decision-grade until the scorer is corrected.**"* Do not keep relying on fuzzy text
+> joins where *"2 chips with skins on"* cannot reconcile to *"Crispy Skin-On Fries"* despite that being
+> the known correct mapping. Build a **one-off acceptance fixture** from the known photograph mapping
+> each of the 39 source lines to: *expected visible/source interpretation · intended catalogue/product
+> identity where established · explicit quantity where present · otherwise household-default 1.*
+> **⛔ "This is TEST DATA ONLY. Do not turn it into production logic."**
+>
+> **4. SEPARATE THE SCORES.** *"Do not collapse everything into one 'correct %'."* Two layers:
+> **(A) PHOTO / SOURCE-TRUTH QUALITY** — 39 expected · detected · omissions · invented PHOTO lines ·
+> duplicates · visible-text/interpretation errors · explicit quantity errors · correctly surfaced
+> UNKNOWNs. **(B) IDENTITY RESOLUTION QUALITY**, per detected line — correct product · wrong identity ·
+> unresolved/UNKNOWN. *"That prevents an OCR/coverage failure from being confused with a
+> catalogue-matching failure."*
+>
+> **5. THE BAR, unchanged.** ~95%+ automatically correct on the 39-line source truth · ZERO invented
+> PHOTO lines · ZERO silent quantity guesses · ZERO household enrichment masquerading as PHOTO · no large
+> silent omission class · genuine ambiguity surfaced explicitly rather than guessed. *38 correct / 1
+> UNKNOWN / 0 inventions* is **excellent**; *35 correct / 4 UNKNOWN / 0 inventions* **may also be
+> product-usable**.
+>
+> **6. COST.** *"$0.1375... is nowhere near an API-cost crisis. If better region coverage doubles or even
+> modestly exceeds that cost but produces a trustworthy weekly shop, that is economically sane."*
+> Measure calls, wall time and real gateway cost. *"Optimise once the product works. **Do not save pennies
+> by accepting rubbish.**"*
+>
+> **7. KEEP THE STRUCTURAL WINS — do not regress.** Closed candidate enum · `strict:true` · free brand
+> invention impossible · UNKNOWN remains valid · region-1 defect fixed · Richmond quantity class fixed ·
+> application-owned region grounding · household context retained · confidence as inspection trigger, not
+> truth authority. **And keep pursuing independently:** in-enum variant confusion (the Vanish case) · the
+> wrong pasta flavour · duplicate resolution · four-way provenance persistence, still incomplete.
+>
+> **8. DISPATCH WITHOUT ASKING AGAIN.** *"This is within Warwick's already-authorised product direction...
+> Dispatch it. Do not bring it back to Warwick for another approval. **The next useful message is the
+> measured result: did smaller, fully covered regions finally make Terra's process trustworthy?**"*
+
+**Larry's execution record, labelled as Larry's:** dispatched as **WP-B15-30**, `WO-2026-08-12-02`, to Keel,
+on branch `build-015/b15-28-agentic-vision-prototype-v2` from `ed36ae1`. Sequenced measurement-first —
+the fixture and the two-layer scorer are built and proven BEFORE the region change, so the next
+percentage is decision-grade when it arrives rather than after the fact.
+
+---
+
+## ⛔ SUPERSEDED AS FRONTIER 2026-08-12 — WP-B15-29, **COMPLETE**. Its A/B/C/D result table below is the accurate RECORD of what was built and measured, and is still current as evidence. It no longer directs the next action — see the block above.
+
+## ⟦PRIOR WORK PACKAGE⟧ 2026-08-12 — **AGENTIC VISUAL COVERAGE + STRUCTURAL GROUNDING.** Authorised by Warwick, delivered as WP-B15-29 (`ed36ae1`).
 
 **Status: AUTHORISED, recon in flight, nothing built yet.** No Veritas gate sought. Nothing merged.
 
