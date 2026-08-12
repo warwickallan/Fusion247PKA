@@ -1854,6 +1854,18 @@ The live re-run against the corrected 39-line denominator (with the seven-catego
 specified) is queued as Asdair's next task once this WP lands — not attempted by Keel, which has no
 gateway credentials. **No pause. Carrying on, per explicit instruction.**
 
+**Round 2 COMPLETED, same session** — `4f03d4d`, pushed. 672/672 tests pass against a real disposable
+Postgres. 7 of 9 acceptance criteria fully met with real evidence: quantity semantics fixed as a class
+(the exact "Richmond 16 Pork Sausages" shape now correctly yields `quantity: null`, flagged, not 16);
+adaptive per-region re-inspection proven (2 flagged regions → exactly 2 individual calls, never
+bundled); the wrong-milk identity bug fixed against the real captured diagnostic reading; the duplicate
+Vanish-line collapse proven; usage/cost instrumentation wired in, cited to Pax's research. **Two honest
+gaps, not hidden:** AC5 (provenance-leak fix) has a documented, tested limit — doesn't yet handle a
+corrected re-run dropping a line entirely rather than overwriting it; AC6 (Yazoo regression) was
+investigated and correctly characterised as an omission, but not fixed — no confident root cause found
+without live gateway access. **The live re-run against the real gateway — the actual proof — is next,
+dispatched to Asdair.**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
