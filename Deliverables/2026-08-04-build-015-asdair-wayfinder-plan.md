@@ -2229,12 +2229,67 @@ output, rather than either architecture alone.
 
 **Every arm re-scored on the same corrected instrument. Denominator 39 page lines. Builder self-test evidence, NOT independent review. No Veritas gate sought.**
 
+> ### ⛔ THESE FIGURES ARE STALE-INSTRUMENT OUTPUT — CORRECTED 2026-08-12 BY WP-B15-31. **Read the correction under the table before quoting any number in it.**
+
 | Arm | Detected | Omit | **Invented** | Dup | Qty err | Identity (layer B) | Calls | Cost |
 |---|---|---|---|---|---|---|---|---|
 | **B** — loop, 3 horizontal regions *(baseline)* | 30/39 | 9 | 3 | 5 | 5 | 27/29 (93.1%) | 3 | $0.1375 |
 | **C** — correctly-oriented bands, **NO upscale** | 28/39 | 11 | 7 | 4 | 9 | 25/28 (89.3%) | 7 | $0.2979 |
-| **D** — same bands, **3× upscale** | **38/39** | **1** | **0** | **0** | 7 | 33/35 (94.3%) | 7 | $0.2671 |
+| **D** — same bands, **3× upscale** | ~~38/39~~ | ~~1~~ | **0** | ~~0~~ | ~~7~~ | 33/35 (94.3%) | 7 | $0.2671 |
 | **D2** — D plus the crop fix | 37/39 | 2 | 1 | 1 | 7 | 32/34 (94.1%) | 7 | $0.3532 |
+
+### ⛔ CORRECTION — the stored scores were written by a SUPERSEDED scorer and never refreshed
+
+**WP-B15-31 re-scored the UNCHANGED Arm D raw data on UNCHANGED code, with its own work stashed out so the
+result could not be its own doing.** Same photograph, same model output, corrected instrument:
+
+| Layer A, identical raw data | Stored above (quoted to Warwick) | **Actual, current instrument** |
+|---|---|---|
+| detected | 38/39 | **39/39** |
+| omitted | 1 | **0** |
+| **duplicates** | **0** | **10** |
+| quantity errors | 7 | **8** |
+| visible-text accuracy | 92.1% | 100% |
+
+**Detection was BETTER than reported; duplicates were far WORSE — zero reported against ten real.** The
+stored `twoLayerScore` block predates the scorer correction. **Nothing in the table above is a measurement
+of the current instrument, and Arm A/B/C/D2 are re-scored in WP-B15-31 for the same reason.**
+
+**⛔ Larry's own error, recorded because the mechanism matters more than the fix:** Larry diagnosed the
+single reported omission as *"our reconciliation is silently dropping correctly-read lines"* and reported
+that to Warwick. **It was wrong.** Every drop IS logged in `reconciliation.merges`, and `rescoreArtefact`
+**never consumes `reconciliation` at all** — it scores `grounded.accepted`. The *conclusion* (detection is
+really 39/39) was right; the mechanism was **inferred from the shape of the evidence rather than
+established**, which is the exact failure [[diagnose-from-the-durable-rows]] exists to prevent.
+
+**A real defect the correction did surface:** reconciliation is **computed, stored, and consumed by
+nothing**, so every graded number describes a pipeline stage that is not the final one. That is why the
+honest re-score shows 10 duplicates. Promoted to in-scope in WP-B15-31.
+
+### ⭐ AND THE QUANTITY FAULT WAS ~3× LARGER THAN "7 ERRORS" — the most useful finding of the night
+
+**All 39 page lines carry a count. Only 38.8% of readings preserved one.** Roughly **six in ten counts were
+being lost**, not seven lines' worth.
+
+**It hid because the default-one rule is CORRECT.** On every line whose true count *is* 1, a lost count and
+a read count produce the identical answer — so **"7 quantity errors" measured the OVERLAP between the two,
+never the fault.** The instrument was reporting about a third of the problem.
+
+**Both hypotheses were falsified, including Larry's.** Resolution was not the cause — the leading `2` is
+plainly legible in the delivered ×3 crop, and **Arm C at ×1 preserved MORE counts than Arm D at ×3**
+(54.9% vs 38.8%), the inverse of a pixel shortage. Catalogue contamination was not the cause either —
+withholding the catalogue changed nothing, 0/4, and the catalogue spelling still appeared with no catalogue
+supplied.
+
+**The seam is that nobody ever asked for the mark.** A free-text "record what you saw" instruction does not
+make a small mark at the *start* of a line survive. Requiring it as its own schema field: **4/4 preserved,
+including the BLOO `2`.** The default-one rule is **untouched** — the mark is put back at the front and
+handed to the same unchanged `leadingQuantityEvidence`.
+
+**Reconciliation was also destroying real purchases:** Yazoo strawberry absorbing Yazoo chocolate, Twix ice
+cream absorbing Twix biscuit bars, Arla milk absorbing ASDA milk — **three separate items Warwick asked for,
+silently merged.** Only one ever surfaced; two were masked by luck. Identity now vetoes a merge, and the
+accounting is closed and asserted with mutation proofs that fire.
 
 ### ⛔ REGION GRANULARITY WAS NOT THE LEVER. RESOLUTION PER LINE WAS.
 
