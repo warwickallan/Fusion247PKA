@@ -2277,13 +2277,46 @@ the held-commit branch discipline. **Still unanswered by Warwick and NOT chased:
 
 ### ⛔⭐ THE MEASUREMENT PROBLEM UNDERNEATH EVERY NUMBER IN THIS BUILD — established 2026-08-12
 
-**Arm D scored 0 invented and 0 duplicates. Arm E scored 3 invented and 2 duplicates. SAME architecture,
-SAME photograph, SAME upscale.** Inventions moved 0 → 3 and duplicates 10 → 2 between two runs of
-essentially the same configuration.
+> ### ⛔ CORRECTED 2026-08-12 BY KEEL'S WP-B15-32 READ-BACK — the paragraph below was CONFOUNDED and is superseded by the correction under it. It is retained because the correction is only legible beside the claim it repairs.
 
-**A difference that size sits inside single-sample noise — and NO ARM IN THIS BUILD HAS EVER BEEN
-REPEATED.** Every figure in this map, including the "38/39 step change", is **one draw from a
-non-deterministic model.**
+> ~~**Arm D scored 0 invented and 0 duplicates. Arm E scored 3 invented and 2 duplicates. SAME
+> architecture, SAME photograph, SAME upscale.**~~ ~~A difference that size sits inside single-sample
+> noise — and NO ARM IN THIS BUILD HAS EVER BEEN REPEATED.~~
+
+### ⛔ THE CORRECTION — three errors, all Larry's, caught before a penny was spent
+
+**(a) Arm D scored 10 duplicates, NOT 0.** That is the **stale figure WP-B15-31 corrected** — the one Larry
+had *already* reported as corrected — and it was then re-used when writing the next Work Order. **Correcting
+a record and then quoting the superseded value in the following document is worse than never correcting it.**
+
+**(b) D and E are NOT the same architecture, so the comparison is CONFOUNDED.** Four commits sit between
+them — `051ff68`, `bdf8f30`, `8f79cd0`, `54e1743` — including the `leading_mark` change that moved
+leading-count preservation 46.2% → 89.5%. **"0 → 3 inventions on identical configuration" mixes a code
+change with non-determinism.** It was stated to Warwick as same-architecture. It was not.
+
+**(c) "No arm has ever been repeated" is FALSE, and the real repeat shows SMALLER variance.** `arm-d` and
+`arm-d2` carry identical recorded configuration six minutes apart:
+
+| | arm-d | arm-d2 |
+|---|---|---|
+| invented | 0 | **1** |
+| quantity errors | 7 | **6** |
+| leading count preserved | 18/39 (46.2%) | **20/39 (51.3%)** |
+| identity correct | 36/36 | **35/36** |
+
+**Variance is real but is 0 → 1 inventions, not 0 → 3.** Keel's caveat is the correct one and stands: an
+uncommitted edit inside that six-minute window cannot be excluded, so this is **strongly indicated, not
+proven.**
+
+**The honest position, replacing the overstatement above:** variance exists, it is probably **modest**, and
+WP-B15-32 is about to measure it properly for the first time — now against a **genuine prior** rather than a
+confounded one. **This strengthens the case for the experiment; it does not weaken it.**
+
+**⛔ Larry's failure, named because it is now TWICE IN ONE SESSION:** two artefacts were read, a comparison
+drawn across them, and **whether the code had moved in between was never checked.** That is the same shape as
+the reconciliation misdiagnosis earlier the same night — **reasoning from the shape of the evidence rather
+than establishing it** — which [[diagnose-from-the-durable-rows]] exists to prevent and which Larry had
+already recorded once that evening.
 
 **Consequence, stated plainly: "39/39, zero invented" was never a stable property.** Architectures have
 been compared on one sample each and their differences read as signal.
