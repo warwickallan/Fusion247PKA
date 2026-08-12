@@ -2070,6 +2070,34 @@ guess**: the omission-density heuristic Keel correctly declined to ship blind in
 against real data; the newly-found same-region alias-mismatch bug; continued pursuit of the persistent
 Lucozade Raspberry invention. Continuing.
 
+**Round 6 COMPLETED** — `ab89d1d`. **Honest null result on the calibration question**: only round 5's
+data was actually usable (rounds 3-4 predate the `source_region` fix, `null` throughout); two candidate
+signals (line-count, word-count per region) both pointed the WRONG direction against real data;
+ground-truth region attribution proved unstable across two reads of the same photo (10/25 attributable
+items landed in different regions run-to-run). Nothing shipped — correctly, per the order's own explicit
+permission. Alias-mismatch bug fixed and proven (brand-anchor guard, real root cause). Lucozade
+Raspberry: a real, plausible prompt-contamination cause found and fixed, unconfirmed live. **Separate,
+significant finding**: `vision_confidence` is `null` on every real captured line — the re-read trigger's
+confidence leg has never actually fired; only the anomaly leg has ever worked.
+
+**⛔ WARWICK'S REDIRECT, same session, immediately after round 6's report — supersedes the round-by-round
+pattern entirely.** ~12 hours of engineering attention, omission still ~50%. His diagnosis: **not
+individual bugs — the PROCESS is wrong.** No more symptom-fix rounds. Full reconciliation demanded and
+delivered: `Deliverables/2026-08-12-vision-pipeline-six-round-reconciliation.md`. **Conclusion the
+reconciliation establishes, not asserts**: rounds 2-6 made real, proven progress on identity-resolution
+(category C) and one narrow slice of visual coverage (category A, the zero-line case) — but the DOMINANT
+failure is squarely category A (visual coverage), untouched by five of six rounds, and round 6's own
+honest investigation proved no cheap post-hoc signal can catch it, because an omitted line leaves nothing
+in the output to check. **Next action, per Warwick's explicit instruction, not a "Round 7"**: establish
+the Fusion gateway's actual deployed capability (multi-turn continuation, tool/function-calling for a
+model-directed crop request, image-detail controls, prompt caching, usage telemetry) BY EXECUTION against
+the live gateway, never inferred from docs — dispatched to Asdair now, the only actor holding live
+credentials. Design of a genuinely different architecture (an autonomous inspect-zoom-reconcile loop, not
+another deterministic-trigger patch) follows the capability finding, not before it. Hard bar set for
+whatever gets built: ~95%+ correctly resolved on the known photo, zero invented lines, zero silent
+quantity guesses, no large silent omission class, genuine uncertainty surfaced honestly — or come back
+with evidence the architecture cannot meet that economically, not another incremental percentage.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
