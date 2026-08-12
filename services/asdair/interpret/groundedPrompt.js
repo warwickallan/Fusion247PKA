@@ -34,6 +34,14 @@
 // remains PURE string-building, exactly as before.
 'use strict';
 
+// Bumped whenever this template's WORDING or JSON-output contract changes in
+// a way that could change what the model returns - the region-citation
+// contract above is what earned v2. Recorded on every PHOTO provenance row
+// (shop_line_provenance.prompt_version, migration 020) specifically so a
+// future accuracy regression is debuggable ("did the model change or did the
+// prompt change" - migration 020's own reasoning for carrying this at all).
+const PROMPT_VERSION = 'grounded-v2-region-citation';
+
 const STATUSES = Object.freeze([
   'matched',
   'needs_confirmation',
@@ -168,4 +176,4 @@ alternatives is a list of candidate ids. confidence is 0.0-1.0. matched_regular_
 above, or null. Never write a product name into matched_regular_id.${sourceRegionNote}`;
 }
 
-module.exports = { buildGroundedPrompt, STATUSES, MATCH_BASES, renderCandidates, renderRegions };
+module.exports = { buildGroundedPrompt, STATUSES, MATCH_BASES, renderCandidates, renderRegions, PROMPT_VERSION };

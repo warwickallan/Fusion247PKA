@@ -692,11 +692,30 @@ async function stepInterpret(deps, snapshot) {
     if (!shop.raw_media_path) {
       throw new Error(`runPipeline: shop ${shop.shop_ref} is a photo shop with no raw_media_path - the raw evidence is missing`);
     }
+    // WO-2026-08-11-B15-VISION-01 Amendment 3: this measures the household-
+    // context (catalogue/rules/last-order) portion of the prompt only - the
+    // REAL prompt deps.interpretPhoto sends also carries a region-citation
+    // section sized by the photo's own region plan, built and measured
+    // INSIDE interpretPhoto now that it depends on the image. Still honest
+    // evidence that real grounding happened (a --dry-run producing zero
+    // candidates would still show here); no longer the full sent prompt's
+    // exact size. See interpretPhotoOrchestrator.js for where the real one
+    // is built and measured.
     const prompt = deps.buildGroundedPrompt(catalogue);
     promptChars = String(prompt).length;
-    // ONE SHOT. Not a loop, not a daemon, not a conversation.
+    // ONE SHOT. Not a loop, not a daemon, not a conversation. (deps.interpretPhoto
+    // itself may fire ONE additional batched follow-up call internally when its
+    // own deterministic checks or the model's own confidence call for it - see
+    // interpretPhotoOrchestrator.js AC5 - which is still "one shot" at THIS
+    // call site's level: one call in, one settled reading out.)
+    // `prompt` is still passed for backward compatibility with every offline
+    // test's fake deps.interpretPhoto (pipeline/test/harness.js), which logs
+    // its length - deps.js's REAL realInterpretPhoto builds its own region-
+    // aware prompt internally now and does not read this field, but keeping
+    // it costs nothing and avoids a second, unrelated interface change to
+    // the fake ~500 existing tests depend on.
     const modelLines = await deps.interpretPhoto({
-      catalogue, prompt, imagePath: shop.raw_media_path, householdId: shop.household_id,
+      catalogue, prompt, imagePath: shop.raw_media_path, householdId: shop.household_id, shopId: shop.id,
     });
     if (!Array.isArray(modelLines)) {
       throw new Error('runPipeline: the grounded interpreter must return an array of { raw_reading, quantity } lines');

@@ -29,7 +29,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { buildGroundedPrompt, STATUSES, MATCH_BASES } = require('../../interpret/groundedPrompt.js');
+const { buildGroundedPrompt, STATUSES, MATCH_BASES, PROMPT_VERSION } = require('../../interpret/groundedPrompt.js');
 
 const CATALOGUE = {
   candidates: [
@@ -155,4 +155,9 @@ test('region contract: does not corrupt the existing catalogue/rules/last-order 
 test('a single-region plan (no strips) still produces a valid, bounded contract', () => {
   const prompt = buildGroundedPrompt(CATALOGUE, { regions: [{ region_no: 1, region_kind: 'full_page' }] });
   assert.match(prompt, /source_region is REQUIRED on every line and MUST be one of: 1\./);
+});
+
+test('PROMPT_VERSION is exported and non-empty - the value shop_line_provenance.prompt_version records on every PHOTO row', () => {
+  assert.equal(typeof PROMPT_VERSION, 'string');
+  assert.ok(PROMPT_VERSION.length > 0 && PROMPT_VERSION.length <= 100, 'must also satisfy migration 020\'s prompt_version length CHECK');
 });

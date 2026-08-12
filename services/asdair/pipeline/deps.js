@@ -31,6 +31,21 @@
 import { createRequire } from 'node:module';
 import { decideNextStep } from './stages.js';
 
+// WO-2026-08-11-B15-VISION-01 Amendment 3. Every one of these is a
+// dependency-free ESM module (proven by their own offline test suites), so
+// - exactly like ./stages.js above - a static import here costs nothing and
+// cannot silently resolve to undefined at runtime (see the D-1 note below
+// on why this container prefers static imports for anything pure).
+// imageRender.js is the ONE exception: it imports `sharp`, so it stays a
+// LAZY `await import()` inside realInterpretPhoto itself, exactly as
+// vision()/extractJson() already are - see that function's own comment.
+import { prepareImage } from './imagePrep.js';
+import { runSanityChecks } from './photoSanityChecks.js';
+import { needsFollowUp, flaggedRegionsForFollowUp } from './followUpTrigger.js';
+import { insertRegionBatch } from './shopImageRegions.js';
+import { insertPhotoProvenanceBatch } from './lineProvenance.js';
+import { interpretPhotoWithDeps } from './interpretPhotoOrchestrator.js';
+
 const require = createRequire(import.meta.url);
 
 // CommonJS components, loaded through createRequire so the ESM pipeline and the
@@ -39,7 +54,7 @@ const shopStore = require('../shop/shopStore.js');
 const shopState = require('../shop/shopState.js');
 const shopStatus = require('../shop/shopStatus.js');
 const { loadCatalogue } = require('../interpret/loadCatalogue.js');
-const { buildGroundedPrompt } = require('../interpret/groundedPrompt.js');
+const { buildGroundedPrompt, PROMPT_VERSION } = require('../interpret/groundedPrompt.js');
 const { resolveAll } = require('../interpret/resolveByCatalogue.js');
 const { planBasket } = require('../skill/planner.js');
 // The household's PROSE rulebook (B15-3). Only the prompt builder is needed
@@ -205,54 +220,57 @@ async function realVisionModel() {
 }
 
 /**
- * ONE grounded vision request. Not a daemon, not a conversation, not an agent.
+ * THE FULL REGION-GROUNDED PHOTO INTERPRETATION (WO-2026-08-11-B15-VISION-01,
+ * Amendment 3). Not a daemon, not a conversation, not an agent.
  *
- * The prompt is built from the catalogue by groundedPrompt.js and asks the model
- * for a raw_reading per line. The model's own candidate id is deliberately
- * IGNORED for identity: resolveByCatalogue decides that from our rows, so a
- * product that does not exist cannot reach a basket whatever the model claims.
+ * Deterministic prep, real rendering, ONE household-aware vision call (page +
+ * every numbered strip, region-cited), deterministic sanity checks, at most
+ * ONE batched follow-up, and durable PHOTO provenance persisted before this
+ * function returns - see interpretPhotoOrchestrator.js's own header for the
+ * full design and interpretPhotoOrchestrator.test.js for the wiring-order
+ * proof. THIS function's only job is to supply that orchestrator with the
+ * REAL collaborators (the real model, the real renderer, the real writer) -
+ * every offline test replaces `deps.interpretPhoto` wholesale (see the
+ * grounding-evidence comment below), so this function itself carries no
+ * dedicated unit test of its own; its logic is proven at
+ * interpretPhotoOrchestrator.test.js, and this is thin wiring over it.
  *
- * A single strict-JSON retry is allowed, and no more. That is a formatting
- * repair, not a second opinion.
+ * The model's own candidate id is still deliberately IGNORED for identity by
+ * every consumer downstream of this function's return: resolveByCatalogue
+ * decides that from our rows, so a product that does not exist cannot reach
+ * a basket whatever the model claims. This function's own sanity checks use
+ * the model's claimed id only as a DETERMINISTIC signal (is a line
+ * unmatched, does it look implausible) - never as identity.
  */
-async function realInterpretPhoto({ prompt, imagePath }) {
+async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
   const fs = require('node:fs');
   const path = require('node:path');
   const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
   const ext = path.extname(imagePath).toLowerCase();
-  const mime = MIME[ext];
-  if (!mime) throw new Error(`pipeline: unsupported image type ${ext}`);
-  const dataUrl = `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`;
+  if (!MIME[ext]) throw new Error(`pipeline: unsupported image type ${ext}`);
+  const imageBuffer = fs.readFileSync(imagePath);
 
+  // LAZY, exactly like vision()/extractJson() below: imageRender.js imports
+  // `sharp`, so importing it only here (never at this file's top level)
+  // keeps this whole module loadable, and every OTHER export in it usable,
+  // on a box where `services/asdair/pipeline`'s own dependencies were never
+  // installed - the same guarantee `pg` has always had here.
+  const { renderAllRegions, toDataUrl } = await import('./imageRender.js');
   const { vision } = await import('../../obsidiwikai/src/core/models.mjs');
   const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
+  const interpreterModel = await realVisionModel();
 
-  let parsed = await extractJson(await vision(prompt, dataUrl));
-  if (!parsed || !Array.isArray(parsed.lines)) {
-    parsed = await extractJson(await vision(
-      `${prompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`, dataUrl,
-    ));
-  }
-  if (!parsed || !Array.isArray(parsed.lines)) {
-    throw new Error('pipeline: the grounded vision request did not return usable JSON');
-  }
-  return parsed.lines.map((l, i) => ({
-    line_no: l.line_no ?? i + 1,
-    raw_reading: String(l.raw_reading ?? '').trim(),
-    quantity: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : null,
-    // ── GATE ZERO (WP-B15-22) ────────────────────────────────────────────
-    // groundedPrompt.js EXPLICITLY asks for these two fields per line
-    // (confidence 0.0-1.0, and status "unreadable" when the model cannot
-    // read something) and until this fix they were dropped here, before
-    // ever reaching resolveByCatalogue.js or shop_line.match_confidence -
-    // asked for, almost certainly returned, and thrown away in this mapping.
-    // Passed through FAITHFULLY: a missing/non-numeric confidence becomes
-    // `null` (never invented, never defaulted to 1.0 - that decision belongs
-    // to whoever GATES on it, not to this pass-through), and the model's own
-    // status string is carried as-is rather than re-interpreted here.
-    confidence: Number.isFinite(Number(l.confidence)) ? Number(l.confidence) : null,
-    model_status: typeof l.status === 'string' && l.status.trim() !== '' ? l.status.trim() : null,
-  }));
+  const { lines } = await interpretPhotoWithDeps(
+    { catalogue, imageBuffer, shopId, interpreterModel, promptVersion: PROMPT_VERSION },
+    {
+      prepareImage, runSanityChecks, needsFollowUp, flaggedRegionsForFollowUp,
+      insertRegionBatch, insertPhotoProvenanceBatch,
+      renderAllRegions, toDataUrl,
+      buildGroundedPrompt, vision, extractJson,
+      writeQuery: realWriteQuery,
+    },
+  );
+  return lines;
 }
 
 /**
