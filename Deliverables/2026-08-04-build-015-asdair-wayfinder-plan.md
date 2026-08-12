@@ -1788,6 +1788,11 @@ floor). Two MEDIUM: a focus-ring scoping gap on the action-sheet modal and its p
 trap on that same modal. All four sent back to Felix in one pass with exact fix locations; Vera will
 re-inspect on completion, no second-hand confirmation.
 
+**Felix fixed all four, same session** — commit `86cfc08`, local-only. Sensible narrow choices: scoped
+the tap-target fix to AsdAIr's own screens rather than the shared global `.act` primitive every other
+screen also uses; used `inert` on the sheet's actual sibling elements rather than a hand-rolled
+tab-cycle. Sent back to Vera for re-inspection — verdict pending.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
