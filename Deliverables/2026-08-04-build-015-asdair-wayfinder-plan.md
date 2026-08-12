@@ -1729,6 +1729,23 @@ Felix's UI both read a PLACEHOLDER field name; the vision-pipeline WP's real col
 `asdair.shop.human_state`. Reconciling that rename is Larry's job once all three branches are ready to
 converge — not attempted mid-flight while each WP is still moving.
 
+**Vision-pipeline WP now COMPLETED for every criterion**, including AC1/AC2 (the piece that was held on
+Warwick's dependency decision) — real proof, not mocked: a genuine capstone test rendering real JPEGs
+through `sharp`, sending real region crops in one `vision()` call, and writing real
+`shop_image_region`/`shop_line_provenance` rows against a real disposable Postgres, in the exact call
+order AC6 requires. 620/623 pipeline tests pass locally (3 correctly skip without DB/sharp opt-in).
+Pushed to `build-015/b15-24-vision-pipeline` @ `3eb0dc3`. **One honest residual, reported not fixed,
+outside every granted surface**: `.github/workflows/asdair-tests.yml`'s pipeline job never runs
+`npm install`, so CI will silently SKIP (not fail) the new sharp/DB-gated tests rather than exercise
+them — proven locally only, not yet proven in CI. Parked as a small, later, `.github/workflows/**`-
+scoped fix; non-blocking, not chased tonight.
+
+**All three legs of tonight's authorised parallel build are now DONE or IMPLEMENTED.** Cockpit-backend
+COMPLETE, vision-pipeline COMPLETE, Cockpit-UI IMPLEMENTED pending Vera's visual/WCAG gate (in
+progress). None of the three branches are merged to `main` — that remains Warwick's `merge-decision`,
+and cross-WP reconciliation (the placeholder state-field rename, the CI dependency-install gap) is
+still owed before any of this is production-accepted.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
