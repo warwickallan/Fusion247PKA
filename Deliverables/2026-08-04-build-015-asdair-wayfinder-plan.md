@@ -2070,6 +2070,55 @@ guess**: the omission-density heuristic Keel correctly declined to ship blind in
 against real data; the newly-found same-region alias-mismatch bug; continued pursuit of the persistent
 Lucozade Raspberry invention. Continuing.
 
+**Round 6 COMPLETED** — `ab89d1d`. **Honest null result on the calibration question**: only round 5's
+data was actually usable (rounds 3-4 predate the `source_region` fix, `null` throughout); two candidate
+signals (line-count, word-count per region) both pointed the WRONG direction against real data;
+ground-truth region attribution proved unstable across two reads of the same photo (10/25 attributable
+items landed in different regions run-to-run). Nothing shipped — correctly, per the order's own explicit
+permission. Alias-mismatch bug fixed and proven (brand-anchor guard, real root cause). Lucozade
+Raspberry: a real, plausible prompt-contamination cause found and fixed, unconfirmed live. **Separate,
+significant finding**: `vision_confidence` is `null` on every real captured line — the re-read trigger's
+confidence leg has never actually fired; only the anomaly leg has ever worked.
+
+**⛔ WARWICK'S REDIRECT, same session, immediately after round 6's report — supersedes the round-by-round
+pattern entirely.** ~12 hours of engineering attention, omission still ~50%. His diagnosis: **not
+individual bugs — the PROCESS is wrong.** No more symptom-fix rounds. Full reconciliation demanded and
+delivered: `Deliverables/2026-08-12-vision-pipeline-six-round-reconciliation.md`. **Conclusion the
+reconciliation establishes, not asserts**: rounds 2-6 made real, proven progress on identity-resolution
+(category C) and one narrow slice of visual coverage (category A, the zero-line case) — but the DOMINANT
+failure is squarely category A (visual coverage), untouched by five of six rounds, and round 6's own
+honest investigation proved no cheap post-hoc signal can catch it, because an omitted line leaves nothing
+in the output to check. **Next action, per Warwick's explicit instruction, not a "Round 7"**: establish
+the Fusion gateway's actual deployed capability (multi-turn continuation, tool/function-calling for a
+model-directed crop request, image-detail controls, prompt caching, usage telemetry) BY EXECUTION against
+the live gateway, never inferred from docs — dispatched to Asdair now, the only actor holding live
+credentials. Design of a genuinely different architecture (an autonomous inspect-zoom-reconcile loop, not
+another deterministic-trigger patch) follows the capability finding, not before it. Hard bar set for
+whatever gets built: ~95%+ correctly resolved on the known photo, zero invented lines, zero silent
+quantity guesses, no large silent omission class, genuine uncertainty surfaced honestly — or come back
+with evidence the architecture cannot meet that economically, not another incremental percentage.
+
+**⛔ CAPABILITY AUDIT LANDED — the answer is YES, buildable, and it names exactly how.**
+`Deliverables/2026-08-12-gateway-capability-audit-and-agentic-loop-design.md`. **The decisive finding**:
+tool/function-calling is CONFIRMED WORKING on this deployment — the model itself correctly emitted a
+real `request_crop` tool call, unprompted by any deterministic trigger. **Genuine multi-turn
+continuation is also confirmed, but only via `/v1/responses`, not the `/v1/chat/completions` endpoint
+this build has used throughout** — `previous_response_id` chaining proven with a real cross-request
+recall test. Prompt caching confirmed working with a real ~90% discount, directly useful for the
+repeated household context. Two bonus findings: the codebase's own pricing constant has been ~25%
+under-costing every figure reported this session (real gateway bills $2.50/$15 per M tokens, code
+assumed $2.00/$12); reasoning-token overhead is real and non-trivial even on trivial calls.
+
+**The architecture this unlocks, matching Warwick's own diagram exactly**: move the re-inspection
+DECISION from the application's deterministic triage (which cannot see what the model never returned —
+this is WHY every downstream heuristic this session tried has failed to touch omission) to the MODEL
+ITSELF, mid-conversation, via a `request_crop` tool call it can invoke when it isn't confident it has
+covered the page — chained via `/v1/responses`' genuine continuation so each turn has full memory of
+what's already been read, not a fresh blind call. Bounded by a hard iteration cap for cost control.
+
+**Next: a standalone PROTOTYPE, not a pipeline integration** — per Warwick's own sequencing ("build the
+simplest version, prove it on the known photograph, integrate it, and move on"). Dispatched to Keel.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
