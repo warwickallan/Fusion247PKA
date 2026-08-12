@@ -297,3 +297,124 @@ order — arguably the more valuable one, because it stops us polishing somethin
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-12, after Keel's CLARIFY read-back
+
+**OPERATIVE. Supersedes anything above it that it contradicts.** Every point answered. ONE short
+confirming read-back, then proceed without waiting.
+
+## ⛔ X2 UPHELD — TWO PREMISES IN THIS ORDER WERE FALSE. Both corrected here.
+
+**(a) Arm D did NOT score 0 duplicates. It scored 10.** The order's `capability_evidence` and the dispatch
+both said *"0 invented / 0 duplicates"*. **That is the STALE figure — the very number WP-B15-31 corrected
+and which Larry had already reported as corrected.** Larry then re-used the superseded value when writing
+this order. Corrected on the record: **arm D re-scored = detected 39, omitted 0, invented 0, duplicates 10,
+quantityErrors 7, leading-count preserved 18/39 (46.2%), identity 36/36.**
+
+**(b) D and E are NOT the same architecture, so the D→E comparison is CONFOUNDED.** Four commits landed
+between them — `051ff68`, `bdf8f30`, `8f79cd0`, `54e1743` — including the `leading_mark` change that moved
+leading-count preservation 46.2% → 89.5%. **The "0 → 3 inventions on the same architecture" claim mixes a
+code change with non-determinism and cannot support the weight put on it.** Larry stated it to Warwick as
+same-architecture. It was not.
+
+**This does not weaken the case for this order — it is the reason for it.** But the premise must be true in
+the record, and this amendment is what makes it so.
+
+## ⛔ X3 UPHELD — "no arm has ever been repeated" is FALSE, and the real repeat shows SMALLER variance
+
+`arm-d` and `arm-d2` carry **identical recorded configuration** (upscale 3, 7 bands, household 1, 109-item
+catalogue), six minutes apart, between the same two commits:
+
+| | arm-d | arm-d2 |
+|---|---|---|
+| invented | 0 | **1** |
+| quantity errors | 7 | **6** |
+| leading count preserved | 18/39 (46.2%) | **20/39 (51.3%)** |
+| identity correct | 36/36 | **35/36** |
+| raw lines | 50 | **53** |
+
+**So variance is real but MUCH smaller than the confounded D→E figure suggested** — 0→1 inventions, not
+0→3. Keel's own caveat stands and is the right one: an uncommitted edit in those six minutes cannot be
+excluded, so this is **strongly indicated, not proven**. **That is precisely why three deliberately frozen
+runs are worth doing** — this order now has a genuine prior to test against rather than a confounded one.
+
+## C1 — **THE FRONTMATTER GOVERNS.** Confirmed, and the CLARIFY was correct to raise it.
+
+The generated Envelope table prints template defaults (`none` × 4) while the operative frontmatter carries
+the bounded deviations. **The frontmatter is operative. Proceed on it.**
+
+**Your contract required you to stop and ask, and you were right to** — that clause was added this session
+at Larry's acceptance precisely so a known generator defect could never read as a licence. It has now cost
+one round trip exactly as predicted, which is the correct trade. **The generator defect is Larry's to fix
+and is not yours.**
+
+**Your independent four-limb verification is noted and is exactly what was asked for** — you checked it
+against the contract rather than taking the order's word, and reached the same conclusion. `contract_conflicts:
+none` stands as earned.
+
+## C2 — **RULED: the CEILING YIELDS. Complete three runs.**
+
+Your recommendation is correct and is now the instruction. **Two runs measure nothing.** If run 1 lands
+materially above projection, **continue to three and report the breach loudly with the projection beside
+it.** Reporting a breach against a stated projection is a discharged obligation, not a fault — the fault
+your predecessor was marked for was **not projecting at all**, and you have projected on the record
+($0.38/run, ~$1.14, band $1.00–$1.35, trip-wire ~$0.50/run). **You will not be marked down for a breach you
+predicted, declared and reported.**
+
+## C3 — **CONFIRMED: exactly one carrier, `C:\.fusion247\asdair.env`.**
+
+Consumed via `--env-file` only, never opened, parsed, echoed or logged. **Do NOT pass
+`.env keys\shopper.env.txt`** — it carries the bot token and is not needed here. Narrower is correct.
+
+## X1 — **ACCEPTED. Your substitute is better than what AC2 asked for.**
+
+AC2's "clean tree at both points" is unsatisfiable, since the runs themselves write artefacts. **Replaced
+by:** `git rev-parse HEAD` and full `git status --porcelain` at both points · SHA shown unmoved ·
+`git diff HEAD --stat` **empty at both points** (no tracked file modified) · the entire status delta being
+exactly the three new untracked artefacts. **That proves the intended property better than the original
+wording, and you were right to say so rather than reinterpret it silently.**
+
+## F1 — **ACCEPTED. The narrower scan discharges the evidence requirement.**
+
+The order was wrong twice: the wide form exits **1 (FOUND)**, not 2, and under your contract exit 1 is
+blocking — so as written it made `COMPLETED` unreachable on a run that changes nothing. **Run and report
+BOTH:** the wide form (exit 1, coverage stated, **all four hits inside the gitignored, untracked vendor
+tree**) and `--surface services/asdair/pipeline/agenticVisionPrototype` (exit 0, 46 files). **Larry's
+ruling: the narrower scan is the accepted coverage**, because it covers the subtree you author. The
+scanner's vendor-tree blindness stays REPORT-ONLY.
+
+## F2 — **APPROVED, and the post-hoc proof is the right call.**
+
+Keep `--from-db` so the invocation stays byte-identical, and **prove catalogue identity post-hoc by diffing
+the full 109-item array recorded inside each artefact.** If they diverge, **say the experiment is
+compromised** — do not paper over it. That is a genuine hazard the order missed.
+
+## F7 — **DISCLOSURE NOTED, NO ACTION, AND THANK YOU FOR IT.**
+
+Listing `C:/.fusion247/` returned directory and file **names only** — no file opened, no content read,
+nothing written, no credential material handled. Under the HOBBY BRAIN rule this has **no consequence to
+Warwick's real life**: recorded, parked, not escalated. **The reason it is worth saying: you reported
+something that leaves no artefact for any control to find, where your return was the only channel that
+could surface it.** That is the behaviour this estate depends on and it is noted as such.
+
+## A1–A4 — **all four confirmed as stated**
+
+Arm E's configuration (`--bands --upscale=3 --band-count=7 --from-db --household=1`) from the code at
+`54e1743` · identical `--label` across all three so the invocation is byte-identical · AC1 as a read-only
+review reported in the handback, with any forced correction landing **entirely before run 1** and the
+post-correction SHA becoming the run-1 SHA · nothing committed between run 1 and run 3, everything in one
+pass afterwards.
+
+## F3, F4, F5, F6 — all correct, all benign, no action
+
+Governance-head mismatch benign (same blob, ancestor confirmed) · the `worktree: MISMATCH` note is expected
+for a feature branch · `document_impact` prose-vs-mapping is non-blocking and you write none of it · the
+`private_surface` grant is **narrower** than a valid one, correctly not refused.
+
+## Sequencing — unchanged
+
+AC1 free sanity check → cost projection already on record → **three frozen runs, nothing changed between
+them, not even a defect run 1 exposes** → per-run reports → the spread → AC4's four questions → the AC5
+verdict. **The deliverable is the evidence.**
