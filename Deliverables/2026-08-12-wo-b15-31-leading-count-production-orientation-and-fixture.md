@@ -316,3 +316,127 @@ STOP — Warwick has explicitly asked for that rather than another symptom round
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-12, after Keel's CLARIFY read-back
+
+**OPERATIVE. Supersedes anything above it that it contradicts.** Every finding answered; the one decision
+taken. ONE further short read-back, then proceed.
+
+## C-1 UPHELD — **AC3's premise was FALSE. There is no Richmond discrepancy. AC3 as written is WITHDRAWN.**
+
+The in-surface fixture line 8 **already reads** `source_text: "16 Richmond SKiNLESS PORK SAUSAGES"`. The
+"12" is the **catalogue product name** (`catalogue_product: "Richmond 12 Skinless Pork Sausages 319g"`), and
+the `Deliverables/` JSON is a product+quantity list carrying that same catalogue name. **Neither artefact
+ever claimed the page says 12.** Keel's own read of the photograph also reads 16.
+
+**Larry and Warwick both misread a catalogue product name as a transcription of the page.** The instruction
+to "establish the Richmond ground truth" was answered before it was issued. **Nothing to correct. Do not
+change `source_text`.** Report the sanity-check of the other 38 lines as originally asked — that half stands.
+
+## The REAL AC3, which Keel found and I had not named — **DECISION: option (b)**
+
+`leadingQuantityEvidence("16 Richmond SKiNLESS PORK SAUSAGES")` returns **16**, and `MAX_PLAUSIBLE_QUANTITY`
+is 24 so it is not refused. Fixture line 8 carries `expected_quantity: 1` per Warwick's pack-size ruling.
+**So a PERFECT reading yields 16 against an expected 1 — one permanent graded quantity error, however well
+AC1 is fixed.**
+
+**AUTHORISED — option (b), Keel's recommendation.** Keep `expected_quantity: 1`. Mark the line **`contested`**
+in the scorer and **exclude it from `quantityErrors`** — with the exclusion **printed beside the number,
+never folded into it**. A reader must see "N quantity errors, 1 contested line excluded, reason: …" or the
+number is dishonest.
+
+**Why (b), recorded as Larry's reasoning:** (a) contradicts a ruling Warwick made in writing today, and this
+exact line is *his own worked example* — *"Richmond 16 sausages → 1 pack of the 16-count product"*. (c)
+makes every future run report a failure that is not a defect, which trains everyone to discount the metric.
+(b) rewrites nothing, hides nothing, and lets AC1 be measured on the six lines it is actually about.
+
+**⛔ Do NOT fix this by threshold-fitting, a special case on the word "Richmond", or a rule tuned until this
+line passes.** The genuine discriminator — *does the leading number match a pack-size token in the resolved
+candidate's product name* — is catalogue-aware disambiguation, **a real piece of work that is OUT OF SCOPE
+here.** Record it as a named follow-up with your evidence. Note for whoever picks it up: the catalogue
+carries a **12**-pack while the page asks for **16**, so the honest outcome may be *quantity 1 with an
+UNRESOLVED identity*, not a match at all.
+
+## AC1 — your seam analysis and proposed fix are ACCEPTED IN FULL
+
+The three-class breakdown is exactly the diagnosis the order asked for, and two things in it are better than
+anything the order anticipated:
+
+- **pg18 is worse than a default** — with the leading `2` lost, `4PK.` becomes the leading token and the rule
+  returns a **confident 4**. A silent wrong quantity, not a silent default. **Fixing the upstream loss fixes
+  it, and the rule stays untouched, exactly as ordered.**
+- **The lines that lost their count also returned in CATALOGUE SPELLING** — page `YAZZO` → `Yazoo`, page
+  `PASTA in SAUCE` → `PASTA 'N CHEESE`. **A catalogue name has no leading count.** One seam explaining five
+  of six losses is a far better hypothesis than "resolution", and it is yours, not the order's.
+
+**Run H1 first — it costs $0** and it either exonerates resolution or ends the investigation. **Then H2, 2
+calls (~$0.08), only if H1 clears.** Commit the re-rendered bands as evidence either way.
+
+**Your proposed fix is APPROVED**: a required, nullable **`leading_mark`** field in the existing strict
+schema carrying the first written mark verbatim, with `leadingQuantityEvidence` fed from it and `as_written`
+as fallback. Same call, same architecture, same rule — **the evidence stops depending on surviving a
+tidy-up.** That is a structural fix, not prompt tuning, and it is what the order asked for.
+
+⚠️ **The acceptance metric is unchanged and is the one that catches a half-fix:** `quantityErrors` must move.
+`visibleTextAccuracyPct` moving is not proof — your predecessor moved it 78.6 → 92.1 while quantity errors
+stayed at 7.
+
+## AC2 — **take (a). Confirmed.**
+
+Add the orientation-aware planner taking an **already-decoded raster**, keep the decode in `imageRender.js`
+which already owns `sharp`, and wire at `deps.js`'s `interpretPhoto` seam. **(b) is rejected**: making
+`prepareImage` async and importing `sharp` there would falsify that module's own purity header **and**
+`deps.js`'s "the whole suite runs FULLY OFFLINE" claim — trading a documented, tested invariant for
+convenience. **`deps.js` and `imageRender.js` are confirmed in scope** (assumption 2 accepted); without the
+`deps.js` seam this is capability, not integration, which is the whole point of AC2.
+
+## C-3 UPHELD — the order's secret-scan line was defective. **Your handling is correct.**
+
+Executed exit 1, four content hits, **all four inside `node_modules/`** — sharp's wasm binary matching an
+`openai-style-key` pattern, and pg-connection-string README examples ×3. `--surface` enumerates from the
+filesystem and cannot exclude vendor trees, so the ordered command **can never exit 0** and critical rule 15
+would make `COMPLETED` unreachable.
+
+**Do exactly what you proposed:** run the ordered command **verbatim**, report exit 1 with the four vendor
+paths named, **and** run it over the authored paths (`agenticVisionPrototype imagePrep.js imageRender.js
+photoSanityChecks.js` → exit 0, 36 files, 0 findings) — **both reported, neither silently substituted.**
+**Larry's ruling: the authored-path scan is the one that discharges the evidence requirement**, because it
+covers the code this order actually writes; the verbatim run is reported as the order's own defect.
+**The scanner's inability to exclude vendor trees is a real finding — report it; do not fix it.**
+
+## C-4 UPHELD — use `services/asdair/pipeline/README.md`
+
+`document_impact` named `CONFIGURATION.md` with `owner: this worker` while it sits outside `file_surface` —
+an order defect. Your resolution is right and needs no amendment: the same entry offers a service-local
+README, and `pipeline/README.md` is in surface. **Do not touch `CONFIGURATION.md`.**
+
+## C-2, C-5, C-6, C-7, C-8 — all correct, all report-only, none blocking
+
+- **C-2:** read-only is correct. `machine_surface`'s "write permitted" wording is generic envelope text; the
+  frontmatter and body both say read-only and they govern.
+- **C-5:** `f014143` is an ancestor of `ff13eeb` with both governing blobs byte-identical. Benign, verified.
+- **C-6:** correct to name it. The env carriers are **consumed, never surfaces** — pass the paths to
+  `node --env-file` and never open, parse, echo or log them. That is deliberate: putting an env file in a
+  surface list was a real error on an earlier order and is not being repeated.
+- **C-7:** the GL-012 shape divergence is long-standing and report-only. Your point that one exact file is
+  strictly narrower than any project subtree is correct and worth recording.
+- **C-8:** cosmetic duplicate. Ignore.
+
+## Your assumptions — all four confirmed
+
+Artefacts committed in-surface under `runs/`; `deps.js` and `imageRender.js` in scope; **spend ceiling
+≈$0.35 accepted**; and **assumption 4 is important — say it in the return.** This exercises the production
+planner and enlargement on the real photograph via the prototype runner. It is **NOT** a live production
+photo event, and the result must not be described as end-to-end automation.
+
+## Sequencing — as ordered, with AC3 collapsed
+
+**H1 (free) → H2 (~$0.08, only if H1 clears) → AC1 fix → AC2 integration + mutation proof → AC4 regression
+pins → AC5 one live run, both layers separately, plus calls / wall time / cost.** The AC3 fixture question is
+settled above and costs nothing; the 38-line sanity check still happens.
+
+⛔ **Unchanged: if it still materially fails after correct orientation, genuine enlargement, structural
+grounding and correct quantity preservation — STOP and return the architectural evidence.** Warwick has
+asked for that explicitly in preference to another symptom round, and it discharges this order.
