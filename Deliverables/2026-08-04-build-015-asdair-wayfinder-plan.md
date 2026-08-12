@@ -1978,6 +1978,13 @@ toward "when in doubt, state nothing" rather than staying calibrated. **Not stop
 Warwick's standing instruction — this is real information about what fixing Terra's process actually
 requires, not a reason to slow down.**
 
+**Round 4 dispatched** (`WO-2026-08-12-B15-VISION-04`): makes the dedup exclusion non-authoritative for
+cross-region collisions specifically (same-region duplicates, the original correctly-fixed Vanish case,
+stay auto-collapsed — only the case that actually failed changes); investigates the still-unaddressed
+dominant omission mode (partial misses within a region that DOES produce lines, distinct from the
+already-fixed zero-line case); traces and fixes the quantity-assertion collapse. Highest-consequence
+defect (silent deletion of a real item) sequenced first.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
