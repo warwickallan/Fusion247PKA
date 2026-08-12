@@ -129,6 +129,33 @@
     "genuine_phase_boundaries_estimate": "15-18",
     "pax_assessment_opinion": "proportionate discipline for this session's genuine event-density, PROVIDED actual commit count does not materially exceed the ~15-18 genuine PASS/PARTIAL/FAILED boundaries; this is Pax's judgement, not a measured fact, and is explicitly labelled as such"
   },
+  "findings": [
+    {
+      "family": "work-order-not-generated",
+      "exposure": "recurrence",
+      "summary": "both hand-authored Cockpit orders skipped tools/wo/envelope.mjs generation",
+      "evidence_ref": "work_order_events seq 1-2, Deliverables/2026-08-12-session-report-asdair-vision-pipeline.md"
+    },
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "none-this-session",
+      "summary": "every completion claim explicitly qualified as builder self-test evidence, not merged; Warwick's mid-session correction accepted without defensiveness",
+      "evidence_ref": "Deliverables/2026-08-12-session-report-asdair-vision-pipeline.md"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "none-this-session",
+      "summary": "round 3's wrongQuantity:0 metric caught as misleading by checking the mechanism behind it (quantity-assertion rate had collapsed, not improved)",
+      "evidence_ref": "Deliverables/2026-08-12-session-report-asdair-vision-pipeline.md"
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "none-this-session",
+      "summary": "every correction found (no-shop, cockpit-vs-vision priority, migration number) properly supersedes the block it corrects with an explicit marker",
+      "evidence_ref": "Deliverables/2026-08-12-session-report-asdair-vision-pipeline.md"
+    }
+  ],
+  "_findings_note": "the block above is the shape tools/session-report/capae-sync.mjs actually consumes (payload.findings[].family / .exposure). capae_family_comparisons below is Pax's original richer per-family comparison (told/vs_previous_exposure/still_repeating fields) — kept as the fuller human record, not machine-consumed.",
   "capae_family_comparisons": [
     {
       "slug": "work-order-not-generated",
