@@ -1866,6 +1866,44 @@ investigated and correctly characterised as an omission, but not fixed — no co
 without live gateway access. **The live re-run against the real gateway — the actual proof — is next,
 dispatched to Asdair.**
 
+**⛔ THE ROUND-2 LIVE RE-RUN LANDED. VERDICT: NOT TRUSTWORTHY YET — but real, verified progress, and a
+NEW dominant failure mode identified that neither round targeted.** Asdair re-established the 39-line
+photo truth independently (not reused from the trolley doc), ran the photo twice through the real
+Terra pipeline (real gateway, real usage capture), and scored both runs against the correct 39-line
+denominator with the seven-category breakdown.
+
+**What's genuinely fixed, holding across two live runs:** Richmond sausages never resolved to quantity
+16 in either run (AC1 holds live); the specific wrong-milk confident misresolution didn't recur (AC3
+holds, though the underlying read of the two milk lines is still a separate, lesser legibility
+weakness); the named Vanish duplicate didn't recur (though see below).
+
+**What's NOT fixed, and is now the dominant problem, previously untargeted by name:** roughly 40% of
+the 39 photo lines are silently OMITTED each run (17/39 and 15/39) — bigger than any other failure
+class. 5-6 lines per run are stated with HIGH CONFIDENCE and are simply wrong (invented, wrong qty) —
+the most dangerous class, larger than the honestly-flagged-uncertain count in Run A. **Two of AC5's
+four named "must never silently reappear" items reappeared anyway** (TRESemme in both runs, Lucozade
+Raspberry in Run B) — the visible symptom AC5 was meant to close is not closed, even though the DB-level
+fix Keel built tested clean (Asdair's harness never touches the database, so this isolates the
+defect to the vision/interpretation layer, not proof the DB fix is wrong — a real, separate residual).
+Yazoo Chocolate remains unstable in two different shapes across two runs (wrong qty vs. omitted) — no
+root cause found yet. A NEW duplicate class appeared (two different Febreze products collapsed into
+one line) — same shape as the fixed Vanish bug, different item, not yet closed generally.
+
+**Real cost, extracted from actual gateway usage, not Keel's pre-run estimate: ≈£0.137-0.138 for the
+difficult-shop case — more than DOUBLE his ≈£0.06 estimate.** First-call-only proxy for a clean shop:
+≈£0.050 vs. his ≈£0.03 estimate. Both his figures were explicitly flagged as pending this exact run;
+they were optimistic. The adaptive-call-count claim (proportionate, never blanket) held — both runs
+fired exactly 3 calls, never 39 — but the "normal case ≈ 1 call" half of the claim remains unproven; no
+easy control photo exists yet to test it.
+
+**Genuine uncertainty is being surfaced honestly where it occurs** (5-7 lines/run correctly flagged
+rather than silently guessed) — that discipline works. It does not, by itself, make the read trustworthy
+while confident-but-wrong lines remain at this rate.
+
+**Not stopping. Not asking whether to park. Continuing per Warwick's standing instruction** — next:
+root-cause the omission rate (the new dominant failure, not previously targeted by either round) and
+the AC5 residual (why the visible symptom persists despite a DB-level fix testing clean).
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
