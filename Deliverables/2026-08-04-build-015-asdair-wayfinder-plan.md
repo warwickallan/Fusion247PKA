@@ -1778,6 +1778,16 @@ complete (Vera's gate still open). Nothing is converged.
 Cockpit largely built, QA gate open; CI gap fixed; state-field reconciliation queued. **Nothing is
 merged. Nothing is "complete" until the discriminating test and Vera's gate both land.**
 
+**Vera's QA gate returned, same session: HOLD (0 CRITICAL, 2 HIGH, 2 MEDIUM), genuinely execution-based
+— she fixed a real server-startup blocker herself (without touching live credentials) to actually get
+the UI rendering first-person, rather than trusting Felix's own build claims.** Two HIGH findings, both
+narrow: the six-state colour mapping is computed but never wired into CSS (every state renders the same
+grey dot — text-only, so not a WCAG failure, but an unfinished wire-up); mobile tap targets on the
+write-action controls (`.as-choice`, `.act`) miss the 44×44 house bar (they clear WCAG's actual 24×24
+floor). Two MEDIUM: a focus-ring scoping gap on the action-sheet modal and its parent heading; no focus
+trap on that same modal. All four sent back to Felix in one pass with exact fix locations; Vera will
+re-inspect on completion, no second-hand confirmation.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
