@@ -2221,6 +2221,104 @@ output, rather than either architecture alone.
 
 ---
 
+## ⟦ROTATION CLOSE⟧ 2026-08-12 — read this block first on resume, everything above is history
+
+**START HERE. This is the current, truthful state as of `/rotate`, superseding any impression given by
+reading the narrative above out of order.**
+
+### Phase and gate
+
+BUILD-015 AsdAIr, mid-implementation. **No Veritas gate has been sought or passed on any of tonight's
+work** — Cockpit backend/UI and the vision-pipeline/agentic-prototype work are all still pre-gate,
+correctly labelled "builder self-test evidence, not independent review" throughout. **Nothing here is
+merged to `main` on GitHub** (`origin/main` remains deliberately unmoved — Warwick's standing
+`merge-decision`, unchanged tonight).
+
+### The exact next action — a genuine open product/priority decision, not a default to invent
+
+Warwick's own words, closing tonight's live-test report: *"that's your call on priority from here, not
+mine to just keep grinding on."* **There is no single obvious next action — this is the frontier a fresh
+session must ask Warwick about, not guess.** The concrete options on the table, all real and evidenced,
+none yet authorised:
+1. Fix the region-1 crop-map bug in the agentic prototype (narrow, precisely diagnosed: `agenticLoop.js`
+   excludes region 1 from its crop map while the prompt advertises it as requestable) — a clean, small
+   Work Order.
+2. Port the production pipeline's grounding/provenance/sanity-check discipline onto the agentic loop's
+   output, to address the new dominant failure (invention, ~19-25% of output lines) the coverage fix
+   exposed.
+3. Some other priority Warwick names — the invention finding may change his view of what matters most.
+**Do not begin a "Round 7" or equivalent without asking first** — this exact loop is what Warwick's
+redirect this session existed to stop.
+
+### Branch/head map — every worktree touched this session, verified by execution at rotation
+
+| Worktree | Branch | HEAD | Push status |
+|---|---|---|---|
+| `C:/Fusion247PKA` | `main` | `2d8c758` | 243+ commits ahead of `origin/main`, deliberately unmoved |
+| `C:/Fusion247PKA-b15vision` | `build-015/b15-24-vision-pipeline` | `ab89d1d` | **pushed this rotation** (was 6 commits behind origin, fixed) |
+| `C:/Fusion247PKA-cockpit-be` | `build-015/b15-25-cockpit-backend` | `82e7618` | pushed, in sync |
+| `C:/Fusion247PKA-cockpit-ui` | `build-015/b15-26-cockpit-ui` | `86cfc08` | **NOT pushed — deliberate.** Felix's contract carries no git-authority section (disclosed gap, `Deliverables/2026-08-11-wo-b15-26-cockpit-ui-order.md`'s contract_conflicts); granted local-commits-only for this order. Push/PR is Larry's or a future Keel's to do, not yet done. |
+| `C:/Fusion247PKA-visionloop2` | `build-015/b15-28-agentic-vision-prototype-v2` | `f9c45a0` | pushed, in sync |
+| `C:/Fusion247PKA-visionloop` | `build-015/b15-28-agentic-vision-prototype` | `a222540` | **Dead, abandoned, correctly.** v1 of the prototype WO, cut from the wrong git base, CLARIFY-refused before any code was written. Carries zero unique commits vs. `main`. No action needed; note it and move on if found in a future `git worktree list`. |
+
+### Parked residue — named, not silent, per every layer this session touched
+
+**Cockpit backend** (`build-015/b15-25-cockpit-backend`, COMPLETE per its own WO, not integrated):
+- `shopLines.markCorrected` still has no production caller — the exact call site is named
+  (`runPipeline.js`'s `stepApplyCorrections`) but wiring it needs a data-shape reconciliation (string
+  `item_name` vs. integer `lineNo`) not yet done.
+- No command exists for "mark an item not this week" on an already-resolved line — a design-doc-required
+  Cockpit action, not yet built.
+- `canonicalState.js` reads a PLACEHOLDER field name; the vision-pipeline branch's real column is
+  `asdair.shop.human_state` (migration 020) — reconciliation never done, explicitly queued since it was
+  first found.
+
+**Cockpit UI** (`build-015/b15-26-cockpit-ui`, Vera-PASSED, not integrated, not pushed):
+- 3 LOW residuals from Vera's final pass, none blocking: a pre-existing shared tab-switcher primitive at
+  39px (clears real WCAG floor); a cosmetic focus-trap body-bounce edge; one Chromium focus-visible
+  heuristic for scripted focus that neither the codebase nor Vera controls.
+
+**Vision pipeline** (`build-015/b15-24-vision-pipeline`, 6 rounds COMPLETE, not integrated):
+- The omission-density calibration (round 4/6's AC2) returned a genuine NULL RESULT — no cheap
+  deterministic signal discriminates on the evidence gathered. Not shipped, correctly.
+- Lucozade Raspberry's round-6 prompt fix was never live-confirmed — the redirect to the reconciliation/
+  capability-audit/prototype work happened before that specific live re-test could run. Status: fixed
+  at unit level, unconfirmed live.
+- GL-012 private-surface question for AsdAIr's own runtime path (`C:/.fusion247/asdair/**` vs. GL-012's
+  stated `C:/.fusion247/private/<project>/**` shape) — flagged repeatedly this session, never resolved.
+  Currently a non-blocker (Asdair's own documented credential pattern works without it), but the
+  underlying shape question is still genuinely open.
+
+**Agentic vision prototype** (`build-015/b15-28-agentic-vision-prototype-v2`, standalone, NOT wired to
+production, real live evidence gathered):
+- The region-1 crop bug (above, in "exact next action").
+- No grounding/sanity-check/provenance layer exists in this codebase at all — deliberately out of scope
+  for a minimal coverage-only test; needed before this could ever be trustworthy on its own.
+- The "resend the same pre-rendered crop, not a fresh higher-resolution render" limitation, disclosed at
+  build time, never revisited — whether genuine re-rendering (not just re-isolating) would help further
+  is untested.
+- This photo's region plan produced only 3 regions total (full page + 2 strips) — coarser than expected;
+  whether finer granularity would help is untested.
+
+**Process/governance finding, worth a fresh session's attention, not a product residue**: Asdair refused
+the final decisive-test dispatch on a role-boundary reading that directly contradicted seven near-
+identical dispatches earlier in the same session. Resolved this time by citing the precedent; the
+underlying contract-wording inconsistency that let a fresh instance read it differently is unfixed and
+could recur. Not touched this rotation — root `CLAUDE.md`'s hard rule against modifying any `AGENTS.md`
+without Warwick's explicit approval applies, and this wasn't put to him as a decision this session.
+
+### Session report status
+
+**Commissioned, not yet returned** — Pax, agent `a9546610ad9fd77a4`, dispatched at rotation per
+`/rotate` steps 5-6b, explicitly NOT on the blocking path (per the skill's own step 6). Expected path:
+`Deliverables/2026-08-12-session-report-asdair-vision-pipeline.md` (+ payload JSON, same name pattern).
+**When it lands — this session or a fresh one — commit it, populate Supabase per step 7b, sync CAPAE per
+step 7c, and fold its findings in. It does not exist on disk yet as of this rotation.**
+
+Subagent ledger (input to Pax, already committed, already durable): `Deliverables/2026-08-12-subagent-token-ledger-asdair-vision-pipeline-session.md`.
+
+---
+
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
 
 ### 🟢 RE-CUT 2026-08-11 (later still) — NO SHOP IS PENDING. THE FRONTIER IS DESIGN/RESEARCH WORK ONLY, NOT A BROWSER BUILD OF ANY KIND.
