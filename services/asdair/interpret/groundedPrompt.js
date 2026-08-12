@@ -38,12 +38,46 @@
 // a way that could change what the model returns - the region-citation
 // contract above is what earned v2; the quantity-evidence rewording below
 // (WO-2026-08-12-B15-VISION-02, AC1) earned v3; the no-prior-hallucination
-// guard below (WO-2026-08-12-B15-VISION-03, AC2) earns v4. Recorded on every
-// PHOTO provenance row (shop_line_provenance.prompt_version, migration 020)
-// specifically so a future accuracy regression is debuggable ("did the model
-// change or did the prompt change" - migration 020's own reasoning for
-// carrying this at all).
-const PROMPT_VERSION = 'grounded-v4-no-prior-hallucination-guard';
+// guard below (WO-2026-08-12-B15-VISION-03, AC2) earned v4; the quantity-
+// assertion recalibration below (WO-2026-08-12-B15-VISION-04, AC3) earns v5.
+// Recorded on every PHOTO provenance row (shop_line_provenance.prompt_version,
+// migration 020) specifically so a future accuracy regression is debuggable
+// ("did the model change or did the prompt change" - migration 020's own
+// reasoning for carrying this at all).
+//
+// ── AC3 (WO-2026-08-12-B15-VISION-04) - THE QUANTITY-ASSERTION COLLAPSE, AND
+//    WHY IT WAS THE v4 GUARD, NOT THE v3 QUANTITY RULE ─────────────────────
+//
+// THE MEASURED REGRESSION: quantity assertion collapsed from 87.1%/69.4%
+// (round 2's own two diagnostic runs, scratchpad round2/run-a.json,
+// run-b.json) to 26.3%/25.0% (round 3's, round3/run-a.json, run-b.json) -
+// masked by a "0 wrong quantities" metric that only improved because the
+// model mostly stopped answering.
+//
+// THE ROOT CAUSE, established by comparison rather than guessed: `git diff`
+// between the round-2 commit (4f03d4d) and the round-3 commit (e075440)
+// shows rule 6 below - the quantity-evidence wording itself - BYTE-IDENTICAL
+// across both. The ONLY prompt changes round 3 made were the "WHAT THEY
+// BOUGHT LAST TIME" re-wording and rule 1 gaining the no-prior-hallucination
+// guard ("A product being one of THE HOUSEHOLD'S KNOWN PRODUCTS or appearing
+// in WHAT THEY BOUGHT LAST TIME is NEVER on its own evidence... Report a
+// line because you can see it, never because it would be a plausible or
+// likely thing"). Since the quantity rule did not change and the quantity
+// rate still collapsed, the cause cannot be rule 6 (round 2) - it is round
+// 3's own guard. The most likely mechanism: a broad "never assert on a
+// plausible inference, only on what you can directly verify" instruction,
+// aimed at LINE EXISTENCE, generalised in the model's response past its
+// literal scope onto every other uncertain-feeling field - including
+// quantity, which rule 6 already told it to be cautious about. Two cautions
+// compounding is not the same as either one alone.
+//
+// THE FIX is scoping, not weakening: the anti-hallucination guard in rule 1
+// closed a real, separately-important defect (TRESemme/Lucozade invented
+// wholesale - WO-2026-08-12-B15-VISION-03, AC2) and must not be relaxed by
+// this Work Order. Instead rule 1 gains one clarifying sentence naming
+// EXACTLY what it does and does not govern, so the model cannot read it as
+// license to also suppress a quantity that genuinely IS written.
+const PROMPT_VERSION = 'grounded-v5-quantity-recalibration';
 
 const STATUSES = Object.freeze([
   'matched',
@@ -154,7 +188,10 @@ TASK
    and do not add a line that is not visibly there. A product being one of THE HOUSEHOLD'S KNOWN PRODUCTS or
    appearing in WHAT THEY BOUGHT LAST TIME is NEVER on its own evidence that it is written on THIS week's
    page - only a real handwritten mark is. Report a line because you can see it, never because it would be a
-   plausible or likely thing for this household to buy.
+   plausible or likely thing for this household to buy. This caution governs ONLY whether a LINE exists on
+   the page - it says nothing about quantity. Once you report a line, follow rule 6 below exactly as written:
+   state a quantity whenever the line's OWN text gives genuine count evidence. Do not let this caution make
+   you leave quantity blank on a line that DOES show one.
 2. For each line, record raw_reading: your best literal reading of the marks. This is the ONLY field where you
    write your own words.
 3. Then choose the candidate id from the list above that the line most likely refers to.

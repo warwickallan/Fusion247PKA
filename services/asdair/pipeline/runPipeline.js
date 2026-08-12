@@ -733,6 +733,15 @@ async function stepInterpret(deps, snapshot) {
       // is load-bearing, not an oversight).
       vision_confidence: l.confidence ?? null,
       vision_status: l.model_status ?? null,
+      // AC1 (WO-2026-08-12-B15-VISION-04): interpretPhotoOrchestrator.js's
+      // normaliseModelLine already carries `source_region` on every photo
+      // line (it is the anti-hallucination region-citation field, migration
+      // 020) - this mapping was the gap that never forwarded it any further,
+      // so resolveByCatalogue.js's cross-region dedup guard never saw it on
+      // the production path even though the diagnostic harness's direct
+      // resolveAll() call did. `null` for a typed line (never region-graded),
+      // exactly like vision_confidence/vision_status above.
+      source_region: Number.isInteger(l.source_region) ? l.source_region : null,
     }));
   } else {
     if (!shop.raw_text) {

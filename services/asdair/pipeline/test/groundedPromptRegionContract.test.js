@@ -41,15 +41,17 @@ const CATALOGUE = {
 };
 
 // The EXACT prompt template this module currently produces (as of
-// WO-2026-08-12-B15-VISION-03 AC2's no-prior-hallucination guard -
-// originally reconstructed for WO-2026-08-11-B15-VISION-01 at governance
-// head 095503af..., kept in sync with every intentional wording change since,
-// most recently WO-2026-08-12-B15-VISION-02 AC1's quantity-evidence
-// rewording of step 6)
+// WO-2026-08-12-B15-VISION-04 AC3's quantity-assertion recalibration of
+// step 1 - originally reconstructed for WO-2026-08-11-B15-VISION-01 at
+// governance head 095503af..., kept in sync with every intentional wording
+// change since: WO-2026-08-12-B15-VISION-02 AC1's quantity-evidence
+// rewording of step 6, WO-2026-08-12-B15-VISION-03 AC2's no-prior-
+// hallucination guard, and now WO-2026-08-12-B15-VISION-04 AC3's scoping
+// clarification on step 1)
 // - reconstructed literally, not regenerated, so a silent, UNINTENTIONAL
 // change to the no-options path is caught by string equality rather than by
 // a test that could drift alongside an accidental behaviour change. An
-// INTENTIONAL wording change (like AC1's, and now AC2's) updates this
+// INTENTIONAL wording change (like AC1's, AC2's, and now AC3's) updates this
 // reconstruction in the SAME commit, never leaves it to silently diverge.
 function originalPrompt(catalogue) {
   const renderCandidates = (candidates) => candidates
@@ -89,7 +91,10 @@ TASK
    and do not add a line that is not visibly there. A product being one of THE HOUSEHOLD'S KNOWN PRODUCTS or
    appearing in WHAT THEY BOUGHT LAST TIME is NEVER on its own evidence that it is written on THIS week's
    page - only a real handwritten mark is. Report a line because you can see it, never because it would be a
-   plausible or likely thing for this household to buy.
+   plausible or likely thing for this household to buy. This caution governs ONLY whether a LINE exists on
+   the page - it says nothing about quantity. Once you report a line, follow rule 6 below exactly as written:
+   state a quantity whenever the line's OWN text gives genuine count evidence. Do not let this caution make
+   you leave quantity blank on a line that DOES show one.
 2. For each line, record raw_reading: your best literal reading of the marks. This is the ONLY field where you
    write your own words.
 3. Then choose the candidate id from the list above that the line most likely refers to.
@@ -172,6 +177,31 @@ test('region contract: does not corrupt the existing catalogue/rules/last-order 
 test('a single-region plan (no strips) still produces a valid, bounded contract', () => {
   const prompt = buildGroundedPrompt(CATALOGUE, { regions: [{ region_no: 1, region_kind: 'full_page' }] });
   assert.match(prompt, /source_region is REQUIRED on every line and MUST be one of: 1\./);
+});
+
+// ── AC3 (WO-2026-08-12-B15-VISION-04) - THE QUANTITY-ASSERTION RECALIBRATION ──
+//
+// The measured regression (round 2: 87.1%/69.4% of lines carried a quantity;
+// round 3: 26.3%/25.0% - scratchpad round2/round3 run-a.json/run-b.json) was
+// traced to round 3's own no-prior-hallucination guard (rule 1) generalising
+// past its literal scope (line existence) onto quantity, NOT to rule 6's
+// quantity-evidence wording, which `git diff` between the round-2 and
+// round-3 commits proves was byte-identical across both. This is the prompt
+// half of the fix: rule 1 must scope its own caution explicitly, so the
+// model cannot read "don't assert on a plausible inference" as licence to
+// also leave a genuinely-written quantity blank.
+test('AC3: rule 1 explicitly scopes its own caution to line existence, not quantity', () => {
+  const prompt = buildGroundedPrompt(CATALOGUE);
+  assert.match(
+    prompt,
+    /This caution governs ONLY whether a LINE exists on\s+the page - it says nothing about quantity/,
+    'the no-prior-hallucination guard must not read as licence to also suppress a genuinely-written quantity',
+  );
+  assert.match(
+    prompt,
+    /state a quantity whenever the line's OWN text gives genuine count evidence/,
+    'the recalibration must positively re-affirm asserting quantity when real evidence exists, not merely soften a caution',
+  );
 });
 
 test('PROMPT_VERSION is exported and non-empty - the value shop_line_provenance.prompt_version records on every PHOTO row', () => {

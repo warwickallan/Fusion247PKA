@@ -380,12 +380,77 @@ function duplicateKey(matchedRegularId, quantity) {
   return String(matchedRegularId) + '|' + String(quantity ?? null);
 }
 
+// ── AC1 (WO-2026-08-12-B15-VISION-04, AMENDMENT 1) - A COLLISION IS ONLY
+//    AUTHORITATIVE WHEN THERE IS REAL EVIDENCE IT IS THE SAME PHYSICAL LINE ──
+//
+// THE BUG THIS CLOSES: the collapse below (AC3, WO-...-VISION-03) trusted
+// `matched_regular_id` as ground truth for EVERY collision. The round-3 live
+// re-test proved that trust misplaced: two genuinely different real
+// products - Lenor Outdoorable Spring Awakening and Febreze Fabric Freshener
+// Spring Awakening - both resolved to the SAME regular id, and the
+// "authoritative" collapse silently deleted the real Febreze line from the
+// basket. A shared `matched_regular_id` is evidence of a misidentification
+// exactly as often as it is evidence of a genuine repeat - the collapse
+// needed a SECOND, independent signal before either line could be trusted
+// over the other.
+//
+// THE EVIDENCE, exactly as Larry's Amendment 1 states it: two readings from
+// the SAME source_region are near-certainly the same physical handwriting
+// read twice (a strip re-scanned, an OCR echo) - that is real supporting
+// evidence. Two readings from DIFFERENT source_regions sharing an id have NO
+// such evidence: the shared id is exactly as likely to be a
+// misidentification as a genuine duplicate, and nothing about which reading
+// the model happened to emit FIRST says otherwise - trusting array/
+// processing order as though it were correctness is precisely the mistake
+// Amendment 1 corrected ("an accident of region-processing order").
+//
+// THE RULE: a colliding group where every KNOWN source_region agrees (or no
+// member carries region evidence at all - see regionsAgree below) keeps
+// ONE-SURVIVOR auto-collapse exactly as AC3 already proved correct (AC4):
+// the first stays whatever it resolved to, every later member of the group
+// is `excluded`. A colliding group with genuine evidence of DISAGREEING
+// regions - at least two members whose source_region values are both known
+// and different - has NO survivor: EVERY member of that group demotes to
+// `needs_confirmation`, never merely the second (or the first) one, so the
+// pipeline never silently DROPS one real reading (the old `excluded` bug)
+// and never silently KEEPS one as sole authoritative on nothing more than
+// emission order (the bug Amendment 1 corrected in this Work Order's own
+// read-back). This generalises past exactly two colliding lines: ANY
+// disagreement anywhere in the group removes the whole group's survivor,
+// because a single confirmed cross-region pair is already proof the id
+// cannot be trusted as ground truth for this group.
+//
+// A demoted line's matched_regular_id/matched_product_name are nulled and
+// the collided candidate is carried into `alternatives` - the exact shape
+// `applyVisionConfidenceGate`'s own needs_confirmation branch already uses
+// above - so `runPipeline.js`'s buildGroundedIntents materialises it as a
+// real `needs_decision` list row (a human decision), never a silent drop and
+// never a silent keep.
+function regionsAgree(regions) {
+  const known = (Array.isArray(regions) ? regions : [])
+    .filter((r) => r !== null && r !== undefined);
+  // Fewer than two KNOWN regions is no evidence of disagreement - the same
+  // "absence of a claim is not a claim it disagrees" guard this file already
+  // applies in sizeCompatible above. This is also what keeps every existing
+  // same-region/no-region test (AC3's chips and Febreze-alias cases, neither
+  // of which carries a source_region at all) auto-collapsing exactly as
+  // before (AC4).
+  if (known.length < 2) return true;
+  return known.every((r) => r === known[0]);
+}
+
 /**
- * Resolve a whole interpreted list. A SECOND (or later) reading resolving to
- * the SAME real catalogue product at the SAME quantity as an earlier line in
- * this batch is the authoritative, catalogue-identity-confirmed duplicate -
- * see the AC3 header comment above for why this is now a real exclusion
- * rather than the old possible_duplicate label nothing downstream acted on.
+ * Resolve a whole interpreted list. Two phases:
+ *
+ *   1. Resolve every reading independently (unchanged from before this
+ *      Work Order) and note which lines share a (matched_regular_id,
+ *      quantity) key - the SAME real catalogue product at the SAME
+ *      quantity as an earlier line in this batch.
+ *   2. Decide, PER COLLIDING GROUP, whether that shared identity is
+ *      authoritative - see the AC1/Amendment-1 header comment above
+ *      `regionsAgree` for the full rule and why a single pass (trusting
+ *      whichever line happened to resolve first) is exactly the defect
+ *      this Work Order exists to close.
  *
  * ── PER-LINE VISION SIGNAL, NEVER SHARED ACROSS THE BATCH (WP-B15-22) ──────
  * `opts` may carry `lastOrderNames` (batch-wide, unchanged), but
@@ -400,10 +465,19 @@ function duplicateKey(matchedRegularId, quantity) {
  * output as `match_confidence` - the column `shop_line.match_confidence`
  * already has and nothing previously populated - so the signal is durable
  * even when the gate did not need to fire.
+ *
+ * `source_region` (AC1, WO-2026-08-12-B15-VISION-04) is read off each line
+ * exactly like `vision_confidence`/`vision_status` - present only on a
+ * photo-sourced reading, `null` for a typed one (never region-graded) - and
+ * carried into the output for the same durability reason `match_confidence`
+ * is: the signal that decided a collision stays visible after the gate has
+ * already fired, not only while it is firing.
  */
 function resolveAll(lines, regulars, opts = {}) {
-  const seenKeys = new Set();
-  return lines.map((l, i) => {
+  // PHASE 1 - resolve independently. Grouped by duplicate key but not yet
+  // acted on: AC1 needs to see EVERY member of a colliding group's
+  // source_region before any single member can be trusted as the survivor.
+  const resolved = lines.map((l, i) => {
     const lineOpts = {
       ...opts,
       visionConfidence: l && Object.prototype.hasOwnProperty.call(l, 'vision_confidence') ? l.vision_confidence : undefined,
@@ -411,28 +485,54 @@ function resolveAll(lines, regulars, opts = {}) {
     };
     const r = resolveReading(l.raw_reading, regulars, lineOpts);
     const quantity = l.quantity ?? null;
-    if (r.matched_regular_id != null) {
-      const key = duplicateKey(r.matched_regular_id, quantity);
-      if (seenKeys.has(key)) {
-        // AC3: the authoritative collapse - never merely a label. Identity
-        // and quantity, both already resolved, are unchanged so the audit
-        // trail still shows exactly what this reading was; only `status`
-        // moves to `excluded` so runPipeline.js's materialisation step skips
-        // it (see that file's own comment on the call site that enforces
-        // this).
-        r.status = 'excluded';
-      } else {
-        seenKeys.add(key);
-      }
-    }
     const match_confidence = lineOpts.visionConfidence === undefined
       ? null
       : (Number.isFinite(Number(lineOpts.visionConfidence)) ? Number(lineOpts.visionConfidence) : null);
+    const source_region = l && Number.isInteger(l.source_region) ? l.source_region : null;
     return {
       line_no: l.line_no ?? i + 1, raw_reading: l.raw_reading, quantity,
-      match_confidence, ...r,
+      match_confidence, source_region, ...r,
     };
   });
+
+  // PHASE 2 - group every resolved line that carries an identity by its
+  // duplicate key, then decide each group per the rule above. A group of
+  // one (no collision) is left completely untouched, exactly as before.
+  const groups = new Map();
+  resolved.forEach((line, idx) => {
+    if (line.matched_regular_id == null) return;
+    const key = duplicateKey(line.matched_regular_id, line.quantity);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(idx);
+  });
+
+  groups.forEach((indices) => {
+    if (indices.length < 2) return;
+    const regions = indices.map((idx) => resolved[idx].source_region);
+    if (regionsAgree(regions)) {
+      // AC3/AC4, UNCHANGED: real supporting evidence (same region, or no
+      // region evidence to contradict it) - one survivor. Identity and
+      // quantity stay on the excluded row so the audit trail still shows
+      // exactly what this reading was; only `status` moves to `excluded` so
+      // runPipeline.js's materialisation step skips it.
+      indices.slice(1).forEach((idx) => { resolved[idx].status = 'excluded'; });
+    } else {
+      // AMENDMENT 1: genuine cross-region disagreement - NO survivor. Every
+      // member of the group is demoted, never merely the later one(s), and
+      // never left as the sole "confident" one on nothing but emission order.
+      indices.forEach((idx) => {
+        const line = resolved[idx];
+        const suggestion = { id: line.matched_regular_id, name: line.matched_product_name };
+        line.status = 'needs_confirmation';
+        line.match_basis = `${line.match_basis || 'catalogue match'} (held: colliding with another reading from a different image region - identity not authoritative, see WO-2026-08-12-B15-VISION-04 Amendment 1)`;
+        line.alternatives = [suggestion].concat(line.alternatives || []);
+        line.matched_regular_id = null;
+        line.matched_product_name = null;
+      });
+    }
+  });
+
+  return resolved;
 }
 
 module.exports = {
@@ -441,4 +541,6 @@ module.exports = {
   // AC3 (WO-2026-08-12-B15-VISION-02) - exported so the size/identity guard
   // is testable in isolation, not only through resolveReading's end result.
   sizeToken, regularSizeTokens, sizeCompatible,
+  // AC1 (WO-2026-08-12-B15-VISION-04) - exported for the same reason.
+  regionsAgree,
 };
