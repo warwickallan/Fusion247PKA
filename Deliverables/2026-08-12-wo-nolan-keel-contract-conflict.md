@@ -268,3 +268,102 @@ correct discharge of this order.**
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-12, after Nolan's CLARIFY read-back
+
+**OPERATIVE. Supersedes anything above it that it contradicts.** Both blockers resolved; every observation
+answered. Per `CLAUDE.md` this earns ONE further read-back — keep it short, then proceed.
+
+## C1 / M1 — UPHELD. **Take option (B). Critical rule 3 is reconciled in the same commit.**
+
+**Nolan is right and the order was wrong.** Critical rule 3 (~L382) — *"NEVER touch a live service,
+scheduled task, or non-throwaway database"* — is an **independent absolute**, and WO-2026-08-12-02's own
+bounded deviation grants SELECT-only reads of `asdair.regulars`, **a live non-throwaway database**. A fresh
+Keel reading only the two sites I named could still refuse that order on critical rule 3 alone. **My AC6
+wording — "on the authority question alone" — masked exactly that rather than resolving it. That was a
+defect in the order, not a subtlety.**
+
+**Option (A) is rejected**: it leaves the conflict to recur on the next live-execution order, which is the
+recurrence this whole Work Order exists to end.
+
+**AUTHORISED — option (B), with Nolan's proposed shape, which is correct:** critical rule 3 binds absolutely
+under the standing default and is displaced **only to the exact extent of a valid, bounded `live_authority`
+deviation naming the target and the permitted operations.**
+
+**⛔ NEVER reachable by ANY deviation — this list is the safety property and must appear in the contract
+text itself, not merely in this order:**
+- a **migration or DDL** against a non-disposable database;
+- **any write to live data** (INSERT, UPDATE, DELETE);
+- **operating or supervising a live service** — start, stop, restart, deregister.
+
+That matches what WO-02's deviation already said of itself (*"SELECT-ONLY, NO INSERT, UPDATE, DELETE or
+DDL"*) and keeps L311–313 true. **Larry's reasoning, recorded as Larry's:** this is the same
+contract-versus-estate drift, not a new widening — the estate has been issuing bounded live-read deviations
+and resolving them by precedence in the order body. **The purpose is to make the contract state the limits
+that are already being applied, and to make anything outside them impossible to reach.** If drafting reveals
+that (B) cannot be written without loosening one of the three never-reachable items, **stop and return that
+finding** — do not ship it.
+
+## M2 — UPHELD. **`.claude/agents/keel.md` is ADDED to `file_surface`.**
+
+You were right not to widen your own surface, and right that a shim contradicting the amended contract is
+the same half-applied-amendment failure AC4 exists to prevent, one layer up.
+
+**⛔ But do NOT simply restate the amended values in the shim.** The shim currently asserts
+*"credential_scope none, live_authority none"* and *"Never touches live services or credentials"* **as
+facts**, which is a duplicated operating rule in a pointer file — and duplication is what produced this
+drift in the first place. `CLAUDE.md` § "Hard rules": **two layers max, the wiki contract plus the host
+shim, and the shim is a thin pointer that never duplicates the contract.**
+
+**The correct fix: make the shim stop asserting the authority values and point at the contract instead.**
+Keep its `description:` doing its real job — routing guidance for Larry. **Fixing the drift by re-copying
+the new values is re-creating the defect with fresher numbers.**
+
+**Contract basis for this added path, granted explicitly and honestly:** the generated `contract_basis` does
+not cover it, but `Team/Nolan - HR/AGENTS.md` step 6 and § "What you never do" both make host shims
+squarely Nolan's artefact — *"Two artifacts always go together: the wiki contract... AND the host shim(s)"*.
+Authoring and maintaining them is your established practice.
+
+## C3 — ACCEPTED. Add the sentence.
+
+Your proposal is right and it is safe in the correct direction: **where the generated envelope table and the
+operative frontmatter disagree on an authority field, that is a defect in the ORDER → CLARIFY at read-back,
+and never act on the wider value until Larry confirms.** It stops a known tooling defect reading as a
+licence. **The envelope-table defect itself remains Larry's to fix** — this clause is the worker-side
+safeguard until it is.
+
+## C2 — confirmed. **Work at `f014143`.**
+
+The envelope was generated at `b1fb831` and the order was then committed twice (once to fix a missed
+UNRESOLVED slot). `f014143` is current `main` and contains this order. No contract drift between them —
+verify that yourself and report if it is not so.
+
+## M3 — accepted as you proposed. Both places.
+
+AC5's recommendation goes in your return **and** as a clearly-labelled **"REPORT ONLY — NOT APPLIED"**
+section at the end of the redline document, so the independent reviewer sees it without having to be told
+it exists.
+
+## Your assumptions — both confirmed, and the second is an improvement on the order
+
+- **Dated provenance line** on the amended section: yes, matching the file's existing convention.
+- **Walk ALL FOUR limbs as counter-cases, not one.** Confirmed, and this corrects AC6 — a single
+  counter-case under-tests the safety property, which was my under-specification.
+
+## Your evidence-defect catch — upheld, and the order's command is superseded
+
+The required secret-scan command was **malformed**: `--surface Team/Keel - Implementation Engineer/AGENTS.md`
+is unquoted and contains spaces, so the shell splits it and the scan either exits 2 or examines ground that
+is not the surface. **Run the properly quoted form over both declared paths** (now three, with the shim) and
+report exit code **AND** coverage, with exit 2 reported as **NOT SCANNED**, never as a pass. Good catch.
+
+## Sequencing — unchanged, with the added scope folded in
+
+AC1 site classification (now including **critical rule 3** and **the shim**) → **redline document written
+FIRST** → apply → all three sites reconciled in the **SAME commit** → the ACCEPT case plus **four** counter-
+cases → AC5 recommendation, report-only → quoted secret scan → **commit to `main`, DO NOT PUSH.**
+
+⛔ **Independent review still follows: Larry dispatches Veritas on your commit.** You are not the last check
+on your own amendment, and the three never-reachable items are what the reviewer will be pointed at first.
