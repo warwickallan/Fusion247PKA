@@ -1,0 +1,511 @@
+{
+  "image": "tg-shopper-chat-8601328832-msg-86-AQADfhFrG0iN2FN-.jpg",
+  "imageSize": {
+    "width": 576,
+    "height": 1280
+  },
+  "exifOrientation": null,
+  "detectedStackingAxis": "x",
+  "alternation": {
+    "x": 0.16563732962697275,
+    "y": 0.10514078164160401,
+    "ratio": 1.5753861350544722
+  },
+  "paperBox": {
+    "top": 192,
+    "bottom": 990,
+    "left": 1,
+    "right": 575
+  },
+  "writtenExtent": {
+    "start": 1,
+    "end": 575,
+    "length": 575
+  },
+  "lineRunsAcross": {
+    "start": 192,
+    "end": 990,
+    "length": 799
+  },
+  "estimatedLines": 37,
+  "estimatedLinePitchPx": 15.54054054054054,
+  "bands": [
+    {
+      "band_no": 1,
+      "from": 0,
+      "to": 99,
+      "crossFrom": 192,
+      "crossTo": 990
+    },
+    {
+      "band_no": 2,
+      "from": 80,
+      "to": 179,
+      "crossFrom": 192,
+      "crossTo": 990
+    },
+    {
+      "band_no": 3,
+      "from": 160,
+      "to": 259,
+      "crossFrom": 192,
+      "crossTo": 990
+    },
+    {
+      "band_no": 4,
+      "from": 240,
+      "to": 339,
+      "crossFrom": 192,
+      "crossTo": 990
+    },
+    {
+      "band_no": 5,
+      "from": 320,
+      "to": 419,
+      "crossFrom": 192,
+      "crossTo": 990
+    },
+    {
+      "band_no": 6,
+      "from": 400,
+      "to": 499,
+      "crossFrom": 192,
+      "crossTo": 990
+    },
+    {
+      "band_no": 7,
+      "from": 480,
+      "to": 575,
+      "crossFrom": 192,
+      "crossTo": 990
+    }
+  ],
+  "regions": [
+    {
+      "region_no": 1,
+      "region_kind": "full_page",
+      "pixel_top": null,
+      "pixel_left": null,
+      "pixel_bottom": null,
+      "pixel_right": null
+    },
+    {
+      "region_no": 2,
+      "region_kind": "strip",
+      "pixel_left": 0,
+      "pixel_right": 100,
+      "pixel_top": 192,
+      "pixel_bottom": 991
+    },
+    {
+      "region_no": 3,
+      "region_kind": "strip",
+      "pixel_left": 80,
+      "pixel_right": 180,
+      "pixel_top": 192,
+      "pixel_bottom": 991
+    },
+    {
+      "region_no": 4,
+      "region_kind": "strip",
+      "pixel_left": 160,
+      "pixel_right": 260,
+      "pixel_top": 192,
+      "pixel_bottom": 991
+    },
+    {
+      "region_no": 5,
+      "region_kind": "strip",
+      "pixel_left": 240,
+      "pixel_right": 340,
+      "pixel_top": 192,
+      "pixel_bottom": 991
+    },
+    {
+      "region_no": 6,
+      "region_kind": "strip",
+      "pixel_left": 320,
+      "pixel_right": 420,
+      "pixel_top": 192,
+      "pixel_bottom": 991
+    },
+    {
+      "region_no": 7,
+      "region_kind": "strip",
+      "pixel_left": 400,
+      "pixel_right": 500,
+      "pixel_top": 192,
+      "pixel_bottom": 991
+    },
+    {
+      "region_no": 8,
+      "region_kind": "strip",
+      "pixel_left": 480,
+      "pixel_right": 576,
+      "pixel_top": 192,
+      "pixel_bottom": 991
+    }
+  ],
+  "newPlanProof": {
+    "passes": true,
+    "checked": 575,
+    "failures": [],
+    "failureCount": 0,
+    "frameClipped": [
+      {
+        "position": 1,
+        "lineFrom": -6.77027027027027,
+        "lineTo": 8.77027027027027
+      },
+      {
+        "position": 2,
+        "lineFrom": -5.77027027027027,
+        "lineTo": 9.77027027027027
+      },
+      {
+        "position": 3,
+        "lineFrom": -4.77027027027027,
+        "lineTo": 10.77027027027027
+      },
+      {
+        "position": 4,
+        "lineFrom": -3.77027027027027,
+        "lineTo": 11.77027027027027
+      },
+      {
+        "position": 5,
+        "lineFrom": -2.77027027027027,
+        "lineTo": 12.77027027027027
+      },
+      {
+        "position": 6,
+        "lineFrom": -1.7702702702702702,
+        "lineTo": 13.77027027027027
+      },
+      {
+        "position": 7,
+        "lineFrom": -0.7702702702702702,
+        "lineTo": 14.77027027027027
+      },
+      {
+        "position": 8,
+        "lineFrom": 0.22972972972972983,
+        "lineTo": 15.77027027027027
+      },
+      {
+        "position": 9,
+        "lineFrom": 1.2297297297297298,
+        "lineTo": 16.77027027027027
+      },
+      {
+        "position": 566,
+        "lineFrom": 558.2297297297297,
+        "lineTo": 573.7702702702703
+      },
+      {
+        "position": 567,
+        "lineFrom": 559.2297297297297,
+        "lineTo": 574.7702702702703
+      },
+      {
+        "position": 568,
+        "lineFrom": 560.2297297297297,
+        "lineTo": 575.7702702702703
+      },
+      {
+        "position": 569,
+        "lineFrom": 561.2297297297297,
+        "lineTo": 576.7702702702703
+      },
+      {
+        "position": 570,
+        "lineFrom": 562.2297297297297,
+        "lineTo": 577.7702702702703
+      },
+      {
+        "position": 571,
+        "lineFrom": 563.2297297297297,
+        "lineTo": 578.7702702702703
+      },
+      {
+        "position": 572,
+        "lineFrom": 564.2297297297297,
+        "lineTo": 579.7702702702703
+      },
+      {
+        "position": 573,
+        "lineFrom": 565.2297297297297,
+        "lineTo": 580.7702702702703
+      },
+      {
+        "position": 574,
+        "lineFrom": 566.2297297297297,
+        "lineTo": 581.7702702702703
+      },
+      {
+        "position": 575,
+        "lineFrom": 567.2297297297297,
+        "lineTo": 582.7702702702703
+      }
+    ],
+    "frameClippedCount": 19,
+    "spanFailures": [],
+    "spanFailureCount": 0,
+    "worstPosition": null
+  },
+  "productionPlanBands": [
+    {
+      "band_no": 1,
+      "from": 12,
+      "to": 563,
+      "crossFrom": 26,
+      "crossTo": 689
+    },
+    {
+      "band_no": 2,
+      "from": 12,
+      "to": 563,
+      "crossFrom": 590,
+      "crossTo": 1253
+    }
+  ],
+  "productionPlanProof": {
+    "passes": false,
+    "checked": 575,
+    "failures": [
+      {
+        "position": 10,
+        "lineFrom": 2.22972972972973,
+        "lineTo": 17.77027027027027
+      },
+      {
+        "position": 11,
+        "lineFrom": 3.22972972972973,
+        "lineTo": 18.77027027027027
+      },
+      {
+        "position": 12,
+        "lineFrom": 4.22972972972973,
+        "lineTo": 19.77027027027027
+      },
+      {
+        "position": 13,
+        "lineFrom": 5.22972972972973,
+        "lineTo": 20.77027027027027
+      },
+      {
+        "position": 14,
+        "lineFrom": 6.22972972972973,
+        "lineTo": 21.77027027027027
+      },
+      {
+        "position": 15,
+        "lineFrom": 7.22972972972973,
+        "lineTo": 22.77027027027027
+      },
+      {
+        "position": 16,
+        "lineFrom": 8.22972972972973,
+        "lineTo": 23.77027027027027
+      },
+      {
+        "position": 17,
+        "lineFrom": 9.22972972972973,
+        "lineTo": 24.77027027027027
+      },
+      {
+        "position": 18,
+        "lineFrom": 10.22972972972973,
+        "lineTo": 25.77027027027027
+      },
+      {
+        "position": 19,
+        "lineFrom": 11.22972972972973,
+        "lineTo": 26.77027027027027
+      },
+      {
+        "position": 20,
+        "lineFrom": 12.22972972972973,
+        "lineTo": 27.77027027027027
+      },
+      {
+        "position": 21,
+        "lineFrom": 13.22972972972973,
+        "lineTo": 28.77027027027027
+      },
+      {
+        "position": 554,
+        "lineFrom": 546.2297297297297,
+        "lineTo": 561.7702702702703
+      },
+      {
+        "position": 555,
+        "lineFrom": 547.2297297297297,
+        "lineTo": 562.7702702702703
+      },
+      {
+        "position": 556,
+        "lineFrom": 548.2297297297297,
+        "lineTo": 563.7702702702703
+      },
+      {
+        "position": 557,
+        "lineFrom": 549.2297297297297,
+        "lineTo": 564.7702702702703
+      },
+      {
+        "position": 558,
+        "lineFrom": 550.2297297297297,
+        "lineTo": 565.7702702702703
+      },
+      {
+        "position": 559,
+        "lineFrom": 551.2297297297297,
+        "lineTo": 566.7702702702703
+      },
+      {
+        "position": 560,
+        "lineFrom": 552.2297297297297,
+        "lineTo": 567.7702702702703
+      },
+      {
+        "position": 561,
+        "lineFrom": 553.2297297297297,
+        "lineTo": 568.7702702702703
+      },
+      {
+        "position": 562,
+        "lineFrom": 554.2297297297297,
+        "lineTo": 569.7702702702703
+      },
+      {
+        "position": 563,
+        "lineFrom": 555.2297297297297,
+        "lineTo": 570.7702702702703
+      },
+      {
+        "position": 564,
+        "lineFrom": 556.2297297297297,
+        "lineTo": 571.7702702702703
+      },
+      {
+        "position": 565,
+        "lineFrom": 557.2297297297297,
+        "lineTo": 572.7702702702703
+      }
+    ],
+    "failureCount": 24,
+    "frameClipped": [
+      {
+        "position": 1,
+        "lineFrom": -6.77027027027027,
+        "lineTo": 8.77027027027027
+      },
+      {
+        "position": 2,
+        "lineFrom": -5.77027027027027,
+        "lineTo": 9.77027027027027
+      },
+      {
+        "position": 3,
+        "lineFrom": -4.77027027027027,
+        "lineTo": 10.77027027027027
+      },
+      {
+        "position": 4,
+        "lineFrom": -3.77027027027027,
+        "lineTo": 11.77027027027027
+      },
+      {
+        "position": 5,
+        "lineFrom": -2.77027027027027,
+        "lineTo": 12.77027027027027
+      },
+      {
+        "position": 6,
+        "lineFrom": -1.7702702702702702,
+        "lineTo": 13.77027027027027
+      },
+      {
+        "position": 7,
+        "lineFrom": -0.7702702702702702,
+        "lineTo": 14.77027027027027
+      },
+      {
+        "position": 8,
+        "lineFrom": 0.22972972972972983,
+        "lineTo": 15.77027027027027
+      },
+      {
+        "position": 9,
+        "lineFrom": 1.2297297297297298,
+        "lineTo": 16.77027027027027
+      },
+      {
+        "position": 566,
+        "lineFrom": 558.2297297297297,
+        "lineTo": 573.7702702702703
+      },
+      {
+        "position": 567,
+        "lineFrom": 559.2297297297297,
+        "lineTo": 574.7702702702703
+      },
+      {
+        "position": 568,
+        "lineFrom": 560.2297297297297,
+        "lineTo": 575.7702702702703
+      },
+      {
+        "position": 569,
+        "lineFrom": 561.2297297297297,
+        "lineTo": 576.7702702702703
+      },
+      {
+        "position": 570,
+        "lineFrom": 562.2297297297297,
+        "lineTo": 577.7702702702703
+      },
+      {
+        "position": 571,
+        "lineFrom": 563.2297297297297,
+        "lineTo": 578.7702702702703
+      },
+      {
+        "position": 572,
+        "lineFrom": 564.2297297297297,
+        "lineTo": 579.7702702702703
+      },
+      {
+        "position": 573,
+        "lineFrom": 565.2297297297297,
+        "lineTo": 580.7702702702703
+      },
+      {
+        "position": 574,
+        "lineFrom": 566.2297297297297,
+        "lineTo": 581.7702702702703
+      },
+      {
+        "position": 575,
+        "lineFrom": 567.2297297297297,
+        "lineTo": 582.7702702702703
+      }
+    ],
+    "frameClippedCount": 19,
+    "spanFailures": [
+      {
+        "band_no": 1,
+        "crossFrom": 26,
+        "crossTo": 689
+      },
+      {
+        "band_no": 2,
+        "crossFrom": 590,
+        "crossTo": 1253
+      }
+    ],
+    "spanFailureCount": 2,
+    "worstPosition": 554
+  }
+}

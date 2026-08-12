@@ -45,7 +45,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { prepareImage } from '../imagePrep.js';
+import { prepareImage, readExifOrientation } from '../imagePrep.js';
 // `imageRender.js` is LAZILY imported inside prepareForAgenticLoop() below,
 // NOT at module top level - it statically imports `sharp`, which may not be
 // installed in every environment (imageRender.test.js's own header documents
@@ -61,6 +61,7 @@ import { buildLineSchema, buildTextFormat, buildProductIdEnum } from './lineSche
 import { groundLines } from './groundLines.js';
 import { loadGroundTruth, scoreSevenWay, formatSevenWay } from './sevenWayScore.js';
 import { loadFixture, scoreTwoLayer, formatTwoLayer } from './twoLayerScore.js';
+import { planOrientationAwareBands, proveCoverage, DEFAULT_BAND_COUNT } from './bandPlan.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -336,7 +337,85 @@ export function rescoreArtefact(artefactPath, { fixturePath = DEFAULT_FIXTURE_PA
   return { artefact, grounded, twoLayer, sevenWay };
 }
 
+/**
+ * AC5's coverage proof, run against a real photograph and against the CURRENT
+ * production region plan on the same two properties.
+ *
+ * Deliberately its own mode, and deliberately runnable WITHOUT credentials or
+ * a gateway: the order requires the proof BEFORE any spend, because a run over
+ * regions that do not cover the page answers nothing.
+ */
+export async function proveCoverageForPhoto(imagePath, { bandCount = DEFAULT_BAND_COUNT } = {}) {
+  const sharp = (await import('sharp')).default;
+  const buf = fs.readFileSync(imagePath);
+  const { data, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const raster = {
+    data, width: info.width, height: info.height, channels: info.channels,
+  };
+  const plan = planOrientationAwareBands(raster, { bandCount });
+
+  // The production plan, held to the SAME two properties, so the comparison is
+  // like for like rather than two different questions.
+  const prepared = prepareImage(buf);
+  const productionBands = prepared.regions
+    .filter((r) => r.region_kind === 'strip')
+    .map((r, i) => ({
+      band_no: i + 1, from: r.pixel_left, to: r.pixel_right - 1, crossFrom: r.pixel_top, crossTo: r.pixel_bottom - 1,
+    }));
+  const productionProof = proveCoverage({
+    bands: productionBands,
+    start: plan.stackingExtent.start,
+    end: plan.stackingExtent.end,
+    lineHeight: plan.linePitch.pitch,
+    crossFrom: plan.crossExtent.start,
+    crossTo: plan.crossExtent.end,
+    axisLimit: plan.axis === 'x' ? info.width - 1 : info.height - 1,
+  });
+
+  return {
+    image: path.basename(imagePath),
+    imageSize: { width: info.width, height: info.height },
+    exifOrientation: readExifOrientation(buf),
+    detectedStackingAxis: plan.axis,
+    alternation: { x: plan.detection.alternationX, y: plan.detection.alternationY, ratio: plan.detection.ratio },
+    paperBox: plan.detection.box,
+    writtenExtent: plan.stackingExtent,
+    lineRunsAcross: plan.crossExtent,
+    estimatedLines: plan.linePitch.lineCount,
+    estimatedLinePitchPx: plan.linePitch.pitch,
+    bands: plan.bands,
+    regions: plan.regions,
+    newPlanProof: plan.coverageProof,
+    productionPlanBands: productionBands,
+    productionPlanProof: productionProof,
+  };
+}
+
 async function main() {
+  const coveragePath = argValue('coverage-proof');
+  if (coveragePath) {
+    const proof = await proveCoverageForPhoto(coveragePath, {
+      bandCount: Number(argValue('bands', String(DEFAULT_BAND_COUNT))),
+    });
+    process.stdout.write('\nAC5 COVERAGE PROOF (no gateway call, no credentials)\n');
+    process.stdout.write(`  image ................. ${proof.image} ${proof.imageSize.width}x${proof.imageSize.height}, EXIF orientation ${proof.exifOrientation}\n`);
+    process.stdout.write(`  detected stacking axis  ${proof.detectedStackingAxis}  (alternation X ${proof.alternation.x.toFixed(4)} vs Y ${proof.alternation.y.toFixed(4)})\n`);
+    process.stdout.write(`  written extent ........ ${proof.writtenExtent.start}..${proof.writtenExtent.end} along ${proof.detectedStackingAxis}; a line runs ${proof.lineRunsAcross.start}..${proof.lineRunsAcross.end} across it\n`);
+    process.stdout.write(`  estimated lines/pitch . ${proof.estimatedLines} lines, ${proof.estimatedLinePitchPx.toFixed(1)} px pitch\n`);
+    process.stdout.write(`  bands ................. ${proof.bands.map((b) => `${b.band_no}:${b.from}-${b.to}`).join('  ')}\n`);
+    const fmt = (p) => `${p.passes ? 'PASS' : 'FAIL'} - ${p.checked} positions checked, ${p.failureCount} interior failure(s), `
+      + `${p.spanFailureCount} band(s) truncating a line lengthways, ${p.frameClippedCount} frame-clipped`;
+    process.stdout.write(`  NEW orientation-aware plan .. ${fmt(proof.newPlanProof)}\n`);
+    process.stdout.write(`  CURRENT production plan ..... ${fmt(proof.productionPlanProof)}\n`);
+    const outDir = argValue('out', path.join(__dirname, 'runs'));
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, 'coverage-proof.json');
+    fs.writeFileSync(outPath, `${JSON.stringify(proof, null, 2)}\n`);
+    process.stdout.write(`  evidence: ${outPath}\n`);
+    if (!proof.newPlanProof.passes) process.exitCode = 1;
+    return;
+  }
+
   const rescorePath = argValue('rescore');
   if (rescorePath) {
     const fixturePath = argValue('fixture', DEFAULT_FIXTURE_PATH);
