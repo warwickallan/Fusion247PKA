@@ -2128,6 +2128,14 @@ branch's tip instead. (2) The real capability-probe evidence (the actual capture
 fresh Keel instance — committed durably to `Deliverables/2026-08-12-capability-probe-evidence/` (checked
 for secrets first; none — auth is referenced via env var, never a literal key). Reissued as v2, dispatched.
 
+**Prototype COMPLETED** — `b314221`, pushed. All 6 ACs met, 722/722 pipeline tests pass (+31 from
+baseline, 0 regressions), real mutation-tested proof the iteration cap actually bounds an adversarial
+model that always requests another crop, pricing fix confirmed with real numbers (+25.0% on a fixed
+token count, matching the audit's finding exactly). **One honest limitation disclosed, not hidden**: a
+`request_crop` follow-up currently resends the SAME already-rendered per-region crop, not a freshly
+higher-resolution render — whether isolation alone (without a genuinely closer look) helps is exactly
+what the live test now needs to show. No live gateway call was made building this — that's next.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
