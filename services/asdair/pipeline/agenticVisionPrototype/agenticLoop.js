@@ -1,0 +1,220 @@
+// =====================================================================
+// BUILD-015 AsdAIr - agenticVisionPrototype/agenticLoop.js
+//
+// WO-2026-08-12-B15-VISION-PROTOTYPE-01 v2, AC2/AC3: the standalone agentic
+// inspection loop. Terra decides, mid-conversation, whether it needs a closer
+// look at part of the photograph - the application no longer decides
+// after the fact from output it can only partially see (the dominant,
+// unsolved failure named in Deliverables/2026-08-12-vision-pipeline-six-
+// round-reconciliation.md - roughly half a photographed list's lines
+// silently omitted, because a post-hoc signal on the model's own returned
+// lines cannot detect what the model never returned at all).
+//
+// STANDALONE, per the Work Order's explicit instruction: NOT imported by, and
+// does not import, interpretPhotoOrchestrator.js / deps.js / runPipeline.js
+// or any other production call site. This module's only pipeline-internal
+// dependency is estimateUsdCost() from models.mjs (already granted, already
+// correct after AC4) for turning a turn's usage into a cost figure.
+//
+// TURN 1 sends the full prepared page PLUS every numbered strip in ONE
+// request (matches the audit's confirmed-working multi-image capability and
+// the architecture doc's own diagram - "full prepared image + numbered
+// regions" in one call). On a `request_crop` tool call, the SAME already-
+// rendered crop for that region_no is sent alone as the next turn, chained
+// via `previous_response_id` - genuinely NO resent history (AC2's own
+// wording: "supply the requested region's crop as the next turn"). This
+// prototype does not re-render a NEW higher-resolution crop on demand - it
+// resends the same per-region render imageRender.js already produced
+// upfront (an intentional simplification for a first prototype, named here
+// rather than silently assumed: whether an ISOLATED look at content already
+// sent, without competing visual noise from every other region, helps is
+// exactly the thing this prototype exists to test).
+//
+// THE ITERATION CAP (AC3): `maxIterations` (default 4, see
+// DEFAULT_MAX_TOOL_CALL_ROUNDS below) is the maximum number of `request_crop`
+// calls this loop will HONOUR with a genuine follow-up turn. If Terra still
+// wants another crop after the cap is reached, this loop makes exactly ONE
+// further call with NO tools offered (`tools: []`) - forcing a best-effort
+// final answer rather than either looping unboundedly or silently returning
+// nothing. This is what "returns its best-effort result at the cap" (AC3's
+// own wording) means concretely: a real, tested code path, not merely a
+// counter that stops calling.
+//
+// `callModel` is INJECTABLE (defaults to models.mjs's real
+// `visionAgenticTurn`) specifically so AC6's tests can supply a scripted
+// sequence of mocked responses (a tool-call turn, a final-answer turn, and a
+// turn that ALWAYS requests another crop for the cap test) without touching
+// global fetch across many sequential turns - the same reason this repo's
+// OWN `deps.js` injects its model/DB collaborators rather than importing them
+// directly (see deps.js's own header).
+// =====================================================================
+
+'use strict';
+
+import { estimateUsdCost, visionAgenticTurn } from '../../../obsidiwikai/src/core/models.mjs';
+
+export const DEFAULT_MAX_TOOL_CALL_ROUNDS = 4;
+
+/**
+ * `/v1/responses` usage is `{input_tokens, output_tokens, ...}` -
+ * DIFFERENT field names from estimateUsdCost()'s expected
+ * `{prompt_tokens, completion_tokens}` (the /v1/chat/completions shape).
+ * models.mjs's visionAgenticTurn() deliberately returns usage UNCHANGED, as
+ * the gateway actually sends it (see its own header) - this loop, not
+ * models.mjs, does the field-name mapping so the SAME estimateUsdCost() (and
+ * the SAME corrected AC4 pricing) keeps working for both endpoints without
+ * a second pricing function.
+ * @param {{input_tokens:number|null, output_tokens:number|null}|null} usage
+ * @returns {{prompt_tokens:number|null, completion_tokens:number|null}|null}
+ */
+export function normalizeResponsesUsage(usage) {
+  if (!usage || typeof usage !== 'object') return null;
+  return {
+    prompt_tokens: Number.isFinite(Number(usage.input_tokens)) ? Number(usage.input_tokens) : null,
+    completion_tokens: Number.isFinite(Number(usage.output_tokens)) ? Number(usage.output_tokens) : null,
+  };
+}
+
+/**
+ * Parse the model's final JSON answer into `{lines}`. Returns `null` (never
+ * throws, never invents a line) when the text is not parseable strict JSON
+ * with a `lines` array - an honest "could not parse this turn's answer",
+ * for the caller to report rather than this module silently swallowing it.
+ * @param {string|null} outputText
+ * @returns {Array<object>|null}
+ */
+function parseFinalLines(outputText) {
+  if (typeof outputText !== 'string' || outputText.trim() === '') return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(outputText);
+  } catch (e) {
+    return null;
+  }
+  return Array.isArray(parsed?.lines) ? parsed.lines : null;
+}
+
+/**
+ * Run the agentic inspection loop to completion (a final answer, or the
+ * iteration cap forcing one).
+ *
+ * @param {object} args
+ * @param {string} args.prompt - from buildAgenticPrompt() - the FIRST turn's
+ *   instruction text.
+ * @param {string} args.fullPageImageUrl - the prepared full-page data URL
+ *   (region_no 1 - full_page - per imagePrep.js's planRegions()).
+ * @param {Record<number, string>} args.regionImageUrls - EVERY region's
+ *   rendered crop, keyed by region_no (2..N+1, the strips) - from
+ *   imageRender.js's renderAllRegions() + toDataUrl(). Sent ALL TOGETHER on
+ *   turn 1, and the SAME per-region entry resent alone on a `request_crop`
+ *   follow-up turn.
+ * @param {object} args.tool - the tool definition offered while the cap has
+ *   not been reached (agenticVisionPrototype/tools.js's REQUEST_CROP_TOOL).
+ * @param {number} [args.maxIterations] - default DEFAULT_MAX_TOOL_CALL_ROUNDS.
+ * @param {Function} [args.callModel] - default models.mjs's visionAgenticTurn;
+ *   injectable for tests.
+ * @returns {Promise<{
+ *   lines: Array<object>|null,
+ *   toolCallRounds: number,
+ *   hitIterationCap: boolean,
+ *   turns: Array<{turnNo:number, responseId:string|null, requestedRegion:number|null, usage:object|null, costUsd:number|null}>,
+ * }>}
+ */
+export async function runAgenticVisionLoop({
+  prompt,
+  fullPageImageUrl,
+  regionImageUrls,
+  tool,
+  maxIterations = DEFAULT_MAX_TOOL_CALL_ROUNDS,
+  callModel = visionAgenticTurn,
+} = {}) {
+  if (typeof prompt !== 'string' || prompt === '') {
+    throw new Error('runAgenticVisionLoop: prompt is required');
+  }
+  if (typeof fullPageImageUrl !== 'string' || fullPageImageUrl === '') {
+    throw new Error('runAgenticVisionLoop: fullPageImageUrl is required');
+  }
+  if (!regionImageUrls || typeof regionImageUrls !== 'object') {
+    throw new Error('runAgenticVisionLoop: regionImageUrls (a region_no -> data URL map) is required');
+  }
+  if (!tool) {
+    throw new Error('runAgenticVisionLoop: tool (the request_crop tool definition) is required');
+  }
+  if (!Number.isInteger(maxIterations) || maxIterations < 0) {
+    throw new Error('runAgenticVisionLoop: maxIterations must be a non-negative integer');
+  }
+
+  const turns = [];
+  let toolCallRounds = 0;
+  let hitIterationCap = false;
+  let previousResponseId = null;
+  let currentPrompt = prompt;
+  let currentImageUrls = [fullPageImageUrl, ...Object.values(regionImageUrls)];
+  let currentTools = [tool];
+  let turnNo = 1;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const result = await callModel({
+      prompt: currentPrompt,
+      imageUrls: currentImageUrls,
+      tools: currentTools,
+      previousResponseId,
+    });
+
+    const costUsd = estimateUsdCost(normalizeResponsesUsage(result.usage));
+    const requestedCall = Array.isArray(result.toolCalls) && result.toolCalls.length > 0
+      ? result.toolCalls[0]
+      : null;
+    const requestedRegion = requestedCall ? Number(requestedCall.arguments && requestedCall.arguments.region) : null;
+
+    turns.push({
+      turnNo, responseId: result.responseId, requestedRegion, usage: result.usage, costUsd,
+    });
+
+    if (!requestedCall) {
+      // No tool call - this IS the final answer turn (whether reached
+      // normally or as the forced final call after the cap).
+      return {
+        lines: parseFinalLines(result.outputText), toolCallRounds, hitIterationCap, turns,
+      };
+    }
+
+    previousResponseId = result.responseId;
+
+    if (currentTools.length === 0) {
+      // We already made the forced, tools-omitted final call and the model
+      // STILL emitted a tool call shape somehow (a mocked-response edge case
+      // or a genuinely surprising live response) - stop here rather than
+      // loop again past the point where we deliberately withdrew the tool.
+      // Best-effort result: whatever text (if any) came back, honestly
+      // parsed - never invented.
+      return {
+        lines: parseFinalLines(result.outputText), toolCallRounds, hitIterationCap: true, turns,
+      };
+    }
+
+    if (toolCallRounds >= maxIterations) {
+      // Cap reached and the model still wants another crop: make exactly
+      // ONE more call with NO tools offered, forcing a best-effort final
+      // answer instead of honouring the request or looping unboundedly.
+      hitIterationCap = true;
+      const cropUrl = Number.isFinite(requestedRegion) ? regionImageUrls[requestedRegion] : undefined;
+      currentPrompt = 'You have used every available inspection round for this photograph. Give your best final JSON answer now, based on everything you have already seen - do not request another crop.';
+      currentImageUrls = cropUrl ? [cropUrl] : [];
+      currentTools = [];
+      turnNo += 1;
+      continue;
+    }
+
+    toolCallRounds += 1;
+    const cropUrl = regionImageUrls[requestedRegion];
+    if (!cropUrl) {
+      throw new Error(`runAgenticVisionLoop: model requested region ${requestedRegion}, no crop available for it`);
+    }
+    currentPrompt = `Here is the crop of region ${requestedRegion} you requested. Continue inspecting - call request_crop again if you still need another look, or give your final JSON answer when confident you have covered the whole page.`;
+    currentImageUrls = [cropUrl];
+    currentTools = [tool];
+    turnNo += 1;
+  }
+}

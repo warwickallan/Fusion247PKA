@@ -118,9 +118,22 @@ test('REGRESSION: vision() still returns a bare string, not {content, usage} - e
 // estimateUsdCost - AC7's authored pricing arithmetic, PURE, no network
 // ---------------------------------------------------------------------
 
-test('estimateUsdCost: uses the AUTHORED Terra pricing constant, cited to Pax\'s research', () => {
-  assert.equal(TERRA_PRICING_USD_PER_MILLION_TOKENS.input, 2.00, 'Pax\'s research, Vellum post-30-July-2026 cut, GPT-5.6 Terra input rate');
-  assert.equal(TERRA_PRICING_USD_PER_MILLION_TOKENS.output, 12.00, 'Pax\'s research, Vellum post-30-July-2026 cut, GPT-5.6 Terra output rate');
+// ── CORRECTED (WO-2026-08-12-B15-VISION-PROTOTYPE-01 v2, AC4 + AMENDMENT 1) ──
+// The pricing constant this file exercises is no longer $2/$12 - it is now
+// $2.50/$15, confirmed by a REAL live-gateway /model/info probe (see
+// models.mjs's own corrected comment for the full citation). Every assertion
+// below that depended on the OLD figure is updated to the new one. Per
+// Amendment 1 (Larry, 2026-08-12): file_surface widened by exactly this file,
+// minimal surgical change only. FOUR assertions depend on the stale constant,
+// not three - Amendment 1 named two pricing-value checks plus "the one
+// dependent cost-computation expected value" (this file's own read-back
+// undercounted by one); the fourth is the missing-token-count test just below,
+// which also computes its expectation from the old `2.00` literal. Same class
+// of change (a numeric literal tracking the pricing constant), nothing else
+// touched.
+test('estimateUsdCost: uses the CORRECTED Terra pricing constant, confirmed by a real live-gateway /model/info probe', () => {
+  assert.equal(TERRA_PRICING_USD_PER_MILLION_TOKENS.input, 2.50, 'confirmed live gateway /model/info: input_cost_per_token 0.0000025 = $2.50/M - Deliverables/2026-08-12-capability-probe-evidence/results.json');
+  assert.equal(TERRA_PRICING_USD_PER_MILLION_TOKENS.output, 15.00, 'confirmed live gateway /model/info: output_cost_per_token 0.000015 = $15/M - Deliverables/2026-08-12-capability-probe-evidence/results.json');
 });
 
 test('estimateUsdCost: a real-shaped clean-shop usage record costs a small, correctly-computed amount', () => {
@@ -130,7 +143,7 @@ test('estimateUsdCost: a real-shaped clean-shop usage record costs a small, corr
   // grounded-prompt shape, not an arbitrary round number.
   const usage = { prompt_tokens: 8000, completion_tokens: 600, total_tokens: 8600 };
   const cost = estimateUsdCost(usage);
-  const expected = (8000 / 1_000_000) * 2.00 + (600 / 1_000_000) * 12.00;
+  const expected = (8000 / 1_000_000) * 2.50 + (600 / 1_000_000) * 15.00;
   assert.ok(Math.abs(cost - expected) < 1e-9, `expected ${expected}, got ${cost}`);
   assert.ok(cost > 0 && cost < 0.05, 'a single clean-shop vision call costs a few cents at most, not pounds');
 });
@@ -142,5 +155,5 @@ test('estimateUsdCost: null usage (gateway never reported it) returns null, neve
 
 test('estimateUsdCost: a missing individual token count is treated as zero for THAT count only, not the whole record discarded', () => {
   const cost = estimateUsdCost({ prompt_tokens: 1000, completion_tokens: null });
-  assert.equal(cost, (1000 / 1_000_000) * 2.00);
+  assert.equal(cost, (1000 / 1_000_000) * 2.50);
 });

@@ -208,6 +208,132 @@ export async function visionWithUsage(prompt, imageUrl) {
   return gatewayChat('vision', prompt, imageUrl);
 }
 
+// ── AGENTIC VISION PROTOTYPE (WO-2026-08-12-B15-VISION-PROTOTYPE-01 v2, AC1) ──
+//
+// /v1/responses support, ADDITIVE ONLY. gatewayChat()/vision()/visionWithUsage()
+// above are COMPLETELY UNCHANGED - every existing caller (interpretPhotoOrchestrator.js,
+// deps.js, and everything else built on build-015/b15-24-vision-pipeline) is
+// unaffected. This is a NEW, separate wire path used ONLY by the standalone
+// prototype at services/asdair/pipeline/agenticVisionPrototype/** - nothing in
+// the production pipeline calls this function.
+//
+// WHY A SEPARATE FUNCTION RATHER THAN EXTENDING gatewayChat(): /v1/chat/completions
+// and /v1/responses are genuinely different wire protocols on this gateway -
+// different path, different request shape (`messages` vs `input`), different
+// response shape (`choices[0].message` vs `output[]`), and different
+// continuation mechanics. `/v1/responses` is the ONLY one of the two where
+// `previous_response_id` actually works: confirmed by real execution,
+// `/v1/chat/completions` + `previous_response_id` returns a genuine 400
+// "Unknown parameter" (Deliverables/2026-08-12-capability-probe-evidence/
+// results.json, `multiturn_previous_response_id_on_chat_completions`).
+// Bolting this onto gatewayChat() would mean branching its entire body on the
+// endpoint; a new function is the smaller, more honest diff.
+//
+// REAL EVIDENCE for the shapes below, durably committed at
+// Deliverables/2026-08-12-capability-probe-evidence/ (not scratchpad-only, not
+// a generic public-docs assumption):
+//  - genuine server-side continuation via `previous_response_id`: a real
+//    two-call exchange where the second call correctly recalls the first
+//    call's content having sent NO prior message history (results.json:
+//    responses_api__responses.second_call_body.output[0].content[0].text ===
+//    "OTTER-3", the codeword ONLY the first call was ever told, plus that
+//    second call's own `previous_response_id` field echoing the first call's id)
+//  - tool-calling confirmed WORKING on /v1/responses, keeping FULL reasoning
+//    (unlike /v1/chat/completions, which needs reasoning_effort:'none' to
+//    allow tools at all - see the `tool_calling` 400 in results.json vs
+//    toolcall2-results.json's `responses_api` succeeding with reasoning kept):
+//    `output` contains a `reasoning`-type item then a `function_call`-type
+//    item (`name:"request_crop"`, `arguments:'{"region":"3"}'`, a `call_id`)
+//  - the response's own top-level `id` (a `resp_...` string) is what a caller
+//    passes back as `previous_response_id` on the next turn
+//  - `usage` on this endpoint is SHAPED DIFFERENTLY from gatewayChat()'s
+//    `{prompt_tokens, completion_tokens, total_tokens}` - it is
+//    `{input_tokens, output_tokens, total_tokens, ...}`. Returned here AS THE
+//    GATEWAY ACTUALLY SENDS IT, never renamed - a caller wanting
+//    estimateUsdCost() must map the field names itself (done in
+//    agenticVisionPrototype/, not here: this function stays a faithful, thin
+//    wire wrapper, matching gatewayChat()'s own "never invents, never
+//    reshapes" discipline).
+//
+// ONE GAP, NAMED RATHER THAN HIDDEN: neither committed probe sent an actual
+// IMAGE via /v1/responses - both probes exercised text-only `input`. The
+// multimodal content-parts shape below (`input_text`/`input_image`, modelled
+// on the ALREADY-PROVEN /v1/chat/completions image_url shape used by
+// gatewayChat() above, per the Responses API's own documented content-parts
+// convention) is NOT independently proven by this WP's own evidence for the
+// image case specifically. This is exactly the class of claim AC1 says not to
+// build on a "generic public-docs assumption" without saying so - so: said so,
+// here, loudly. Asdair's live run against the real gateway (AC5, the actual
+// point of this WP) is what proves or falsifies this, not a unit test with a
+// mocked fetch.
+export async function visionAgenticTurn({
+  prompt, imageUrls = [], tools = [], previousResponseId = null,
+} = {}) {
+  if (!GATEWAY) {
+    throw new Error(
+      'fusion-gateway: no gateway configured (set FUSION_GATEWAY_URL). ' +
+      'Refusing to fall back for an agentic vision call.'
+    );
+  }
+  if (typeof prompt !== 'string' || prompt === '') {
+    throw new Error('fusion-gateway visionAgenticTurn: prompt is required');
+  }
+  const images = Array.isArray(imageUrls) ? imageUrls : [imageUrls];
+  for (const url of images) {
+    if (typeof url !== 'string' || url === '') {
+      throw new Error('fusion-gateway visionAgenticTurn: every image reference must be a non-empty data: or http(s): URL');
+    }
+  }
+  const body = {
+    model: answerModel(),
+    store: true,
+    input: images.length > 0
+      ? [{
+        role: 'user',
+        content: [
+          { type: 'input_text', text: prompt },
+          ...images.map((url) => ({ type: 'input_image', image_url: url })),
+        ],
+      }]
+      : prompt,
+  };
+  if (previousResponseId) body.previous_response_id = previousResponseId;
+  if (tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = 'auto';
+  }
+  const res = await fetch(`${GATEWAY.replace(/\/$/, '')}/responses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(GATEWAY_KEY ? { Authorization: `Bearer ${GATEWAY_KEY}` } : {}) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`fusion-gateway responses -> ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const j = await res.json();
+  const output = Array.isArray(j.output) ? j.output : [];
+  const messageItem = output.find((item) => item && item.type === 'message');
+  const outputText = messageItem && Array.isArray(messageItem.content) && messageItem.content[0]
+    ? (messageItem.content[0].text ?? null)
+    : null;
+  const toolCalls = output
+    .filter((item) => item && item.type === 'function_call')
+    .map((item) => ({
+      name: item.name,
+      callId: item.call_id,
+      arguments: (() => {
+        try { return JSON.parse(item.arguments); } catch (e) { return null; }
+      })(),
+    }));
+  return {
+    responseId: j.id ?? null,
+    outputText,
+    toolCalls,
+    usage: j.usage && typeof j.usage === 'object' ? j.usage : null,
+  };
+}
+
 // ── AC7 (WO-2026-08-12-B15-VISION-02) - AUTHORED PRICING CONFIGURATION ─────
 //
 // NOT AN EXISTING, PREVIOUSLY-CONFIGURED VALUE. No pricing configuration
@@ -222,26 +348,39 @@ export async function visionWithUsage(prompt, imageUrl) {
 //    Luna $0.80/$4; a slightly older/different-dated source gives Sol
 //    $5/$30, Terra $2.50/$15, Luna $1/$6."
 //
-// TWO figures are on record for Terra because GPT-5.6 pricing moved once in
-// its first month (that research's own finding). The CURRENT constant below
-// uses the POST-CUT figure ($2/$12, the more recent of the two, per Vellum)
-// - the OLDER $2.50/$15 figure is kept alongside it, named, so a future
-// reader can see exactly what changed and by how much rather than losing
-// the superseded number entirely. Recorded as a documented, overridable
-// constant rather than a bare number buried in a calculation, so the NEXT
-// price change (near-certain, per that same research) is a one-line diff,
-// not an archaeology exercise - and per AC8, a live gateway pricing check
-// remains Asdair's job, not re-derived here from an env var this order was
-// not given.
+// TWO figures were on record for Terra because GPT-5.6 pricing moved once in
+// its first month (that research's own finding), and this constant originally
+// picked the WRONG one of the two.
 //
-// USD, per 1,000,000 tokens - the unit that source publishes in, so this
-// needs no unit conversion at the point of use.
+// ── CORRECTED (WO-2026-08-12-B15-VISION-PROTOTYPE-01 v2, AC4) ──────────────
+// This is no longer a secondary-source pick between two research figures -
+// it is now confirmed by a REAL `/model/info` probe against the LIVE deployed
+// gateway (Deliverables/2026-08-12-capability-probe-evidence/results.json,
+// `model_info_probe[].relevant[model_name=="gpt-5.6-terra"].model_info`):
+// `input_cost_per_token: 0.0000025` (= $2.50/M), `output_cost_per_token:
+// 0.000015` (= $15/M) - exactly the figure this file previously labelled
+// "OLDER" and excluded from estimateUsdCost(). The gateway actually bills
+// $2.50/$15, not the $2/$12 this constant used to hold. Every cost figure
+// reported across all six vision-pipeline rounds this session was therefore
+// ~25% too low (real spend was somewhat higher than reported; the actual
+// totals were still small, single-digit dollars, but the constant was wrong
+// regardless and is corrected here, not merely re-labelled).
+//
+// The two exported constants are UNCHANGED IN NAME (so no other file's import
+// needs to change) - their VALUES are swapped: `TERRA_PRICING_USD_PER_MILLION_
+// TOKENS` (the one estimateUsdCost() actually reads) now holds the
+// live-gateway-confirmed $2.50/$15; `_OLDER` now holds the previous, now-
+// confirmed-wrong $2/$12 figure, kept for traceability only, same as before.
+//
+// USD, per 1,000,000 tokens - the unit the gateway's own per-token figures
+// convert to cleanly, so this needs no further unit conversion at the point
+// of use.
 export const TERRA_PRICING_USD_PER_MILLION_TOKENS_OLDER = Object.freeze({
-  input: 2.50, output: 15.00, // superseded - kept for traceability only, NOT used by estimateUsdCost
+  input: 2.00, output: 12.00, // superseded - kept for traceability only, NOT used by estimateUsdCost
 });
 export const TERRA_PRICING_USD_PER_MILLION_TOKENS = Object.freeze({
-  input: 2.00,  // prompt_tokens - Pax's research, Vellum post-30-July-2026 cut, GPT-5.6 Terra
-  output: 12.00, // completion_tokens - Pax's research, Vellum post-30-July-2026 cut, GPT-5.6 Terra
+  input: 2.50,  // prompt_tokens - CONFIRMED by live gateway /model/info probe, GPT-5.6 Terra
+  output: 15.00, // completion_tokens - CONFIRMED by live gateway /model/info probe, GPT-5.6 Terra
 });
 
 /**
