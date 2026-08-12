@@ -2223,6 +2223,80 @@ output, rather than either architecture alone.
 
 ## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (latest) — **REGION GRANULARITY + A TRUSTWORTHY MEASUREMENT.** Authorised by Warwick. **START HERE. This is the current frontier.**
 
+**Status: WP-B15-32 COMPLETE, `e087de5`, pushed. ⭐ THE VARIANCE IS MEASURED. Detection is STABLE at 39/39 three times. The largest remaining defect is DETERMINISTIC GEOMETRY, not model instability. ⛔ Warwick's "near-zero invention" case is NOT met and is deliberately not rounded to.**
+
+### ⭐ THE VARIANCE RESULT — three frozen runs, identity PROVEN not asserted
+
+**Proof the runs were identical:** HEAD `54e1743` before run 1 and after run 3, **unmoved** · `git diff HEAD --stat` **empty at both points** · status delta exactly the three new untracked artefacts · byte-identical invocation including the label · **the recorded 109-item catalogue array byte-identical across all three artefacts**, so the database did not move under the experiment. **Nothing was fixed between runs** — run 1 produced 2 wrong identities and 7 quantity errors and was left alone.
+
+| metric | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| **detected / 39** | **39** | **39** | **39** |
+| omitted | 0 | 0 | 0 |
+| invented PHOTO lines | 1 | 1 | 2 |
+| duplicate **sites detected** | 5 | 5 | 6 |
+| duplicates **surviving** | 5 | 3 | 2 |
+| quantity errors | 7 | 5 | 3 |
+| non-default counts correct | 9/12 | 9/12 | 10/12 |
+| correct identity | 34/36 (94.4%) | 35/36 (97.2%) | **36/36 (100%)** |
+| calls · wall · cost | 7 · 215.5s · $0.3674 | 7 · 161.7s · $0.3212 | 7 · 175.0s · $0.3326 |
+
+**Cost $1.0212 total**, against a projection made *before* run 1 of $0.38/run, ~$1.14, band $1.00–$1.35 —
+**inside the band, 32% under the $1.50 ceiling. No breach.**
+
+### The four answers
+
+1. **Is 39/39 stable? YES — the strongest result here.** 39/39/39, zero omissions, three times. **It also
+   BEAT arm E's 38/39, so arm E was a BAD DRAW, not a plateau.** ⛔ **Every conclusion drawn from arm E
+   alone — including Larry's "the bar is not met" framing — came from the worst of four samples.**
+2. **Do inventions recur randomly or systematically? RANDOMLY.** A different phantom each run — Milky Way ·
+   TRESemme · TRESemme + Walls sausage rolls. All `free-generation` of **catalogue items not on the page**.
+   Only one recurred. **The RATE is low and stable (1,1,2); WHICH item is not.**
+3. **Do duplicates recur in the same places? YES, emphatically — the most actionable finding here.** Four
+   sites in **3/3** runs, always the same adjacent band pair: Princes corned beef (5+6) · Febreze (5+6) ·
+   Sultana cake (6+7) · cheese & onion crisps (7+8). **Every recurring one is `cross_region` at a BAND
+   BOUNDARY.** The same physical lines fall in the overlap every time. **That is our geometry, not model
+   instability** — what varies is only whether reconciliation collapses them.
+4. **Do digit errors recur? MIXED, and the split IS the answer.** **Deterministic, identical wrong value
+   3/3:** page 11 `4→1` · page 16 `3→2` · page 19 `1→2` (plus page 8, contested by design). **Jitter:**
+   page 2 read `7`, then `4`, then correctly. **~¾ of the quantity fault is a fixed set of specific lines
+   misread the same way every time.**
+
+### ⛔ THE VERDICT — neither case cleanly. Nearer the first, and deliberately NOT rounded there.
+
+**Established:** detection and identity — and identity is *improving* run over run (94.4% → 97.2% → 100%).
+**Fixable without model work:** the largest remaining defect, cross-region duplication at band boundaries,
+is **deterministic geometry**.
+**NOT met:** *"near-zero invention"*. Free-generation of catalogue items absent from the page happens **every
+run**, at a stable rate, on a varying item. **That is the "household enrichment masquerading as PHOTO"
+Warwick named by name — still passing the visual-existence gate.** Keel refused to round it into the first
+case; Larry is not rounding it either.
+
+### Two instrument limits — REPORTED, not corrected, and both change how every future number must be read
+
+- **`leadingCountPreserved` measures AVAILABILITY, not CORRECTNESS.** It scores a line preserved if the mark
+  *arrived*; it never checks it against the true count. **A wrong digit still counts as preserved, so it is
+  blind to the page 11/16/19 class entirely.** Never quote it without `quantityErrors` beside it.
+- **`quantityErrors` is published with an unstated denominator.** **27 of 39 lines have a true count of 1**,
+  where a lost count and a read count give the identical answer — so only **12 lines can surface the fault
+  at all**. "3 quantity errors" reads as 3-in-39 and is nearer **3-in-12**. The discriminating figure is
+  **9/12, 9/12, 10/12**, and the instrument does not print it.
+
+**Keel also found and reported a defect in its OWN analysis script:** it read `details[].quantity`, which
+does not exist, so every non-default line silently scored as an error and it returned exactly the 12
+non-default lines. **It looked like a clean finding.** Recorded because a plausible wrong answer from a
+broken measuring script is precisely what this order existed to prevent.
+
+**Honest limits carried forward:** three runs separates "recurs 3/3" from "appeared once" but cannot put a
+confidence interval on a rate · **ONE photograph only** — nothing here says how the mechanism behaves on a
+different list, hand or lighting · layer A visible-text remains **not independently graded** · **the gateway
+may have routed to a different model build between runs and that is not observable from here** · **no
+production photograph event was exercised. Capability, not live proof.**
+
+---
+
+### ⛔ SUPERSEDED — WP-B15-32 as dispatched. Retained for the directive it carries.
+
 **Status: WP-B15-32 AUTHORISED AND DISPATCHED — the variance measurement. ⛔ NO ARCHITECTURE CHANGES until it returns.**
 
 ### AMENDMENT — Warwick, 2026-08-12 (after WP-B15-31). **His ruling, quoted. Larry's record-keeping is labelled Larry's.**
