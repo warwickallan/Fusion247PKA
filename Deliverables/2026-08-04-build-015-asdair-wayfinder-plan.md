@@ -2158,6 +2158,20 @@ mocked two-call shape matching the real capture doubled, not a single-call fixtu
 real gateway** — this is the honest limit every mock carries. Live re-test dispatched — this is the
 one that actually decides whether the architecture works.
 
+**⛔ ASDAIR REFUSED THE LIVE RE-TEST DISPATCH on role-boundary grounds — a genuine inconsistency, not
+yet resolved.** Its stated reasoning: running a diagnostic script is "process start," forbidden by its
+own contract's "domain operator, not builder... no process start/stop" clause. **This directly
+contradicts established practice this session**: the identical category of task (standalone diagnostic
+script, known photo, own gateway credentials, no DB write, no shop/browser/Telegram action) was
+dispatched to and executed by Asdair SEVEN times already — the original discriminating test, all five
+subsequent round re-tests, and the FIRST run of this exact prototype script, which crashed and was
+reported without any refusal. Pushed back citing the precedent directly rather than accepting or
+silently rerouting — asking specifically what distinguishes this dispatch from the one immediately
+before it. **Neither Larry nor Pax can substitute**: Larry has no gateway credentials in his own shell
+(by design, confirmed early this session); Pax has no Bash tool, cannot execute a script at all. Asdair
+is the only agent in this build holding both live gateway access and script-execution capability.
+Awaiting its reconciliation.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
