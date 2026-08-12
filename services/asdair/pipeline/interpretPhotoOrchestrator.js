@@ -60,13 +60,23 @@ function mergeFollowUp(original, followUpLines, flaggedRegionNos) {
  * @param {object} collaborators - every dependency, real or fake:
  *   {prepareImage, renderAllRegions, toDataUrl, insertRegionBatch,
  *    buildGroundedPrompt, vision, extractJson, runSanityChecks,
- *    needsFollowUp, flaggedRegionsForFollowUp, insertPhotoProvenanceBatch,
- *    writeQuery}
- * @returns {Promise<{lines: Array<object>, promptChars: number, followUpFired: boolean}>}
+ *    needsFollowUp, flaggedRegionsForFollowUp, silentRegions,
+ *    insertPhotoProvenanceBatch, writeQuery}
+ *   `silentRegions` (AC1, WO-2026-08-12-B15-VISION-03) is OPTIONAL - a
+ *   collaborator container that omits it (every pre-existing test fixture)
+ *   simply gets no AC6 observability field populated below; nothing else
+ *   about the wiring or the follow-up decision depends on its presence,
+ *   since `needsFollowUp`/`flaggedRegionsForFollowUp` compute the same
+ *   signal internally once given `stripRegionNos`.
+ * @returns {Promise<{lines: Array<object>, promptChars: number, followUpFired: boolean,
+ *   initialSilentRegions: number[], droppedLines: Array<object>}>}
  *   `lines` matches the EXTERNAL shape deps.js's realInterpretPhoto has
  *   always returned: {line_no, raw_reading, quantity, confidence,
  *   model_status} - unchanged, so runPipeline.js's stepInterpret and every
  *   offline test that fakes deps.interpretPhoto wholesale need no change.
+ *   `initialSilentRegions` and `droppedLines` are ADDITIVE (AC6,
+ *   WO-2026-08-12-B15-VISION-03) - see their own inline comments below for
+ *   what each observes and why a future live re-test needs it.
  */
 export async function interpretPhotoWithDeps(
   { catalogue, imageBuffer, shopId, interpreterModel, promptVersion },
@@ -76,6 +86,7 @@ export async function interpretPhotoWithDeps(
     prepareImage, renderAllRegions, toDataUrl, insertRegionBatch,
     buildGroundedPrompt, vision, extractJson,
     runSanityChecks, needsFollowUp, flaggedRegionsForFollowUp,
+    silentRegions: silentRegionsFn,
     insertPhotoProvenanceBatch, writeQuery,
   } = collaborators;
 
@@ -110,18 +121,38 @@ export async function interpretPhotoWithDeps(
   // unmatched lines, missing source_region; resolves cross-strip duplicates.
   let { lines: checked } = runSanityChecks(lines);
 
-  // 6. THE FOLLOW-UP DECISION (AC5/AC2) - low confidence OR a deterministic
-  // anomaly, either alone sufficient. Each flagged region is now
-  // re-inspected as its OWN individual vision() call (WO-2026-08-12-B15-
-  // VISION-02, AC2) - never bundled into one request, and never fired for a
-  // region nothing flagged. A clean list (0 suspect regions) costs exactly
-  // the one call from step 4, unchanged.
-  const { needsFollowUp: shouldFollowUp } = needsFollowUp(checked);
+  // AC1 (WO-2026-08-12-B15-VISION-03) - the STRIP regions the model was
+  // actually shown (never the full_page region, which is whole-page context
+  // rather than a specific physical area a follow-up crop can usefully
+  // re-inspect - see followUpTrigger.js's silentRegions for what this feeds).
+  const stripRegionNos = prepared.regions
+    .filter((r) => r.region_kind === 'strip')
+    .map((r) => r.region_no);
+
+  // 6. THE FOLLOW-UP DECISION (AC5/AC2, widened by AC1/WO-2026-08-12-B15-
+  // VISION-03 with a THIRD, independent trigger: a strip region producing
+  // ZERO live lines at all - "silence isn't currently treated as an
+  // anomaly" is exactly the gap this closes). Low confidence, a
+  // deterministic anomaly, or a silent region - any one alone sufficient.
+  // Each flagged region is re-inspected as its OWN individual vision() call
+  // (WO-2026-08-12-B15-VISION-02, AC2) - never bundled into one request,
+  // and never fired for a region nothing flagged. A clean list (0 suspect
+  // regions) costs exactly the one call from step 4, unchanged.
+  const { needsFollowUp: shouldFollowUp } = needsFollowUp(checked, stripRegionNos);
+  // AC6 (WO-2026-08-12-B15-VISION-03) - captured from the ORIGINAL pass
+  // only, before any follow-up round runs, so a future live re-test's
+  // harness can see exactly which regions were silent on first read
+  // regardless of whether a follow-up later recovered them. `silentRegions`
+  // is an OPTIONAL collaborator (see this function's own doc comment) -
+  // absent, this is simply `[]`, never a thrown error.
+  const initialSilentRegions = typeof silentRegionsFn === 'function'
+    ? silentRegionsFn(checked, stripRegionNos)
+    : [];
   let followUpFired = false;
 
   if (shouldFollowUp) {
     followUpFired = true;
-    const flaggedRegionNos = flaggedRegionsForFollowUp(checked);
+    const flaggedRegionNos = flaggedRegionsForFollowUp(checked, stripRegionNos);
     const flaggedRegions = prepared.regions.filter((r) => flaggedRegionNos.includes(r.region_no));
 
     // ONE INDIVIDUAL CALL PER FLAGGED REGION - the A/B-proven shape. A
@@ -180,5 +211,34 @@ export async function interpretPhotoWithDeps(
       })),
     promptChars: prompt.length,
     followUpFired,
+    // AC6 (WO-2026-08-12-B15-VISION-03) - ADDITIVE observability, never
+    // consumed by any pre-existing caller (runPipeline.js's stepInterpret
+    // reads only `.lines`/`.followUpFired`/`.promptChars`, unchanged) and
+    // never persisted by this function - both fields exist to let a future
+    // live re-test's HARNESS (abAcceptanceHarness.js) tell apart the three
+    // omission shapes AC1 named:
+    //   * "never generated by any region"  - a region_no in
+    //     initialSilentRegions with NO corresponding entry in droppedLines
+    //     for it either: nothing was ever read there, on the FIRST pass.
+    //   * "generated then filtered/dropped" - present in droppedLines: the
+    //     model DID produce this raw_reading, and photoSanityChecks.js's
+    //     cross-strip/same-region dedup superseded it (see
+    //     resolveCrossStripDuplicates) - a real pipeline decision, not
+    //     silence.
+    //   * "genuinely never seen by the model" - a strip that is NEITHER
+    //     silent NOR the source of a dropped line, yet a human-verified
+    //     ground-truth item is known to belong there: this pair alone
+    //     cannot prove that shape (it needs the ground-truth item's real
+    //     photo position, which this pipeline does not have), but ruling
+    //     out the first two narrows it down for a human reviewer instead
+    //     of leaving all three indistinguishable, which is the gap AC6
+    //     names.
+    initialSilentRegions,
+    droppedLines: checked
+      .filter((l) => l.supersededByIndex !== null && l.supersededByIndex !== undefined)
+      .map((l) => ({
+        line_no: l.line_no, raw_reading: l.raw_reading, source_region: l.source_region,
+        supersededByIndex: l.supersededByIndex,
+      })),
   };
 }

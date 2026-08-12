@@ -41,7 +41,7 @@ import { decideNextStep } from './stages.js';
 // vision()/extractJson() already are - see that function's own comment.
 import { prepareImage } from './imagePrep.js';
 import { runSanityChecks } from './photoSanityChecks.js';
-import { needsFollowUp, flaggedRegionsForFollowUp } from './followUpTrigger.js';
+import { needsFollowUp, flaggedRegionsForFollowUp, silentRegions } from './followUpTrigger.js';
 import { insertRegionBatch } from './shopImageRegions.js';
 import { insertPhotoProvenanceBatch } from './lineProvenance.js';
 import { interpretPhotoWithDeps } from './interpretPhotoOrchestrator.js';
@@ -287,10 +287,10 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
     return content;
   };
 
-  const { lines } = await interpretPhotoWithDeps(
+  const { lines, initialSilentRegions, droppedLines } = await interpretPhotoWithDeps(
     { catalogue, imageBuffer, shopId, interpreterModel, promptVersion: PROMPT_VERSION },
     {
-      prepareImage, runSanityChecks, needsFollowUp, flaggedRegionsForFollowUp,
+      prepareImage, runSanityChecks, needsFollowUp, flaggedRegionsForFollowUp, silentRegions,
       insertRegionBatch, insertPhotoProvenanceBatch,
       renderAllRegions, toDataUrl,
       buildGroundedPrompt, vision, extractJson,
@@ -304,6 +304,14 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
   // grounding-evidence record above (never a raw reading, never the prompt,
   // never the photograph) - this is an operational cost log, not a second
   // copy of the shopping list.
+  //
+  // AC6 (WO-2026-08-12-B15-VISION-03) - silent_regions_count/dropped_lines_
+  // count are ADDITIVE to this existing line, same sanitization discipline:
+  // counts only, never the region numbers or the dropped raw_reading text.
+  // The full, unsanitized detail (needed to actually classify an omission)
+  // stays in interpretPhotoWithDeps's own return, which the DIAGNOSTIC
+  // harness (abAcceptanceHarness.js runAdaptiveStrategy) reads directly -
+  // this production log line is a cheap standing signal, not the mechanism.
   const totalCostUsd = usageLog.reduce((sum, u) => sum + (u.cost_usd ?? 0), 0);
   const anyUsageUnreported = usageLog.some((u) => u.usage === null);
   // eslint-disable-next-line no-console
@@ -311,6 +319,8 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
     event: 'asdair_vision_usage', shop_id: shopId, vision_calls: usageLog.length,
     total_cost_usd: anyUsageUnreported ? null : Number(totalCostUsd.toFixed(6)),
     any_usage_unreported: anyUsageUnreported,
+    silent_regions_count: Array.isArray(initialSilentRegions) ? initialSilentRegions.length : 0,
+    dropped_lines_count: Array.isArray(droppedLines) ? droppedLines.length : 0,
   }));
 
   return lines;

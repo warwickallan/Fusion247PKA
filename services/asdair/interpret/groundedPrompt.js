@@ -37,12 +37,13 @@
 // Bumped whenever this template's WORDING or JSON-output contract changes in
 // a way that could change what the model returns - the region-citation
 // contract above is what earned v2; the quantity-evidence rewording below
-// (WO-2026-08-12-B15-VISION-02, AC1) earns v3. Recorded on every PHOTO
-// provenance row (shop_line_provenance.prompt_version, migration 020)
+// (WO-2026-08-12-B15-VISION-02, AC1) earned v3; the no-prior-hallucination
+// guard below (WO-2026-08-12-B15-VISION-03, AC2) earns v4. Recorded on every
+// PHOTO provenance row (shop_line_provenance.prompt_version, migration 020)
 // specifically so a future accuracy regression is debuggable ("did the model
 // change or did the prompt change" - migration 020's own reasoning for
 // carrying this at all).
-const PROMPT_VERSION = 'grounded-v3-quantity-evidence';
+const PROMPT_VERSION = 'grounded-v4-no-prior-hallucination-guard';
 
 const STATUSES = Object.freeze([
   'matched',
@@ -143,12 +144,17 @@ ${renderCandidates(catalogue.candidates)}
 STANDING RULES THAT AFFECT INTERPRETATION:
 ${renderRules(catalogue.rules)}
 
-WHAT THEY BOUGHT LAST TIME (useful prior - they repeat most weeks):
+WHAT THEY BOUGHT LAST TIME (a prior for DISAMBIGUATING a mark you can already see on the page - they repeat
+most weeks - but NEVER on its own a reason to report a line. If nothing on the page corresponds to something
+they usually buy, it is not on this week's list, however likely that seems):
 ${renderLastOrder(catalogue.last_order)}${regionsSection}
 
 TASK
 1. Locate EVERY handwritten line on the page, in page order. Do not drop a line because you are unsure of it,
-   and do not add a line that is not visibly there.
+   and do not add a line that is not visibly there. A product being one of THE HOUSEHOLD'S KNOWN PRODUCTS or
+   appearing in WHAT THEY BOUGHT LAST TIME is NEVER on its own evidence that it is written on THIS week's
+   page - only a real handwritten mark is. Report a line because you can see it, never because it would be a
+   plausible or likely thing for this household to buy.
 2. For each line, record raw_reading: your best literal reading of the marks. This is the ONLY field where you
    write your own words.
 3. Then choose the candidate id from the list above that the line most likely refers to.

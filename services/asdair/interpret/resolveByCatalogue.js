@@ -340,9 +340,52 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
   return none;
 }
 
+// ── AC3 (WO-2026-08-12-B15-VISION-03) - THE AUTHORITATIVE DUPLICATE COLLAPSE ──
+//
+// THE BUG THIS CLOSES, traced by reading the actual materialisation path
+// (runPipeline.js buildGroundedIntents): every interpreted line becomes a
+// real `add_list_item` intent UNCONDITIONALLY - there is no status this
+// function could set that buildGroundedIntents itself would skip. The OLD
+// behaviour here only ever set `status = 'possible_duplicate'` on a repeat,
+// which is a label NOTHING downstream ever acted on - a genuine duplicate
+// (the round-3 live re-test's real Febreze pair: two raw readings both
+// correctly resolving to the SAME real catalogue product) therefore reached
+// the basket as TWO separate lines. This is the SAME defect SHAPE
+// photoSanityChecks.resolveCrossStripDuplicates already fixed for the
+// Vanish case (WO-2026-08-12-B15-VISION-02, AC4) - "generalise the
+// duplicate-collapsing mechanism" (AC3) means giving THIS layer, which runs
+// on the AUTHORITATIVE catalogue identity rather than the model's own
+// unreliable self-claim, the same real teeth: `runPipeline.js`'s single
+// call site now SKIPS a line whose status is `excluded` before building any
+// intent - see that file's own comment on the change.
+//
+// THE KEY, matching photoSanityChecks.duplicateKey's own already-tested
+// semantics exactly: (matched_regular_id, quantity). Two reads of the SAME
+// real product at the SAME quantity are the same physical purchase read
+// twice; two reads of the SAME product at DIFFERENT quantities are the
+// design doc's own protected case ("two real milk lines at different
+// quantities must NOT collapse") and are left completely unflagged, never
+// merely relabelled - matching what a genuinely separate purchase deserves.
+//
+// `excluded` (never `possible_duplicate`) is what a true duplicate now
+// receives - a value shopLines.LINE_STATUSES has carried since migration
+// 008 and this estate already treats elsewhere (runPipeline.js's own
+// standing-rule exclusions, applyDecisions.js, planner.js) as "durably kept
+// on record, never a real basket line". The row is NEVER dropped from this
+// array - matching this whole codebase's insert-only, audit-trail
+// discipline (see lineProvenance.js's own header) - only its status
+// changes, so shop_line still carries a full, honest account of every
+// reading the model produced.
+function duplicateKey(matchedRegularId, quantity) {
+  return String(matchedRegularId) + '|' + String(quantity ?? null);
+}
+
 /**
- * Resolve a whole interpreted list. Marks a repeat of an already-resolved
- * regular as possible_duplicate rather than silently ordering it twice.
+ * Resolve a whole interpreted list. A SECOND (or later) reading resolving to
+ * the SAME real catalogue product at the SAME quantity as an earlier line in
+ * this batch is the authoritative, catalogue-identity-confirmed duplicate -
+ * see the AC3 header comment above for why this is now a real exclusion
+ * rather than the old possible_duplicate label nothing downstream acted on.
  *
  * ── PER-LINE VISION SIGNAL, NEVER SHARED ACROSS THE BATCH (WP-B15-22) ──────
  * `opts` may carry `lastOrderNames` (batch-wide, unchanged), but
@@ -359,7 +402,7 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
  * even when the gate did not need to fire.
  */
 function resolveAll(lines, regulars, opts = {}) {
-  const seen = new Set();
+  const seenKeys = new Set();
   return lines.map((l, i) => {
     const lineOpts = {
       ...opts,
@@ -367,15 +410,26 @@ function resolveAll(lines, regulars, opts = {}) {
       visionStatus: l && Object.prototype.hasOwnProperty.call(l, 'vision_status') ? l.vision_status : undefined,
     };
     const r = resolveReading(l.raw_reading, regulars, lineOpts);
+    const quantity = l.quantity ?? null;
     if (r.matched_regular_id != null) {
-      if (seen.has(r.matched_regular_id)) r.status = 'possible_duplicate';
-      seen.add(r.matched_regular_id);
+      const key = duplicateKey(r.matched_regular_id, quantity);
+      if (seenKeys.has(key)) {
+        // AC3: the authoritative collapse - never merely a label. Identity
+        // and quantity, both already resolved, are unchanged so the audit
+        // trail still shows exactly what this reading was; only `status`
+        // moves to `excluded` so runPipeline.js's materialisation step skips
+        // it (see that file's own comment on the call site that enforces
+        // this).
+        r.status = 'excluded';
+      } else {
+        seenKeys.add(key);
+      }
     }
     const match_confidence = lineOpts.visionConfidence === undefined
       ? null
       : (Number.isFinite(Number(lineOpts.visionConfidence)) ? Number(lineOpts.visionConfidence) : null);
     return {
-      line_no: l.line_no ?? i + 1, raw_reading: l.raw_reading, quantity: l.quantity ?? null,
+      line_no: l.line_no ?? i + 1, raw_reading: l.raw_reading, quantity,
       match_confidence, ...r,
     };
   });

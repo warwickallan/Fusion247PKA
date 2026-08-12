@@ -107,13 +107,53 @@ test('a leading quantity never pollutes the match term', () => {
   assert.equal(stripLeadingQuantity('1 pk small mars bars'), 'small mars bars');
 });
 
-test('the same regular appearing twice is flagged possible_duplicate, not ordered twice', () => {
+// ── AC3 (WO-2026-08-12-B15-VISION-03) - THE AUTHORITATIVE DUPLICATE COLLAPSE ──
+//
+// UPDATED from the old 'possible_duplicate' label, which runPipeline.js's
+// buildGroundedIntents was proven (by reading that materialisation code) to
+// never act on - a genuine duplicate reached the basket as two lines. This
+// is the SAME test's SAME fixture, asserting the CORRECTED behaviour the
+// order's own AC3 requires, not a new scenario: see resolveByCatalogue.js's
+// own AC3 header comment for the full reasoning and the shopLines.js
+// LINE_STATUSES precedent 'excluded' already carries elsewhere in this estate.
+test('AC3: the same regular appearing twice at the SAME quantity is authoritatively EXCLUDED, not merely labelled', () => {
   const out = resolveAll(
     [{ raw_reading: '1 chips' }, { raw_reading: '1 chips' }],
     REGULARS,
   );
   assert.equal(out[0].status, 'matched');
-  assert.equal(out[1].status, 'possible_duplicate');
+  assert.equal(out[1].status, 'excluded', 'a true duplicate must be excluded from basket materialisation, not merely flagged');
+  assert.equal(out[1].matched_regular_id, out[0].matched_regular_id, 'the identity is kept on record - never dropped, only excluded');
+});
+
+test('AC3: the Febreze-shape defect - TWO DIFFERENT raw readings resolving to the SAME real product ALSO collapse (not just an exact-text repeat)', () => {
+  // The round-3 live re-test's real failure: "1 Febreze fabric spray" and
+  // "1 Febreze air spray" are DIFFERENT raw text, but both genuinely
+  // resolve to the SAME real catalogue product at the SAME quantity - the
+  // general case this fix must catch, not only a byte-identical repeat.
+  const FEBREZE = [
+    { id: 30, name: 'Febreze Fabric Freshener Spray Lenor Spring Awakening 385ML', brand: 'Febreze', aka: ['febreze fabric spray', 'febreze air spray'] },
+  ];
+  const out = resolveAll(
+    [{ raw_reading: '1 febreze fabric spray', quantity: 1 }, { raw_reading: '1 febreze air spray', quantity: 1 }],
+    FEBREZE,
+  );
+  assert.equal(out[0].status, 'matched');
+  assert.equal(out[0].matched_regular_id, 30);
+  assert.equal(out[1].status, 'excluded', 'two DIFFERENT raw readings of the SAME real product must still collapse');
+  assert.equal(out[1].matched_regular_id, 30);
+});
+
+test('AC3: the SAME product at a DIFFERENT quantity is a genuinely separate purchase - never excluded, never even labelled', () => {
+  // The design doc's own protected case, carried over unchanged from
+  // photoSanityChecks.duplicateKey's identical (product id, quantity) rule:
+  // two real milk lines at different quantities must not collapse.
+  const out = resolveAll(
+    [{ raw_reading: '2 chips', quantity: 2 }, { raw_reading: '4 chips', quantity: 4 }],
+    REGULARS,
+  );
+  assert.equal(out[0].status, 'matched');
+  assert.equal(out[1].status, 'matched', 'a different quantity of the same real product is a separate purchase, not a duplicate');
 });
 
 // ── 4. The prompt must actually be grounded ─────────────────────────────────
@@ -149,6 +189,29 @@ test('the prompt forbids adding an invisible line and forbids dropping a low-con
   const p = buildGroundedPrompt(CATALOGUE);
   assert.ok(/do not add a line that is not visibly there/i.test(p));
   assert.ok(/Do not drop a line because you are unsure/i.test(p));
+});
+
+// ── AC2 (WO-2026-08-12-B15-VISION-03) - THE NO-PRIOR-HALLUCINATION GUARD ────
+//
+// The round-2 live re-test found TRESemme shampoo, a TRESemme conditioner and
+// a Lucozade Raspberry sport drink INVENTED on both live runs - none actually
+// on the photo, all plausible "usually bought" household regulars/priors.
+// This is the prompt-layer half of the fix: an explicit instruction that
+// "known products" and "last time" are disambiguation aids ONLY, never
+// evidence a line exists. See resolveByCatalogue.js/runPipeline.js for the
+// AC3 general-dedup fix, a genuinely separate defect these tests do not cover.
+test('AC2: the prompt explicitly forbids treating a known/prior product as evidence a line exists on the page', () => {
+  const p = buildGroundedPrompt(CATALOGUE);
+  // whitespace-tolerant: the instruction wraps across lines in the prompt,
+  // same convention as the other multi-line instruction assertions above.
+  assert.ok(
+    /is\s+NEVER\s+on\s+its\s+own\s+evidence\s+that\s+it\s+is\s+written\s+on\s+THIS\s+week's\s+page/i.test(p),
+    'a household regular or last-order item must never be treated as license to report a line nobody wrote',
+  );
+  assert.ok(
+    /only a real handwritten mark is/i.test(p),
+    'the prompt must name the actual evidence bar - a real mark, not a plausible prior',
+  );
 });
 
 // ── 5. Open-ended transcription must not be the primary path ────────────────

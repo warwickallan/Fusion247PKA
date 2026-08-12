@@ -14,6 +14,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { interpretPhotoWithDeps } from './interpretPhotoOrchestrator.js';
+import { needsFollowUp as realNeedsFollowUp, flaggedRegionsForFollowUp as realFlaggedRegionsForFollowUp, silentRegions as realSilentRegions } from './followUpTrigger.js';
+import { runSanityChecks as realRunSanityChecks } from './photoSanityChecks.js';
 
 const CATALOGUE = { candidates: [{ id: 1, name: 'Milk' }], rules: [], last_order: { lines: [] } };
 
@@ -282,4 +284,126 @@ test('promptChars is measured from the REAL region-aware prompt actually sent, n
   collaborators.buildGroundedPrompt = () => 'A PARTICULAR PROMPT OF KNOWN LENGTH';
   const result = await interpretPhotoWithDeps({ catalogue: CATALOGUE, imageBuffer: Buffer.from('img'), shopId: 1 }, collaborators);
   assert.equal(result.promptChars, 'A PARTICULAR PROMPT OF KNOWN LENGTH'.length);
+});
+
+// =====================================================================
+// AC1/AC6 (WO-2026-08-12-B15-VISION-03) - the silent-region follow-up
+// trigger, wired through the REAL followUpTrigger.js/photoSanityChecks.js
+// (not the inline fakes above) so this proves genuine orchestrator
+// integration, not merely that SOME function got called.
+// =====================================================================
+
+/** Real needsFollowUp/flaggedRegionsForFollowUp/runSanityChecks/silentRegions,
+ *  everything else still a fake - isolates the ONE seam these tests exist to prove. */
+function realFollowUpCollaborators({ callLog }) {
+  return {
+    ...baseCollaborators({ callLog }),
+    runSanityChecks: (lines) => { callLog.push('runSanityChecks'); return realRunSanityChecks(lines); },
+    needsFollowUp: realNeedsFollowUp,
+    flaggedRegionsForFollowUp: realFlaggedRegionsForFollowUp,
+    silentRegions: realSilentRegions,
+  };
+}
+
+test('AC1: a strip region producing ZERO live lines triggers a follow-up for THAT region alone, even with every line high-confidence and anomaly-free', async () => {
+  const callLog = [];
+  const collaborators = realFollowUpCollaborators({ callLog });
+  collaborators.prepareImage = () => ({
+    rotate: 0, flip: null, imageFingerprint: null,
+    regions: [
+      { region_no: 1, region_kind: 'full_page', pixel_top: null, pixel_left: null, pixel_bottom: null, pixel_right: null },
+      { region_no: 2, region_kind: 'strip', pixel_top: 0, pixel_left: 0, pixel_bottom: 700, pixel_right: 1000 },
+      { region_no: 3, region_kind: 'strip', pixel_top: 600, pixel_left: 0, pixel_bottom: 1300, pixel_right: 1000 },
+    ],
+  });
+  // The first pass cites ONLY region 2 - region 3 (a real strip) gets no
+  // line at all. Every line is high-confidence and carries no catalogue
+  // anomaly (a genuine LEADING count, "2 Milk", so photoSanityChecks'
+  // unjustified-quantity check does not fire), so neither pre-existing
+  // trigger path can explain a follow-up.
+  collaborators.vision = async (prompt, imageUrls) => {
+    callLog.push('vision:' + (Array.isArray(imageUrls) ? imageUrls.length : 1));
+    return JSON.stringify({
+      lines: [{ line_no: 1, raw_reading: '2 Milk', quantity: 2, matched_regular_id: 1, confidence: 0.95, status: 'matched', source_region: 2 }],
+    });
+  };
+
+  const originalVision = collaborators.vision;
+  const followUpUrlCounts = [];
+  collaborators.vision = async (prompt, imageUrls) => {
+    const isFirstPass = Array.isArray(imageUrls) && imageUrls.length === 3;
+    if (isFirstPass) return originalVision(prompt, imageUrls);
+    followUpUrlCounts.push(Array.isArray(imageUrls) ? imageUrls.length : 1);
+    callLog.push('vision:' + (Array.isArray(imageUrls) ? imageUrls.length : 1));
+    return JSON.stringify({
+      lines: [{ line_no: 1, raw_reading: 'Recovered on region 3', quantity: null, matched_regular_id: 9, confidence: 0.9, status: 'matched', source_region: 3 }],
+    });
+  };
+
+  const result = await interpretPhotoWithDeps({ catalogue: CATALOGUE, imageBuffer: Buffer.from('img'), shopId: 1 }, collaborators);
+
+  assert.equal(result.followUpFired, true, 'the silent strip region alone must trigger a follow-up');
+  assert.deepEqual(followUpUrlCounts, [1], 'exactly one individual follow-up call, for the ONE silent region');
+  assert.deepEqual(result.initialSilentRegions, [3], 'AC6: the ORIGINAL silent region must be reported even though the follow-up later recovered it');
+  assert.ok(result.lines.some((l) => l.raw_reading === 'Recovered on region 3'), 'the follow-up reading for the silent region must reach the final lines');
+});
+
+test('AC1: every strip covered - a genuinely clean pass never fires a follow-up, whatever region list is real', async () => {
+  const callLog = [];
+  const collaborators = realFollowUpCollaborators({ callLog });
+  collaborators.prepareImage = () => ({
+    rotate: 0, flip: null, imageFingerprint: null,
+    regions: [
+      { region_no: 1, region_kind: 'full_page', pixel_top: null, pixel_left: null, pixel_bottom: null, pixel_right: null },
+      { region_no: 2, region_kind: 'strip', pixel_top: 0, pixel_left: 0, pixel_bottom: 700, pixel_right: 1000 },
+      { region_no: 3, region_kind: 'strip', pixel_top: 600, pixel_left: 0, pixel_bottom: 1300, pixel_right: 1000 },
+    ],
+  });
+  collaborators.vision = async (prompt, imageUrls) => {
+    callLog.push('vision:' + (Array.isArray(imageUrls) ? imageUrls.length : 1));
+    return JSON.stringify({
+      lines: [
+        { line_no: 1, raw_reading: '2 Milk', quantity: 2, matched_regular_id: 1, confidence: 0.95, status: 'matched', source_region: 2 },
+        { line_no: 2, raw_reading: '1 Bread', quantity: 1, matched_regular_id: 2, confidence: 0.92, status: 'matched', source_region: 3 },
+      ],
+    });
+  };
+
+  const result = await interpretPhotoWithDeps({ catalogue: CATALOGUE, imageBuffer: Buffer.from('img'), shopId: 1 }, collaborators);
+
+  assert.equal(result.followUpFired, false);
+  assert.deepEqual(result.initialSilentRegions, []);
+  assert.equal(callLog.filter((c) => c.startsWith('vision:')).length, 1, 'every strip covered -> exactly one call, unchanged');
+});
+
+test('AC6: droppedLines reports a cross-strip-superseded line - the "generated then filtered" shape, distinct from silence', async () => {
+  const callLog = [];
+  const collaborators = realFollowUpCollaborators({ callLog });
+  // Same real product at the same quantity, read twice (a genuine leading
+  // count each time, so unjustified-quantity never contaminates this fixture
+  // and the ONLY anomaly in play is the duplicate itself) - the confidence
+  // difference decides which survives (resolveCrossStripDuplicates: highest
+  // confidence wins), so index 1 (0.95) survives and index 0 (0.6) is the
+  // one reported in droppedLines, pointing at survivor index 1.
+  collaborators.vision = async () => JSON.stringify({
+    lines: [
+      { line_no: 1, raw_reading: '2 Milk', quantity: 2, matched_regular_id: 1, confidence: 0.6, status: 'matched', source_region: 1 },
+      { line_no: 2, raw_reading: '2 Milk', quantity: 2, matched_regular_id: 1, confidence: 0.95, status: 'matched', source_region: 1 },
+    ],
+  });
+
+  const result = await interpretPhotoWithDeps({ catalogue: CATALOGUE, imageBuffer: Buffer.from('img'), shopId: 1 }, collaborators);
+
+  assert.equal(result.lines.length, 1, 'only the survivor reaches the live lines');
+  assert.equal(result.droppedLines.length, 1, 'the superseded reading must be reported, not silently absorbed');
+  assert.equal(result.droppedLines[0].raw_reading, '2 Milk');
+  assert.equal(result.droppedLines[0].supersededByIndex, 1, 'the loser must name which survivor (the higher-confidence index 1) superseded it');
+});
+
+test('silentRegions is an OPTIONAL collaborator - its absence never throws and yields no observability field, not a crash', async () => {
+  const callLog = [];
+  const collaborators = baseCollaborators({ callLog }); // no silentRegions fake at all
+  const result = await interpretPhotoWithDeps({ catalogue: CATALOGUE, imageBuffer: Buffer.from('img'), shopId: 1 }, collaborators);
+  assert.deepEqual(result.initialSilentRegions, []);
+  assert.deepEqual(result.droppedLines, []);
 });

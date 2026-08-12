@@ -256,6 +256,57 @@ test('GATE ZERO END TO END: a TEXT shop never acquires transcript provenance - i
   assert.equal(shop.transcript_confidence, null);
 });
 
+// =====================================================================
+// AC3 (WO-2026-08-12-B15-VISION-03) - THE END-TO-END PROOF, THROUGH THE REAL
+// PRODUCTION PATH: deps.interpretPhoto -> resolveAll (the REAL one, wired by
+// test/harness.js) -> shopLines.upsertLines -> buildGroundedIntents ->
+// deps.executeIntents -> the real shopping_list_items table. This is what
+// the round-3 live re-test's real Febreze duplicate needed and did not have:
+// a genuine catalogue-identity duplicate collapsed BEFORE it reaches a real
+// basket line, not merely labelled possible_duplicate and left to reach it
+// anyway (the proven defect - see resolveByCatalogue.js's own AC3 header
+// comment for how it was traced, by reading buildGroundedIntents itself).
+// =====================================================================
+
+test('AC3 END TO END: a genuine catalogue-identity duplicate (two DIFFERENT raw readings, same real product, same quantity) is durably recorded but reaches the basket only ONCE', async () => {
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
+      // A DIFFERENT raw reading of the SAME physical item (the Febreze-shape
+      // defect: not a byte-identical repeat) - "gourmet" is regular 11's own
+      // SECOND exact alias (test/harness.js: aka ['gourmet cat food',
+      // 'gourmet']), so this resolves via EXACT_ALIAS to the SAME real
+      // regular id 11 at the SAME quantity 3, genuinely different text.
+      { line_no: 2, raw_reading: '3 gourmet', quantity: 3 },
+    ],
+  });
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  const interpret = await runPipeline(HANDLE, h.deps);   // interpret -> PROCESSING
+
+  // BOTH readings are durably recorded - the audit trail must show what the
+  // model actually said, never silently dropped.
+  assert.equal(h.db.shop_line.length, 2);
+  const line1 = h.db.shop_line.find((l) => l.line_no === 1);
+  const line2 = h.db.shop_line.find((l) => l.line_no === 2);
+  assert.equal(line1.status, 'matched');
+  assert.equal(line1.matched_regular_id, 11);
+  assert.equal(line2.status, 'excluded', 'the second reading of the same real product at the same quantity must be authoritatively excluded');
+  assert.equal(line2.matched_regular_id, 11, 'identity is kept on record even though the line is excluded');
+  assert.equal(line2.raw_reading, '3 gourmet', 'the raw reading the model actually produced must survive verbatim');
+
+  // Materialisation: exactly ONE real basket line for Gourmet cat food, not two.
+  const gourmetItems = h.db.shopping_list_items.filter((i) => i.item_name === 'Gourmet cat food');
+  assert.equal(gourmetItems.length, 1, 'a true duplicate must reach the basket exactly once');
+  assert.equal(interpret.lines, 1, 'the excluded line must not count toward materialised lines');
+
+  // The replay guard: the excluded line is never bound to a list item (it
+  // was never materialised), while the survivor is.
+  assert.ok(line1.list_item_id, 'the surviving line must be bound to the real list item it became');
+  assert.equal(line2.list_item_id, null, 'an excluded line was never materialised, so it has nothing to bind to');
+});
+
 test('GATE ZERO §4: the plan_ready advisory log flags an IMPLAUSIBLY LOW line count on a photo shop', async () => {
   // No priced comparator is cheaply available at plan_ready (SOP-021's own
   // GBP 120-150 band is "structurally inoperative" - no price column exists;

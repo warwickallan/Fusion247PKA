@@ -41,14 +41,16 @@ const CATALOGUE = {
 };
 
 // The EXACT prompt template this module currently produces (as of
-// WO-2026-08-12-B15-VISION-02 AC1's quantity-evidence rewording of step 6 -
+// WO-2026-08-12-B15-VISION-03 AC2's no-prior-hallucination guard -
 // originally reconstructed for WO-2026-08-11-B15-VISION-01 at governance
-// head 095503af..., kept in sync with every intentional wording change since)
+// head 095503af..., kept in sync with every intentional wording change since,
+// most recently WO-2026-08-12-B15-VISION-02 AC1's quantity-evidence
+// rewording of step 6)
 // - reconstructed literally, not regenerated, so a silent, UNINTENTIONAL
 // change to the no-options path is caught by string equality rather than by
 // a test that could drift alongside an accidental behaviour change. An
-// INTENTIONAL wording change (like AC1's) updates this reconstruction in the
-// SAME commit, never leaves it to silently diverge.
+// INTENTIONAL wording change (like AC1's, and now AC2's) updates this
+// reconstruction in the SAME commit, never leaves it to silently diverge.
 function originalPrompt(catalogue) {
   const renderCandidates = (candidates) => candidates
     .map((c) => {
@@ -77,12 +79,17 @@ ${renderCandidates(catalogue.candidates)}
 STANDING RULES THAT AFFECT INTERPRETATION:
 ${renderRules(catalogue.rules)}
 
-WHAT THEY BOUGHT LAST TIME (useful prior - they repeat most weeks):
+WHAT THEY BOUGHT LAST TIME (a prior for DISAMBIGUATING a mark you can already see on the page - they repeat
+most weeks - but NEVER on its own a reason to report a line. If nothing on the page corresponds to something
+they usually buy, it is not on this week's list, however likely that seems):
 ${renderLastOrder(catalogue.last_order)}
 
 TASK
 1. Locate EVERY handwritten line on the page, in page order. Do not drop a line because you are unsure of it,
-   and do not add a line that is not visibly there.
+   and do not add a line that is not visibly there. A product being one of THE HOUSEHOLD'S KNOWN PRODUCTS or
+   appearing in WHAT THEY BOUGHT LAST TIME is NEVER on its own evidence that it is written on THIS week's
+   page - only a real handwritten mark is. Report a line because you can see it, never because it would be a
+   plausible or likely thing for this household to buy.
 2. For each line, record raw_reading: your best literal reading of the marks. This is the ONLY field where you
    write your own words.
 3. Then choose the candidate id from the list above that the line most likely refers to.

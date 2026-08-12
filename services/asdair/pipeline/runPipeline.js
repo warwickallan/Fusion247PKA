@@ -824,7 +824,22 @@ async function stepInterpret(deps, snapshot) {
   // already confirmed refuses the re-read, and the list must follow the stored
   // truth rather than the fresh guess.
   const stored = shopLines.withCanonicalNames(lineWrites.map((w) => w.line), catalogue);
-  const intents = buildGroundedIntents(stored, {
+
+  // AC3 (WO-2026-08-12-B15-VISION-03): an 'excluded' line (resolveByCatalogue.js
+  // resolveAll's authoritative duplicate collapse - see that module's own AC3
+  // header comment) is durably PERSISTED above unchanged, exactly like every
+  // other line - the audit trail must show it existed and what it was. It
+  // must NEVER be materialised as a second real basket line for the same
+  // physical item, which is what buildGroundedIntents' own unconditional
+  // one-intent-per-line mapping would otherwise do (proven by reading that
+  // function: nothing in it inspects `status` for a skip). Filtered OUT of
+  // materialisation only, never out of the interpretation record itself -
+  // `materialisable` and everything indexed against it (`intents`,
+  // `written.results`, the linkListItem loop below) stay in lock-step by
+  // construction, since all three are now derived from the SAME filtered
+  // array rather than from `stored` directly.
+  const materialisable = stored.filter((l) => l.status !== 'excluded');
+  const intents = buildGroundedIntents(materialisable, {
     sourceId, listDate, requestedBy: 'asdair:pipeline', shopId: shop.id,
   });
   deps.assertAllowedIntents(intents);
@@ -836,9 +851,9 @@ async function stepInterpret(deps, snapshot) {
 
   // Bind each interpreted line to the list item it became. THE REPLAY GUARD:
   // a line carrying a list_item_id has already been materialised.
-  for (let i = 0; i < stored.length; i += 1) {
+  for (let i = 0; i < materialisable.length; i += 1) {
     const itemId = written.results[i] && written.results[i].item_id;
-    if (itemId) await shopLines.linkListItem(deps, shop.id, stored[i].line_no, itemId);
+    if (itemId) await shopLines.linkListItem(deps, shop.id, materialisable[i].line_no, itemId);
   }
 
   // ── PROVENANCE FOR A PHOTO INTERPRETATION (WP-B15-22, GATE ZERO) ─────────
@@ -885,8 +900,11 @@ async function stepInterpret(deps, snapshot) {
     catalogue_candidates: catalogue.candidates.length,
     list_id: written.listId,
     // The gate reads the DURABLE flag on the shop; this is the fresh evidence
-    // for the same fact, reported so a caller can see why.
-    unresolved: stored.filter((l) => l.status !== 'matched').length,
+    // for the same fact, reported so a caller can see why. AC3
+    // (WO-2026-08-12-B15-VISION-03): an 'excluded' line is NOT unresolved -
+    // its identity is fully known and it was deliberately excluded as an
+    // authoritative duplicate, never a line a human still needs to act on.
+    unresolved: stored.filter((l) => l.status !== 'matched' && l.status !== 'excluded').length,
     lines_confirmed_and_kept: lineWrites.filter((w) => w.skipped).length,
     interpreted: stored,
   };
