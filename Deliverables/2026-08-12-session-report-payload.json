@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "report_type": "session_performance_report",
+  "author": "Pax",
+  "build": "BUILD-015 AsdAIr",
+  "report_date": "2026-08-12",
+  "session_window": {
+    "start": "2026-08-11T20:09:30.787Z",
+    "end_last_confirmed_dispatch": "2026-08-12T16:24:42.669Z",
+    "raw_span_hms": "19h49m",
+    "dead_gap_excluded": {
+      "start": "2026-08-12T07:25:00.567Z",
+      "end": "2026-08-12T15:14:01.423Z",
+      "duration_hms": "7h49m",
+      "note": "no dispatch of any kind found in this window; almost certainly an off-session pause, not active work"
+    },
+    "active_span_estimate_hms": "11h55m",
+    "branch": "main",
+    "closing_head_sha": "2d8c758",
+    "closing_head_provenance": "Larry-reported in the Wayfinder branch/head map table; NOT independently verified via git in this dispatch (no Bash/git tool grant)"
+  },
+  "tooling_limitation": "Read/Write/WebFetch/WebSearch/Grep/Glob only, no Bash/git this dispatch. All git-log-derived figures are UNESTABLISHED and explicitly marked, never estimated.",
+  "dispatch_inventory": {
+    "ledger_claimed_top_level_count": 18,
+    "narrative_reconstructed_count_estimate": "24-26",
+    "narrative_count_method": "counted distinct dispatch events named in the Wayfinder's own prose for this session's window",
+    "ledger_distinct_ids_named": 21,
+    "ids_independently_verified_against_raw_output_files": 12,
+    "ids_not_found_at_authoritative_path": 9,
+    "ids_not_found_detail": [
+      "asdair initial design-critique/research dispatch",
+      "silas schema-decision dispatch",
+      "asdair live-test round 1 (bundled discriminating test)",
+      "asdair live-test round 2",
+      "asdair live-test round 3",
+      "asdair live-test round 4",
+      "asdair live-test round 5",
+      "asdair capability-audit dispatch",
+      "keel agentic prototype v1 (CLARIFY-refused)"
+    ],
+    "verification_note": "unverified IDs could not be resolved either by direct string match or by broad content search (migration 020, omission, hallucinat, discriminating re-test, Silas, asdair) across the full 142-file task directory. Does not prove the dispatches did not happen (Wayfinder narrative corroborates most of them independently); establishes only that raw per-dispatch telemetry for them is unavailable at the declared authoritative path."
+  },
+  "verified_dispatches": [
+    {"agent": "asdair", "task": "ASDA catalogue cross-check", "id": "afd91d45c67ecab3b", "turns": 159, "tool_calls": 51, "start": "2026-08-11T20:35:10.284Z", "end": "2026-08-11T22:01:09.950Z", "span_hms": "1h26m"},
+    {"agent": "keel", "task": "Cockpit-BE", "id": "aae482c6f4681ff4a", "turns": 263, "tool_calls": 93, "start": "2026-08-11T22:54:09.004Z", "end": "2026-08-11T23:15:29.032Z", "span_hms": "21m"},
+    {"agent": "felix", "task": "Cockpit-UI", "id": "a08f29325fe53099d", "turns": 501, "tool_calls": 181, "start": "2026-08-11T22:54:14.718Z", "end": "2026-08-12T02:53:16.920Z", "span_hms": "3h59m", "note": "interleaved with other dispatches, not continuous execution"},
+    {"agent": "vera", "task": "QA gate on Cockpit UI", "id": "aedac3fe42dfed1b3", "turns": 396, "tool_calls": 144, "start": "2026-08-12T02:19:03.052Z", "end": "2026-08-12T03:03:31.161Z", "span_hms": "44m", "verdict": "HOLD then PASS"},
+    {"agent": "keel", "task": "vision pipeline round 1", "id": "a1e9569932638f02f", "turns": 627, "tool_calls": 222, "start": "2026-08-11T23:10:43.548Z", "end": "2026-08-12T02:37:42.481Z", "span_hms": "3h27m", "note": "interleaved, not continuous execution"},
+    {"agent": "keel", "task": "vision pipeline round 2", "id": "a97eb04777a2edb4a", "turns": 604, "tool_calls": 210, "start": "2026-08-12T03:25:29.819Z", "end": "2026-08-12T04:12:44.272Z", "span_hms": "47m"},
+    {"agent": "keel", "task": "vision pipeline round 3", "id": "a0fb8f7e265fc28c8", "turns": 406, "tool_calls": 144, "start": "2026-08-12T04:39:21.776Z", "end": "2026-08-12T05:11:03.358Z", "span_hms": "32m"},
+    {"agent": "keel", "task": "vision pipeline round 4", "id": "a0c6cf4b492362dc3", "turns": 317, "tool_calls": 112, "start": "2026-08-12T05:27:28.807Z", "end": "2026-08-12T05:51:34.217Z", "span_hms": "24m"},
+    {"agent": "keel", "task": "vision pipeline round 5", "id": "ab3336fa89f6c7e00", "turns": 285, "tool_calls": 100, "start": "2026-08-12T06:12:43.832Z", "end": "2026-08-12T06:29:27.657Z", "span_hms": "17m"},
+    {"agent": "keel", "task": "vision pipeline round 6", "id": "a9851cce50b9c9002", "turns": 360, "tool_calls": 128, "start": "2026-08-12T06:53:53.276Z", "end": "2026-08-12T07:25:00.567Z", "span_hms": "31m"},
+    {"agent": "keel", "task": "agentic vision prototype v2", "id": "a5b5b27826b40875b", "turns": 282, "tool_calls": 101, "start": "2026-08-12T15:14:01.423Z", "end": "2026-08-12T15:37:29.265Z", "span_hms": "23m"},
+    {"agent": "keel", "task": "agentic prototype protocol fix", "id": "a7bcd0b64a42a4229", "turns": 167, "tool_calls": 60, "start": "2026-08-12T15:53:38.843Z", "end": "2026-08-12T16:05:40.363Z", "span_hms": "12m"},
+    {"agent": "asdair", "task": "decisive live test (fixed loop)", "id": "a13e342ee025c899c", "turns": 168, "tool_calls": 61, "start": "2026-08-12T16:06:24.478Z", "end": "2026-08-12T16:24:42.669Z", "span_hms": "18m", "note": "initially refused on role-boundary grounds, proceeded after Larry cited precedent"}
+  ],
+  "peak_context_samples_tokens": {
+    "asdair_asda_cross_check_final_cache_read": 223898,
+    "felix_cockpit_ui_cache_read_lower_bound": 306379,
+    "keel_vision_round1_cache_read_lower_bound": 383665,
+    "keel_vision_round6_cache_read_lower_bound": 305849,
+    "asdair_decisive_test_cache_read_lower_bound": 125989,
+    "note": "lower bounds sampled near end-of-file, not exhaustively read to true final line for every dispatch; total subagent output-token sum across all dispatches is UNESTABLISHED"
+  },
+  "cumulative_vs_per_dispatch_question": {
+    "status": "PARTIALLY_ESTABLISHED",
+    "evidence": "within one continuously-appended per-agent-ID output file (asdair ASDA cross-check), cache_read_input_tokens grows across most turns but resets to zero twice, each followed by a large fresh cache_creation spike (165047, 191727 tokens)",
+    "confound": "cannot distinguish a genuine resume-boundary context reset from ordinary 5-minute prompt-cache TTL expiry given elapsed real time between turns",
+    "recommendation": "re-test with a resume performed inside the 5-minute cache window to remove the confound"
+  },
+  "work_order_events": [
+    {"seq": 1, "target": "keel", "order": "hand-authored Cockpit-BE-shaped WO", "verdict": "REFUSE", "cause": "missing tools/wo/envelope.mjs generation marker; undivided services/cockpit/** surface", "preventable": true, "caught_by": "worker SOP-022 preflight"},
+    {"seq": 2, "target": "keel", "order": "hand-authored WO-2026-08-11-B15-COCKPIT-01 / vision-pipeline worktree cut", "verdict": "REFUSE", "cause": "missing envelope.mjs marker; isolation:worktree cut from stale origin/main instead of local HEAD", "preventable": true, "caught_by": "worker SOP-022 preflight"},
+    {"seq": 3, "target": "silas", "order": "schema decision, photo-truth provenance table", "verdict": "COMPLETED", "note": "corrected Larry's own stale migration number reference (018 -> real 020)"},
+    {"seq": 4, "target": "keel", "order": "WO-2026-08-11-B15-COCKPIT-BE-01 (regenerated)", "verdict": "COMPLETED", "note": "all 5 AC met"},
+    {"seq": 5, "target": "keel", "order": "Cockpit-backend WP, first pass", "verdict": "PARTIAL", "cause": "AC4 blocked by a target test file outside declared surface, pinning an exact key shape", "preventable": false, "note": "worker correctly declined to game the test; fixed by Amendment 2 widening surface by exactly one file"},
+    {"seq": 6, "target": "felix", "order": "WO-2026-08-11-B15-COCKPIT-UI-01 (regenerated)", "verdict": "COMPLETED then IMPLEMENTED", "note": "Vera HOLD -> 4 findings fixed -> Vera PASS"},
+    {"seq": 7, "target": "keel", "order": "WO-2026-08-11-B15-VISION-01", "verdict": "CLARIFY then COMPLETED", "cause": "preflight found the actual canonical prompt-builder file differed from file_surface; amended", "preventable": true},
+    {"seq": 8, "target": "keel", "order": "vision pipeline rounds 2-6", "verdict": "COMPLETED x5, one honest null result (round 6 AC2)", "note": "each followed by a live re-test dispatched to Asdair, four of five clean read-backs with no amendment needed"},
+    {"seq": 9, "target": "keel", "order": "agentic vision prototype v1", "verdict": "CLARIFY-refused, correctly", "cause": "worktree cut from local main, which lacked the pricing-constant code AC4 needed; capability-probe evidence lived only in an ephemeral scratchpad", "preventable": true, "note": "same isolation:worktree-cuts-from-wrong-base defect class as seq 1-2, recurring within the same session"},
+    {"seq": 10, "target": "keel", "order": "agentic vision prototype v2", "verdict": "COMPLETED", "note": "all 6 AC met, re-cut from correct branch tip, evidence committed durably first"},
+    {"seq": 11, "target": "keel", "order": "agentic prototype protocol/bug fix", "verdict": "COMPLETED", "note": "function_call_output construction bug and dropped-second-tool-call bug both fixed"},
+    {"seq": 12, "target": "asdair", "order": "decisive live re-test", "verdict": "REFUSE then proceeded", "cause": "role-boundary reading directly contradicting 7 near-identical prior dispatches same session", "preventable": "partially - resolved by citing precedent; underlying contract-wording inconsistency remains unfixed and named as capable of recurring"}
+  ],
+  "first_dispatch_full_success_rate": {
+    "numerator": 11,
+    "denominator": 15,
+    "pct": 73,
+    "method": "orders with a clear COMPLETED/REFUSE/PARTIAL verdict in the Wayfinder narrative; 3 did not proceed on first dispatch for preventable process reasons (2x missing envelope generation, 1x wrong git base), 1 returned PARTIAL rather than COMPLETE"
+  },
+  "notifications": {
+    "ding_log_source": "~/.mypka/governor/ding-log.jsonl",
+    "session_window_sends": [
+      {"seq": 179, "ts": "2026-08-12T02:38:56.150Z", "bytes": 229, "likely_correlate": "keel vision round 1 completion (ended 02:37:42, ~1min prior)"},
+      {"seq": 180, "ts": "2026-08-12T03:04:58.369Z", "bytes": 248, "likely_correlate": "vera final PASS (ended 03:03:31, ~1.5min prior)"},
+      {"seq": 181, "ts": "2026-08-12T05:24:39.279Z", "bytes": 273, "likely_correlate": "between vision round 4 end (05:11:03) and round 5 start (05:27:28)"},
+      {"seq": 182, "ts": "2026-08-12T16:25:26.557Z", "bytes": 326, "likely_correlate": "decisive live test completion (ended 16:24:42, ~1min prior)"}
+    ],
+    "all_sends_succeeded": true,
+    "channel_available_throughout_session": true,
+    "queued_or_failed_this_session": 0,
+    "gap_flagged": {
+      "from": "2026-08-11T16:34:37.690Z (prior day's last ding)",
+      "to": "2026-08-12T02:38:56.150Z (this session's first ding)",
+      "duration_hms": "~10h04m",
+      "events_silently_spanned": [
+        "two Work Order refusals",
+        "Cockpit-backend COMPLETED, all 5 AC met",
+        "Cockpit-UI implemented",
+        "Vera's first HOLD verdict"
+      ],
+      "assessment": "probable miss, not certain - message body content not retained at available path; byte sizes (229-326) markedly smaller than this log's typical earlier-week entries (1000-3700+), consistent with terse status pings rather than batched outcome summaries"
+    }
+  },
+  "documentation_vs_product_commits": {
+    "status": "commit_count_UNESTABLISHED_no_git_access_this_dispatch",
+    "product_shas_named_in_narrative": ["82e7618", "f7bf71a", "86cfc08", "9dd980f", "3eb0dc3", "6923ad6", "4f03d4d", "e075440", "f442b2f", "f8d0e1e", "ab89d1d", "b314221", "f9c45a0"],
+    "dead_branch_head_excluded": "a222540 (zero unique commits, correctly not counted)",
+    "product_commit_count_named": 13,
+    "wayfinder_line_count": 3370,
+    "narrative_update_points_estimate": "24-26 (one per dispatch return)",
+    "genuine_phase_boundaries_estimate": "15-18",
+    "pax_assessment_opinion": "proportionate discipline for this session's genuine event-density, PROVIDED actual commit count does not materially exceed the ~15-18 genuine PASS/PARTIAL/FAILED boundaries; this is Pax's judgement, not a measured fact, and is explicitly labelled as such"
+  },
+  "capae_family_comparisons": [
+    {
+      "slug": "work-order-not-generated",
+      "told": {"occurrences": 3, "clean": 0, "required": 5},
+      "qualified_exposure_this_session": "RECURRENCE",
+      "evidence": "both hand-authored Cockpit orders skipped tools/wo/envelope.mjs generation",
+      "larry_action": "did not self-catch; workers' SOP-022 preflight caught it; fixed by regenerating and reissuing",
+      "prevention_held_after_fix": true,
+      "vs_previous_exposure": "unchanged_at_best_arguably_degraded",
+      "still_repeating_despite_starting_context": true
+    },
+    {
+      "slug": "built-tested-never-activated",
+      "told": {"occurrences": 5, "clean": 0, "required": 5},
+      "qualified_exposure_this_session": "none-this-session",
+      "evidence": "every completion claim explicitly qualified as builder self-test evidence, not merged; Warwick's mid-session correction accepted without defensiveness",
+      "larry_action": "maintained qualification consistently across every phase-boundary entry",
+      "prevention_held_after_fix": true,
+      "vs_previous_exposure": "improved_clean_continuation",
+      "still_repeating_despite_starting_context": false
+    },
+    {
+      "slug": "control-cannot-reach-what-it-checks",
+      "told": {"occurrences": 3, "clean": 3, "required": 5},
+      "qualified_exposure_this_session": "none-this-session",
+      "evidence": "round 3's wrongQuantity:0 metric caught as misleading by checking the mechanism behind it (quantity-assertion rate had collapsed, not improved)",
+      "larry_action": "relayed the finding faithfully rather than accepting the flattering metric",
+      "prevention_held_after_fix": true,
+      "vs_previous_exposure": "improved_clean_continuation",
+      "still_repeating_despite_starting_context": false
+    },
+    {
+      "slug": "record-amended-body-not-recut",
+      "told": {"occurrences": 3, "clean": 4, "required": 5},
+      "qualified_exposure_this_session": "none-this-session",
+      "evidence": "every correction found (no-shop, cockpit-vs-vision priority, migration number) properly supersedes the block it corrects with an explicit marker",
+      "larry_action": "applied the documented supersede pattern correctly at every correction point",
+      "prevention_held_after_fix": true,
+      "vs_previous_exposure": "clean_continuation",
+      "still_repeating_despite_starting_context": false
+    }
+  ],
+  "findings_without_family": [
+    "self-authored token ledger citing dispatch IDs that do not resolve against the declared authoritative source for ~40% of its rows",
+    "isolation:worktree-cuts-from-stale-origin defect recurred within the same session after being found and named once (Cockpit refusals -> prototype v1 refusal)",
+    "Asdair's role-boundary contract-wording inconsistency explicitly unfixed and named by the Wayfinder as capable of recurring"
+  ],
+  "explicit_unestablished": [
+    "exact total subagent-side token consumption (order-of-magnitude only)",
+    "cumulative vs per-dispatch subagent_tokens across SendMessage resumes, cleanly isolated from cache-TTL expiry",
+    "exact documentation-commit vs product-commit ratio (no git/Bash access this dispatch)",
+    "literal content of the four ding messages sent this session (byte size/timestamp only)",
+    "whether the 9 unverified ledger IDs are real dispatches via a foreground/synchronous mechanism vs a ledger transcription error",
+    "independent git verification of closing main HEAD 2d8c758"
+  ]
+}
