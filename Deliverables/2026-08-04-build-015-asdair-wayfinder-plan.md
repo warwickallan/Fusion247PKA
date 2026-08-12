@@ -1791,7 +1791,50 @@ re-inspect on completion, no second-hand confirmation.
 **Felix fixed all four, same session** — commit `86cfc08`, local-only. Sensible narrow choices: scoped
 the tap-target fix to AsdAIr's own screens rather than the shared global `.act` primitive every other
 screen also uses; used `inert` on the sheet's actual sibling elements rather than a hand-rolled
-tab-cycle. Sent back to Vera for re-inspection — verdict pending.
+tab-cycle. **Vera's re-inspection: PASS** — genuinely execution-verified, not a diff-read. Real CDP-dispatched Tab
+keypresses (not JS `.click()`) confirmed the focus trap holds across 11+ presses in both directions on
+two different sheets; real device-metrics viewports (not `--window-size`, which she'd already found
+silently clamps below ~540px in this environment) confirmed all three write-action controls now measure
+44px; all eight state/fallback presentations confirmed visibly distinct on both text and colour. 3 LOW
+residuals recorded, none blocking: a pre-existing shared tab-switcher primitive at 39px (clears WCAG's
+real 24×24 floor, wasn't the original finding's target), a cosmetic body-bounce on the focus-trap edge,
+and one Chromium focus-visible heuristic for scripted (non-Tab) focus that neither Vera nor the codebase
+controls. **Cockpit-UI's visual/accessibility gate is closed.** This is Vera's gate only — not a
+completion claim; still not merged, still not reviewed by Veritas at whatever boundary eventually
+applies.
+
+**⛔ THE DISCRIMINATING TEST LANDED. THE ANSWER IS NO, NOT YET.** Asdair ran the known photo through
+the real new pipeline (real sharp crops, real grounded vision call, real follow-up, real catalogue
+resolution) and scored it against the 41-line verified trolley. **Result: 20/41 correct on name AND
+quantity (49%). 23/41 named at all. 18/41 never appeared.** Richmond sausages read correctly (1, not
+16) in THIS run — **but recurred as 16 in a sibling run**, proving it is NOT structurally fixed, only
+non-deterministic. **Root cause found and it is a real, concrete, fixable bug**:
+`photoSanityChecks.js`'s `MAX_PLAUSIBLE_QUANTITY = 24` cannot catch 16 — the exact flagship failure the
+whole design doc cites as motivating this check sits under its own threshold. 5 of the 13 previously-
+missing items recovered, 1 partial, 7 still fully missing. **New regressions found, not present before**:
+Yazoo Chocolate now missing entirely; a genuine identity-resolution bug (6-pint milk mismatched to the
+Cravendale 2L regular, corrupting both lines); a duplicate Vanish line; persisting hallucinated extras
+that were explicitly supposed to be excluded (TRESemme ×2, Viakal, Minced Beef Hotpot, Lucozade
+Raspberry).
+
+**The A/B question is now empirically settled by the real photo, per Warwick's own instruction — not
+by further argument.** Individual per-region calls clearly beat the bundled single call: 35/41 products
+named vs. 24/41, 27/41 correct quantity vs. 21/41, confirming Pax's literature-based flag. Cost: 3 calls
+/ 108s vs. 1 call / 45s. 6 items (Batchelors Mac 'n' Cheese, ASDA Allergy tablets, Fruit Splits Lollies,
+Febreze Vanilla Butterscotch, Vanish Pre-Treat Gel, Ariel Pods) were missed by BOTH strategies — a
+separate catalogue/alias gap, not a call-strategy problem.
+
+**Verdict, in Asdair's own words: "measurably better, not yet trustworthy."** Mechanism proven; outcome
+NOT yet achieved. This WP is not ready to close on the strength of tonight's build alone.
+
+**One disclosed process note, not resolved**: Asdair ran this using its own long-established, documented
+credential-consumption pattern (`node --env-file=...`, per its own runtime README) rather than reading
+any secret file directly — but this Work Order carried no explicit `private_surface` declaration, and
+the GL-012 shape mismatch flagged earlier this session (`C:/.fusion247/asdair/**` vs. the stated
+`C:/.fusion247/private/<project>/**` pattern) is still genuinely open, now surfaced a third time. Not
+escalated tonight per the hobby-brain bar (no credential exposed, Asdair's own established method, its
+own normal job) — but worth Warwick knowing it happened, and worth settling properly rather than
+re-deciding ad hoc each time it comes up.
 
 ---
 
