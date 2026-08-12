@@ -60,13 +60,30 @@ import { REQUEST_CROP_TOOL } from './tools.js';
 import { buildLineSchema, buildTextFormat, buildProductIdEnum } from './lineSchema.js';
 import { groundLines } from './groundLines.js';
 import { loadGroundTruth, scoreSevenWay, formatSevenWay } from './sevenWayScore.js';
+import { loadFixture, scoreTwoLayer, formatTwoLayer } from './twoLayerScore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Repo-committed default; overridable with --ground-truth for a run from a different head. */
+/**
+ * ⚠️ NOT ON THIS BRANCH, and that was silent. `2026-08-12-photo-ground-truth-
+ * 39-lines.json` was committed to `main` and never to this branch, so this
+ * path resolves to a missing file here: `rescoreArtefact()` threw on it, and a
+ * live run printed "NOT SCORED" and banked `score: null` rather than failing.
+ * Found at the WP-B15-30 read-back, before it cost a second live run.
+ *
+ * It is kept, and kept OPTIONAL, because it is still correct for a head that
+ * carries the file. The AC3 fixture below is what actually grades from
+ * WP-B15-30 onward, and it lives in-surface where this branch can reach it.
+ */
 export const DEFAULT_GROUND_TRUTH_PATH = path.join(
   __dirname, '..', '..', '..', '..', 'Deliverables', '2026-08-12-photo-ground-truth-39-lines.json',
 );
+
+/**
+ * The AC3 acceptance fixture - the grading instrument from WP-B15-30 onward.
+ * ⛔ TEST DATA ONLY (Warwick). No production path reads it.
+ */
+export const DEFAULT_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'photo39.fixture.json');
 
 /**
  * Read a `--catalogue=<path>` JSON file: an array of `{name, aliases?}` (or
@@ -284,39 +301,66 @@ function hasFlag(name) {
  * the SAME evidence. It also makes every number in the report reproducible by
  * anyone holding the artefact.
  */
-export function rescoreArtefact(artefactPath, groundTruthPath) {
+export function rescoreArtefact(artefactPath, { fixturePath = DEFAULT_FIXTURE_PATH, groundTruthPath = null } = {}) {
   const artefact = JSON.parse(fs.readFileSync(artefactPath, 'utf8'));
   const grounded = groundLines({
     lines: artefact.rawLines,
     productIdEnum: artefact.constrained ? artefact.productIdEnum ?? null : null,
     regionNos: artefact.regionNos ?? [...new Set((artefact.rawLines || []).map((l) => Number(l.source_region)))],
   });
-  const groundTruth = loadGroundTruth(groundTruthPath);
-  const catalogueById = new Map((artefact.catalogue || []).map((c) => [String(c.id), c]));
-  const score = scoreSevenWay({
+
+  // AC4 - the instrument that grades. Two layers, never one number.
+  const fixture = loadFixture(fixturePath);
+  const twoLayer = scoreTwoLayer({
     accepted: grounded.accepted,
     rejected: grounded.rejected,
     duplicateGroups: grounded.duplicateGroups,
-    groundTruth,
-    catalogueById,
-    identityMode: artefact.constrained ? 'enum' : 'verbatim',
+    fixture,
   });
-  return { artefact, grounded, score };
+
+  // The superseded seven-category scorer, run ONLY when its ground-truth file
+  // is actually present. It is retained for like-for-like comparison with the
+  // WP-B15-29 numbers already on the record - never as the deciding measure.
+  let sevenWay = null;
+  if (groundTruthPath && fs.existsSync(groundTruthPath)) {
+    sevenWay = scoreSevenWay({
+      accepted: grounded.accepted,
+      rejected: grounded.rejected,
+      duplicateGroups: grounded.duplicateGroups,
+      groundTruth: loadGroundTruth(groundTruthPath),
+      catalogueById: new Map((artefact.catalogue || []).map((c) => [String(c.id), c])),
+      identityMode: artefact.constrained ? 'enum' : 'verbatim',
+    });
+  }
+
+  return { artefact, grounded, twoLayer, sevenWay };
 }
 
 async function main() {
   const rescorePath = argValue('rescore');
   if (rescorePath) {
-    const gtPath = argValue('ground-truth', DEFAULT_GROUND_TRUTH_PATH);
-    const { artefact, grounded, score } = rescoreArtefact(rescorePath, gtPath);
-    process.stdout.write(`\nRE-SCORED (no gateway call) from ${rescorePath}\n`);
+    const fixturePath = argValue('fixture', DEFAULT_FIXTURE_PATH);
+    const gtPath = argValue('ground-truth', null);
+    const {
+      artefact, grounded, twoLayer, sevenWay,
+    } = rescoreArtefact(rescorePath, { fixturePath, groundTruthPath: gtPath });
+    process.stdout.write(`\nRE-SCORED on the CORRECTED instrument (no gateway call) from ${rescorePath}\n`);
     process.stdout.write(`  grounding: accepted ${grounded.counts.accepted}, rejected ${grounded.counts.rejected}, `
       + `identified ${grounded.counts.identified}, explicit UNKNOWN ${grounded.counts.unknownVisible}, `
-      + `no identity claim ${grounded.counts.noIdentityClaim}, quantity nulled ${grounded.counts.quantityNulled}, `
+      + `no identity claim ${grounded.counts.noIdentityClaim}, sanity-flagged ${grounded.counts.quantityNulled}, `
+      + `qty from page ${grounded.counts.quantityFromPage}, qty defaulted ${grounded.counts.quantityDefaulted}, `
+      + `model qty discarded ${grounded.counts.modelQuantityDiscarded}, `
       + `cross-region collisions ${grounded.counts.crossRegionCollisions}\n`);
-    process.stdout.write(`${formatSevenWay(score, artefact.label)}\n`);
-    process.stdout.write(`  omitted products: ${score.omittedProducts.join(' | ')}\n`);
-    fs.writeFileSync(rescorePath, `${JSON.stringify({ ...artefact, grounded, score }, null, 2)}\n`);
+    process.stdout.write(`${formatTwoLayer(twoLayer, artefact.label)}\n`);
+    process.stdout.write(`  omitted page lines: ${twoLayer.omittedPageLines.map((o) => `#${o.page_order} ${o.source_text}`).join(' | ') || '(none)'}\n`);
+    process.stdout.write('  LIMITS (print these WITH the numbers, never without):\n');
+    twoLayer.limits.forEach((l) => process.stdout.write(`    - ${l}\n`));
+    if (sevenWay) {
+      process.stdout.write(`\n  SUPERSEDED seven-category scorer, for comparison only:\n${formatSevenWay(sevenWay, artefact.label)}\n`);
+    }
+    fs.writeFileSync(rescorePath, `${JSON.stringify({
+      ...artefact, grounded, twoLayerScore: twoLayer, score: sevenWay ?? artefact.score ?? null,
+    }, null, 2)}\n`);
     process.stdout.write(`  artefact updated in place: ${rescorePath}\n`);
     return;
   }
