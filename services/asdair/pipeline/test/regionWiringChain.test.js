@@ -62,6 +62,18 @@ const { resolveAll } = require('../../interpret/resolveByCatalogue.js');
 // Byte-for-byte the same catalogue fixture
 // resolveByCatalogueCrossRegionCollision.test.js uses, so a reader can see
 // this is the SAME real incident, proven through the earlier boundary.
+//
+// UPDATED, WO-2026-08-12-B15-VISION-06 (round 6), AC3: the second reading
+// below was originally "FEBREZE FABRIC SPRAY LENOR SPRING AWAKENING" - round
+// 6 found and fixed the genuine identity/alias-matching defect that made
+// that reading falsely resolve to this Lenor regular at all (a pass-4 word-
+// overlap false positive; see resolveByCatalogue.js's own "PASS-4 BRAND-
+// ANCHOR GUARD" comment). That reading now correctly resolves to
+// `unmatched_new_item`, so it can no longer collide with anything and this
+// file's own wiring proof needs a reading pair that still genuinely, validly
+// shares the Lenor identity from two different raw texts -
+// resolveByCatalogueCrossRegionCollision.test.js's own "AC3 (round 6)" test
+// proves the ORIGINAL Febreze reading's corrected outcome directly.
 const LENOR_FEBREZE_COLLISION = [
   { id: 5, name: 'Lenor Outdoorable Spring Awakening Fabric Conditioner 86 Washes', brand: 'Lenor', aka: ['lenor outdoor'] },
 ];
@@ -125,7 +137,12 @@ function regionCollaborators() {
           matched_regular_id: 5, confidence: 0.9, status: 'matched', source_region: 2,
         },
         {
-          line_no: 2, raw_reading: 'FEBREZE FABRIC SPRAY LENOR SPRING AWAKENING', quantity: null,
+          // Round 6 (WO-2026-08-12-B15-VISION-06, AC3): was 'FEBREZE FABRIC
+          // SPRAY LENOR SPRING AWAKENING' - that reading no longer resolves
+          // to id 5 at all (see this file's header note), so this wiring
+          // proof now uses a second, genuinely-Lenor reading to keep
+          // exercising a REAL cross-region collision.
+          line_no: 2, raw_reading: 'LENOR FABRIC CONDITIONER', quantity: null,
           matched_regular_id: 12, confidence: 0.9, status: 'matched', source_region: 3,
         },
       ],
@@ -153,7 +170,7 @@ test('AC2 (acceptance_property): source_region survives interpretPhotoWithDeps\'
   // carried - see interpretPhotoOrchestrator.js:205-211's own history.
   const bySource = new Map(result.lines.map((l) => [l.raw_reading, l.source_region]));
   assert.equal(bySource.get('LENOR OUTDOOR SPRING AWAKENING'), 2, 'source_region must survive this function\'s own return, not just its internal `checked` array');
-  assert.equal(bySource.get('FEBREZE FABRIC SPRAY LENOR SPRING AWAKENING'), 3);
+  assert.equal(bySource.get('LENOR FABRIC CONDITIONER'), 3);
 });
 
 test('AC2 (acceptance_property): the REAL chain - interpretPhotoWithDeps\'s real return feeds resolveByCatalogue.resolveAll, and BOTH cross-region-colliding lines end up needs_confirmation, neither silently excluded', async () => {
@@ -169,16 +186,16 @@ test('AC2 (acceptance_property): the REAL chain - interpretPhotoWithDeps\'s real
   const resolved = resolveAll(orchestrated.lines, LENOR_FEBREZE_COLLISION);
 
   const lenor = resolved.find((l) => l.raw_reading === 'LENOR OUTDOOR SPRING AWAKENING');
-  const febreze = resolved.find((l) => l.raw_reading === 'FEBREZE FABRIC SPRAY LENOR SPRING AWAKENING');
+  const secondLenorReading = resolved.find((l) => l.raw_reading === 'LENOR FABRIC CONDITIONER');
 
-  assert.ok(lenor && febreze, 'both lines must be present in the resolved output');
+  assert.ok(lenor && secondLenorReading, 'both lines must be present in the resolved output');
 
   assert.equal(lenor.status, 'needs_confirmation', 'the FIRST line must be demoted - Amendment 1: emission order is not evidence. Before this fix this line auto-collapsed to `matched` because regionsAgree() saw two null source_regions and could not tell the collision was cross-region');
   assert.equal(lenor.matched_regular_id, null);
-  assert.equal(febreze.status, 'needs_confirmation', 'the SECOND line must never be silently excluded from the basket - this is the exact live Lenor/Febreze regression Asdair reproduced twice');
-  assert.equal(febreze.matched_regular_id, null);
+  assert.equal(secondLenorReading.status, 'needs_confirmation', 'the SECOND line must never be silently excluded from the basket - this is what the round-3 live Lenor/Febreze regression demonstrated (round 6 has since separately fixed the Febreze reading itself; this pair still proves the cross-region mechanism on a genuinely valid shared identity)');
+  assert.equal(secondLenorReading.matched_regular_id, null);
   assert.ok(
-    lenor.alternatives.some((a) => a.id === 5) && febreze.alternatives.some((a) => a.id === 5),
+    lenor.alternatives.some((a) => a.id === 5) && secondLenorReading.alternatives.some((a) => a.id === 5),
     'the collided candidate is offered for a human decision on both lines, never simply discarded',
   );
 });

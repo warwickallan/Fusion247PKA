@@ -41,18 +41,19 @@ const CATALOGUE = {
 };
 
 // The EXACT prompt template this module currently produces (as of
-// WO-2026-08-12-B15-VISION-04 AC3's quantity-assertion recalibration of
-// step 1 - originally reconstructed for WO-2026-08-11-B15-VISION-01 at
-// governance head 095503af..., kept in sync with every intentional wording
-// change since: WO-2026-08-12-B15-VISION-02 AC1's quantity-evidence
-// rewording of step 6, WO-2026-08-12-B15-VISION-03 AC2's no-prior-
-// hallucination guard, and now WO-2026-08-12-B15-VISION-04 AC3's scoping
-// clarification on step 1)
+// WO-2026-08-12-B15-VISION-06 AC4's rule-3/rule-1 identity scoping -
+// originally reconstructed for WO-2026-08-11-B15-VISION-01 at governance
+// head 095503af..., kept in sync with every intentional wording change
+// since: WO-2026-08-12-B15-VISION-02 AC1's quantity-evidence rewording of
+// step 6, WO-2026-08-12-B15-VISION-03 AC2's no-prior-hallucination guard,
+// WO-2026-08-12-B15-VISION-04 AC3's scoping clarification on step 1, and now
+// WO-2026-08-12-B15-VISION-06 AC4's step-3 "last time" identity scoping)
 // - reconstructed literally, not regenerated, so a silent, UNINTENTIONAL
 // change to the no-options path is caught by string equality rather than by
 // a test that could drift alongside an accidental behaviour change. An
-// INTENTIONAL wording change (like AC1's, AC2's, and now AC3's) updates this
-// reconstruction in the SAME commit, never leaves it to silently diverge.
+// INTENTIONAL wording change (like AC1's, AC2's, AC3's, and now AC4's)
+// updates this reconstruction in the SAME commit, never leaves it to
+// silently diverge.
 function originalPrompt(catalogue) {
   const renderCandidates = (candidates) => candidates
     .map((c) => {
@@ -97,10 +98,14 @@ TASK
    you leave quantity blank on a line that DOES show one.
 2. For each line, record raw_reading: your best literal reading of the marks. This is the ONLY field where you
    write your own words.
-3. Then choose the candidate id from the list above that the line most likely refers to.
+3. Then, for a line you have ALREADY established exists per rule 1, choose the candidate id from the list
+   above that it most likely refers to.
    - Use the aliases. The household writes shorthand: their own alias list is the strongest signal.
    - Use brand, category and usual quantity as supporting evidence.
-   - Use what they bought last time - a line that matches a previous purchase is very likely that product.
+   - Use what they bought last time to help pick WHICH candidate this ALREADY-established line refers to - a
+     line that matches a previous purchase is likely that product. This is an IDENTITY aid only: rule 1 still
+     governs whether to report a line at all, and "they usually buy this" is never itself a reason a line
+     exists on this week's page.
 4. If a line genuinely matches NO candidate, set matched_regular_id to null and status "unmatched_new_item".
    DO NOT pick the least-bad candidate just to fill the field. A wrong confident match is far worse than an
    honest "I don't know" - it puts the wrong thing in a real shopping basket.
@@ -202,6 +207,46 @@ test('AC3: rule 1 explicitly scopes its own caution to line existence, not quant
     /state a quantity whenever the line's OWN text gives genuine count evidence/,
     'the recalibration must positively re-affirm asserting quantity when real evidence exists, not merely soften a caution',
   );
+});
+
+// ── AC4 (WO-2026-08-12-B15-VISION-06) - THE "LAST TIME" IDENTITY SCOPING ───
+//
+// Investigated finding: "Lucozade Sport Drink Raspberry" invented at high
+// confidence across rounds 3, 4 and 5 despite never appearing on any of
+// those photos. Rule 1's existing no-prior-hallucination guard (AC2, round
+// 3) already governs LINE EXISTENCE; rule 3's own "last time" bullet, two
+// paragraphs later, was unscoped and reachable as a second, unscoped
+// invitation to treat purchase history as evidence a line exists at all.
+// This closes that seam by naming rule 1 explicitly inside rule 3, without
+// weakening either rule's own content - see groundedPrompt.js's own AC4
+// header comment for the full reasoning and its honestly-stated limit.
+test('AC4: rule 3\'s "last time" identity aid explicitly defers to rule 1\'s existence gate', () => {
+  const prompt = buildGroundedPrompt(CATALOGUE);
+  assert.match(
+    prompt,
+    /for a line you have ALREADY established exists per rule 1, choose the candidate id/,
+    'rule 3 must name that it operates on a line ALREADY established to exist, not decide existence itself',
+  );
+  assert.match(
+    prompt,
+    /This is an IDENTITY aid only: rule 1 still\s+governs whether to report a line at all/,
+    'the "last time" bullet must explicitly defer to rule 1 rather than reading as independent license',
+  );
+  assert.match(
+    prompt,
+    /"they usually buy this" is never itself a reason a line\s+exists on this week's page/,
+    'the closing sentence must restate the existence bar in rule 3\'s own words, not only rule 1\'s',
+  );
+});
+
+test('AC4: rule 1\'s own existence guard (AC2, round 3) is completely unchanged by the rule-3 scoping', () => {
+  const prompt = buildGroundedPrompt(CATALOGUE);
+  assert.match(
+    prompt,
+    /is\s+NEVER\s+on\s+its\s+own\s+evidence\s+that\s+it\s+is\s+written\s+on\s+THIS\s+week's\s+page/i,
+    'rule 1\'s pinned wording (catalogueGrounding.test.js\'s own AC2 assertion) must survive byte-for-byte',
+  );
+  assert.match(prompt, /only a real handwritten mark is/i);
 });
 
 test('PROMPT_VERSION is exported and non-empty - the value shop_line_provenance.prompt_version records on every PHOTO row', () => {

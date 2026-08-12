@@ -313,8 +313,51 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
 
   // 4. Strong word overlap with the canonical name (brand + variant).
   //    Requires >= 2 shared significant words, and a single clear winner.
+  //
+  //    ── AC3 (WO-2026-08-12-B15-VISION-06) - THE PASS-4 BRAND-ANCHOR GUARD ──
+  //
+  //    THE BUG THIS CLOSES, reproduced from round 5's live re-test: with the
+  //    real "Febreze Fabric Freshener Spray Lenor Spring Awakening" product
+  //    not (yet) a recorded regular, the raw reading "FEBREZE FABRIC SPRAY
+  //    LENOR" matched the UNRELATED Lenor Outdoorable conditioner via THIS
+  //    pass - "lenor" and "fabric" are 2 shared significant words, clearing
+  //    the >= 2 threshold, even though NEITHER is the reading's own real
+  //    identity: the reading's distinguishing word is "febreze" (its actual
+  //    brand), present nowhere in the Lenor regular's own name or aliases.
+  //    "lenor" here is a co-branded SCENT name Febreze's own real product
+  //    genuinely carries too, and "fabric" is a bare category word - neither
+  //    is evidence THIS candidate is the one being described.
+  //
+  //    This pass is already documented as "brand + variant" evidence; the
+  //    guard below makes that presupposition an ENFORCED fact instead of an
+  //    implicit hope: a candidate is only ELIGIBLE for this pass's scoring
+  //    when the READING's own first significant word (length > 3, the same
+  //    "significant" bar this pass already uses) appears somewhere in that
+  //    candidate's own name or alias list. A reading whose first word is too
+  //    short to judge (<=3 chars) gets no guard at all - absence of a usable
+  //    lead word is not evidence of a mismatch, the same "absence is not a
+  //    claim it disagrees" principle the SIZE guard above already applies.
+  //
+  //    Passes 1-3 are UNTOUCHED: an exact alias/name (1-2) stays "the
+  //    household's own shorthand - strongest signal there is", and the
+  //    tolerant alias/subset passes (2b, 3) already run their own real
+  //    token-level evidence checks; only this pass's generic overlap gets a
+  //    brand anchor.
+  const readingLeadWord = (() => {
+    const parts = term.split(' ').filter((w) => w.length > 3);
+    return parts.length > 0 ? parts[0] : null;
+  })();
+  const candidateOwnWords = (reg) => {
+    const set = new Set(normaliseTerm(reg.name).split(' '));
+    aliasesOf(reg).forEach((a) => normaliseTerm(a).split(' ').forEach((w) => set.add(w)));
+    return set;
+  };
+  const brandEligible = readingLeadWord === null
+    ? candidates
+    : candidates.filter((r) => candidateOwnWords(r).has(readingLeadWord));
+
   const words = new Set(term.split(' ').filter((w) => w.length > 3));
-  const scored = candidates
+  const scored = brandEligible
     .map((r) => {
       const nw = normaliseTerm(r.name).split(' ').filter((w) => w.length > 3);
       const overlap = nw.filter((w) => words.has(w)).length;

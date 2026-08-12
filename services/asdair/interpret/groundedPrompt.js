@@ -39,11 +39,48 @@
 // contract above is what earned v2; the quantity-evidence rewording below
 // (WO-2026-08-12-B15-VISION-02, AC1) earned v3; the no-prior-hallucination
 // guard below (WO-2026-08-12-B15-VISION-03, AC2) earned v4; the quantity-
-// assertion recalibration below (WO-2026-08-12-B15-VISION-04, AC3) earns v5.
-// Recorded on every PHOTO provenance row (shop_line_provenance.prompt_version,
-// migration 020) specifically so a future accuracy regression is debuggable
-// ("did the model change or did the prompt change" - migration 020's own
-// reasoning for carrying this at all).
+// assertion recalibration below (WO-2026-08-12-B15-VISION-04, AC3) earned
+// v5; the rule-3/rule-1 scoping below (WO-2026-08-12-B15-VISION-06, AC4)
+// earns v6. Recorded on every PHOTO provenance row
+// (shop_line_provenance.prompt_version, migration 020) specifically so a
+// future accuracy regression is debuggable ("did the model change or did
+// the prompt change" - migration 020's own reasoning for carrying this at
+// all).
+//
+// ── AC4 (WO-2026-08-12-B15-VISION-06) - THE "LAST TIME" IDENTITY RULE NOW
+//    DEFERS TO RULE 1'S EXISTENCE GATE, NAMED EXPLICITLY ──────────────────
+//
+// THE PERSISTENT FINDING THIS ADDRESSES: "Lucozade Sport Drink Raspberry"
+// invented at high confidence in every live run checked (rounds 3, 4, 5),
+// despite the household's real regular being Lucozade ORANGE and no
+// raspberry variant on any of those photos. round 3's own AC2 guard (rule 1)
+// already tells the model that a KNOWN PRODUCT or a LAST-TIME item is NEVER
+// on its own evidence a line exists - and that guard visibly WORKS for most
+// candidates most of the time. What it does not name is rule 3's own
+// wording two paragraphs later: "a line that matches a previous purchase is
+// very likely that product" - written for a DIFFERENT decision (which
+// candidate an ALREADY-established line refers to) but reachable, in one
+// pass over the same prompt, as a second, unscoped invitation to treat
+// purchase history as evidence a line is there at all. Round 5's own
+// invented-line list (Lucozade Raspberry, Smart Litter, Aquafresh, Viakal)
+// is consistent with exactly this: several distinct SKUs, not the same one
+// twice, each individually plausible as a recurring regular - the shape
+// rule 1's guard was built to prevent, recurring specifically where rule 3
+// also fires.
+//
+// THE FIX, scoping again rather than weakening (the same discipline AC3's
+// v5 recalibration used): rule 3's "last time" bullet now says explicitly
+// that it governs IDENTITY of a line already established to exist, and
+// names rule 1 as still governing whether to report the line in the first
+// place - closing the one seam between two true, individually-correct
+// rules that a single pass over the prompt could otherwise blur.
+//
+// HONESTLY STATED, NOT OVERCLAIMED: this is a well-reasoned prompt-level fix
+// grounded in the actual wording and the actual observed symptom shape - it
+// is NOT confirmed against the household's live `last_order` content, which
+// this Work Order has no DB read authority to inspect. Whether it actually
+// reduces Lucozade-Raspberry-class invention is Asdair's next live re-test
+// to show, not something this text change can prove on its own.
 //
 // ── AC3 (WO-2026-08-12-B15-VISION-04) - THE QUANTITY-ASSERTION COLLAPSE, AND
 //    WHY IT WAS THE v4 GUARD, NOT THE v3 QUANTITY RULE ─────────────────────
@@ -77,7 +114,7 @@
 // this Work Order. Instead rule 1 gains one clarifying sentence naming
 // EXACTLY what it does and does not govern, so the model cannot read it as
 // license to also suppress a quantity that genuinely IS written.
-const PROMPT_VERSION = 'grounded-v5-quantity-recalibration';
+const PROMPT_VERSION = 'grounded-v6-lasttime-identity-scoping';
 
 const STATUSES = Object.freeze([
   'matched',
@@ -194,10 +231,14 @@ TASK
    you leave quantity blank on a line that DOES show one.
 2. For each line, record raw_reading: your best literal reading of the marks. This is the ONLY field where you
    write your own words.
-3. Then choose the candidate id from the list above that the line most likely refers to.
+3. Then, for a line you have ALREADY established exists per rule 1, choose the candidate id from the list
+   above that it most likely refers to.
    - Use the aliases. The household writes shorthand: their own alias list is the strongest signal.
    - Use brand, category and usual quantity as supporting evidence.
-   - Use what they bought last time - a line that matches a previous purchase is very likely that product.
+   - Use what they bought last time to help pick WHICH candidate this ALREADY-established line refers to - a
+     line that matches a previous purchase is likely that product. This is an IDENTITY aid only: rule 1 still
+     governs whether to report a line at all, and "they usually buy this" is never itself a reason a line
+     exists on this week's page.
 4. If a line genuinely matches NO candidate, set matched_regular_id to null and status "unmatched_new_item".
    DO NOT pick the least-bad candidate just to fill the field. A wrong confident match is far worse than an
    honest "I don't know" - it puts the wrong thing in a real shopping basket.

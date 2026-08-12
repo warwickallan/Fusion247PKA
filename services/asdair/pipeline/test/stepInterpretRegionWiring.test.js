@@ -47,6 +47,18 @@ const HANDLE = { shopRef: REF };
 
 // Byte-for-byte the same real incident fixture regionWiringChain.test.js and
 // resolveByCatalogueCrossRegionCollision.test.js use.
+//
+// UPDATED, WO-2026-08-12-B15-VISION-06 (round 6), AC3: the second raw
+// reading below was originally 'FEBREZE FABRIC SPRAY LENOR SPRING
+// AWAKENING' - round 6 fixed the genuine identity/alias-matching defect
+// that made that reading falsely resolve to this Lenor regular in the first
+// place (see resolveByCatalogue.js's own "PASS-4 BRAND-ANCHOR GUARD"
+// comment). It now correctly resolves to `unmatched_new_item` and so can no
+// longer collide with anything; this file's own production-wiring proof now
+// uses a second, genuinely-Lenor reading to keep exercising a REAL
+// cross-region collision end to end. resolveByCatalogueCrossRegionCollision
+// .test.js's own "AC3 (round 6)" test proves the corrected Febreze outcome
+// directly, at the pure resolveAll layer.
 const LENOR_REGULAR = { id: 5, name: 'Lenor Outdoorable Spring Awakening Fabric Conditioner 86 Washes', brand: 'Lenor', aka: ['lenor outdoor'] };
 const CATALOGUE = {
   household_id: HOUSEHOLD_ID,
@@ -84,7 +96,7 @@ function realInterpretPhotoViaOrchestrator() {
         vision: async () => JSON.stringify({
           lines: [
             { line_no: 1, raw_reading: 'LENOR OUTDOOR SPRING AWAKENING', quantity: null, matched_regular_id: 5, confidence: 0.9, status: 'matched', source_region: 2 },
-            { line_no: 2, raw_reading: 'FEBREZE FABRIC SPRAY LENOR SPRING AWAKENING', quantity: null, matched_regular_id: 12, confidence: 0.9, status: 'matched', source_region: 3 },
+            { line_no: 2, raw_reading: 'LENOR FABRIC CONDITIONER', quantity: null, matched_regular_id: 12, confidence: 0.9, status: 'matched', source_region: 3 },
           ],
         }),
         extractJson: async (text) => JSON.parse(text),
@@ -134,13 +146,13 @@ test('AC2 (acceptance_property), full production wiring: runPipeline.js\'s REAL 
   // exact chain the acceptance_property names.
   assert.equal(h.db.shop_line.length, 2);
   const lenor = h.db.shop_line.find((l) => l.raw_reading === 'LENOR OUTDOOR SPRING AWAKENING');
-  const febreze = h.db.shop_line.find((l) => l.raw_reading === 'FEBREZE FABRIC SPRAY LENOR SPRING AWAKENING');
-  assert.ok(lenor && febreze, 'both durable rows must exist');
+  const secondLenorReading = h.db.shop_line.find((l) => l.raw_reading === 'LENOR FABRIC CONDITIONER');
+  assert.ok(lenor && secondLenorReading, 'both durable rows must exist');
 
-  assert.equal(lenor.status, 'needs_confirmation', 'the FIRST line must be demoted, not auto-collapsed to matched - the exact live Lenor/Febreze regression Asdair reproduced twice, now closed through the FULL production chain');
+  assert.equal(lenor.status, 'needs_confirmation', 'the FIRST line must be demoted, not auto-collapsed to matched - the round-3 live Lenor/Febreze regression demonstrated this mechanism, now closed through the FULL production chain (round 6 has since separately fixed the Febreze reading itself; this pair still proves the cross-region mechanism on a genuinely valid shared identity)');
   assert.equal(lenor.matched_regular_id, null);
-  assert.equal(febreze.status, 'needs_confirmation', 'the SECOND line must never be silently excluded from the durable interpretation or the basket');
-  assert.equal(febreze.matched_regular_id, null);
+  assert.equal(secondLenorReading.status, 'needs_confirmation', 'the SECOND line must never be silently excluded from the durable interpretation or the basket');
+  assert.equal(secondLenorReading.matched_regular_id, null);
 
   // AC3 (round 3's own guard, unaffected): an excluded/demoted line is still
   // durably PERSISTED, never dropped from the interpretation record.
