@@ -39,7 +39,7 @@ import { decideNextStep } from './stages.js';
 // imageRender.js is the ONE exception: it imports `sharp`, so it stays a
 // LAZY `await import()` inside realInterpretPhoto itself, exactly as
 // vision()/extractJson() already are - see that function's own comment.
-import { prepareImage } from './imagePrep.js';
+import { prepareImage, planOrientationAwareRegions, DEFAULT_REGION_UPSCALE } from './imagePrep.js';
 import { runSanityChecks } from './photoSanityChecks.js';
 import { needsFollowUp, flaggedRegionsForFollowUp, silentRegions } from './followUpTrigger.js';
 import { insertRegionBatch } from './shopImageRegions.js';
@@ -271,7 +271,44 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
   // keeps this whole module loadable, and every OTHER export in it usable,
   // on a box where `services/asdair/pipeline`'s own dependencies were never
   // installed - the same guarantee `pg` has always had here.
-  const { renderAllRegions, toDataUrl } = await import('./imageRender.js');
+  const {
+    renderAllRegions, renderPreparedPage, decodeGreyscaleRaster, toDataUrl,
+  } = await import('./imageRender.js');
+
+  // ── WP-B15-31 AC2: THE ORIENTATION-AWARE PLAN, ON THE LIVE PATH ────────
+  //
+  // Reading direction comes from IMAGE EVIDENCE, not EXIF alone - the real
+  // photograph's EXIF orientation tag reads `null` while the page is rotated
+  // ~90 degrees, so EXIF-only planning cut horizontal strips through vertical
+  // writing and no strip ever held a whole line.
+  //
+  // The raster is decoded from the PREPARED page, never the original: the
+  // renderer rotates before it crops, so a plan computed on un-rotated pixels
+  // would be correct only while the EXIF rotation happened to be zero. That is
+  // the kind of latent bug that stays invisible until the first photograph
+  // whose EXIF is actually set.
+  const exifPrepared = prepareImage(imageBuffer);
+  const preparedPageBuf = await renderPreparedPage(
+    imageBuffer, { rotate: exifPrepared.rotate, flip: exifPrepared.flip },
+  );
+  const orientationPlan = planOrientationAwareRegions(await decodeGreyscaleRaster(preparedPageBuf));
+
+  // The orchestrator's collaborator stays SYNCHRONOUS and its shape is
+  // unchanged; the async decode happens here, once, before it is called.
+  const prepareImageOrientationAware = (buf) => ({
+    ...prepareImage(buf),
+    preparedWidth: orientationPlan.preparedWidth,
+    preparedHeight: orientationPlan.preparedHeight,
+    regions: orientationPlan.regions,
+    readingAxis: orientationPlan.axis,
+    linePitchPx: orientationPlan.linePitch.pitch,
+    coverageProof: orientationPlan.coverageProof,
+  });
+
+  // Enlargement applied BEFORE inspection. A crop is not a zoom.
+  const renderAllRegionsEnlarged = (buf, transform, regions) => renderAllRegions(
+    buf, transform, regions, { upscale: DEFAULT_REGION_UPSCALE },
+  );
   const { visionWithUsage, estimateUsdCost } = await import('../../obsidiwikai/src/core/models.mjs');
   const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
   const interpreterModel = await realVisionModel();
@@ -290,9 +327,15 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
   const { lines, initialSilentRegions, droppedLines } = await interpretPhotoWithDeps(
     { catalogue, imageBuffer, shopId, interpreterModel, promptVersion: PROMPT_VERSION },
     {
-      prepareImage, runSanityChecks, needsFollowUp, flaggedRegionsForFollowUp, silentRegions,
-      insertRegionBatch, insertPhotoProvenanceBatch,
-      renderAllRegions, toDataUrl,
+      prepareImage: prepareImageOrientationAware,
+      runSanityChecks,
+      needsFollowUp,
+      flaggedRegionsForFollowUp,
+      silentRegions,
+      insertRegionBatch,
+      insertPhotoProvenanceBatch,
+      renderAllRegions: renderAllRegionsEnlarged,
+      toDataUrl,
       buildGroundedPrompt, vision, extractJson,
       writeQuery: realWriteQuery,
     },
