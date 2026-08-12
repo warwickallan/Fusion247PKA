@@ -83,6 +83,26 @@ import { resolveQuantity, composeQuantityProbe, QUANTITY_BASIS } from './quantit
 /** Below this, the application may decide to LOOK AGAIN. It accepts nothing. */
 export const DEFAULT_LOOK_AGAIN_BELOW = 0.6;
 
+/**
+ * Why a line was referred to a human. WP-B15-33 AC1(a).
+ *
+ * Every referral names its cause so that a later stage can discharge the ONE
+ * cause it actually resolved. A stage that clears a bare boolean clears every
+ * reason at once, including reasons it knows nothing about.
+ */
+export const NEEDS_HUMAN = Object.freeze({
+  /** Two observations collided across regions and NOTHING has resolved it yet. */
+  CROSS_REGION_DUPLICATE_UNRESOLVED: 'cross_region_duplicate_unresolved',
+  /** Two observations of ONE physical line disagree about the written count. */
+  LEADING_MARK_DISAGREEMENT: 'leading_mark_disagreement',
+  /** No located visual evidence supports this line - AC3. PHOTO is withheld. */
+  NO_LOCATED_VISUAL_EVIDENCE: 'no_located_visual_evidence',
+  /** Two lines claim the same physical place. AC3. */
+  POSITION_COLLISION: 'position_collision',
+});
+
+const CROSS_REGION_DUPLICATE_UNRESOLVED = NEEDS_HUMAN.CROSS_REGION_DUPLICATE_UNRESOLVED;
+
 /** Verbatim text of a line, whichever contract produced it (Arm A vs Arm B). */
 export function verbatimOf(line) {
   const written = line.as_written ?? line.raw_reading;
@@ -100,6 +120,25 @@ export function verbatimOf(line) {
 export function leadingMarkOf(line) {
   const mark = line?.leading_mark;
   return typeof mark === 'string' && mark.trim() !== '' ? mark.trim() : null;
+}
+
+/**
+ * The line's `band_position_pct` observation, or null (WP-B15-33 C6).
+ *
+ * Null-safe for the same reason `leadingMarkOf` is: every contract before this
+ * one never asked, and an absent field means "this contract did not ask", never
+ * "the model could not place it". An out-of-range value is treated as ABSENT
+ * rather than clamped - a clamp would invent a position the model never gave.
+ * That is safe in one direction only, and it is the direction this field is
+ * bound to: the position may WITHHOLD a line and may never accept one, so an
+ * honest null costs nothing while a fabricated 0 or 100 would be evidence.
+ */
+export function bandPositionOf(line) {
+  const pct = line?.band_position_pct;
+  if (pct === null || pct === undefined) return null;
+  const n = Number(pct);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  return n;
 }
 
 /** Normalise for duplicate comparison: trim, lowercase, collapse whitespace. */
@@ -191,7 +230,22 @@ export function markDuplicates(lines) {
     groups.get(key).push(index);
   });
 
-  const out = lines.map((l) => ({ ...l, duplicate_of: null, duplicate_collision: false, needs_human: false }));
+  // ── WP-B15-33 AC1(a): A REFERRAL NOW CARRIES ITS CAUSE ──────────────────
+  // `needs_human` was a bare boolean set here, BEFORE reconciliation runs, and
+  // nothing downstream ever revisited it. So the four recurring band-boundary
+  // sites were correctly collapsed into one line each by
+  // `reconcileAcrossBands` and then still demanded a human, forever, for a
+  // collision that had already been resolved. That is what "duplicates" in the
+  // reporting actually meant.
+  //
+  // The fix is not to stop flagging - the flag is right at the moment it is
+  // set, because at THIS point in the pipeline the collision genuinely is
+  // unresolved. The fix is that a referral must say WHY, so a later stage can
+  // clear the one cause it has actually discharged without silently clearing
+  // the others. `needs_human` stays, and stays the derived truth of the list.
+  const out = lines.map((l) => ({
+    ...l, duplicate_of: null, duplicate_collision: false, needs_human: false, needs_human_reasons: [],
+  }));
   const duplicateGroups = [];
 
   for (const [key, indices] of groups) {
@@ -222,6 +276,7 @@ export function markDuplicates(lines) {
       for (const i of indices) {
         out[i].duplicate_collision = true;
         out[i].needs_human = true;
+        out[i].needs_human_reasons = [...new Set([...out[i].needs_human_reasons, CROSS_REGION_DUPLICATE_UNRESOLVED])];
       }
       duplicateGroups.push({
         key, kind: 'cross_region', regions: [...regions], survivorIndex: null, members,
@@ -340,6 +395,22 @@ export function groundLines({ lines, productIdEnum, regionNos, lookAgainBelow = 
       // "the page said 2 and the dedicated field carried it" is distinguishable
       // from "the reading happened to still start with a digit".
       leading_mark: leadingMark,
+      // WP-B15-33 C6. Carried, never acted on here: this module decides what
+      // the application BELIEVES about a line, and a position may only ever
+      // withhold PHOTO provenance downstream. It never makes a line acceptable,
+      // so it is deliberately not consulted by any check above.
+      //
+      // ⚠️ THE KEY IS PROPAGATED ONLY WHEN THE MODEL WAS ACTUALLY ASKED FOR IT.
+      // Writing `band_position_pct: null` unconditionally would make every
+      // pre-WP-B15-33 artefact look like a run whose model declined to place
+      // its lines, when in truth no such field was ever requested. Downstream,
+      // `applyVisualEvidenceGate` distinguishes those two states by the presence
+      // of this key, and it withholds on one and not the other - so
+      // manufacturing the key here would silently convert "not asked" into
+      // "asked and refused" for every artefact on the record.
+      ...(Object.prototype.hasOwnProperty.call(line, 'band_position_pct')
+        ? { band_position_pct: bandPositionOf(line) }
+        : {}),
       quantity_evidence_source: resolvedQuantity.evidenceSource ?? null,
       quantity_probe_text: resolvedQuantity.probeText ?? written,
       model_quantity: resolvedQuantity.modelQuantity,

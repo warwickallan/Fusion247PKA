@@ -58,7 +58,54 @@ import { estimateUsdCost, visionAgenticTurn } from '../../../obsidiwikai/src/cor
 import { normalizeResponsesUsage } from './agenticLoop.js';
 import { buildLineSchema, buildTextFormat, buildProductIdEnum } from './lineSchema.js';
 import { similarity, MATCH_FLOOR } from './sevenWayScore.js';
-import { verbatimOf } from './groundLines.js';
+import { verbatimOf, leadingMarkOf, NEEDS_HUMAN } from './groundLines.js';
+import { absolutePosition, POSITION_TOLERANCE_PITCH_FRACTION } from './visualEvidenceGate.js';
+
+/** Normalise a leading mark for comparison: case and inner spacing only. */
+function normaliseMark(mark) {
+  return String(mark ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Add a cause to a line's referral list, keeping `needs_human` its derived truth. */
+function addNeedsHumanReason(line, reason) {
+  const reasons = Array.isArray(line.needs_human_reasons) ? line.needs_human_reasons : [];
+  line.needs_human_reasons = [...new Set([...reasons, reason])];
+  line.needs_human = line.needs_human_reasons.length > 0;
+}
+
+/**
+ * Discharge ONE named cause. WP-B15-33 AC1(a).
+ *
+ * Narrow on purpose: a stage may only clear the question it actually answered.
+ * The bare boolean this replaces could not express that, which is how a
+ * resolved collision and an unresolved disputed count became the same flag.
+ */
+function clearNeedsHumanReason(line, reason) {
+  const reasons = Array.isArray(line.needs_human_reasons) ? line.needs_human_reasons : [];
+  line.needs_human_reasons = reasons.filter((r) => r !== reason);
+  line.needs_human = line.needs_human_reasons.length > 0;
+}
+
+/**
+ * WP-B15-33 AC2 - two observations of ONE physical line that disagree about
+ * the written count.
+ *
+ * The count is then DISPUTED, and the application must say so rather than
+ * believe whichever observation arrived first. Nothing is merged away and no
+ * number is changed: the line is referred.
+ */
+function recordLeadingMarkDisagreement(kept, other) {
+  const a = normaliseMark(leadingMarkOf(kept));
+  const b = normaliseMark(leadingMarkOf(other));
+  // Absence is not disagreement. One crop reading the mark and the other not
+  // seeing it at all is the ordinary edge-of-band case, and it is exactly what
+  // the overlap exists to survive.
+  if (a === '' || b === '') return false;
+  if (a === b) return false;
+  addNeedsHumanReason(kept, NEEDS_HUMAN.LEADING_MARK_DISAGREEMENT);
+  kept.leading_mark_disagreement = [...new Set([...(kept.leading_mark_disagreement ?? []), a, b])];
+  return true;
+}
 
 /**
  * The instruction for ONE band. Deliberately a different, smaller contract
@@ -85,6 +132,8 @@ TASK - two SEPARATE questions per line, in this order. Do not merge them.
 2. WRITE DOWN WHAT YOU ACTUALLY SEE. as_written is your best literal reading of the marks, verbatim, including shorthand and spelling as written. This is the ONLY field where you write your own words. Never replace it with a tidied or catalogue-matched product name - it is the record of what the page says, not of what you concluded. If a line is CUT OFF at the edge of this band, still write down what you can see of it.
 
 2a. COPY THE START OF THE LINE INTO leading_mark, AS A SEPARATE FIELD. Almost every line on this household's list begins with something written before the product name. Look at the very start of the line and transcribe exactly what is there - "2", "16", "1", "1 x 6pts", "4 x 4pts", "2 PKTS." - into leading_mark. Copy it even when it is a single "1", even when it seems obvious, and even when you have already included it in as_written. If the line genuinely begins with a word, leading_mark is null. This is TRANSCRIPTION, not judgement: do not decide whether the mark is a purchase count, do not take a number from later in the line, and do not work out what it "ought" to be. The application decides what the mark MEANS; your only job is to say what is WRITTEN.
+
+2b. SAY WHERE THE LINE PHYSICALLY SITS, in band_position_pct. Look at where the ink actually is in THIS crop and give the position of the START of the line as a whole number from 0 to 100, measured along the direction you are reading the lines: 0 is hard against the beginning edge of this crop, 100 is hard against the far edge. This is OBSERVATION, exactly as leading_mark is TRANSCRIPTION. Read it off the image. Do NOT derive it from the order of your answer, do NOT space your values out evenly to look tidy, and do NOT nudge two values apart to make them look distinct. If you genuinely cannot place a line in this crop, return null - that is honest and it costs nothing. This value says nothing about what the line is or how many to buy, and it is never used to accept a line.
 
 3. ONLY THEN, WHICH CANDIDATE IS IT? For a line you have ALREADY established exists, choose the candidate id it most likely refers to. Use the aliases - the household writes shorthand and their own alias list is the strongest signal. Use brand, category and usual quantity as supporting evidence.
 
@@ -208,7 +257,9 @@ export async function inspectBandsIndividually({
  * @param {number} [args.matchFloor]
  * @returns {{reconciled:Array<object>, merges:Array<object>, mergedAway:number}}
  */
-export function reconcileAcrossBands({ lines, matchFloor = MATCH_FLOOR } = {}) {
+export function reconcileAcrossBands({
+  lines, matchFloor = MATCH_FLOOR, regions = [], axis = 'y', linePitch = null,
+} = {}) {
   const input = Array.isArray(lines) ? lines : [];
   const reconciled = [];
   const merges = [];
@@ -286,7 +337,73 @@ export function reconcileAcrossBands({ lines, matchFloor = MATCH_FLOOR } = {}) {
       merged_as_written: written,
       regions: kept.seen_in_regions,
     });
+
+    // ── WP-B15-33 AC2: TWO OBSERVATIONS OF ONE LINE THAT DISAGREE ABOUT THE
+    //    COUNT ARE A DISPUTED COUNT, NOT A SETTLED ONE ────────────────────
+    //
+    // These two readings are, by everything above, the SAME physical line. If
+    // their `leading_mark` transcriptions disagree, then the page carries one
+    // count and the application has been handed two different answers for it.
+    // Believing whichever arrived first is exactly the silently-wrong line
+    // Warwick's bar forbids, and it is silent precisely because a merge looks
+    // like a resolution.
+    //
+    // ⛔ THE HONEST LIMIT, and it must travel with this mechanism: it can only
+    // fire where there are TWO observations to disagree. A single wrong
+    // observation with nothing to contradict it stays undetectable here.
+    // Measured on the three variance artefacts, this catches page 16 in runs 1
+    // and 3, and does NOT catch page 19 (one observation) or page 11 in runs
+    // 2-3. Do not quote it as a fix for the count defect; it is a fix for
+    // BELIEVING the count defect.
+    recordLeadingMarkDisagreement(kept, line);
   }
+
+  // ── WP-B15-33 AC1(a): DISCHARGE THE REFERRAL THIS STAGE HAS RESOLVED ────
+  //
+  // `markDuplicates` flagged every cross-region collision for a human BEFORE
+  // this stage ran, which was correct at the time: the collision was genuinely
+  // unresolved. This stage resolves it. Nothing used to say so, so the four
+  // recurring band-boundary sites were collapsed correctly and then went on
+  // demanding a human for a question that had been answered.
+  //
+  // The discharge is deliberately NARROW and evidence-bound. A survivor's
+  // duplicate referral clears only when this stage actually absorbed the other
+  // observation into it - never merely because reconciliation ran, and never
+  // for any OTHER reason the line was referred. A stage that clears a bare
+  // boolean clears reasons it knows nothing about.
+  for (const line of reconciled) {
+    if (line.merged_from.length === 0) continue;
+    clearNeedsHumanReason(line, NEEDS_HUMAN.CROSS_REGION_DUPLICATE_UNRESOLVED);
+    line.duplicate_collision = false;
+    line.duplicate_resolved_by_reconciliation = true;
+  }
+
+  // ── WP-B15-33 AC2: THE DISPUTED COUNT THE MERGE RULE DELIBERATELY HIDES ──
+  //
+  // The quantity check above is CORRECT and is not being changed: "2 milk" and
+  // "4 milk" are two real purchases and must never collapse. But that same rule
+  // means two observations of ONE physical line whose counts were read
+  // DIFFERENTLY also fail to merge - and they then stand as two settled
+  // purchases with two different, confidently wrong numbers.
+  //
+  // Measured on the variance artefacts, this is exactly page 16: band 4 read
+  // "2 YAZZO STRAWBERRY MILK SHAKE" and band 5 read "- YAZZO STRAWBERRY MILK
+  // SHAKE" - one physical line, counts 2 and 1, page truth 3. Neither
+  // observation is right and nothing in the pipeline said the count was in
+  // dispute.
+  //
+  // So: same resolved product, touching bands, DIFFERENT quantity - refer both.
+  // Nothing merges, nothing is deleted, no number is rewritten. The application
+  // says "I have two readings of this and they disagree", which is precisely
+  // Warwick's bar: an uncertain line may go to Cockpit; a silently wrong one
+  // may not.
+  //
+  // Where positions are available they SETTLE it: two observations at the same
+  // physical place are one line with a disputed count; two at different places
+  // are the genuine two-purchases case and are left alone.
+  markDisputedCounts({
+    reconciled, regions, axis, linePitch,
+  });
 
   // ── CLOSED ACCOUNTING, ASSERTED. Every accepted line lands in EXACTLY ONE
   //    bucket: it survived, or it was absorbed into a named survivor ───────
@@ -320,6 +437,61 @@ export function reconcileAcrossBands({ lines, matchFloor = MATCH_FLOOR } = {}) {
     // that physical line. Reported, never hidden behind a nicer number.
     survivorsNotFullestReading: reconciled.filter((l) => l.survivor_is_fullest === false).length,
   };
+}
+
+/**
+ * WP-B15-33 AC2 - refer every pair of observations that resolve to the SAME
+ * product across touching bands but disagree about the count.
+ *
+ * ⛔ REFERS. Never merges, never deletes, never rewrites a number. The whole
+ * mechanism can do exactly one thing: add a cause to a referral list.
+ *
+ * ⛔ ITS HONEST LIMIT, and it belongs beside the mechanism rather than in a
+ * report nobody reopens: this can only fire where there are TWO observations
+ * to disagree. A single wrong reading with nothing to contradict it is
+ * invisible here. Measured on the three variance artefacts it catches page 16
+ * in runs 1 and 3; it does NOT catch page 19 (one observation) or page 11 in
+ * runs 2-3. It is a fix for BELIEVING a wrong count, not a fix for reading one.
+ *
+ * @returns {number} how many lines were referred.
+ */
+export function markDisputedCounts({
+  reconciled, regions = [], axis = 'y', linePitch = null,
+} = {}) {
+  const lines = Array.isArray(reconciled) ? reconciled : [];
+  const regionsByNo = new Map(
+    (regions || []).filter((r) => r && r.region_kind === 'strip').map((r) => [Number(r.region_no), r]),
+  );
+  const pitch = Number.isFinite(Number(linePitch)) && Number(linePitch) > 0 ? Number(linePitch) : null;
+  const tolerance = pitch === null ? null : pitch * POSITION_TOLERANCE_PITCH_FRACTION;
+  const positionOf = (line) => absolutePosition(line, regionsByNo, axis);
+
+  const referred = new Set();
+  for (let i = 0; i < lines.length; i += 1) {
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const a = lines[i];
+      const b = lines[j];
+      if (!a.identified || !b.identified) continue;
+      if (String(a.product_id) !== String(b.product_id)) continue;
+      if ((a.quantity ?? null) === (b.quantity ?? null)) continue;
+      if (Math.abs(Number(a.source_region) - Number(b.source_region)) > 1) continue;
+
+      // Position, where the application has it, is the decider. Two readings at
+      // the same physical place are ONE line; two at different places are the
+      // household genuinely buying the same product twice, which is a real and
+      // supported case and is left entirely alone.
+      const pa = positionOf(a);
+      const pb = positionOf(b);
+      if (tolerance !== null && pa !== null && pb !== null && Math.abs(pa - pb) > tolerance) continue;
+
+      addNeedsHumanReason(a, NEEDS_HUMAN.LEADING_MARK_DISAGREEMENT);
+      addNeedsHumanReason(b, NEEDS_HUMAN.LEADING_MARK_DISAGREEMENT);
+      a.disputed_count_with = [...new Set([...(a.disputed_count_with ?? []), b.line_no])];
+      b.disputed_count_with = [...new Set([...(b.disputed_count_with ?? []), a.line_no])];
+      referred.add(i).add(j);
+    }
+  }
+  return referred.size;
 }
 
 /**

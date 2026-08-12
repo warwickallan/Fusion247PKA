@@ -58,6 +58,424 @@ import fs from 'node:fs';
 import { UNKNOWN_VISIBLE_ITEM, NOT_A_LINE } from './lineSchema.js';
 import { verbatimOf } from './groundLines.js';
 import { similarity, MATCH_FLOOR, quantityAgreesUnderDefaultOne } from './sevenWayScore.js';
+import { QUANTITY_BASIS } from './quantityRule.js';
+import { PROVENANCE } from './visualEvidenceGate.js';
+
+// =====================================================================
+// WP-B15-33 AC4 - THE FIVE METRIC FAMILIES. Warwick: "The current metrics
+// have repeatedly lied by omission."
+//
+// This section SUPERSEDES the headline role of `layerA`/`layerB` below, which
+// are RETAINED unchanged so every number already on the record stays
+// reproducible from the same artefact. Nothing is deleted; what changes is
+// which block is quoted as the measurement.
+//
+// ── THE THREE OMISSIONS THIS FIXES, each one measured, not theorised ─────
+//
+// 1. `leadingCountPreserved` MEASURED AVAILABILITY AND WAS READ AS
+//    CORRECTNESS. It asks "did a count survive to the application?", which is
+//    a real question and was the right question for WP-B15-31. It is blind by
+//    construction to the pages 11 / 16 / 19 class, where the count arrives
+//    perfectly and is simply the WRONG DIGIT. Across the three variance runs
+//    it read 34/39, 37/39, 37/39 while three counts were wrong in EVERY run.
+//    Preserved and correct are now separate numbers and neither can be quoted
+//    as the other.
+//
+// 2. RATES WERE PUBLISHED WITHOUT DENOMINATORS. Every rate here carries the
+//    denominator it was computed over, in the same object, so a figure cannot
+//    be lifted out of its population.
+//
+// 3. "DUPLICATES" CONFLATED SITES WITH SURVIVORS - and that conflation cost a
+//    whole Work Order. The order that commissioned this work read
+//    "sites 5/5/6, survivors 5/3/2" as four uncollapsed duplicates; the four
+//    named sites were in fact being collapsed correctly in 3/3 runs, and the
+//    survivors were a different set entirely. The family below reports the
+//    three quantities Warwick asked for as three separate numbers: raw
+//    overlapping observations, correctly reconciled same-line duplicates, and
+//    INCORRECT CROSS-LINE MERGES - the last being the one that destroys a real
+//    purchase and the one nothing had ever measured.
+//
+// ── AND THE MEASUREMENT WARWICK'S BAR ACTUALLY NEEDS ────────────────────
+// "A genuine uncertain line may go to Cockpit. A silently wrong line may not."
+// That makes SILENCE part of the defect, so a wrong number that was referred
+// to a human is a different outcome from a wrong number the application
+// believed. `quantitySilentlyWrong` is the figure that answers Warwick's bar;
+// `quantityWrongButReferred` is the one that is a success.
+// =====================================================================
+
+/** A rate that cannot be separated from the population it was computed over. */
+function rate(n, d) {
+  return {
+    n, d, pct: d > 0 ? Number(((n / d) * 100).toFixed(1)) : null,
+  };
+}
+
+/** Does this page line carry a written count at the start? */
+function pageCarriesCount(exp) {
+  return /^\s*\d/.test(String(exp?.source_text || ''));
+}
+
+/**
+ * Join readings to page lines: strongest pair first, one-to-one.
+ *
+ * Extracted from `scoreTwoLayer` unchanged so the families below grade on
+ * EXACTLY the same correspondence the two-layer score used. Two joins would
+ * drift, and a metric that disagrees with the metric beside it is worse than
+ * either alone.
+ */
+function joinReadings(answers, expected) {
+  const readingPairs = [];
+  const identityPairs = [];
+  answers.forEach((line, ai) => {
+    const written = verbatimOf(line);
+    expected.forEach((exp, ei) => {
+      const byReading = similarity(exp.source_text, written);
+      if (byReading >= MATCH_FLOOR) readingPairs.push({ ai, ei, byReading });
+      if (line.identified && exp.expected_product_id
+        && String(line.product_id) === String(exp.expected_product_id)) {
+        identityPairs.push({ ai, ei });
+      }
+    });
+  });
+  readingPairs.sort((p, q) => q.byReading - p.byReading || p.ai - q.ai || p.ei - q.ei);
+  const fixtureForAnswer = new Map();
+  const claimed = new Set();
+  for (const p of readingPairs) {
+    if (fixtureForAnswer.has(p.ai) || claimed.has(p.ei)) continue;
+    fixtureForAnswer.set(p.ai, p.ei);
+    claimed.add(p.ei);
+  }
+  const anyReadingForAnswer = new Map();
+  for (const p of readingPairs) if (!anyReadingForAnswer.has(p.ai)) anyReadingForAnswer.set(p.ai, p.ei);
+  const identityOnlyForAnswer = new Map();
+  for (const p of identityPairs) if (!identityOnlyForAnswer.has(p.ai)) identityOnlyForAnswer.set(p.ai, p.ei);
+  return {
+    fixtureForAnswer, anyReadingForAnswer, identityOnlyForAnswer, claimed,
+  };
+}
+
+/** Best page line for one free-text reading, or null. Used to grade MERGES. */
+function bestPageLineFor(text, expected) {
+  let best = null;
+  let bestScore = 0;
+  expected.forEach((exp, ei) => {
+    const s = similarity(exp.source_text, text);
+    if (s >= MATCH_FLOOR && s > bestScore) {
+      bestScore = s;
+      best = ei;
+    }
+  });
+  return best;
+}
+
+/**
+ * WP-B15-33 AC4 - score one run in Warwick's five families.
+ *
+ * @param {object} args
+ * @param {Array<object>} args.accepted - the FINAL lines, after reconciliation
+ *   and after the AC3 visual-evidence gate. Grading anything earlier measures
+ *   a state the application never acts on.
+ * @param {Array<object>} [args.merges] - reconciliation's own merge record.
+ *   Without it, incorrect cross-line merges CANNOT be measured, and the family
+ *   says so rather than reporting a comfortable zero.
+ * @param {Array<object>} [args.duplicateGroups]
+ * @param {number|null} [args.rawObservationCount] - lines returned before
+ *   reconciliation.
+ * @param {object} args.fixture
+ * @param {object} [args.gateCounts] - `applyVisualEvidenceGate`'s counts.
+ * @param {boolean} [args.enumClosed] - was a closed candidate enum enforced.
+ */
+export function scoreMetricFamilies({
+  accepted, merges = null, duplicateGroups = [], rawObservationCount = null,
+  fixture, gateCounts = null, enumClosed = true,
+} = {}) {
+  if (!fixture?.lines?.length) throw new Error('scoreMetricFamilies: fixture is required');
+  const expected = fixture.lines;
+  const answers = Array.isArray(accepted) ? accepted : [];
+  const { fixtureForAnswer, anyReadingForAnswer, identityOnlyForAnswer, claimed } = joinReadings(answers, expected);
+
+  // ── FAMILY 1: PHOTO COVERAGE ────────────────────────────────────────────
+  const detected = fixtureForAnswer.size;
+  const coverage = {
+    expectedPageLines: expected.length,
+    detected: rate(detected, expected.length),
+    omitted: rate(expected.length - detected, expected.length),
+    omittedPageLines: expected
+      .map((e, ei) => ({ e, ei }))
+      .filter(({ ei }) => !claimed.has(ei))
+      .map(({ e }) => ({ page_order: e.page_order, source_text: e.source_text })),
+  };
+
+  // ── FAMILY 2: PHOTO INVENTION ───────────────────────────────────────────
+  // Warwick asked for two numbers because they are two different failures.
+  const invention = {
+    catalogueValidButUnsupported: 0,
+    catalogueValidButUnsupportedDetail: [],
+    arbitraryOutOfSet: 0,
+    // The AC3 gate's effect on the class, which is the only thing that says
+    // whether the gate did its job.
+    unsupportedStillHoldingPhoto: 0,
+    unsupportedWithheldByGate: 0,
+    /** The AC3 gate did not run on this artefact - NOT the same as passing it. */
+    unsupportedGateNotRun: 0,
+    arbitraryOutOfSetNote: enumClosed
+      ? 'STRUCTURALLY IMPOSSIBLE on this run, not merely absent: a closed product_id enum was enforced and '
+        + 'assertProductIdsInEnum THROWS on any value outside it. This number can only ever be 0 here, and quoting '
+        + 'it as evidence of model restraint would be false.'
+      : 'No closed enum was enforced on this run, so an out-of-set identity was possible and this count is meaningful.',
+  };
+
+  // ── FAMILY 4: QUANTITY ──────────────────────────────────────────────────
+  const quantity = {
+    pageLinesCarryingWrittenCount: expected.filter(pageCarriesCount).length,
+    detectedWherePageCarriesCount: 0,
+    countPreserved: 0,
+    countCorrect: 0,
+    countWrong: 0,
+    countWrongDetail: [],
+    silentlyWrong: 0,
+    wrongButReferred: 0,
+    contestedExcluded: 0,
+    defaultOneLines: answers.filter((l) => l.quantity_basis === QUANTITY_BASIS.HOUSEHOLD_DEFAULT).length,
+    packDigitsIgnoredAsQuantity: answers.filter(
+      (l) => l.model_quantity_disagreed && l.quantity_basis === QUANTITY_BASIS.HOUSEHOLD_DEFAULT,
+    ).length,
+    // The 12-line subset: the ONLY lines on which a LOST count is
+    // distinguishable from a correctly-read one, because everywhere else the
+    // household default supplies the same answer. It is the right denominator
+    // for LOSS and the wrong one for CORRECTNESS - which is the confusion that
+    // let page 19 (true count 1, read 2, in 3/3 runs) sit outside the measured
+    // set while being one of the three defects the work was commissioned for.
+    lossSubsetTotal: 0,
+    lossSubsetCorrect: 0,
+  };
+
+  // ── FAMILY 5: IDENTITY ──────────────────────────────────────────────────
+  const identity = {
+    gradable: 0, correct: 0, wrong: 0, unresolvedUnknown: 0, noClaim: 0, notGradable: 0,
+  };
+
+  answers.forEach((line, ai) => {
+    const ei = fixtureForAnswer.get(ai);
+    const isUnknown = line.product_id === UNKNOWN_VISIBLE_ITEM;
+    const isNotALine = line.product_id === NOT_A_LINE;
+    if (isNotALine) return;
+
+    if (ei === undefined) {
+      // Read something no page line corresponds to. A second observation of an
+      // already-claimed line is a DUPLICATE and belongs to family 3, not here.
+      if (anyReadingForAnswer.has(ai)) return;
+      invention.catalogueValidButUnsupported += 1;
+      if (line.provenance_eligible === PROVENANCE.WITHHELD) invention.unsupportedWithheldByGate += 1;
+      else if (line.provenance_eligible === PROVENANCE.NOT_ASSESSED) invention.unsupportedGateNotRun += 1;
+      else invention.unsupportedStillHoldingPhoto += 1;
+      invention.catalogueValidButUnsupportedDetail.push({
+        as_written: verbatimOf(line),
+        named_product_id: line.product_id ?? null,
+        named_via_identity_only: identityOnlyForAnswer.has(ai),
+        provenance_eligible: line.provenance_eligible ?? null,
+        withheld_because: line.photo_evidence?.reasons ?? [],
+      });
+      return;
+    }
+
+    const exp = expected[ei];
+
+    // QUANTITY, graded on the page's own written count.
+    if (pageCarriesCount(exp)) {
+      quantity.detectedWherePageCarriesCount += 1;
+      const markPreserved = typeof line.leading_mark === 'string' && line.leading_mark.trim() !== '';
+      if (markPreserved || /^\s*\d/.test(verbatimOf(line))) quantity.countPreserved += 1;
+    }
+    const isLossSubset = exp.expected_quantity !== 1;
+    if (isLossSubset) quantity.lossSubsetTotal += 1;
+
+    const ok = quantityAgreesUnderDefaultOne(exp.expected_quantity, line.quantity ?? null);
+    if (exp.contested) {
+      quantity.contestedExcluded += 1;
+    } else if (ok) {
+      quantity.countCorrect += 1;
+      if (isLossSubset) quantity.lossSubsetCorrect += 1;
+    } else {
+      quantity.countWrong += 1;
+      const referred = line.needs_human === true;
+      if (referred) quantity.wrongButReferred += 1;
+      else quantity.silentlyWrong += 1;
+      quantity.countWrongDetail.push({
+        page_line: exp.page_order,
+        source_text: exp.source_text,
+        as_written: verbatimOf(line),
+        leading_mark: line.leading_mark ?? null,
+        expected_quantity: exp.expected_quantity,
+        got_quantity: line.quantity ?? null,
+        in_loss_subset: isLossSubset,
+        referred_to_human: referred,
+        referral_reasons: line.needs_human_reasons ?? [],
+      });
+    }
+
+    // IDENTITY.
+    if (!exp.identity_established) identity.notGradable += 1;
+    else {
+      identity.gradable += 1;
+      if (isUnknown) identity.unresolvedUnknown += 1;
+      else if (!line.identified) identity.noClaim += 1;
+      else if (String(line.product_id) === String(exp.expected_product_id)) identity.correct += 1;
+      else identity.wrong += 1;
+    }
+  });
+
+  // ── FAMILY 3: DUPLICATES - three numbers, never one ─────────────────────
+  const residualDuplicates = answers.filter(
+    (l, ai) => l.product_id !== NOT_A_LINE
+      && !fixtureForAnswer.has(ai) && anyReadingForAnswer.has(ai),
+  ).length;
+
+  const duplicates = {
+    rawObservations: rawObservationCount,
+    // A merge is CORRECT when both readings are the same page line, and
+    // INCORRECT when they are two different ones. The second is the failure
+    // that silently destroys a purchase Warwick asked for - Yazoo strawberry
+    // into Yazoo chocolate, Twix ice cream into Twix biscuits, Arla into ASDA -
+    // and until now nothing measured it at all.
+    reconciledSameLine: 0,
+    incorrectCrossLineMerges: 0,
+    incorrectCrossLineMergeDetail: [],
+    mergesUngradable: 0,
+    residualUnreconciledDuplicates: residualDuplicates,
+    crossRegionCollisionGroups: (duplicateGroups || []).filter((g) => g.kind === 'cross_region').length,
+    sameRegionCollisionGroups: (duplicateGroups || []).filter((g) => g.kind === 'same_region').length,
+    measurable: Array.isArray(merges),
+    note: Array.isArray(merges)
+      ? null
+      : 'NOT MEASURED: reconciliation merges were not supplied to the scorer, so correct-versus-incorrect '
+        + 'merges could not be graded. This is an absent measurement, NEVER a zero.',
+  };
+
+  if (Array.isArray(merges)) {
+    for (const m of merges) {
+      const a = bestPageLineFor(String(m.kept_as_written ?? ''), expected);
+      const b = bestPageLineFor(String(m.merged_as_written ?? ''), expected);
+      if (a === null || b === null) {
+        duplicates.mergesUngradable += 1;
+      } else if (a === b) {
+        duplicates.reconciledSameLine += 1;
+      } else {
+        duplicates.incorrectCrossLineMerges += 1;
+        duplicates.incorrectCrossLineMergeDetail.push({
+          kept_as_written: m.kept_as_written,
+          kept_page_line: expected[a].page_order,
+          merged_as_written: m.merged_as_written,
+          merged_page_line: expected[b].page_order,
+          regions: m.regions ?? null,
+        });
+      }
+    }
+  }
+
+  return {
+    families: {
+      photoCoverage: coverage,
+      photoInvention: invention,
+      duplicates,
+      quantity: {
+        ...quantity,
+        // ⛔ SILENCE IS ONLY MEASURABLE ONCE EVERY REFERRAL MECHANISM HAS RUN.
+        // On an artefact banked before the AC3 gate existed, no line can be
+        // withheld and no line can be referred by it - so a "0 silently wrong"
+        // read off that run would be measuring the absence of a mechanism, not
+        // the presence of correctness. The number is still computed and still
+        // published; what travels with it is what it was computed WITHOUT.
+        silentlyWrongMeasuredWithGate: gateCounts ? gateCounts.applicable === true : false,
+        silentlyWrongNote: (gateCounts && gateCounts.applicable === true)
+          ? null
+          : 'MEASURED WITHOUT THE AC3 GATE - this run predates `band_position_pct`, so the gate could not '
+            + 'refer anything and this figure reflects the AC1/AC2 referral causes only. It is a real number '
+            + 'about this run; it is NOT evidence about the gate.',
+        preserved: rate(quantity.countPreserved, quantity.detectedWherePageCarriesCount),
+        correct: rate(quantity.countCorrect, quantity.countCorrect + quantity.countWrong),
+        lossSubset: rate(quantity.lossSubsetCorrect, quantity.lossSubsetTotal),
+        preservedVsCorrectNote:
+          'PRESERVED is AVAILABILITY - a count reached the application. CORRECT is whether it was the RIGHT '
+          + 'count. They are different questions and the first is blind to a misread digit. Never quote one as '
+          + 'the other.',
+        denominatorNote:
+          'CORRECTNESS is graded over all detected count-bearing page lines (39 of 39 carry a written count). '
+          + 'The 12-line loss subset is the ONLY population where a LOST count is distinguishable from a read '
+          + 'one, and it is the right denominator for LOSS ONLY. Quoting the 12 as the correctness denominator '
+          + 'excludes the over-counting class entirely - page 19 (1 read as 2) and page 2 (1 read as 7) both '
+          + 'sit outside it, and both spend real money.',
+      },
+      identity: {
+        ...identity,
+        correctRate: rate(identity.correct, identity.gradable),
+        denominatorNote: 'DETECTED lines with an ESTABLISHED catalogue identity - never 39',
+      },
+      visualEvidenceGate: gateCounts ?? { note: 'NOT RUN on this scoring pass.' },
+    },
+    familiesLimits: [
+      'These five families grade the FINAL lines - after reconciliation and after the AC3 visual-evidence '
+      + 'gate. They do not describe any earlier state of the pipeline.',
+      'The reading-to-page-line join is a text similarity between two READINGS of the same handwriting. It '
+      + 'mis-assigns when more observations exist than page lines: in variance run 1 a strawberry reading was '
+      + 'assigned to the chocolate page line because the strawberry line was already claimed, producing a '
+      + 'quantity error that is a JOIN ARTEFACT and not a product defect.',
+      'Identity is graded only where the fixture established a catalogue identity (36 of 39).',
+      'The fixture inherits the committed 39-line list, whose own provenance is unrecorded, and page 8 '
+      + '(Richmond) is CONTESTED on both quantity and identity - excluded from correctness and counted separately.',
+      'SILENTLY WRONG is the figure Warwick\'s bar asks for. A wrong count that was referred to a human is '
+      + 'NOT silently wrong, and is a success by that bar - but it is still a wrong reading, and this scorer '
+      + 'never presents a referral as a correct answer.',
+    ],
+  };
+}
+
+/** The five families, printed with every denominator attached. */
+export function formatFamilies(score, label) {
+  const f = score.families;
+  const r = (x) => (x.pct === null ? `${x.n}/${x.d}` : `${x.n}/${x.d} (${x.pct}%)`);
+  return [
+    `  ${label} - THE FIVE METRIC FAMILIES (WP-B15-33 AC4)`,
+    '  1. PHOTO COVERAGE',
+    `       expected page lines .... ${f.photoCoverage.expectedPageLines}`,
+    `       detected .............. ${r(f.photoCoverage.detected)}`,
+    `       omitted ............... ${r(f.photoCoverage.omitted)}`,
+    '  2. PHOTO INVENTION',
+    `       catalogue-valid but UNSUPPORTED ... ${f.photoInvention.catalogueValidButUnsupported}`,
+    `         of which still holding PHOTO .... ${f.photoInvention.unsupportedStillHoldingPhoto}`,
+    `         of which withheld by the gate ... ${f.photoInvention.unsupportedWithheldByGate}`,
+    `       arbitrary out-of-set invention .... ${f.photoInvention.arbitraryOutOfSet}  [${f.photoInvention.arbitraryOutOfSetNote}]`,
+    '  3. DUPLICATES',
+    `       raw observations before reconciliation ... ${f.duplicates.rawObservations ?? 'not supplied'}`,
+    `       correctly reconciled same-line .......... ${f.duplicates.reconciledSameLine}`,
+    `       INCORRECT CROSS-LINE MERGES ............. ${f.duplicates.incorrectCrossLineMerges}${f.duplicates.measurable ? '' : '  [' + f.duplicates.note + ']'}`,
+    `       merges ungradable against the fixture ... ${f.duplicates.mergesUngradable}`,
+    `       residual unreconciled duplicates ........ ${f.duplicates.residualUnreconciledDuplicates}`,
+    '  4. QUANTITY',
+    `       page lines carrying a written count ..... ${f.quantity.pageLinesCarryingWrittenCount}/${f.photoCoverage.expectedPageLines}`,
+    `       explicit counts PRESERVED (availability)  ${r(f.quantity.preserved)}`,
+    `       explicit counts CORRECT .................. ${r(f.quantity.correct)}`,
+    `       wrong: SILENTLY wrong .................... ${f.quantity.silentlyWrong}   <- Warwick's bar. Target 0.`,
+    `       wrong: referred to a human ............... ${f.quantity.wrongButReferred}   (a SUCCESS by that bar)`,
+    `       12-line LOSS subset correct .............. ${r(f.quantity.lossSubset)}   (loss only - NOT the correctness denominator)`,
+    `       household default-one lines .............. ${f.quantity.defaultOneLines}`,
+    `       pack digits ignored as quantity .......... ${f.quantity.packDigitsIgnoredAsQuantity}`,
+    `       contested page lines excluded ............ ${f.quantity.contestedExcluded}`,
+    '  5. IDENTITY',
+    `       correct ............... ${r(f.identity.correctRate)}  (${f.identity.denominatorNote})`,
+    `       wrong ................. ${f.identity.wrong}`,
+    `       unresolved / UNKNOWN .. ${f.identity.unresolvedUnknown}`,
+    `       no identity claim ..... ${f.identity.noClaim}`,
+    `       not gradable .......... ${f.identity.notGradable}`,
+    '  AC3 VISUAL-EVIDENCE GATE',
+    f.visualEvidenceGate.applicable === false
+      ? `       NOT APPLICABLE TO THIS RUN - ${f.visualEvidenceGate.applicabilityNote}`
+      : `       PHOTO ${f.visualEvidenceGate.photo ?? '-'} | WITHHELD ${f.visualEvidenceGate.withheld ?? '-'} `
+        + `(no position ${f.visualEvidenceGate.withheldNoPosition ?? '-'}, position collision ${f.visualEvidenceGate.withheldPositionCollision ?? '-'})`,
+    `       position available ${f.visualEvidenceGate.positionAvailable ?? '-'}/${f.visualEvidenceGate.total ?? '-'} | bands over geometric budget ${f.visualEvidenceGate.bandsOverBudget ?? '-'} (REPORTED, not enforced)`,
+    ...(f.quantity.silentlyWrongNote ? [`  ⚠ ${f.quantity.silentlyWrongNote}`] : []),
+  ].join('\n');
+}
 
 export const TWO_LAYER_LIMITS = Object.freeze([
   'LAYER A visible-text/interpretation accuracy is NOT INDEPENDENTLY GRADED. The fixture\'s source_text '

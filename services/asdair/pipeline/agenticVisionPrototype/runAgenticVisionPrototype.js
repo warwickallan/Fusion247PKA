@@ -60,7 +60,10 @@ import { REQUEST_CROP_TOOL } from './tools.js';
 import { buildLineSchema, buildTextFormat, buildProductIdEnum } from './lineSchema.js';
 import { groundLines } from './groundLines.js';
 import { loadGroundTruth, scoreSevenWay, formatSevenWay } from './sevenWayScore.js';
-import { loadFixture, scoreTwoLayer, formatTwoLayer } from './twoLayerScore.js';
+import {
+  loadFixture, scoreTwoLayer, formatTwoLayer, scoreMetricFamilies, formatFamilies,
+} from './twoLayerScore.js';
+import { applyVisualEvidenceGate } from './visualEvidenceGate.js';
 import { planOrientationAwareBands, proveCoverage, DEFAULT_BAND_COUNT } from './bandPlan.js';
 import { inspectBandsIndividually, reconcileAcrossBands } from './bandInspection.js';
 
@@ -311,13 +314,52 @@ export function rescoreArtefact(artefactPath, { fixturePath = DEFAULT_FIXTURE_PA
     regionNos: artefact.regionNos ?? [...new Set((artefact.rawLines || []).map((l) => Number(l.source_region)))],
   });
 
+  // ── WP-B15-33 AC4: RE-SCORE A BANDED ARTEFACT THROUGH THE WHOLE CURRENT
+  //    PIPELINE, not just the scorer ────────────────────────────────────────
+  //
+  // The re-score used to stop at `groundLines`, which meant a banded artefact
+  // was graded on a set the run itself never acted on - reconciliation and the
+  // AC3 gate both come after it. That made the before/after illegible for
+  // exactly the artefacts this order has to compare. Where the artefact carries
+  // a band plan, the same reconciliation and the same gate the live run uses
+  // are replayed here over the SAME banked raw lines, so the only variable
+  // between the old number and the new one is the instrument.
+  const plan = artefact.plan ?? null;
+  const isBanded = Boolean(plan?.regions?.length);
+  const reconciliation = isBanded
+    ? reconcileAcrossBands({
+      lines: grounded.accepted,
+      regions: plan.regions,
+      axis: plan.axis,
+      linePitch: plan.linePitch?.pitch ?? null,
+    })
+    : null;
+  const gate = isBanded
+    ? applyVisualEvidenceGate({
+      lines: reconciliation.reconciled,
+      regions: plan.regions,
+      axis: plan.axis,
+      linePitch: plan.linePitch?.pitch ?? null,
+    })
+    : null;
+  const finalLines = gate ? gate.lines : grounded.accepted;
+
   // AC4 - the instrument that grades. Two layers, never one number.
   const fixture = loadFixture(fixturePath);
   const twoLayer = scoreTwoLayer({
-    accepted: grounded.accepted,
+    accepted: finalLines,
     rejected: grounded.rejected,
     duplicateGroups: grounded.duplicateGroups,
     fixture,
+  });
+  const families = scoreMetricFamilies({
+    accepted: finalLines,
+    merges: reconciliation ? reconciliation.merges : null,
+    duplicateGroups: grounded.duplicateGroups,
+    rawObservationCount: Array.isArray(artefact.rawLines) ? artefact.rawLines.length : null,
+    fixture,
+    gateCounts: gate ? gate.counts : null,
+    enumClosed: Boolean(artefact.constrained || isBanded),
   });
 
   // The superseded seven-category scorer, run ONLY when its ground-truth file
@@ -335,7 +377,9 @@ export function rescoreArtefact(artefactPath, { fixturePath = DEFAULT_FIXTURE_PA
     });
   }
 
-  return { artefact, grounded, twoLayer, sevenWay };
+  return {
+    artefact, grounded, reconciliation, gate, finalLines, twoLayer, families, sevenWay,
+  };
 }
 
 /**
@@ -463,10 +507,27 @@ export async function runBandArm({
     productIdEnum: inspection.productIdEnum,
     regionNos: bandRegions.map((r) => r.region_no),
   });
-  const reconciliation = reconcileAcrossBands({ lines: grounded.accepted });
+  const reconciliation = reconcileAcrossBands({
+    lines: grounded.accepted,
+    regions: plan.regions,
+    axis: plan.axis,
+    linePitch: plan.linePitch?.pitch ?? null,
+  });
+
+  // ── WP-B15-33 AC3: THE GATE RUNS LAST, AND IT ONLY WITHHOLDS ────────────
+  // Last, because it grades the lines the application would actually act on -
+  // grading anything earlier measures a state nothing consumes. Only withholds,
+  // because deleting a detected line would trade Warwick's grounding
+  // requirement against his 0-omissions requirement, and he asked for both.
+  const gate = applyVisualEvidenceGate({
+    lines: reconciliation.reconciled,
+    regions: plan.regions,
+    axis: plan.axis,
+    linePitch: plan.linePitch?.pitch ?? null,
+  });
 
   return {
-    plan, bandRegions, inspection, grounded, reconciliation, elapsedMs, renderedBytes, upscale, bandCount,
+    plan, bandRegions, inspection, grounded, reconciliation, gate, elapsedMs, renderedBytes, upscale, bandCount,
   };
 }
 
@@ -500,7 +561,7 @@ async function main() {
     const fixturePath = argValue('fixture', DEFAULT_FIXTURE_PATH);
     const gtPath = argValue('ground-truth', null);
     const {
-      artefact, grounded, twoLayer, sevenWay,
+      artefact, grounded, reconciliation, gate, twoLayer, families, sevenWay,
     } = rescoreArtefact(rescorePath, { fixturePath, groundTruthPath: gtPath });
     process.stdout.write(`\nRE-SCORED on the CORRECTED instrument (no gateway call) from ${rescorePath}\n`);
     process.stdout.write(`  grounding: accepted ${grounded.counts.accepted}, rejected ${grounded.counts.rejected}, `
@@ -509,15 +570,43 @@ async function main() {
       + `qty from page ${grounded.counts.quantityFromPage}, qty defaulted ${grounded.counts.quantityDefaulted}, `
       + `model qty discarded ${grounded.counts.modelQuantityDiscarded}, `
       + `cross-region collisions ${grounded.counts.crossRegionCollisions}\n`);
-    process.stdout.write(`${formatTwoLayer(twoLayer, artefact.label)}\n`);
+    process.stdout.write(`${formatFamilies(families, artefact.label)}\n`);
+    process.stdout.write('  FAMILY LIMITS (print these WITH the numbers, never without):\n');
+    families.familiesLimits.forEach((l) => process.stdout.write(`    - ${l}\n`));
+    process.stdout.write(`\n  SUPERSEDED two-layer score, recomputed on the same raw lines for comparison only:\n${formatTwoLayer(twoLayer, artefact.label)}\n`);
     process.stdout.write(`  omitted page lines: ${twoLayer.omittedPageLines.map((o) => `#${o.page_order} ${o.source_text}`).join(' | ') || '(none)'}\n`);
-    process.stdout.write('  LIMITS (print these WITH the numbers, never without):\n');
     twoLayer.limits.forEach((l) => process.stdout.write(`    - ${l}\n`));
     if (sevenWay) {
       process.stdout.write(`\n  SUPERSEDED seven-category scorer, for comparison only:\n${formatSevenWay(sevenWay, artefact.label)}\n`);
     }
+
+    // ── RETAIN THE SUPERSEDED BLOCK. The point of re-scoring the SAME banked
+    //    raw lines is that the instrument is the only thing that changed, and
+    //    that claim is only checkable while the old numbers are still in the
+    //    file beside the new ones. Overwriting them would destroy the very
+    //    comparison the re-score exists to make.
+    const supersededBlocks = {
+      ...(artefact.supersededScores ?? {}),
+      ...(artefact.twoLayerScore && !artefact.supersededScores?.twoLayerScore_asRunWPB1532
+        ? { twoLayerScore_asRunWPB1532: artefact.twoLayerScore }
+        : {}),
+      ...(artefact.reconciliation && !artefact.supersededScores?.reconciliation_asRunWPB1532
+        ? { reconciliation_asRunWPB1532: artefact.reconciliation }
+        : {}),
+      note: 'AS RUN at WP-B15-32, retained byte-for-byte. The raw model output in `rawLines` is unchanged, so '
+        + 'the difference between these blocks and the current ones is the INSTRUMENT and the application-side '
+        + 'pipeline (WP-B15-33), never a different draw from the model.',
+    };
+
     fs.writeFileSync(rescorePath, `${JSON.stringify({
-      ...artefact, grounded, twoLayerScore: twoLayer, score: sevenWay ?? artefact.score ?? null,
+      ...artefact,
+      supersededScores: supersededBlocks,
+      grounded,
+      ...(reconciliation ? { reconciliation } : {}),
+      ...(gate ? { visualEvidenceGate: { counts: gate.counts }, finalLines: gate.lines } : {}),
+      metricFamilies: families,
+      twoLayerScore: twoLayer,
+      score: sevenWay ?? artefact.score ?? null,
     }, null, 2)}\n`);
     process.stdout.write(`  artefact updated in place: ${rescorePath}\n`);
     return;
@@ -540,11 +629,22 @@ async function main() {
       imagePath: imgPath, catalogueItems, bandCount, upscale,
     });
     const fixture = loadFixture(argValue('fixture', DEFAULT_FIXTURE_PATH));
+    // SUPERSEDED headline, RETAINED so every number already on the record stays
+    // reproducible from the same artefact (WP-B15-33 AC4).
     const score = scoreTwoLayer({
-      accepted: arm.reconciliation.reconciled,
+      accepted: arm.gate.lines,
       rejected: arm.grounded.rejected,
       duplicateGroups: arm.grounded.duplicateGroups,
       fixture,
+    });
+    const families = scoreMetricFamilies({
+      accepted: arm.gate.lines,
+      merges: arm.reconciliation.merges,
+      duplicateGroups: arm.grounded.duplicateGroups,
+      rawObservationCount: arm.inspection.lines.length,
+      fixture,
+      gateCounts: arm.gate.counts,
+      enumClosed: true,
     });
 
     process.stdout.write(`\n${label.toUpperCase()} - orientation-aware bands, upscale x${arm.upscale}\n`);
@@ -553,9 +653,11 @@ async function main() {
     process.stdout.write(`  raw lines ${arm.inspection.lines.length} -> accepted ${arm.grounded.counts.accepted} -> reconciled ${arm.reconciliation.reconciled.length} `
       + `(merged away ${arm.reconciliation.mergedAway}, confirmed by two bands ${arm.reconciliation.confirmedByTwoBands})\n`);
     process.stdout.write(`  per band: ${arm.inspection.perBand.map((b) => `${b.region_no}:${b.parseFailed ? 'PARSE-FAIL' : b.lineCount}`).join(' ')}\n`);
-    process.stdout.write(`${formatTwoLayer(score, label)}\n`);
+    process.stdout.write(`${formatFamilies(families, label)}\n`);
+    process.stdout.write('  FAMILY LIMITS (print these WITH the numbers, never without):\n');
+    families.familiesLimits.forEach((l) => process.stdout.write(`    - ${l}\n`));
+    process.stdout.write(`\n  SUPERSEDED two-layer score, retained for like-for-like comparison only:\n${formatTwoLayer(score, label)}\n`);
     process.stdout.write(`  omitted page lines: ${score.omittedPageLines.map((o) => `#${o.page_order} ${o.source_text}`).join(' | ') || '(none)'}\n`);
-    process.stdout.write('  LIMITS (print these WITH the numbers, never without):\n');
     score.limits.forEach((l) => process.stdout.write(`    - ${l}\n`));
 
     const outDir = argValue('out', path.join(__dirname, 'runs'));
@@ -590,6 +692,9 @@ async function main() {
       rawLines: arm.inspection.lines,
       grounded: arm.grounded,
       reconciliation: arm.reconciliation,
+      visualEvidenceGate: { counts: arm.gate.counts },
+      finalLines: arm.gate.lines,
+      metricFamilies: families,
       twoLayerScore: score,
     }, null, 2)}\n`);
     process.stdout.write(`\nrun artefact: ${outPath}\n`);

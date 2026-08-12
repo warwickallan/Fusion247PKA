@@ -63,6 +63,37 @@
 // or special-cased - it simply stops being handed evidence that has already
 // been destroyed.
 //
+// ── WP-B15-33 C6: `band_position_pct` — WHERE THE LINE WAS SEEN ─────────
+// AUTHORISED BY LARRY, 2026-08-12 (Amendment 1 to WO-2026-08-12-06), and
+// reported to Warwick as Larry's ruling. It is the SAME PATTERN as
+// `leading_mark`: a transcription-only observation field, added because a
+// decision the application must make deterministically had no evidence to
+// make it from.
+//
+// ⛔ WHY THIS IS NOT WHAT WARWICK CLOSED. He forbade redesigning the vision
+// architecture, another model experiment, and prompt whack-a-mole. This is
+// none of those. Regions, reading axis, 3x enlargement, individual band
+// inspection, the closed enum, UNKNOWN and the explicit quantity field are
+// ALL UNTOUCHED. Nothing about how the page is SEEN changes.
+//
+// WHY IT IS NECESSARY RATHER THAN NICE. Warwick's AC3 requires that a
+// catalogue product with no supporting visual evidence cannot enter PHOTO
+// provenance, and requires it STRUCTURALLY rather than as a prompt request.
+// Measured on the three variance artefacts, the phantoms - "1 box MILKY WAY",
+// "1 TRESemme conditioner", "1 WALLS SAUSAGE ROLLS" - each carry a VALID
+// application-supplied `source_region`, a non-empty `as_written` and an
+// in-enum `product_id`. They pass every gate the application has. Without a
+// per-line positional signal there is nothing structural left to test: the
+// only other application-owned candidate, the geometric line budget, is
+// per-BAND not per-LINE and is strong enough to reject a real line.
+//
+// ⛔ THE BOUND, AND IT IS THE WHOLE SAFETY OF THE FIELD:
+//   * TRANSCRIPTION ONLY - where the writing physically sits in this crop.
+//   * NO BEARING on identity, on quantity, or on the candidate set.
+//   * IT MAY NEVER BE A REASON TO ACCEPT A LINE. It may only ever be a reason
+//     to WITHHOLD one. A missing or useless value therefore costs detection
+//     nothing and can never manufacture confidence.
+//
 // ── AC3: THE TWO QUESTIONS ARE SEPARATE FIELDS, NOT ONE ─────────────────
 // `visible_line` (is there actually a handwritten line here?) is asked
 // distinctly from `product_id` (which supplied candidate is it?). They are
@@ -150,7 +181,7 @@ export function buildLineSchema({ candidates = [], regionNos } = {}) {
           type: 'object',
           additionalProperties: false,
           // strict mode: EVERY property is required; optionality is a null type.
-          required: ['line_no', 'as_written', 'leading_mark', 'visible_line', 'product_id', 'source_region', 'quantity', 'confidence'],
+          required: ['line_no', 'as_written', 'leading_mark', 'band_position_pct', 'visible_line', 'product_id', 'source_region', 'quantity', 'confidence'],
           properties: {
             line_no: {
               type: 'integer',
@@ -163,6 +194,10 @@ export function buildLineSchema({ candidates = [], regionNos } = {}) {
             leading_mark: {
               type: ['string', 'null'],
               description: 'TRANSCRIBE, never interpret: the mark or marks written at the very START of this line, BEFORE the product name begins - for example "2", "16", "1 x 6pts", "4 x 4pts", "2 PKTS.". Copy exactly what is written there, even if it is a single digit. If the line begins directly with a word, this is null. Never infer it, never calculate it, never take a number from later in the line, and never omit it because the line looks like an ordinary single item.',
+            },
+            band_position_pct: {
+              type: ['integer', 'null'],
+              description: 'OBSERVATION ONLY: how far along this crop, in the direction you are reading the lines, the START of this line physically sits. 0 = hard against the beginning edge of this crop, 100 = hard against the far edge. Read it off where the ink actually is. NEVER derive it from the order of your answer, never space your lines out evenly to look tidy, and never adjust it to make two lines differ. If you genuinely cannot place the line in this crop, return null - that is an honest and acceptable answer. This value says nothing about what the line is or how many to buy.',
             },
             visible_line: {
               type: 'boolean',
