@@ -2119,6 +2119,38 @@ what's already been read, not a fresh blind call. Bounded by a hard iteration ca
 **Next: a standalone PROTOTYPE, not a pipeline integration** — per Warwick's own sequencing ("build the
 simplest version, prove it on the known photograph, integrate it, and move on"). Dispatched to Keel.
 
+**First dispatch correctly CLARIFY-refused, twice-compounding process gap found and fixed**: (1) the
+prototype worktree was cut from local `main`, which does not yet contain the pricing constant/cost-
+estimation code AC4 needs to fix — that code only exists on the unmerged `build-015/b15-24-vision-
+pipeline` branch (six rounds of vision-pipeline work have never been merged to main). Re-cut from that
+branch's tip instead. (2) The real capability-probe evidence (the actual captured tool-calling and
+`/v1/responses` continuation proof) lived only in a session-scoped ephemeral scratchpad, invisible to a
+fresh Keel instance — committed durably to `Deliverables/2026-08-12-capability-probe-evidence/` (checked
+for secrets first; none — auth is referenced via env var, never a literal key). Reissued as v2, dispatched.
+
+**Prototype COMPLETED** — `b314221`, pushed. All 6 ACs met, 722/722 pipeline tests pass (+31 from
+baseline, 0 regressions), real mutation-tested proof the iteration cap actually bounds an adversarial
+model that always requests another crop, pricing fix confirmed with real numbers (+25.0% on a fixed
+token count, matching the audit's finding exactly). **One honest limitation disclosed, not hidden**: a
+`request_crop` follow-up currently resends the SAME already-rendered per-region crop, not a freshly
+higher-resolution render — whether isolation alone (without a genuinely closer look) helps is exactly
+what the live test now needs to show. No live gateway call was made building this — that's next.
+
+**⛔ FIRST LIVE RUN LANDED. Real positive signal, but a wiring bug prevented any scored result.** Asdair
+independently re-derived the 39-line ground truth from the source photo before scoring anything (didn't
+trust the transcript claim). **Terra spontaneously called `request_crop`, unprompted, on turn 1 of every
+run — twice simultaneously (regions 2 and 3)** — the core hypothesis this whole redirect exists to test
+is confirmed: the model will actively seek closer inspection when given the tool. **But the loop crashed
+on turn 2, all 3 runs, identical cause**: `visionAgenticTurn()` never constructs the `function_call_
+output` item the Responses API requires before continuing a tool-call conversation, so the gateway
+correctly 400s. Compounded by a second bug: the loop only reads Terra's FIRST tool call, silently
+dropping the second. **No lines were scored — not "0/39 omitted," a different failure class entirely**
+(the run never reached a final answer to score, not a run that completed and under-covered). This is
+exactly the kind of integration-boundary defect a mocked unit test cannot catch (round 4 hit the same
+shape of miss). Secondary finding: this photo's region plan produced only 3 regions total, coarser than
+expected — worth revisiting once the crash is fixed. **Narrow, precisely-located fix dispatched next —
+not another open-ended round.**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
