@@ -1704,6 +1704,31 @@ widened the surface by exactly those two files and approved a disposable local P
 database-level proof (no Docker available here; a throwaway instance substitutes, matching the CI
 job's own allowance). Implementation now proceeding.
 
+**All three legs now at real, honestly-reported progress:**
+- **Felix's Cockpit-UI is IMPLEMENTED** (`build-015/b15-26-cockpit-ui`, commit `f7bf71a`, local-commits-
+  only per its contract's disclosed gap) — four-tab nav, canonical-state-driven Shop screen, a
+  write-capable Questions board routed through one command function, Diagnostics-gated developer
+  content. Not self-certified visually (no browser tool in Felix's grant, and `node server.mjs` fails
+  to start in that worktree on an unrelated dependency gap) — **Vera dispatched** for the real
+  visual/WCAG/responsive gate.
+- **Keel's vision-pipeline hit a genuine product decision**: no image-processing library exists
+  anywhere in this repo, and real rotate/deskew/crop — the exact mechanism that made the manual read
+  beat Terra — cannot be built zero-dependency. Put to Warwick directly as a two-option choice; his
+  answer: authorise a minimal library, scoped to `services/asdair/pipeline/**` only (`sharp`, pinned).
+  Everything else in this WP is DONE and proven while that was pending, including **AC3's acceptance_
+  property proven against a real disposable Postgres** — an actual `23514` CHECK-constraint refusal
+  captured, not paraphrased. One finding fixed directly by Larry (not the worker, per an established
+  precedent in the test itself): `invariants.test.js`'s `OWNED` writer-list needed two new table names,
+  committed as `9dd980f` on Keel's own branch. `interpretPhoto`'s rewrite (the held piece) now
+  unblocked.
+- **Cockpit-backend is COMPLETE** — all 5 acceptance criteria met, pushed to
+  `build-015/b15-25-cockpit-backend` @ `82e7618`.
+
+**Genuine cross-WP reconciliation still owed, not yet done:** Cockpit-backend's `canonicalState.js` and
+Felix's UI both read a PLACEHOLDER field name; the vision-pipeline WP's real column is
+`asdair.shop.human_state`. Reconciling that rename is Larry's job once all three branches are ready to
+converge — not attempted mid-flight while each WP is still moving.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
