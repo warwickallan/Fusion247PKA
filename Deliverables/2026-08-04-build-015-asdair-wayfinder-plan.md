@@ -1836,6 +1836,74 @@ escalated tonight per the hobby-brain bar (no credential exposed, Asdair's own e
 own normal job) — but worth Warwick knowing it happened, and worth settling properly rather than
 re-deciding ad hoc each time it comes up.
 
+**Warwick's full architecture ruling landed, same session: no model switch, fix Terra's process.**
+Recorded in full as Amendment 4 of `Deliverables/2026-08-11-cockpit-and-vision-pipeline-design.md`.
+Key correction: the test denominator was wrong — the photo has **39 source lines**, not 41 (the
+41-line trolley is 39 photo + 3 Regulars − 1 skip; grading OCR against it double-counted enrichment as
+photo accuracy). Round-2 Work Order issued (`WO-2026-08-12-B15-VISION-02`,
+`Deliverables/2026-08-12-wo-b15-24-vision-pipeline-round2-order.md`), dispatched to Keel on the SAME
+branch as round 1 (`build-015/b15-24-vision-pipeline`, merged forward to pick up Amendment 4). Fixes,
+each at its own root cause per Warwick's explicit instruction not to conflate them: quantity semantics
+as a class (a number in a product name is never automatically the requested quantity — not a threshold
+move); the wrong-milk identity-resolution bug, in the resolver, not the vision prompt; the duplicate
+Vanish-line reconciliation gap; the provenance leak reintroducing previously-excluded items; the Yazoo
+regression. Also replaces blanket "one batched follow-up call" with adaptive targeted re-inspection —
+individual calls for actually-suspect regions only, never routine per-line calls, matching the A/B
+evidence without over-generalising it. Requires real cost instrumentation from actual gateway usage.
+The live re-run against the corrected 39-line denominator (with the seven-category breakdown Warwick
+specified) is queued as Asdair's next task once this WP lands — not attempted by Keel, which has no
+gateway credentials. **No pause. Carrying on, per explicit instruction.**
+
+**Round 2 COMPLETED, same session** — `4f03d4d`, pushed. 672/672 tests pass against a real disposable
+Postgres. 7 of 9 acceptance criteria fully met with real evidence: quantity semantics fixed as a class
+(the exact "Richmond 16 Pork Sausages" shape now correctly yields `quantity: null`, flagged, not 16);
+adaptive per-region re-inspection proven (2 flagged regions → exactly 2 individual calls, never
+bundled); the wrong-milk identity bug fixed against the real captured diagnostic reading; the duplicate
+Vanish-line collapse proven; usage/cost instrumentation wired in, cited to Pax's research. **Two honest
+gaps, not hidden:** AC5 (provenance-leak fix) has a documented, tested limit — doesn't yet handle a
+corrected re-run dropping a line entirely rather than overwriting it; AC6 (Yazoo regression) was
+investigated and correctly characterised as an omission, but not fixed — no confident root cause found
+without live gateway access. **The live re-run against the real gateway — the actual proof — is next,
+dispatched to Asdair.**
+
+**⛔ THE ROUND-2 LIVE RE-RUN LANDED. VERDICT: NOT TRUSTWORTHY YET — but real, verified progress, and a
+NEW dominant failure mode identified that neither round targeted.** Asdair re-established the 39-line
+photo truth independently (not reused from the trolley doc), ran the photo twice through the real
+Terra pipeline (real gateway, real usage capture), and scored both runs against the correct 39-line
+denominator with the seven-category breakdown.
+
+**What's genuinely fixed, holding across two live runs:** Richmond sausages never resolved to quantity
+16 in either run (AC1 holds live); the specific wrong-milk confident misresolution didn't recur (AC3
+holds, though the underlying read of the two milk lines is still a separate, lesser legibility
+weakness); the named Vanish duplicate didn't recur (though see below).
+
+**What's NOT fixed, and is now the dominant problem, previously untargeted by name:** roughly 40% of
+the 39 photo lines are silently OMITTED each run (17/39 and 15/39) — bigger than any other failure
+class. 5-6 lines per run are stated with HIGH CONFIDENCE and are simply wrong (invented, wrong qty) —
+the most dangerous class, larger than the honestly-flagged-uncertain count in Run A. **Two of AC5's
+four named "must never silently reappear" items reappeared anyway** (TRESemme in both runs, Lucozade
+Raspberry in Run B) — the visible symptom AC5 was meant to close is not closed, even though the DB-level
+fix Keel built tested clean (Asdair's harness never touches the database, so this isolates the
+defect to the vision/interpretation layer, not proof the DB fix is wrong — a real, separate residual).
+Yazoo Chocolate remains unstable in two different shapes across two runs (wrong qty vs. omitted) — no
+root cause found yet. A NEW duplicate class appeared (two different Febreze products collapsed into
+one line) — same shape as the fixed Vanish bug, different item, not yet closed generally.
+
+**Real cost, extracted from actual gateway usage, not Keel's pre-run estimate: ≈£0.137-0.138 for the
+difficult-shop case — more than DOUBLE his ≈£0.06 estimate.** First-call-only proxy for a clean shop:
+≈£0.050 vs. his ≈£0.03 estimate. Both his figures were explicitly flagged as pending this exact run;
+they were optimistic. The adaptive-call-count claim (proportionate, never blanket) held — both runs
+fired exactly 3 calls, never 39 — but the "normal case ≈ 1 call" half of the claim remains unproven; no
+easy control photo exists yet to test it.
+
+**Genuine uncertainty is being surfaced honestly where it occurs** (5-7 lines/run correctly flagged
+rather than silently guessed) — that discipline works. It does not, by itself, make the read trustworthy
+while confident-but-wrong lines remain at this rate.
+
+**Not stopping. Not asking whether to park. Continuing per Warwick's standing instruction** — next:
+root-cause the omission rate (the new dominant failure, not previously targeted by either round) and
+the AC5 residual (why the visible symptom persists despite a DB-level fix testing clean).
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
