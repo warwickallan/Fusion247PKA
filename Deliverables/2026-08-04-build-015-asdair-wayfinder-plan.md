@@ -1740,11 +1740,43 @@ outside every granted surface**: `.github/workflows/asdair-tests.yml`'s pipeline
 them — proven locally only, not yet proven in CI. Parked as a small, later, `.github/workflows/**`-
 scoped fix; non-blocking, not chased tonight.
 
-**All three legs of tonight's authorised parallel build are now DONE or IMPLEMENTED.** Cockpit-backend
-COMPLETE, vision-pipeline COMPLETE, Cockpit-UI IMPLEMENTED pending Vera's visual/WCAG gate (in
-progress). None of the three branches are merged to `main` — that remains Warwick's `merge-decision`,
-and cross-WP reconciliation (the placeholder state-field rename, the CI dependency-install gap) is
-still owed before any of this is production-accepted.
+**⛔ CORRECTION, Warwick, same session, immediately after: "vision pipeline: complete" was the wrong
+claim.** His words: *"What they've proved is that the mechanism works... What they have not yet told
+you is the one thing you actually care about: Does Terra, with its new glasses, now read Mum's
+troublesome photograph materially better?... That's the difference between we successfully built
+spectacles and Terra can actually fucking read through them."* **Restated precisely: vision mechanics
+PROVEN (real sharp rendering, real Postgres constraints, executed tests). The actual outcome — does
+Terra now read the known photograph correctly — is NOT YET PROVEN.** Cockpit is "largely built," not
+complete (Vera's gate still open). Nothing is converged.
+
+**Four things Warwick named, all actioned this same session, not parked:**
+1. **The discriminating test itself — the most important open item.** Dispatched to Asdair (only actor
+   with live gateway credentials): run the known photograph through the NEW pipeline code and compare
+   against the verified 41-line trolley, real count, real check on whether the specific named errors
+   (Richmond ×16, the 9+ missing items) are actually fixed. ALSO run Keel's built-but-unrun A/B harness
+   (bundled vs. individually-called strips) against this same real photo — Warwick's explicit
+   instruction: let the real photo decide that question, don't reopen the abstract argument. Diagnostic
+   run only, no live shop/basket/Telegram action. In progress.
+2. **The "620/623" claim — independently re-verified by Larry, not just relayed.** Confirmed exactly:
+   623 tests, 620 pass, 0 fail, 3 skip (the three DB-gated files, correctly gated on
+   `ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE`, separately run by Keel with real Postgres and reported 15/15
+   pass). **But also found, by re-running it cold myself: without `npm install`, sharp is missing and 7
+   MORE tests silently skip instead of running** (13/623 total, not 3) — reproducing, live, the exact
+   defect class item 3 addresses.
+3. **The CI dependency-install gap — fixed now, not parked**, per Warwick: *"not really a later nicety
+   if CI silently skips the very sharp/database tests that constitute the new vision proof."* Committed
+   directly by Larry to `main` (`6923ad6`) — small, mechanical, matches an already-established pattern
+   in the same file for two sibling packages, Warwick's explicit go-ahead. Adds the missing install step
+   in `unit`, and moves the pipeline's three DB-gated proofs (including the AC3 database-constraint
+   acceptance_property) into `integration` against the real Postgres service container, so CI actually
+   exercises them rather than only proving them locally.
+4. **Cross-WP state-field reconciliation** (the placeholder rename across Cockpit-backend/UI to the
+   real `asdair.shop.human_state`) — **not done yet, queued as the next Keel task** once Vera and the
+   discriminating test land. Not silently parked past merge — explicitly sequenced, not forgotten.
+
+**Convergence status, stated honestly:** vision mechanics proven; production-outcome proof in progress;
+Cockpit largely built, QA gate open; CI gap fixed; state-field reconciliation queued. **Nothing is
+merged. Nothing is "complete" until the discriminating test and Vera's gate both land.**
 
 ---
 
