@@ -34,6 +34,35 @@
 //    it, or letting the model "tidy" it destroys the one signal that detects
 //    the failure mode this schema creates.
 //
+// ── WP-B15-31 AC1: `leading_mark` IS A SEPARATE FIELD BECAUSE `as_written`
+//    DEMONSTRABLY LOSES THE COUNT ───────────────────────────────────────
+// Measured on the real photograph, not theorised. Every one of the 39 page
+// lines begins with a written count. In the WP-B15-30 Arm D run only 38.8%
+// of `as_written` values came back starting with a digit; in Arm C, 54.9%.
+// The count was being dropped on roughly three lines in five.
+//
+// It was invisible as a defect because the household default is ONE: on every
+// line whose true count IS 1, a lost count and a correctly-read count produce
+// the same answer. Only the six lines whose count was NOT 1 ever surfaced as
+// quantity errors - so "7 quantity errors" was measuring the overlap between
+// a large silent fault and a small subset of lines, never the fault itself.
+//
+// ⛔ IT IS NOT A RESOLUTION PROBLEM, and that was checked before anything was
+// built. The delivered ×3 band crops were re-rendered and inspected: in the
+// band carrying "2 BLOO TOILET Rim" the leading "2" is plainly legible, and
+// the model returned "BLOO TOILET RIM" from that exact crop while tidying
+// "FERBREEZE" to the catalogue's "FEBREZE". More resolution made it WORSE
+// (Arm C 54.9% -> Arm D 38.8%), which is the opposite of what a pixel
+// shortage predicts. The count was not missing from the image; it was being
+// tidied out of a free-text field on its way to a catalogue-shaped name.
+//
+// So the count gets its own REQUIRED, nullable, transcription-only field. A
+// tidy-up of the product name can no longer take the purchase count with it,
+// because the count is no longer stored inside the product name. The
+// deterministic default-one rule is UNCHANGED and is not weakened, bypassed
+// or special-cased - it simply stops being handed evidence that has already
+// been destroyed.
+//
 // ── AC3: THE TWO QUESTIONS ARE SEPARATE FIELDS, NOT ONE ─────────────────
 // `visible_line` (is there actually a handwritten line here?) is asked
 // distinctly from `product_id` (which supplied candidate is it?). They are
@@ -121,7 +150,7 @@ export function buildLineSchema({ candidates = [], regionNos } = {}) {
           type: 'object',
           additionalProperties: false,
           // strict mode: EVERY property is required; optionality is a null type.
-          required: ['line_no', 'as_written', 'visible_line', 'product_id', 'source_region', 'quantity', 'confidence'],
+          required: ['line_no', 'as_written', 'leading_mark', 'visible_line', 'product_id', 'source_region', 'quantity', 'confidence'],
           properties: {
             line_no: {
               type: 'integer',
@@ -130,6 +159,10 @@ export function buildLineSchema({ candidates = [], regionNos } = {}) {
             as_written: {
               type: 'string',
               description: 'VERBATIM what is written on the page for this line, exactly as read, including spelling and abbreviations. Never a tidied, corrected or catalogue-matched name.',
+            },
+            leading_mark: {
+              type: ['string', 'null'],
+              description: 'TRANSCRIBE, never interpret: the mark or marks written at the very START of this line, BEFORE the product name begins - for example "2", "16", "1 x 6pts", "4 x 4pts", "2 PKTS.". Copy exactly what is written there, even if it is a single digit. If the line begins directly with a word, this is null. Never infer it, never calculate it, never take a number from later in the line, and never omit it because the line looks like an ordinary single item.',
             },
             visible_line: {
               type: 'boolean',

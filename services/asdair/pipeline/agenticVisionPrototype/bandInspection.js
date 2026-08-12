@@ -84,6 +84,8 @@ TASK - two SEPARATE questions per line, in this order. Do not merge them.
 
 2. WRITE DOWN WHAT YOU ACTUALLY SEE. as_written is your best literal reading of the marks, verbatim, including shorthand and spelling as written. This is the ONLY field where you write your own words. Never replace it with a tidied or catalogue-matched product name - it is the record of what the page says, not of what you concluded. If a line is CUT OFF at the edge of this band, still write down what you can see of it.
 
+2a. COPY THE START OF THE LINE INTO leading_mark, AS A SEPARATE FIELD. Almost every line on this household's list begins with something written before the product name. Look at the very start of the line and transcribe exactly what is there - "2", "16", "1", "1 x 6pts", "4 x 4pts", "2 PKTS." - into leading_mark. Copy it even when it is a single "1", even when it seems obvious, and even when you have already included it in as_written. If the line genuinely begins with a word, leading_mark is null. This is TRANSCRIPTION, not judgement: do not decide whether the mark is a purchase count, do not take a number from later in the line, and do not work out what it "ought" to be. The application decides what the mark MEANS; your only job is to say what is WRITTEN.
+
 3. ONLY THEN, WHICH CANDIDATE IS IT? For a line you have ALREADY established exists, choose the candidate id it most likely refers to. Use the aliases - the household writes shorthand and their own alias list is the strongest signal. Use brand, category and usual quantity as supporting evidence.
 
 4. IF IT MATCHES NO CANDIDATE, say so: product_id UNKNOWN_VISIBLE_ITEM. DO NOT pick the least-bad candidate just to fill the field. A wrong confident match is far worse than an honest "I don't know" - it puts the wrong thing in a real shopping basket. An UNKNOWN_VISIBLE_ITEM is a correct, welcome, fully successful answer.
@@ -220,9 +222,36 @@ export function reconcileAcrossBands({ lines, matchFloor = MATCH_FLOOR } = {}) {
     const existingIndex = reconciled.findIndex((kept) => {
       const keptRegion = Number(kept.source_region);
       if (Math.abs(keptRegion - region) > 1) return false;
-      // Identity, where both claim one, is the strongest signal available and
-      // is checked first - two readings of the same hand can differ.
-      if (kept.identified && line.identified && String(kept.product_id) === String(line.product_id)) {
+      // ── WP-B15-31: IDENTITY VETOES A MERGE. It does not merely fail to
+      //    trigger one, and that difference cost three real purchases ───────
+      //
+      // Measured in the Arm D artefact, not theorised. Where both lines carry
+      // an ESTABLISHED identity and the identities DIFFER, the old code fell
+      // through to text similarity - and similar text is exactly what two
+      // different variants of the same product have. Three real page lines
+      // were destroyed that way in one run:
+      //
+      //   "Yazoo strawberry milk shake" (59) absorbed "Yazoo chocolate milk
+      //     shake" (15)                                     - same band, band 4
+      //   "2 PKTS. TWIX ICECREAM BARS" (114) absorbed "1 PKT. TWIX CHOC
+      //     BISCUIT BARS" (115)                             - same band, band 7
+      //   "x 4pts. ARLA SEMI SKIMMED MILK" (4) absorbed "x 6pts. ASDA SEMI
+      //     SKIMMED MILK" (2)                               - same band, band 8
+      //
+      // Every one of those is two separate things the household actually buys,
+      // and every one of them read as "nearly the same words". Only ONE of the
+      // three surfaced as an omission in the score - the other two happened to
+      // have a second returned instance covering the same page line, so the
+      // page-side count masked them. THE MASKING WAS LUCK, NOT CORRECTNESS.
+      //
+      // So the identity check is now a GATE, taken before similarity is ever
+      // consulted: two lines the application has resolved to DIFFERENT
+      // catalogue products are two different purchases, however alike they
+      // read. Text similarity only decides the case where at most one of the
+      // two has an established identity - the genuine fragment case, e.g.
+      // "LOCTITE" and "SUPERGLUE" both resolving to 116, which still merges.
+      if (kept.identified && line.identified) {
+        if (String(kept.product_id) !== String(line.product_id)) return false;
         // ⚠️ SAME PRODUCT, DIFFERENT QUANTITY = TWO REAL LINES. The household
         // genuinely buys "2 milk" and "4 milk" in one shop; collapsing them
         // loses a purchase. This is the design doc's own worked example.
@@ -239,6 +268,17 @@ export function reconcileAcrossBands({ lines, matchFloor = MATCH_FLOOR } = {}) {
     const kept = reconciled[existingIndex];
     kept.seen_in_regions = [...new Set([...kept.seen_in_regions, region])].sort((a, b) => a - b);
     kept.merged_from.push({ line_no: line.line_no, as_written: written, source_region: region });
+    // The FULLEST reading seen for this physical line, recorded beside the
+    // survivor rather than swapped into it. Arm D kept "1 box" and absorbed
+    // "1 BOX ASDA FRUIT LOLLY ICE B.", and kept "LENOR O..." over "LENOR
+    // OUTDOOR" - the survivor is simply whichever arrived first, which is a
+    // real defect in the recorded page truth. It is REPORTED here, not
+    // silently repaired: `as_written` is what the quantity was already
+    // resolved from earlier in the pipeline, and quietly replacing it after
+    // the fact would decouple the recorded text from the resolved number.
+    const candidateReadings = [verbatimOf(kept), written, ...kept.merged_from.map((m) => m.as_written)];
+    kept.fullest_reading = candidateReadings.reduce((a, b) => (b.length > a.length ? b : a), '');
+    kept.survivor_is_fullest = kept.fullest_reading === verbatimOf(kept);
     merges.push({
       kept_line_no: kept.line_no,
       kept_as_written: verbatimOf(kept),
@@ -248,12 +288,72 @@ export function reconcileAcrossBands({ lines, matchFloor = MATCH_FLOOR } = {}) {
     });
   }
 
+  // ── CLOSED ACCOUNTING, ASSERTED. Every accepted line lands in EXACTLY ONE
+  //    bucket: it survived, or it was absorbed into a named survivor ───────
+  //
+  // This exists because the failure it catches ALREADY HAPPENED and was found
+  // by reading an artefact rather than by any control. Arm D put 49 accepted
+  // lines in and got 38 out, while the score reported 38 detected, 0 invented,
+  // 0 duplicates and 0 not-a-line: 38 + 0 + 0 + 0 = 38, against 49. The
+  // arithmetic never had to add up, so nobody noticed that eleven lines had
+  // gone and that three of them were real purchases.
+  //
+  // A count that is not required to reconcile is not a count. This throws.
+  assertReconciliationCloses({ inputCount: input.length, reconciled, merges });
+
   return {
     reconciled,
     merges,
     mergedAway: input.length - reconciled.length,
+    // The closed accounting, returned so a scorer or a report can PRINT it
+    // rather than re-derive it and get it wrong in a second place.
+    accounting: {
+      accepted: input.length,
+      survived: reconciled.length,
+      absorbed: merges.length,
+      closes: reconciled.length + merges.length === input.length,
+    },
     // How often overlap actually did its job: a line the application can see
     // in two bands is a line that could not have silently vanished at a seam.
     confirmedByTwoBands: reconciled.filter((l) => l.seen_in_regions.length > 1).length,
+    // Survivors whose recorded text is NOT the fullest reading available for
+    // that physical line. Reported, never hidden behind a nicer number.
+    survivorsNotFullestReading: reconciled.filter((l) => l.survivor_is_fullest === false).length,
   };
+}
+
+/**
+ * The reconciliation accounting identity, as an executable assertion.
+ *
+ * Exported so it can be MUTATION-PROVED directly: a control nobody has watched
+ * fail is not evidence that it works.
+ *
+ * @param {{inputCount:number, reconciled:Array<object>, merges:Array<object>}} args
+ * @throws when a line has disappeared, been double-counted, or been absorbed
+ *   into a survivor that does not exist.
+ */
+export function assertReconciliationCloses({ inputCount, reconciled, merges }) {
+  const survived = reconciled.length;
+  const absorbed = merges.length;
+  if (survived + absorbed !== inputCount) {
+    throw new Error(
+      `reconcileAcrossBands: ACCOUNTING DOES NOT CLOSE - ${inputCount} accepted line(s) in, `
+      + `${survived} survived + ${absorbed} absorbed = ${survived + absorbed}. `
+      + `${inputCount - survived - absorbed} line(s) disappeared with no disposition.`,
+    );
+  }
+  const survivorNos = new Set(reconciled.map((l) => l.line_no));
+  const orphan = merges.find((m) => !survivorNos.has(m.kept_line_no));
+  if (orphan) {
+    throw new Error(
+      `reconcileAcrossBands: line ${orphan.merged_line_no} was absorbed into line `
+      + `${orphan.kept_line_no}, which is not among the survivors. The absorbing line `
+      + 'was itself removed, so the absorbed line is unreachable.',
+    );
+  }
+  const absorbedNos = merges.map((m) => m.merged_line_no);
+  if (new Set(absorbedNos).size !== absorbedNos.length) {
+    throw new Error('reconcileAcrossBands: a line was absorbed more than once - buckets are not exclusive.');
+  }
+  return true;
 }

@@ -78,7 +78,7 @@ import {
   checkImplausibleQuantity,
 } from '../photoSanityChecks.js';
 import { UNKNOWN_VISIBLE_ITEM, NOT_A_LINE } from './lineSchema.js';
-import { resolveQuantity, QUANTITY_BASIS } from './quantityRule.js';
+import { resolveQuantity, composeQuantityProbe, QUANTITY_BASIS } from './quantityRule.js';
 
 /** Below this, the application may decide to LOOK AGAIN. It accepts nothing. */
 export const DEFAULT_LOOK_AGAIN_BELOW = 0.6;
@@ -87,6 +87,19 @@ export const DEFAULT_LOOK_AGAIN_BELOW = 0.6;
 export function verbatimOf(line) {
   const written = line.as_written ?? line.raw_reading;
   return typeof written === 'string' ? written : '';
+}
+
+/**
+ * The line's `leading_mark` transcription, or null (WP-B15-31 AC1).
+ *
+ * Null-safe on purpose: the older Arm A / Arm B contracts never carried this
+ * field, and an absent field means "this contract did not ask", never "the
+ * page had no count". The quantity rule falls back to `as_written` in that
+ * case, which is exactly the pre-WP-B15-31 behaviour.
+ */
+export function leadingMarkOf(line) {
+  const mark = line?.leading_mark;
+  return typeof mark === 'string' && mark.trim() !== '' ? mark.trim() : null;
 }
 
 /** Normalise for duplicate comparison: trim, lowercase, collapse whitespace. */
@@ -276,13 +289,22 @@ export function groundLines({ lines, productIdEnum, regionNos, lookAgainBelow = 
     //
     // The rule reads the PAGE, never the model, so a quantity the checks just
     // rejected cannot leak back in through the default.
-    const quantityProbe = { raw_reading: written, quantity: line.quantity ?? null };
+    // WP-B15-31 AC1: the sanity checks and the rule now see the page's own
+    // leading mark, restored from its dedicated transcription field, instead
+    // of only whatever survived into the free-text reading. The checks and the
+    // rule are UNCHANGED - only the evidence handed to them is no longer
+    // damaged. `leadingMarkOf` returns null for the older contracts, so their
+    // behaviour is bit-for-bit what it was.
+    const leadingMark = leadingMarkOf(line);
+    const probeText = composeQuantityProbe(written, leadingMark).text;
+    const quantityProbe = { raw_reading: probeText, quantity: line.quantity ?? null };
     const unjustified = checkUnjustifiedQuantity(quantityProbe);
     if (unjustified) flags.push(unjustified);
     const implausible = checkImplausibleQuantity(quantityProbe);
     if (implausible) flags.push(implausible);
     const resolvedQuantity = resolveQuantity({
       asWritten: written,
+      leadingMark,
       reportedQuantity: line.quantity ?? null,
       isPurchaseLine: true,
     });
@@ -313,7 +335,13 @@ export function groundLines({ lines, productIdEnum, regionNos, lookAgainBelow = 
       // from a 1 the page actually wrote. Both the basis and the model's own
       // discarded claim travel with the line.
       quantity_basis: resolvedQuantity.basis,
-      quantity_evidence: leadingQuantityEvidence(written),
+      quantity_evidence: leadingQuantityEvidence(probeText),
+      // WP-B15-31 AC1: WHERE the evidence came from travels with the line, so
+      // "the page said 2 and the dedicated field carried it" is distinguishable
+      // from "the reading happened to still start with a digit".
+      leading_mark: leadingMark,
+      quantity_evidence_source: resolvedQuantity.evidenceSource ?? null,
+      quantity_probe_text: resolvedQuantity.probeText ?? written,
       model_quantity: resolvedQuantity.modelQuantity,
       model_quantity_disagreed: resolvedQuantity.modelDisagreed,
       confidence,

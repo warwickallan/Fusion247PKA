@@ -1,0 +1,129 @@
+{
+  "experiment": "WP-B15-31 AC1 H2",
+  "image": "C:/.fusion247/asdair/shopper-media/tg-shopper-chat-8601328832-msg-86-AQADfhFrG0iN2FN-.jpg",
+  "region": {
+    "region_no": 3,
+    "region_kind": "strip",
+    "pixel_left": 80,
+    "pixel_right": 180,
+    "pixel_top": 192,
+    "pixel_bottom": 991
+  },
+  "upscale": 3,
+  "baseline": {
+    "source": "runs/2026-08-12T20-37-00-348Z-arm-d.json, band region 3 - FREE, not re-paid for",
+    "candidatesSupplied": 109,
+    "leadingMarkField": false,
+    "visibleLines": 4,
+    "asWrittenStartingWithDigit": 0,
+    "readings": [
+      "FEBREZE AIR MIST VANILLA",
+      "BLOO TOILET RIM",
+      "VANISH OXI PINK",
+      "LENOR OUTDOOR"
+    ],
+    "pageTruth": [
+      "1 FERBREEZE AIR MIST VANILLA",
+      "2 BLOO TOILET Rim",
+      "1 VANISH OXi PiNK",
+      "1 LENOR OUTDOOR"
+    ]
+  },
+  "arms": [
+    {
+      "label": "ARM A - catalogue WITHHELD, no leading_mark",
+      "elapsedMs": 9170,
+      "costUsd": 0.013715000000000001,
+      "candidatesSupplied": 0,
+      "leadingMarkField": false,
+      "lines": [
+        {
+          "line_no": 1,
+          "as_written": "FEBREZE AIR MIST VANILLA",
+          "visible_line": true,
+          "product_id": "UNKNOWN_VISIBLE_ITEM",
+          "source_region": 3,
+          "quantity": null,
+          "confidence": 0.91
+        },
+        {
+          "line_no": 2,
+          "as_written": "BLOO TOILET RIM",
+          "visible_line": true,
+          "product_id": "UNKNOWN_VISIBLE_ITEM",
+          "source_region": 3,
+          "quantity": null,
+          "confidence": 0.88
+        },
+        {
+          "line_no": 3,
+          "as_written": "VANISH OXI PINK",
+          "visible_line": true,
+          "product_id": "UNKNOWN_VISIBLE_ITEM",
+          "source_region": 3,
+          "quantity": null,
+          "confidence": 0.93
+        },
+        {
+          "line_no": 4,
+          "as_written": "LENOR OUTDOOR",
+          "visible_line": true,
+          "product_id": "UNKNOWN_VISIBLE_ITEM",
+          "source_region": 3,
+          "quantity": null,
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "label": "ARM B - catalogue PRESENT, leading_mark REQUIRED",
+      "elapsedMs": 21270,
+      "costUsd": 0.03912,
+      "candidatesSupplied": 109,
+      "leadingMarkField": true,
+      "lines": [
+        {
+          "line_no": 1,
+          "as_written": "1 FEBREZE AIR MIST VANILLA",
+          "leading_mark": "1",
+          "visible_line": true,
+          "product_id": "44",
+          "source_region": 3,
+          "quantity": 1,
+          "confidence": 0.9
+        },
+        {
+          "line_no": 2,
+          "as_written": "2 BLOO TOILET RIM",
+          "leading_mark": "2",
+          "visible_line": true,
+          "product_id": "87",
+          "source_region": 3,
+          "quantity": 2,
+          "confidence": 0.88
+        },
+        {
+          "line_no": 3,
+          "as_written": "1 VANISH OXI PINK",
+          "leading_mark": "1",
+          "visible_line": true,
+          "product_id": "56",
+          "source_region": 3,
+          "quantity": 1,
+          "confidence": 0.89
+        },
+        {
+          "line_no": 4,
+          "as_written": "1 LENOR OUTDOOR",
+          "leading_mark": "1",
+          "visible_line": true,
+          "product_id": "5",
+          "source_region": 3,
+          "quantity": 1,
+          "confidence": 0.91
+        }
+      ]
+    }
+  ],
+  "totalCostUsd": 0.05283500000000001
+}
