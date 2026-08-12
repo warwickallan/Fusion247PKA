@@ -4,6 +4,12 @@
   "author": "Pax",
   "build": "BUILD-015 AsdAIr",
   "report_date": "2026-08-12",
+  "session_date": "2026-08-12",
+  "branch": "main",
+  "closing_head": "467a91c002c3ed2bd195b0672dbd0cefeb47d424",
+  "closing_head_note": "Larry-added at populate time: the actual closing head is 467a91c (after committing this report/payload themselves), not Pax's 2d8c758 snapshot, which predates its own commit by construction.",
+  "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-12-session-report-asdair-vision-pipeline.md",
   "session_window": {
     "start": "2026-08-11T20:09:30.787Z",
     "end_last_confirmed_dispatch": "2026-08-12T16:24:42.669Z",
