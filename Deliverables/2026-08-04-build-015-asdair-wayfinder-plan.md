@@ -2223,6 +2223,56 @@ output, rather than either architecture alone.
 
 ## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (latest) — **REGION GRANULARITY + A TRUSTWORTHY MEASUREMENT.** Authorised by Warwick. **START HERE. This is the current frontier.**
 
+**Status: WP-B15-32 AUTHORISED AND DISPATCHED — the variance measurement. ⛔ NO ARCHITECTURE CHANGES until it returns.**
+
+### AMENDMENT — Warwick, 2026-08-12 (after WP-B15-31). **His ruling, quoted. Larry's record-keeping is labelled Larry's.**
+
+> *"Current direction is correct. **Do NOT change architecture again yet.** The latest result does NOT
+> justify another prompt round, another heuristic, another region redesign, or another Work Order.
+> **We now have a measurement problem first.**"*
+>
+> **1. The free fixture sanity check FIRST** — *"Before spending another cent... Do not let another
+> stale/noisy instrument drive engineering decisions."*
+>
+> **2. Then repeat the EXACT SAME final arm three times.** *"Same code. Same image. Same catalogue. Same
+> prompt/schema. Same image-prep path. Same reconciliation. No architectural changes between runs...
+> The purpose is to measure VARIANCE, not to improve the score."* ~$1 acceptable.
+>
+> **3. ⛔ Do NOT average away bad behaviour.** *"Do not give Warwick one flattering mean percentage. Show
+> the actual three runs."* The questions: is 39/39 stable · do inventions recur randomly or systematically ·
+> do duplicates recur in the same places · do digit errors recur on the same quantities. *"Averages may be
+> useful afterwards, but the raw spread is decision-grade."*
+>
+> **4. ⛔ NO CHANGES BETWEEN THE THREE RUNS. "This is load-bearing.** If Run 1 exposes a defect, do NOT fix
+> it before Runs 2 and 3... Otherwise we learn nothing about variance because the system changes underneath
+> the experiment. Preserve all artefacts."*
+>
+> **5. The verdict he has pre-committed to.** ≈39/39, 38/39, 39/39 with near-zero invention → *"the
+> eyesight architecture is effectively established and the remaining defects are narrow
+> deterministic/reconciliation work."* ≈39/39, 32/39, 36/39 or wildly varying inventions → *"the vision
+> mechanism itself is not stable enough and we stop calling it polishing. **That is the decision this
+> experiment exists to make.**"*
+>
+> **7. What is still NOT proven** — *"eyesight mechanism looks very promising; identity resolution looks
+> strong; quantity preservation is materially improved but imperfect; duplicate reconciliation still has
+> real defects; household catalogue items can still appear as PHOTO when absent; the integrated production
+> path has not yet been exercised by a real production photograph. **Capability is not live proof.**"*
+>
+> **9. Governance side-issues do not derail this.** The Keel contract conflict is closed. The Veritas
+> receipt SHA mismatch and Larry's held-commit branch discipline are *"real governance defects, but they are
+> not allowed to consume the vision frontier tonight unless they actively invalidate the experiment.
+> Record them and close them separately."*
+
+**Larry's execution record:** dispatched as **WP-B15-32**, `WO-2026-08-12-05`, ceiling **$1.50** with a
+**cost projection required BEFORE run 1** — WP-B15-31 breached its ceiling and diagnosed its own cause as
+failing to project. **Parked per §9, not chased:** the Veritas receipt-hash mismatch (twice, systematic) and
+the held-commit branch discipline. **Still unanswered by Warwick and NOT chased:** the one-word
+`register`/`deregister` tightening.
+
+---
+
+### ⛔ SUPERSEDED AS FRONTIER — WP-B15-31, COMPLETE (PARTIAL). Its result and measurement finding below remain the accurate record.
+
 **Status: WP-B15-31 COMPLETE (PARTIAL), `54e1743`, pushed. The leading-count fix WORKS. ⛔ Warwick's bar is STILL NOT MET, and Keel stopped rather than iterating, per his standing instruction. ⭐ THE MEASUREMENT FINDING BELOW MATTERS MORE THAN ANY RESULT IN THIS MAP — read it before acting on a single number here.**
 
 ### ⛔⭐ THE MEASUREMENT PROBLEM UNDERNEATH EVERY NUMBER IN THIS BUILD — established 2026-08-12
