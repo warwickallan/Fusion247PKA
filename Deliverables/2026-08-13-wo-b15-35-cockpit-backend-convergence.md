@@ -245,3 +245,104 @@ what you could not, and your HEAD SHA.
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-13, after Keel's CLARIFY read-back
+
+**OPERATIVE.** All five findings answered, one already fixed on disk. **No further read-back gate — give a
+one-paragraph confirmation and PROCEED.** Warwick is asleep and two other lanes are moving.
+
+## 1 — ENV CARRIER NAMED. My omission; I named them on the vision orders and not on this one.
+
+**`credential_scope` is extended to name the carriers explicitly:** the AsdAIr carrier
+**`C:\.fusion247\asdair.env`**, and the **cockpit-api carrier(s) named in `services/asdair/CONFIGURATION.md`**
+— read that file for the exact names and use precisely what it declares, nothing adjacent.
+
+**Consumed ONLY via `node --env-file`. Never opened, parsed, printed, echoed or logged.** They are
+**consumption routes, NOT surfaces** — deliberately not placed in `machine_surface`, because that is a
+WRITE list and putting an env file there was a real error on an earlier order tonight that I am not
+repeating.
+
+## 2 — AC1's EXECUTION PROOF: your read-only substitute is AUTHORISED, with one condition that makes it non-vacuous.
+
+You are right that a write to `asdair.shop.human_state` is a write to live data, and that is **one of the
+three things no deviation ever reaches** in your contract. I had that clause amended and independently
+reviewed a few hours ago; **I am not eroding it the same night for my own convenience.** No live write. No
+rolled-back write either — an UPDATE inside a rolled-back transaction is still an UPDATE, and "it did not
+commit" is exactly the kind of reasoning that turns an absolute into a negotiable.
+
+**AUTHORISED:** SELECT `status, human_state` across the real shop rows and assert your mapping function
+reproduces the stored value exactly, on the real column, on real rows, **with zero writes.**
+
+⛔ **THE CONDITION, and it is the whole value of the proof: ASSERT A NON-ZERO ROW COUNT, and report
+explicitly whether `human_state` is NULL on every row.** Your own finding 3 says **nothing writes that
+column** — so the naive form of this assertion passes against a column that is null everywhere, which is a
+green proving nothing. **A check no data can fail is not a check.** If it is null throughout, **say so
+plainly: that is not a failed proof, it is the finding AC1 exists to fix.**
+
+**And be honest about what remains unproven:** the WRITE half of the seam is proven by test and by wiring,
+**not by live execution**, because no disposable Postgres exists (`pg_isready` → no response) and standing
+one up is not authorised. **Label it exactly that way.** AC1 therefore lands PARTIAL on evidence and I will
+report it to Warwick as PARTIAL rather than dress it up.
+
+## 3 — AC1 IS BIGGER THAN THE ORDER SAID. Accepted, and it is in surface.
+
+`grep human_state` returning **zero hits** is the real state: nothing writes it at all. Migration 020 §5
+assigns the mapping to you explicitly. **AC1 = add the durable write at the same code path that already
+transitions `shop.status`, AND make `canonicalState.js` read the column.** Larger diff than my wording
+implied; proceed.
+
+## 4 — MIGRATION 020 — **ALREADY FIXED WHILE YOU HELD. Pull before you start.**
+
+You were right that the branch was not self-consistent in isolation. I took it as git lifecycle work while
+you were at the gate: **020 is now on your branch at `7f33566`**, checked out from `main` verbatim — no
+merge, no edit, no new schema. **Your tree now defines the column your code will reference.** Integration
+still carries 020 exactly once.
+
+## 5 — SECRET-SCAN EVIDENCE LINE CORRECTED. Your handling is right.
+
+The wide form exits **1 (FOUND)** on **three pre-existing content hits in `services/asdair/transcribe/*.test.js`**
+— test fixtures, present on `main`, none of yours — and critical rule 15 makes exit 1 blocking, so as
+written the line was unsatisfiable. **Report BOTH: the wide scan with the paths named and values never
+quoted, and the narrow scan of what you actually write. LARRY'S RULING: the narrow scan discharges the
+evidence requirement.** ⛔ **Do not touch `transcribe/`.**
+
+## THE TWO PROPOSED STATE MAPPINGS — I am ruling, not passing them to Warwick.
+
+Silas flagged both as *"genuinely arguable, for Keel/Warwick to confirm"*. Warwick is asleep and this is an
+ordinary technical choice with a safe default, so it is mine.
+
+- **`BASKET_READY → READY_FOR_WARWICK` — CONFIRMED as proposed.** The basket is built and waiting on him.
+
+- **⛔ `CANCELLED → COMPLETE` — OVERRULED. Map `CANCELLED → FAILED`.**
+  **Reasoning, recorded because it is a product judgement:** "Complete" tells Warwick his shop is **done**,
+  which for a cancelled shop implies **groceries are coming when nothing was ordered.** That is the
+  dangerous direction of error. "Failed" is imprecise — a cancellation is deliberate, not a breakage — but
+  it is imprecise in the SAFE direction, and it never implies delivery.
+  **AC3's sentence carries the nuance the closed state set cannot:** *"This shop was cancelled. Nothing was
+  ordered."* Warwick's own example — *"Basket build failed. Nothing was ordered."* — is exactly this shape.
+  **The state must not lie about delivery; the sentence does the explaining.** Record the override and my
+  reasoning in your return so Warwick can reverse it in one word if he disagrees.
+
+## AC6 SHAPE — your plan is accepted exactly as proposed, and it is the right shape.
+
+Optional `line_no` on the `correctLine` spec, used when the board supplies it; when absent, resolve
+`item_name` → shop line by normalised match and mark **only on a unique match**; otherwise record an
+**explicit unresolved-correction reason and mark nothing.** ⛔ **No guess, no cast.** That is precisely the
+"resolve honestly rather than cast past it" the order asked for.
+
+## API — your published shape is accepted and is now the contract.
+
+`workspace.status.canonical_state` with its closed six-value vocabulary is **frozen as a name and a
+vocabulary**; only its derivation moves from the stage map to the durable column. Everything else additive
+under `workspace.*`. **The parallel UI worker has been told to build to this and to report assumptions
+rather than invent fields — if you must change an existing key, tell me immediately and I will relay it.**
+
+## Sequencing — unchanged
+
+AC1 (write at the transition path + read the column + the non-vacuous read-only proof) → AC2 → AC3 with its
+contradiction test → AC4 → AC5 → AC6 → AC7 → AC8 → AC9 local start/verify/stop.
+
+**Return PARTIAL honestly if AC1's write half stays test-proven only. That is the true state and I would
+rather report it than a green that overstates.**
