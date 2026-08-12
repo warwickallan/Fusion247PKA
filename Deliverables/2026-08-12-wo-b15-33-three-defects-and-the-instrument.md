@@ -332,3 +332,112 @@ evidence — that discharges the order.** Do not iterate toward a number.
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-12, after Keel's CLARIFY read-back
+
+**OPERATIVE. Supersedes anything above it that it contradicts.** ONE short confirming read-back, then proceed
+without waiting.
+
+## C1 UPHELD — **AC1's premise was FALSE. It is RETARGETED.**
+
+The four named sites are **already collapsed, 3/3, with `accounting.closes: true`**. `reconcileAcrossBands`
+(`bandInspection.js:211`) already implements the ordered invariant, **and the identity veto already exists**
+(`:253–259`, added by WP-B15-31 with the Yazoo / Twix / Arla incidents written into its comment as rationale).
+**Larry read "sites 5/5/6, survivors 5/3/2" and concluded the four recurring sites were not being collapsed.
+They were. The survivors are a different set.** AC1 as written was close to a no-op plus tests over
+already-correct behaviour.
+
+**AC1 IS RETARGETED to the real defect you found:**
+
+**(a) `needs_human` is never cleared after reconciliation resolves the pair.** `markDuplicates` runs inside
+`groundLines` **before** reconciliation and stamps `duplicate_collision: true, needs_human: true` on every
+cross-region member; reconciliation then merges the pair and **nothing revisits the flag**. So the four
+correctly-collapsed sites survive as **one line each that still demands a human.** Fix that — it is small,
+in-scope and it is what "duplicates" in the reporting actually meant.
+
+**(b) The residual non-adjacent duplicates are AC3's territory, not AC1's — and you are right.** Page 1
+(Arla milk) appears in regions **2 (`L0–R100`) and 8 (`L480–R576`)**, which share no pixels. **By
+application-owned geometry those cannot be one physical line, and the adjacency rule is CORRECT to refuse
+them.** That is a line appearing where there is no visual evidence for it — a grounding failure. **Hand it
+to AC3.**
+
+**AC7's mutation proofs stand unchanged**, and are now proofs that existing behaviour cannot silently
+regress rather than proofs of new work. Keep both directions.
+
+## C2 UPHELD — **AC2 is RETARGETED to "no SILENTLY wrong count".**
+
+You have established that the model's `leading_mark` is wrong **at source**, identically 3/3 — page 11 `4`→
+`"1"`, page 16 `3`→`"2"`, page 19 `1`→`"2"` — and that **the application-side quantity rule is correct in
+every one of those cases**: it receives a mark, believes the page over the model's own `quantity`, and
+resolves faithfully to a wrong digit. **There is no downstream extraction seam left to fix. Warwick's AC2 as
+scoped is unachievable, and saying so is the correct return.**
+
+**RETARGETED, using Warwick's own bar:** *"A genuine uncertain line may go to Cockpit. **A silently wrong
+line may not.**"* Detect **cross-observation disagreement in `leading_mark` on one reconciled physical line**
+and route it to `needs_human` rather than silently believing one side.
+
+⛔ **Report the coverage honestly and do not oversell it:** on the existing artefacts this catches page 16 in
+runs 1 and 3; it does **not** catch page 19 (single observation) or page 11 in runs 2–3. **A single wrong
+observation with nothing to disagree with it remains undetectable by this mechanism.**
+
+## C6 — **AUTHORISED. Add the transcription-only positional field. This is Larry's ruling and it is reported to Warwick as such.**
+
+You flagged the lever and correctly declined to pull it. **Pull it.**
+
+**Why this is NOT what Warwick forbade:** he ruled out *redesigning the vision architecture*, *another model
+experiment*, and *prompt whack-a-mole*. **A transcription-only positional field is none of those.** Regions,
+reading axis, 3× enlargement, individual band inspection, the closed enum, UNKNOWN and the explicit quantity
+field are all **untouched**. It is the **same pattern as `leading_mark`**, which Warwick accepted and which
+moved count preservation 46.2% → 89.5%.
+
+**Why it is necessary rather than nice:** you have established in C5 that AC3 has **no available structural
+signal** — the phantoms carry a valid `source_region`, non-empty `as_written` and an in-enum `product_id`,
+so they pass every existing gate — and that the only application-owned alternative, the geometric line
+budget, is **per-band not per-line** and strong enough to reject a real line. **Warwick's §3 demands
+structural enforcement. Without a per-line positional signal it cannot be built. The field is the mechanism
+his own directive requires.**
+
+**Bound it tightly:** transcription-only, position **within the band**, no bearing on identity, quantity or
+the candidate set; it informs **application-side** decisions only. **It must never become a reason to accept
+a line** — only a reason to withhold one.
+
+## C5 — **CONFIRMED, and you were right to refuse to take it by omission.**
+
+**The AC3 gate may ONLY WITHHOLD PHOTO provenance — route to UNKNOWN / `needs_human`. It may NEVER delete a
+detected line.** That is the only reading under which *"cannot enter PHOTO provenance"* and *"0 omissions"*
+are both satisfiable, and it is the correct one. **A withheld line is still detected, still reported, still
+visible to Warwick.**
+
+## C3 UPHELD — **39 is the denominator for CORRECTNESS; 12 only for LOSS. AC6's target is restated.**
+
+Your catch is material and it spends real money: the 12-line set excludes page 19, and excludes the
+**over-counting** class entirely — run 1 read page 2's `"1 x 6pts"` as **7**, page 15's `1` as `4`, page 9's
+`1` as `2`. **"0 errors on the 12 informative lines" is satisfiable while the household buys seven milks.**
+
+**AC6's quantity target is restated as: ZERO SILENTLY WRONG COUNTS ACROSS ALL 39 LINES** — every explicit
+count either correct, or routed to `needs_human`. **Publish the 12-line loss subset beside it**, as AC4
+already specifies. Implement AC4's QUANTITY family as written; it already resolves this correctly.
+
+## C4 — noted, and it is why the instrument goes first.
+
+Run 1's `page 17 exp 2 got 1` on a *strawberry* reading is a **one-to-one join artefact** — page 16 was
+already claimed — not a product defect. **Do not treat 9/12 as a fixed baseline. Publish both, pre- and
+post-correction, as ordered.**
+
+## A1–A4 — all four confirmed
+
+Photograph **read-only** (the `machine_surface` "write permitted" wording is generator boilerplate; the
+frontmatter and Inputs govern) · package suite = `node --test` from `services/asdair/pipeline` · artefacts
+under `runs/`, committed · re-scores written as new blocks with the superseded blocks retained.
+
+## Sequencing — unchanged, and your reading of it was right
+
+**AC4 instrument first** → **AC1(a) + AC3 with their AC7 mutation proofs** → **AC2 retargeted** → **AC5 pins**
+→ **AC8 projection** → **AC6 freeze and three or more runs, nothing changed between them.**
+
+⛔ **The honest bar for this order, restated: no SILENTLY wrong line.** A line the system cannot resolve
+going to Cockpit is a **success**. A line it resolves confidently and wrongly is not. **If the runs still
+show silently wrong output after all of this, say so plainly with the evidence — that discharges the
+order.**
