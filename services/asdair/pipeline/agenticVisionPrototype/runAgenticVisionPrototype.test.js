@@ -52,17 +52,33 @@ test('module load: loadCatalogue/printReport are importable regardless of sharp 
   assert.equal(typeof mod.runAgainstPhoto, 'function');
 });
 
-test('prepareForAgenticLoop: returns a fullPageImageUrl plus one entry per strip, keyed by region_no, none of them region_no 1', sharpGate, async () => {
+// ── WO-2026-08-12-01-v2 (WP-B15-29), AC1 - REQUIREMENT CHANGED, and this
+// assertion changed WITH it rather than being relaxed to fit the code.
+//
+// The previous version of this test asserted the OPPOSITE: "region_no 1
+// (full_page) must never ALSO appear in regionImageUrls". That assertion
+// encoded the split representation that WAS the defect - region 1 was
+// advertised to the model as requestable while living nowhere the crop lookup
+// could find it, so the one region the model most often asks for mid-loop was
+// the one region that could not be served, and the loop threw.
+//
+// AC1 requires region 1 to be requestable end to end, by the narrow fix of
+// populating the crop map with it while turn 1 still receives the full page
+// separately. So the requirement inverted, and the test states the new
+// requirement: region 1 is present, and it is the SAME image as the full page
+// rather than a second render of it.
+test('prepareForAgenticLoop: region 1 is IN the crop map (AC1) and is byte-identical to fullPageImageUrl', sharpGate, async () => {
   const buf = await realJpeg({ width: 1200, height: 3000 }); // tall enough for more than one strip
   const { fullPageImageUrl, regionImageUrls, regionNos } = await mod.prepareForAgenticLoop(buf);
   assert.match(fullPageImageUrl, /^data:image\/jpeg;base64,/);
-  assert.ok(Object.keys(regionImageUrls).length > 0, 'a tall page must plan at least one strip');
-  assert.ok(!('1' in regionImageUrls), 'region_no 1 (full_page) must never ALSO appear in regionImageUrls - it is fullPageImageUrl');
+  assert.ok(Object.keys(regionImageUrls).length > 1, 'a tall page must plan the full page plus at least one strip');
+  assert.ok('1' in regionImageUrls, 'AC1: region_no 1 MUST be requestable - it was the region the model asked for and could not be served');
+  assert.equal(regionImageUrls[1], fullPageImageUrl, 'region 1 must be the same prepared page, not a second render of it');
   for (const url of Object.values(regionImageUrls)) {
     assert.match(url, /^data:image\/jpeg;base64,/);
   }
   assert.deepEqual(regionNos[0], 1, 'regionNos always starts with 1 (full_page)');
-  assert.equal(regionNos.length, Object.keys(regionImageUrls).length + 1);
+  assert.equal(regionNos.length, Object.keys(regionImageUrls).length, 'every advertised region has a crop available');
 });
 
 test('prepareForAgenticLoop: a short page (one strip only) still returns a usable region map', sharpGate, async () => {
@@ -70,6 +86,33 @@ test('prepareForAgenticLoop: a short page (one strip only) still returns a usabl
   const { regionImageUrls, regionNos } = await mod.prepareForAgenticLoop(buf);
   assert.ok(Object.keys(regionImageUrls).length >= 1);
   assert.ok(regionNos.length >= 2, 'at least full_page plus one strip');
+});
+
+test('AC1: EVERY advertised region has a crop - the split representation cannot come back', sharpGate, async () => {
+  const buf = await realJpeg({ width: 1200, height: 3000 });
+  const { regionImageUrls, regionNos } = await mod.prepareForAgenticLoop(buf);
+  const unserviceable = regionNos.filter((n) => !regionImageUrls[n]);
+  assert.deepEqual(unserviceable, [], 'a region the model is told it may request must always be servable');
+});
+
+test('toCandidate: a bigint id arriving from pg as a STRING stays a string end to end', () => {
+  const c = mod.toCandidate({
+    id: '90071992547409911', name: 'Weetabix', aka: ['wheat biscuits'], typical_qty: 2,
+  });
+  assert.equal(c.id, '90071992547409911');
+  assert.equal(typeof c.id, 'string', 'Number() on a bigint id is the defect that broke a live shop');
+  assert.deepEqual(c.aliases, ['wheat biscuits']);
+  assert.equal(c.typicalQty, 2);
+});
+
+test('loadCatalogueFromDb: refuses to run without ASDAIR_DB_URL rather than reaching for some other connection', async () => {
+  const original = process.env.ASDAIR_DB_URL;
+  delete process.env.ASDAIR_DB_URL;
+  try {
+    await assert.rejects(() => mod.loadCatalogueFromDb(1), /ASDAIR_DB_URL is not set/);
+  } finally {
+    if (original !== undefined) process.env.ASDAIR_DB_URL = original;
+  }
 });
 
 test('loadCatalogue: no path given returns an empty catalogue', () => {

@@ -287,3 +287,69 @@ test('visionAgenticTurn: usage absent from the response returns null, never a fa
     restore();
   }
 });
+
+// =====================================================================
+// WO-2026-08-12-01-v2 (WP-B15-29), AC2 - the `textFormat` pass-through.
+//
+// These assert the WIRE, because the failure this parameter guards against is
+// invisible at every other layer: `response_format` on /v1/responses returns
+// HTTP 200 with the constraint simply not applied, so a caller that checked
+// only the status code would ship an unconstrained pipeline that looks
+// healthy. What is on the wire is therefore the only thing worth asserting.
+// =====================================================================
+
+test('AC2: textFormat is nested under `text.format` EXACTLY as supplied - never rewritten, never wrapped again', async () => {
+  const fmt = {
+    type: 'json_schema', name: 'asdair_photo_lines', strict: true, schema: { type: 'object', properties: {} },
+  };
+  const { calls, restore } = mockFetch({
+    id: 'resp_fmt', output: [{ type: 'message', content: [{ type: 'output_text', text: '{"lines":[]}' }] }],
+  });
+  try {
+    await visionAgenticTurn({ prompt: 'read this', imageUrls: ['data:image/jpeg;base64,PAGE'], textFormat: fmt });
+    assert.deepEqual(calls[0].body.text, { format: fmt });
+    assert.equal(calls[0].body.text.format.strict, true, 'strict:true is the enforcing switch - omitting it returns 200 and enforces nothing');
+    assert.equal(calls[0].body.response_format, undefined, 'response_format on /responses is the SILENT trap and must never be sent');
+    assert.equal(calls[0].body.text.format.json_schema, undefined, 'a nested json_schema under text.format is a loud 400');
+  } finally {
+    restore();
+  }
+});
+
+test('AC2: with NO textFormat the body is unchanged - every existing caller is unaffected', async () => {
+  const { calls, restore } = mockFetch({
+    id: 'resp_plain', output: [{ type: 'message', content: [{ type: 'output_text', text: 'OK' }] }],
+  });
+  try {
+    await visionAgenticTurn({ prompt: 'read this' });
+    assert.equal(calls[0].body.text, undefined, 'the pass-through must add nothing at all when it is not used');
+    assert.equal(calls[0].body.input, 'read this', 'the bare-string input path is untouched');
+  } finally {
+    restore();
+  }
+});
+
+test('AC2: the schema composes with images AND tools in ONE request - no turn-splitting is needed', async () => {
+  const fmt = { type: 'json_schema', name: 'n', strict: true, schema: { type: 'object' } };
+  const { calls, restore } = mockFetch({
+    id: 'resp_all', output: [{ type: 'message', content: [{ type: 'output_text', text: '{"lines":[]}' }] }],
+  });
+  try {
+    await visionAgenticTurn({
+      prompt: 'read this',
+      imageUrls: ['data:image/jpeg;base64,PAGE'],
+      tools: [{ type: 'function', name: 'request_crop', parameters: { type: 'object', properties: {} } }],
+      previousResponseId: 'resp_prev',
+      toolOutputs: [{ callId: 'call_1', output: 'ok' }],
+      textFormat: fmt,
+    });
+    const body = calls[0].body;
+    assert.equal(body.text.format.name, 'n');
+    assert.equal(body.tools.length, 1);
+    assert.equal(body.previous_response_id, 'resp_prev');
+    assert.equal(body.input[0].type, 'function_call_output');
+    assert.equal(body.input[1].content[1].type, 'input_image');
+  } finally {
+    restore();
+  }
+});

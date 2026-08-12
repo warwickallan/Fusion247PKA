@@ -290,8 +290,28 @@ export async function visionWithUsage(prompt, imageUrl) {
 // evidence. Asdair's next live run (dispatched immediately after this WP,
 // per its own Sequencing) is what proves or falsifies this, not a unit test
 // with a mocked fetch.
+// ── WO-2026-08-12-01-v2 (WP-B15-29), AC2 — the `textFormat` pass-through ──
+// ONE optional parameter, added because this function builds the ENTIRE
+// /v1/responses body and exposed no seam through which a caller could
+// constrain the output. It is a pass-through and nothing else: when
+// `textFormat` is absent the body is byte-identical to before, so every
+// existing caller is unaffected.
+//
+// The caller supplies the FLAT Responses-API shape
+// `{type:'json_schema', name, strict:true, schema}` and this function nests it
+// under `text.format` - the ONE shape live probing found actually enforces.
+// Two traps, recorded here because the silent one is the dangerous one:
+//   - a NESTED `json_schema` object under `text.format` returns a loud 400;
+//   - `response_format` (the /v1/chat/completions field) on /v1/responses
+//     returns HTTP 200 with the constraint SILENTLY NOT APPLIED - and
+//     /responses is the endpoint this function calls, so a caller that
+//     assumed `200 === constrained` would ship an unconstrained pipeline that
+//     looks perfectly healthy.
+// This function therefore never accepts `response_format` and never rewrites
+// the caller's shape: it passes exactly what it was handed, so what the
+// caller reasoned about is what goes on the wire.
 export async function visionAgenticTurn({
-  prompt, imageUrls = [], tools = [], previousResponseId = null, toolOutputs = [],
+  prompt, imageUrls = [], tools = [], previousResponseId = null, toolOutputs = [], textFormat = null,
 } = {}) {
   if (!GATEWAY) {
     throw new Error(
@@ -345,6 +365,8 @@ export async function visionAgenticTurn({
     body.tools = tools;
     body.tool_choice = 'auto';
   }
+  // AC2: pass-through only. Absent -> the body is exactly what it always was.
+  if (textFormat) body.text = { format: textFormat };
   const res = await fetch(`${GATEWAY.replace(/\/$/, '')}/responses`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(GATEWAY_KEY ? { Authorization: `Bearer ${GATEWAY_KEY}` } : {}) },

@@ -1,0 +1,2591 @@
+{
+  "label": "arm-b",
+  "constrained": true,
+  "householdId": 1,
+  "catalogueSize": 109,
+  "regionNos": [
+    1,
+    2,
+    3
+  ],
+  "catalogue": [
+    {
+      "id": "1",
+      "name": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
+      "aliases": [
+        "gourmet cat food",
+        "gourmet"
+      ],
+      "brand": "Gourmet",
+      "category": "Premium Wet Cat Food",
+      "typicalQty": null
+    },
+    {
+      "id": "2",
+      "name": "ASDA British Milk Semi Skimmed 6 Pints",
+      "aliases": [
+        "6pt milk",
+        "6pts milk",
+        "6 pint milk",
+        "franks 6 pint"
+      ],
+      "brand": "ASDA",
+      "category": "Semi Skimmed Milk",
+      "typicalQty": null
+    },
+    {
+      "id": "3",
+      "name": "Lucozade Sport Drink Orange 4 x 500ml",
+      "aliases": [
+        "lucozade orange sport",
+        "lucozade orange"
+      ],
+      "brand": "Lucozade",
+      "category": "Sports Drinks",
+      "typicalQty": null
+    },
+    {
+      "id": "4",
+      "name": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+      "aliases": [
+        "arla 4pt milk",
+        "arla 4pt",
+        "arla 4pts",
+        "arla semi",
+        "4pt milk",
+        "milk"
+      ],
+      "brand": "Cravendale",
+      "category": "Semi Skimmed Milk",
+      "typicalQty": null
+    },
+    {
+      "id": "5",
+      "name": "Lenor Outdoorable Spring Awakening Fabric Conditioner 86 Washes",
+      "aliases": [
+        "lenor outdoor",
+        "lenor"
+      ],
+      "brand": "Lenor",
+      "category": "Fabric Conditioner Softeners",
+      "typicalQty": null
+    },
+    {
+      "id": "6",
+      "name": "Walkers Cheese & Onion Multipack Crisps 6x25g",
+      "aliases": [
+        "cheese onion crisps",
+        "cheese and onion crisps"
+      ],
+      "brand": "Walkers",
+      "category": "Small Multipack Crisps 4 8 Packs",
+      "typicalQty": null
+    },
+    {
+      "id": "7",
+      "name": "ASDA Crispy Skin-On Fries 750g",
+      "aliases": [
+        "chips"
+      ],
+      "brand": "ASDA",
+      "category": "Frozen Chips Fries",
+      "typicalQty": null
+    },
+    {
+      "id": "8",
+      "name": "Lucozade Sport Drink Raspberry 4 x 500ml",
+      "aliases": [
+        "lucozade raspberry sport",
+        "lucozade raspberry"
+      ],
+      "brand": "Lucozade",
+      "category": "Sports Drinks",
+      "typicalQty": null
+    },
+    {
+      "id": "9",
+      "name": "Princes Lean Corned Beef 200g",
+      "aliases": [
+        "lean corned beef",
+        "corned beef"
+      ],
+      "brand": "Princes",
+      "category": "Cold Meats Corned Beef",
+      "typicalQty": null
+    },
+    {
+      "id": "10",
+      "name": "Yazoo Banana Milk Drink 400ml",
+      "aliases": [
+        "banana yazoo"
+      ],
+      "brand": "Yazoo",
+      "category": "Milk Drinks",
+      "typicalQty": null
+    },
+    {
+      "id": "11",
+      "name": "ASDA British Double Gloucester 400g",
+      "aliases": [
+        "double gloucester"
+      ],
+      "brand": "ASDA",
+      "category": "Red Leicester Gloucester",
+      "typicalQty": null
+    },
+    {
+      "id": "12",
+      "name": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
+      "aliases": [
+        "dreamies cheese",
+        "dreamies"
+      ],
+      "brand": "Dreamies",
+      "category": "Cat Biscuit Treats",
+      "typicalQty": null
+    },
+    {
+      "id": "13",
+      "name": "Kleenex Original Tissues - Twin Pack",
+      "aliases": [
+        "tissues"
+      ],
+      "brand": "Kleenex",
+      "category": "View All Cough Cold Flu",
+      "typicalQty": null
+    },
+    {
+      "id": "14",
+      "name": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g",
+      "aliases": [
+        "pasta cheese leek ham",
+        "pasta cheese leek and ham",
+        "cheese leek ham"
+      ],
+      "brand": "Batchelors",
+      "category": "Pasta Sauce",
+      "typicalQty": null
+    },
+    {
+      "id": "15",
+      "name": "Yazoo Chocolate Milk Drink 400ml",
+      "aliases": [
+        "chocolate yazoo",
+        "choc yazoo",
+        "choc yazoos"
+      ],
+      "brand": "Yazoo",
+      "category": "Milk Drinks",
+      "typicalQty": null
+    },
+    {
+      "id": "16",
+      "name": "ASDA Shortbread Fingers 210g",
+      "aliases": [
+        "shortbread fingers"
+      ],
+      "brand": "ASDA",
+      "category": "Shortbread Biscuits",
+      "typicalQty": null
+    },
+    {
+      "id": "17",
+      "name": "TRESemme Rich Moisture HAIR CONDITIONER 680 ml",
+      "aliases": [],
+      "brand": "TRESemme",
+      "category": "Conditioner",
+      "typicalQty": null
+    },
+    {
+      "id": "18",
+      "name": "Sure Nonstop Protection Sport Cool Anti-Perspirant Aerosol 250 ml",
+      "aliases": [],
+      "brand": "Sure",
+      "category": "Men S Spray Deodorant",
+      "typicalQty": null
+    },
+    {
+      "id": "19",
+      "name": "Birds Eye 4 Classic Beef Burgers with Onion 227g",
+      "aliases": [],
+      "brand": "Birds",
+      "category": "Frozen Burgers",
+      "typicalQty": null
+    },
+    {
+      "id": "20",
+      "name": "Andrex Ultimate Quilts Toilet Tissue 9 Rolls",
+      "aliases": [],
+      "brand": "Andrex",
+      "category": "Quilted Toilet Roll",
+      "typicalQty": null
+    },
+    {
+      "id": "21",
+      "name": "Sure Nonstop Protection Bright Bouquet Anti-Perspirant Aerosol 250 ml",
+      "aliases": [
+        "sure female"
+      ],
+      "brand": "Sure",
+      "category": "Women S Spray Deodorant",
+      "typicalQty": null
+    },
+    {
+      "id": "22",
+      "name": "Robinsons Double Strength Summer Fruits No Added Sugar Squash 1.75L",
+      "aliases": [],
+      "brand": "Robinsons",
+      "category": "Other Fruit Flavoured Squash",
+      "typicalQty": null
+    },
+    {
+      "id": "23",
+      "name": "Rustlers All Day Breakfast Sausage Muffin 155g",
+      "aliases": [
+        "sausage baps",
+        "sausage bap"
+      ],
+      "brand": "Rustlers",
+      "category": "Microwaveable Snacks",
+      "typicalQty": null
+    },
+    {
+      "id": "24",
+      "name": "McCain Air Fryer Hash Brown Bites 600g",
+      "aliases": [],
+      "brand": "McCain",
+      "category": "Frozen Hash Browns Croquettes Onion Rings",
+      "typicalQty": null
+    },
+    {
+      "id": "25",
+      "name": "Sure Nonstop Protection Quantum Dry Anti-Perspirant Aerosol 250 ml",
+      "aliases": [],
+      "brand": "Sure",
+      "category": "Men S Spray Deodorant",
+      "typicalQty": null
+    },
+    {
+      "id": "26",
+      "name": "Weetabix Protein 24 pack cereal",
+      "aliases": [
+        "weetabix protein"
+      ],
+      "brand": "Weetabix",
+      "category": "Wheat Biscuits Mini Wheats",
+      "typicalQty": null
+    },
+    {
+      "id": "27",
+      "name": "ASDA 12 Free Range Large Eggs",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Free Range Eggs",
+      "typicalQty": null
+    },
+    {
+      "id": "28",
+      "name": "The BAKERY at ASDA Sultana & Cherry Cake",
+      "aliases": [
+        "sultana and cherry cake",
+        "sultana & cherry cake"
+      ],
+      "brand": "The",
+      "category": "Loaf Cakes",
+      "typicalQty": null
+    },
+    {
+      "id": "29",
+      "name": "Vanish Oxi Action Laundry Whitener and Stain Remover Powder, 450g",
+      "aliases": [
+        "vanish white"
+      ],
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "typicalQty": null
+    },
+    {
+      "id": "30",
+      "name": "Febreze Fabric Freshener Spray Lenor Spring Awakening 385ML",
+      "aliases": [],
+      "brand": "Febreze",
+      "category": "Undefined",
+      "typicalQty": null
+    },
+    {
+      "id": "31",
+      "name": "Smart Litter Wood Pellet Litter 10 Litres",
+      "aliases": [],
+      "brand": "Smart",
+      "category": "Cat Litter Accessories",
+      "typicalQty": null
+    },
+    {
+      "id": "32",
+      "name": "ASDA Free Range 6 Large Eggs",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Free Range Eggs",
+      "typicalQty": null
+    },
+    {
+      "id": "33",
+      "name": "ASDA Dairy Toffee 180g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Jelly Chewy Sweets",
+      "typicalQty": null
+    },
+    {
+      "id": "34",
+      "name": "Canderel Granular Low Calorie Sweetener 75g",
+      "aliases": [
+        "canderel"
+      ],
+      "brand": "Canderel",
+      "category": "Sweetener",
+      "typicalQty": null
+    },
+    {
+      "id": "35",
+      "name": "Sweetex Calorie Free Sweeteners 600 Tablets",
+      "aliases": [],
+      "brand": "Sweetex",
+      "category": "Sweetener",
+      "typicalQty": null
+    },
+    {
+      "id": "36",
+      "name": "Ariel 4in1 PODS®, Washing Capsules 33",
+      "aliases": [
+        "ariel pods"
+      ],
+      "brand": "Ariel",
+      "category": "Washing Capsules Pods",
+      "typicalQty": null
+    },
+    {
+      "id": "37",
+      "name": "Calgon washing machine cleaner tablets limescale protection 15 tablets",
+      "aliases": [
+        "calgon",
+        "calgon tablets",
+        "washing machine cleaner"
+      ],
+      "brand": "Calgon",
+      "category": "Washing Machine Cleaners Limescale Protection",
+      "typicalQty": 1
+    },
+    {
+      "id": "38",
+      "name": "ASDA Apple Slices 80g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Apples",
+      "typicalQty": null
+    },
+    {
+      "id": "39",
+      "name": "Silver Spoon Granulated Sugar 1kg",
+      "aliases": [],
+      "brand": "Silver",
+      "category": "Granulated Sugar",
+      "typicalQty": null
+    },
+    {
+      "id": "40",
+      "name": "Tetley 240 Original Tea Bags 750g",
+      "aliases": [],
+      "brand": "Tetley",
+      "category": "Everyday Tea",
+      "typicalQty": null
+    },
+    {
+      "id": "41",
+      "name": "ASDA Sausages with Buttery Mash 400g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "British",
+      "typicalQty": null
+    },
+    {
+      "id": "42",
+      "name": "ASDA Cottage Pie 400g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "British",
+      "typicalQty": null
+    },
+    {
+      "id": "43",
+      "name": "Vanish Gold Oxi Action Stain Remover Powder for clothes 450g",
+      "aliases": [],
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "typicalQty": null
+    },
+    {
+      "id": "44",
+      "name": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
+      "aliases": [],
+      "brand": "Febreze",
+      "category": "Febreze",
+      "typicalQty": null
+    },
+    {
+      "id": "45",
+      "name": "Ambrosia Rice Pudding Dessert Snack Pots Multipack 4 x 120g",
+      "aliases": [
+        "rice pudding x4",
+        "rice pudding",
+        "x4 rice pudding"
+      ],
+      "brand": "Ambrosia",
+      "category": "Pudding Pots",
+      "typicalQty": null
+    },
+    {
+      "id": "46",
+      "name": "Dylon Colour Catcher Protection 40 Laundry Sheets",
+      "aliases": [],
+      "brand": "Dylon",
+      "category": "Stain Remover For Colours Colour Catchers",
+      "typicalQty": null
+    },
+    {
+      "id": "47",
+      "name": "Tropicana Smooth Orange Fruit Juice 1.5L",
+      "aliases": [
+        "smooth orange juice",
+        "smooth oj"
+      ],
+      "brand": "Tropicana",
+      "category": "Bigger Pack Juice",
+      "typicalQty": null
+    },
+    {
+      "id": "48",
+      "name": "Nescafe Americano Instant Coffee 140g",
+      "aliases": [],
+      "brand": "Nescafe",
+      "category": "Premium Instant Coffee",
+      "typicalQty": null
+    },
+    {
+      "id": "49",
+      "name": "ASDA Toffee Assortment 200g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Toffee Fudge Liquorice",
+      "typicalQty": null
+    },
+    {
+      "id": "50",
+      "name": "Ariel 4in1 PODS®, Washing Capsules 22",
+      "aliases": [
+        "ariel pods"
+      ],
+      "brand": "Ariel",
+      "category": "Washing Capsules Pods",
+      "typicalQty": null
+    },
+    {
+      "id": "51",
+      "name": "Always Discreet Incontinence Pads Women Normal 39 Count",
+      "aliases": [],
+      "brand": "Always",
+      "category": "Pads",
+      "typicalQty": null
+    },
+    {
+      "id": "52",
+      "name": "Persil Wonder Wash Bio Liquid Detergent Ultra Care 837 ml (31 washes)",
+      "aliases": [],
+      "brand": "Persil",
+      "category": "Washing Liquid Gel",
+      "typicalQty": null
+    },
+    {
+      "id": "53",
+      "name": "ASDA 20 Medium Zip Seal Food & Freezer Bags",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Food Bags Tubs",
+      "typicalQty": null
+    },
+    {
+      "id": "54",
+      "name": "Sure Nonstop Protection Invisible Pure Anti-Perspirant Aerosol 250 ml",
+      "aliases": [],
+      "brand": "Sure",
+      "category": "Women S Spray Deodorant",
+      "typicalQty": null
+    },
+    {
+      "id": "55",
+      "name": "Lure Beauty Travel Vent Brush",
+      "aliases": [],
+      "brand": "Lure",
+      "category": "Hair Brushes Combs",
+      "typicalQty": null
+    },
+    {
+      "id": "56",
+      "name": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
+      "aliases": [
+        "vanish pink"
+      ],
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "typicalQty": null
+    },
+    {
+      "id": "57",
+      "name": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Paracetamol",
+      "typicalQty": null
+    },
+    {
+      "id": "58",
+      "name": "Fairy Max Power Washing Up Liquid 545ML",
+      "aliases": [
+        "fairy max"
+      ],
+      "brand": "Fairy",
+      "category": "Washing Up Liquid",
+      "typicalQty": null
+    },
+    {
+      "id": "59",
+      "name": "Yazoo Strawberry Milk Drink 400ml",
+      "aliases": [
+        "strawberry yazoo"
+      ],
+      "brand": "Yazoo",
+      "category": "Milk Drinks",
+      "typicalQty": null
+    },
+    {
+      "id": "60",
+      "name": "ASDA 6 Bananas",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Bananas",
+      "typicalQty": null
+    },
+    {
+      "id": "61",
+      "name": "VO5 Volume Boost Gel Spray 165g",
+      "aliases": [],
+      "brand": "VO5",
+      "category": "Hair Wax Putty Gels",
+      "typicalQty": null
+    },
+    {
+      "id": "62",
+      "name": "Vanish Pre-Treat Gel",
+      "aliases": [],
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "typicalQty": null
+    },
+    {
+      "id": "63",
+      "name": "Heinz Baked Beans & Richmond Pork Sausages 200g",
+      "aliases": [],
+      "brand": "Heinz",
+      "category": "Baked Beans",
+      "typicalQty": null
+    },
+    {
+      "id": "64",
+      "name": "Kellogg's Frosties Breakfast Cereal 925g",
+      "aliases": [],
+      "brand": "Kellogg's",
+      "category": "Cornflakes Honey Nut",
+      "typicalQty": null
+    },
+    {
+      "id": "65",
+      "name": "ASDA Malted Milk Biscuits 200g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Plain Biscuits",
+      "typicalQty": null
+    },
+    {
+      "id": "66",
+      "name": "Carnation Evaporated Milk 170g Tin",
+      "aliases": [],
+      "brand": "Carnation",
+      "category": "Evaporated Condensed Milk",
+      "typicalQty": null
+    },
+    {
+      "id": "67",
+      "name": "Viakal Fresh Limescale Remover Spray 500ML",
+      "aliases": [
+        "viakal large",
+        "viakal"
+      ],
+      "brand": "Viakal",
+      "category": "Bathroom Cleaning Spray Wipes",
+      "typicalQty": null
+    },
+    {
+      "id": "68",
+      "name": "Dove Nourishing Body Wash 720 ml",
+      "aliases": [],
+      "brand": "Dove",
+      "category": "Shower Gel Body Wash",
+      "typicalQty": null
+    },
+    {
+      "id": "69",
+      "name": "Arla BOB Semi-Skimmed Milk 2L That Tastes Like Whole",
+      "aliases": [],
+      "brand": "Arla",
+      "category": "Semi Skimmed Milk",
+      "typicalQty": null
+    },
+    {
+      "id": "70",
+      "name": "John West Tuna Chunks in Brine 4 x 132g",
+      "aliases": [],
+      "brand": "John",
+      "category": "Tuna",
+      "typicalQty": null
+    },
+    {
+      "id": "71",
+      "name": "Hovis Soft White Medium 800g",
+      "aliases": [],
+      "brand": "Hovis",
+      "category": "White Bread",
+      "typicalQty": null
+    },
+    {
+      "id": "72",
+      "name": "Exceptional by ASDA Creamy Mashed Potato 400g",
+      "aliases": [],
+      "brand": "Exceptional",
+      "category": "Prepared Vegetables",
+      "typicalQty": null
+    },
+    {
+      "id": "73",
+      "name": "ASDA 10 Slices Honey Roast Dry Cured Ham 250g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Ham Pork Slices",
+      "typicalQty": null
+    },
+    {
+      "id": "74",
+      "name": "Voltarol Joint & Back Pain Relief 2.32% Gel 50g",
+      "aliases": [],
+      "brand": "Voltarol",
+      "category": "Rubs Gel Pads Sprays",
+      "typicalQty": null
+    },
+    {
+      "id": "75",
+      "name": "Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g",
+      "aliases": [],
+      "brand": "Batchelors",
+      "category": "Pasta Sauce",
+      "typicalQty": null
+    },
+    {
+      "id": "76",
+      "name": "Pepsi Max No Sugar Cola Bottle 2L",
+      "aliases": [],
+      "brand": "Pepsi",
+      "category": "Sugar Free Diet Cola",
+      "typicalQty": null
+    },
+    {
+      "id": "77",
+      "name": "Batchelors Pasta 'n' Sauce Roast Chicken & Bacon Flavour Instant Pasta Sachet 99g",
+      "aliases": [],
+      "brand": "Batchelors",
+      "category": "Pasta Sauce",
+      "typicalQty": null
+    },
+    {
+      "id": "78",
+      "name": "ASDA Toffee Cheesecakes 2 x 100g (200g)",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Cheesecakes",
+      "typicalQty": null
+    },
+    {
+      "id": "79",
+      "name": "Heinz Tinned Baked Beans in a Rich Tomato Sauce 6 x 200g",
+      "aliases": [],
+      "brand": "Heinz",
+      "category": "Baked Beans",
+      "typicalQty": null
+    },
+    {
+      "id": "80",
+      "name": "ASDA Sliced Topside of Beef 90g",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Beef Slices",
+      "typicalQty": null
+    },
+    {
+      "id": "81",
+      "name": "Exceptional by ASDA Roast Topside of Beef 90g",
+      "aliases": [],
+      "brand": "Exceptional",
+      "category": "Beef Slices",
+      "typicalQty": null
+    },
+    {
+      "id": "82",
+      "name": "ASDA Citrus Burst Thick Bleach 750ml",
+      "aliases": [],
+      "brand": "ASDA",
+      "category": "Bleach Disinfectants",
+      "typicalQty": null
+    },
+    {
+      "id": "83",
+      "name": "Twix Caramel Multipack Chocolate Bars 40g x 9",
+      "aliases": [],
+      "brand": "Twix",
+      "category": "Multipack Biscuits",
+      "typicalQty": null
+    },
+    {
+      "id": "84",
+      "name": "Walkers Salt & Vinegar Multipack Crisps 6x25g",
+      "aliases": [],
+      "brand": "Walkers",
+      "category": "Small Multipack Crisps 4 8 Packs",
+      "typicalQty": null
+    },
+    {
+      "id": "85",
+      "name": "Richmond 12 Skinless Pork Sausages 319g",
+      "aliases": [
+        "richmond pork sausages",
+        "richmond skinless pork sausages",
+        "richmond sausages"
+      ],
+      "brand": "Richmond",
+      "category": "Sausages",
+      "typicalQty": 1
+    },
+    {
+      "id": "86",
+      "name": "TGI Fridays BBQ Pulled Pork 400g",
+      "aliases": [],
+      "brand": "TGI",
+      "category": "Marinated Pork",
+      "typicalQty": null
+    },
+    {
+      "id": "87",
+      "name": "Bloo Spa Moments Toilet Rim Block - Vitality 50g",
+      "aliases": [],
+      "brand": "Bloo",
+      "category": "Toilet Cleaners Rimblocks Gels",
+      "typicalQty": null
+    },
+    {
+      "id": "88",
+      "name": "Warburtons Danish Lighter White Bread 400g",
+      "aliases": [
+        "warburtons danish",
+        "danish bread"
+      ],
+      "brand": "Warburtons",
+      "category": "Small Bread Loaves",
+      "typicalQty": null
+    },
+    {
+      "id": "89",
+      "name": "Lurpak Slightly Salted Butter 200g",
+      "aliases": [
+        "lurpak",
+        "lurpak butter"
+      ],
+      "brand": "Lurpak",
+      "category": "Block Butter",
+      "typicalQty": null
+    },
+    {
+      "id": "90",
+      "name": "ASDA Minced Beef Hotpot 400g",
+      "aliases": [
+        "mince hotpot",
+        "minced beef hotpot",
+        "beef hotpot"
+      ],
+      "brand": null,
+      "category": "Ready Meals",
+      "typicalQty": null
+    },
+    {
+      "id": "91",
+      "name": "ASDA Chicken Hotpot 400g",
+      "aliases": [
+        "chicken hotpot"
+      ],
+      "brand": null,
+      "category": "Ready Meals",
+      "typicalQty": null
+    },
+    {
+      "id": "102",
+      "name": "Wall's 4 Pork Sausage Rolls 220g",
+      "aliases": [
+        "walls sausage rolls",
+        "walls sausage roll",
+        "wall's sausage rolls",
+        "sausage rolls"
+      ],
+      "brand": "Wall's",
+      "category": "Party Food Pies Salads Dips",
+      "typicalQty": 1
+    },
+    {
+      "id": "103",
+      "name": "Milky Way Multipack Chocolate Bars 10 x 21.5g",
+      "aliases": [
+        "milky way",
+        "milky way multipack",
+        "pk milky way"
+      ],
+      "brand": "Milky Way",
+      "category": "Multipack Chocolate",
+      "typicalQty": 1
+    },
+    {
+      "id": "104",
+      "name": "Mars Caramel Multipack Chocolate Bars 8 x 34.5g",
+      "aliases": [
+        "mars bars",
+        "small mars bars",
+        "mars multipack",
+        "pk small mars bars"
+      ],
+      "brand": "Mars",
+      "category": "Multipack Chocolate",
+      "typicalQty": 1
+    },
+    {
+      "id": "105",
+      "name": "TRESemme Rich Moisture HAIR SHAMPOO 680 ml",
+      "aliases": [
+        "tresemme shampoo",
+        "tresemme blue",
+        "tresemme blue label",
+        "tresseme shampoo"
+      ],
+      "brand": "TRESemme",
+      "category": "Shampoo",
+      "typicalQty": 1
+    },
+    {
+      "id": "106",
+      "name": "COOK by ASDA Cook Ground Black Pepper 25g",
+      "aliases": [
+        "black pepper",
+        "ground black pepper",
+        "pepper"
+      ],
+      "brand": "COOK by ASDA",
+      "category": "Herbs Spices",
+      "typicalQty": 1
+    },
+    {
+      "id": "107",
+      "name": "ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets",
+      "aliases": [
+        "hayfever tabs",
+        "hay fever tabs",
+        "hayfever tablets",
+        "hay fever tablets"
+      ],
+      "brand": "ASDA",
+      "category": "Hayfever Allergy",
+      "typicalQty": 1
+    },
+    {
+      "id": "108",
+      "name": "Heinz Tinned Baked Beans in a Rich Tomato Sauce 6 x 415g",
+      "aliases": [
+        "large heinz beans",
+        "heinz beans large",
+        "6pk large heinz beans"
+      ],
+      "brand": "Heinz",
+      "category": "Baked Beans",
+      "typicalQty": null
+    },
+    {
+      "id": "109",
+      "name": "Nescafe Azera Americano Intense Instant Coffee 140g",
+      "aliases": [
+        "azera",
+        "nescafe azera",
+        "azera coffee",
+        "bottle azera coffee"
+      ],
+      "brand": "Nescafe",
+      "category": "Premium Instant Coffee",
+      "typicalQty": null
+    },
+    {
+      "id": "110",
+      "name": "Aquafresh Complete Care Whitening Toothpaste 75ml",
+      "aliases": [
+        "toothpaste",
+        "aquafresh"
+      ],
+      "brand": "Aquafresh",
+      "category": "Toothpaste",
+      "typicalQty": null
+    },
+    {
+      "id": "111",
+      "name": "George Home Tea Towels",
+      "aliases": [
+        "tea towels",
+        "tea towel",
+        "pk tea towels",
+        "pkt tea towels"
+      ],
+      "brand": "George Home",
+      "category": "Tea Towels",
+      "typicalQty": null
+    },
+    {
+      "id": "112",
+      "name": "Sudocrem Antiseptic Cream 125g",
+      "aliases": [
+        "sudocrem",
+        "antiseptic cream",
+        "sudocrem antiseptic"
+      ],
+      "brand": "Sudocrem",
+      "category": "Antiseptic Cream",
+      "typicalQty": null
+    },
+    {
+      "id": "113",
+      "name": "Saxa Ground White Pepper 25g",
+      "aliases": [
+        "white pepper",
+        "ground white pepper"
+      ],
+      "brand": "Saxa",
+      "category": "Herbs Spices",
+      "typicalQty": null
+    },
+    {
+      "id": "114",
+      "name": "Twix Chocolate & Caramel Ice Cream 4pk",
+      "aliases": [
+        "twix ice cream bars",
+        "twix icecream bars",
+        "twix ice creams"
+      ],
+      "brand": "Twix",
+      "category": "Ice Cream",
+      "typicalQty": 2
+    },
+    {
+      "id": "115",
+      "name": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
+      "aliases": [
+        "twix choc biscuit bars",
+        "twix biscuit bars",
+        "twix chocolate biscuit bars"
+      ],
+      "brand": "Twix",
+      "category": "Multipack Biscuits",
+      "typicalQty": 1
+    },
+    {
+      "id": "116",
+      "name": "Loctite Super Glue Original 3g",
+      "aliases": [
+        "loctite super glue",
+        "loctite superglue",
+        "super glue"
+      ],
+      "brand": "Loctite",
+      "category": "Glues, Tapes & Adhesives",
+      "typicalQty": 1
+    },
+    {
+      "id": "117",
+      "name": "ASDA Sliced Ham on the Bone 400g",
+      "aliases": [
+        "ham on the bone",
+        "1 pkt ham on the bone",
+        "pkt ham on the bone"
+      ],
+      "brand": "ASDA",
+      "category": "Ham & Pork Slices",
+      "typicalQty": 1
+    },
+    {
+      "id": "118",
+      "name": "ASDA 4 Beef Quarter Pounders 454g",
+      "aliases": [
+        "beef quarter pounders",
+        "quarter pounders",
+        "asda beef quarter pounder",
+        "4pk quarter pounders"
+      ],
+      "brand": "ASDA",
+      "category": "Frozen Burgers",
+      "typicalQty": 1
+    },
+    {
+      "id": "119",
+      "name": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
+      "aliases": [
+        "dettol spray",
+        "can dettol spray",
+        "dettol disinfectant spray"
+      ],
+      "brand": "Dettol",
+      "category": "Bleach & Disinfectants",
+      "typicalQty": 1
+    }
+  ],
+  "textFormatSent": {
+    "type": "json_schema",
+    "name": "asdair_photo_lines",
+    "strict": true,
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lines"
+      ],
+      "properties": {
+        "lines": {
+          "type": "array",
+          "description": "Every line you found, across every region you inspected.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "line_no",
+              "as_written",
+              "visible_line",
+              "product_id",
+              "source_region",
+              "quantity",
+              "confidence"
+            ],
+            "properties": {
+              "line_no": {
+                "type": "integer",
+                "description": "Sequential number of this line in your answer, starting at 1."
+              },
+              "as_written": {
+                "type": "string",
+                "description": "VERBATIM what is written on the page for this line, exactly as read, including spelling and abbreviations. Never a tidied, corrected or catalogue-matched name."
+              },
+              "visible_line": {
+                "type": "boolean",
+                "description": "FIRST question, answered independently: is there actually a handwritten shopping line at this place on the page? true = you can see writing here. false = there is no line here."
+              },
+              "product_id": {
+                "type": "string",
+                "enum": [
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14",
+                  "15",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20",
+                  "21",
+                  "22",
+                  "23",
+                  "24",
+                  "25",
+                  "26",
+                  "27",
+                  "28",
+                  "29",
+                  "30",
+                  "31",
+                  "32",
+                  "33",
+                  "34",
+                  "35",
+                  "36",
+                  "37",
+                  "38",
+                  "39",
+                  "40",
+                  "41",
+                  "42",
+                  "43",
+                  "44",
+                  "45",
+                  "46",
+                  "47",
+                  "48",
+                  "49",
+                  "50",
+                  "51",
+                  "52",
+                  "53",
+                  "54",
+                  "55",
+                  "56",
+                  "57",
+                  "58",
+                  "59",
+                  "60",
+                  "61",
+                  "62",
+                  "63",
+                  "64",
+                  "65",
+                  "66",
+                  "67",
+                  "68",
+                  "69",
+                  "70",
+                  "71",
+                  "72",
+                  "73",
+                  "74",
+                  "75",
+                  "76",
+                  "77",
+                  "78",
+                  "79",
+                  "80",
+                  "81",
+                  "82",
+                  "83",
+                  "84",
+                  "85",
+                  "86",
+                  "87",
+                  "88",
+                  "89",
+                  "90",
+                  "91",
+                  "102",
+                  "103",
+                  "104",
+                  "105",
+                  "106",
+                  "107",
+                  "108",
+                  "109",
+                  "110",
+                  "111",
+                  "112",
+                  "113",
+                  "114",
+                  "115",
+                  "116",
+                  "117",
+                  "118",
+                  "119",
+                  "UNKNOWN_VISIBLE_ITEM",
+                  "NOT_A_LINE"
+                ],
+                "description": "SECOND question, answered only after the first: which supplied candidate does the visible writing correspond to? Use UNKNOWN_VISIBLE_ITEM when you can see a line but cannot confidently match it to a supplied candidate - that is a correct and welcome answer. Use NOT_A_LINE when there is no shopping line here at all."
+              },
+              "source_region": {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  3
+                ],
+                "description": "The region number where you actually read this line. Only a region supplied to you is valid."
+              },
+              "quantity": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "How many to buy, ONLY when separate evidence says so (a count written before the item, or an explicit multiplier). A number that is part of the product name or pack size is NEVER the quantity. No separate evidence means null."
+              },
+              "confidence": {
+                "type": "number",
+                "description": "Your confidence in this READING, 0 to 1. It decides only whether the page is worth another look; it never makes a line acceptable."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "productIdEnumSize": 111,
+  "turns": [
+    {
+      "turnNo": 1,
+      "responseId": "resp_almlJ3a8060fAD329IMkWt1UwN956K8XuadTWSOD6Drk7iJP0TMQZr-rQrLiTjoA_dhSXDGVDDgMacXg_6I5cVH9yuZgI09VLaUc1xqFFPUIZn1vN8Abr2wdCWPSPXaZ504h1koEf7oo8UNmBJ_9R-gp1HEKtoiAYAGDtDa-886fPR8l9-C3auOe9k9z1JXKUwUHas3dDcxEFSMV23AKpzsb0Fz7Q84EXRFjMtihxC6Xrpv4YZlTsG8X_Sj1qzed6O3mbTmLJkVbiVpCn0Jqtn1TT6_MzDbODaKz9fEL21R_-nUf1ISUdsLZQ_X0wpPy9lBgkYEOHu1zXdZQGIack07_kUvAS1rMyv2q866-q47QGulUvgZtns6ZbPpjQq9nIp1e-4z1qDzKjiZl8lPfm9UmKMR0IzVXgubpFB9Tc2MVSPwQvbPCypFhbPI3EqFLu-26hutrWxaOl25lWlxJ0WsL",
+      "requestedRegion": 2,
+      "requestedRegions": [
+        2,
+        3
+      ],
+      "usage": {
+        "input_tokens": 7983,
+        "input_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0,
+          "text_tokens": null,
+          "cache_write_tokens": 7980
+        },
+        "output_tokens": 92,
+        "output_tokens_details": {
+          "reasoning_tokens": 42,
+          "text_tokens": null
+        },
+        "total_tokens": 8075,
+        "cost": null
+      },
+      "costUsd": 0.021337500000000002
+    },
+    {
+      "turnNo": 2,
+      "responseId": "resp_xWpONudtbPFOqQfErRx2G2NY2QV6IFokIdt0v4EHr8u9OTCVVpf-LCSERDIKXmOEsLL3ChYbrtVjRJHHtHJmTDGr0aaMtAuj7VyXYxEgBWzq18HOocIMZzNJPkZJUACaH_2FGjpN6Hc8aOQBkd_hfCWue48N6InMj2UOrJSvJAbWkTY-OUvZwnLvurNCJ069kCWqRlQklK-R9KBgOQKFBVhxJWCJubaORJUPkiu9eDiAa65hFDr04Gwzg9LXPG7Tffb67U7lD8_t912ZNvqmrstVmH7KnYAH8heT5tJ_6jRySyv5u2kazu-CzaKc6O1opBlfnseBFfXJUYoLgCCHCuPKaKNC1bvTTWqcJyseOAoHc_TAgEl0M7F-Z5oxjmw6rdxBMHkloL4mqmsbx_0XuLFv7dhokB2UsY2Q_ssLZUWnZBCXjf9Be14okC7UMHy74RYr-GllRUTh5q39DIvvZwPC",
+      "requestedRegion": 1,
+      "requestedRegions": [
+        1
+      ],
+      "usage": {
+        "input_tokens": 9068,
+        "input_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 7980,
+          "text_tokens": null,
+          "cache_write_tokens": 1085
+        },
+        "output_tokens": 1427,
+        "output_tokens_details": {
+          "reasoning_tokens": 1407,
+          "text_tokens": null
+        },
+        "total_tokens": 10495,
+        "cost": null
+      },
+      "costUsd": 0.044075
+    },
+    {
+      "turnNo": 3,
+      "responseId": "resp_GoW0d51-EpeP-F_HwRtZ_U-9UGfuxm0u55STOoSe0Uo29DdE0asP6MMpZ2U-dLD8dHWLoCiqXjCIVdLE4HVs7I0KY_HE6liWjKt1BSVjaWGFz5i8vtDIBGkkbPshO8xVuxIaIOGSDDV4MO3jqXSAlw-dXgwk7KUBw8-wGTZCZxX4VJp_85gRceYehurNy1jAwUM-zLbLXo3EtY16SvBnGBpDoWa78yKElPy9ASu5OPD_tqBaXNLbC40708CxqM2_biN5UwIcC4CMv7_m3Fjks46vSZ2C3ctTArb3Dps0n4E760KcQfvbCh1UwiOTDb1mPhH6AIw82Aaq-_uJ3hEA-vd6N2nZAW58XiQfiKSc-GQGfdW90y5ylaAUNW3B31tL_1TqNX3lgY2K14-223NqcWOSEZNH5P_Ito0silqtVqRfyhnYlt4S5BJiWJDKTrvdDdAPpbsouZv2wm7jAxId9tBZ",
+      "requestedRegion": null,
+      "requestedRegions": [],
+      "usage": {
+        "input_tokens": 11424,
+        "input_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 9065,
+          "text_tokens": null,
+          "cache_write_tokens": 2356
+        },
+        "output_tokens": 2902,
+        "output_tokens_details": {
+          "reasoning_tokens": 1357,
+          "text_tokens": null
+        },
+        "total_tokens": 14326,
+        "cost": null
+      },
+      "costUsd": 0.07209
+    }
+  ],
+  "toolCallRounds": 2,
+  "hitIterationCap": false,
+  "elapsedMs": 50409,
+  "totalCostUsd": 0.13750250000000003,
+  "rawLines": [
+    {
+      "line_no": 1,
+      "as_written": "4 x 4pts ASDA semi skimmed milk",
+      "visible_line": true,
+      "product_id": "2",
+      "source_region": 2,
+      "quantity": 4,
+      "confidence": 0.66
+    },
+    {
+      "line_no": 2,
+      "as_written": "1 Warburtons Danish white sliced bread",
+      "visible_line": true,
+      "product_id": "88",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.92
+    },
+    {
+      "line_no": 3,
+      "as_written": "1 large white sliced bread",
+      "visible_line": true,
+      "product_id": "71",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.83
+    },
+    {
+      "line_no": 4,
+      "as_written": "2 chips with skins on",
+      "visible_line": true,
+      "product_id": "7",
+      "source_region": 2,
+      "quantity": 2,
+      "confidence": 0.91
+    },
+    {
+      "line_no": 5,
+      "as_written": "1 pkt roast beef",
+      "visible_line": true,
+      "product_id": "80",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.92
+    },
+    {
+      "line_no": 6,
+      "as_written": "1 pkt ham on the bone",
+      "visible_line": true,
+      "product_id": "117",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.94
+    },
+    {
+      "line_no": 7,
+      "as_written": "16 Richmond skinless pork sausages",
+      "visible_line": true,
+      "product_id": "85",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.94
+    },
+    {
+      "line_no": 8,
+      "as_written": "1 pkt ham & tomato pasta",
+      "visible_line": true,
+      "product_id": "UNKNOWN_VISIBLE_ITEM",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.71
+    },
+    {
+      "line_no": 9,
+      "as_written": "1 pkt Weetabix protein",
+      "visible_line": true,
+      "product_id": "26",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.9
+    },
+    {
+      "line_no": 10,
+      "as_written": "2 Batchelors pasta microwave",
+      "visible_line": true,
+      "product_id": "UNKNOWN_VISIBLE_ITEM",
+      "source_region": 2,
+      "quantity": 2,
+      "confidence": 0.68
+    },
+    {
+      "line_no": 11,
+      "as_written": "2 pasta & sauce chicken & bacon",
+      "visible_line": true,
+      "product_id": "77",
+      "source_region": 2,
+      "quantity": 2,
+      "confidence": 0.84
+    },
+    {
+      "line_no": 12,
+      "as_written": "1 large Arla 4pt",
+      "visible_line": true,
+      "product_id": "4",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.85
+    },
+    {
+      "line_no": 13,
+      "as_written": "1 Princes lean corned beef",
+      "visible_line": true,
+      "product_id": "9",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.94
+    },
+    {
+      "line_no": 14,
+      "as_written": "1 Lurpak butter",
+      "visible_line": true,
+      "product_id": "89",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.94
+    },
+    {
+      "line_no": 15,
+      "as_written": "1 double Gloucester cheese",
+      "visible_line": true,
+      "product_id": "11",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.94
+    },
+    {
+      "line_no": 16,
+      "as_written": "1 pkt Birds Eye 4 quarter pounders",
+      "visible_line": true,
+      "product_id": "118",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.91
+    },
+    {
+      "line_no": 17,
+      "as_written": "1 VO5 gel",
+      "visible_line": true,
+      "product_id": "61",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.95
+    },
+    {
+      "line_no": 18,
+      "as_written": "3 Yazoo strawberry milk shake",
+      "visible_line": true,
+      "product_id": "59",
+      "source_region": 2,
+      "quantity": 3,
+      "confidence": 0.95
+    },
+    {
+      "line_no": 19,
+      "as_written": "2 Yazoo choc milk shake",
+      "visible_line": true,
+      "product_id": "15",
+      "source_region": 2,
+      "quantity": 2,
+      "confidence": 0.95
+    },
+    {
+      "line_no": 20,
+      "as_written": "2 pk Lucozade orange sport",
+      "visible_line": true,
+      "product_id": "3",
+      "source_region": 2,
+      "quantity": 2,
+      "confidence": 0.95
+    },
+    {
+      "line_no": 21,
+      "as_written": "1 Always discreet panty liners normal",
+      "visible_line": true,
+      "product_id": "51",
+      "source_region": 2,
+      "quantity": 1,
+      "confidence": 0.85
+    },
+    {
+      "line_no": 22,
+      "as_written": "Febreze air mist vanilla",
+      "visible_line": true,
+      "product_id": "44",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.89
+    },
+    {
+      "line_no": 23,
+      "as_written": "Vanish oxi pink",
+      "visible_line": true,
+      "product_id": "56",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.97
+    },
+    {
+      "line_no": 24,
+      "as_written": "Vanish oxi white",
+      "visible_line": true,
+      "product_id": "29",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.97
+    },
+    {
+      "line_no": 25,
+      "as_written": "Vanish oxi gold",
+      "visible_line": true,
+      "product_id": "43",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.97
+    },
+    {
+      "line_no": 26,
+      "as_written": "Calgon superfluo",
+      "visible_line": true,
+      "product_id": "37",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.7
+    },
+    {
+      "line_no": 27,
+      "as_written": "Lenor outdoor",
+      "visible_line": true,
+      "product_id": "5",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.98
+    },
+    {
+      "line_no": 28,
+      "as_written": "3 Gourmet cat food - fish",
+      "visible_line": true,
+      "product_id": "1",
+      "source_region": 2,
+      "quantity": 3,
+      "confidence": 0.94
+    },
+    {
+      "line_no": 29,
+      "as_written": "Dreamies cheese",
+      "visible_line": true,
+      "product_id": "12",
+      "source_region": 2,
+      "quantity": null,
+      "confidence": 0.97
+    },
+    {
+      "line_no": 30,
+      "as_written": "2 pkts Twix icecream bars",
+      "visible_line": true,
+      "product_id": "114",
+      "source_region": 3,
+      "quantity": 2,
+      "confidence": 0.95
+    },
+    {
+      "line_no": 31,
+      "as_written": "1 pkt Twix choc biscuit bars",
+      "visible_line": true,
+      "product_id": "115",
+      "source_region": 3,
+      "quantity": 1,
+      "confidence": 0.95
+    },
+    {
+      "line_no": 32,
+      "as_written": "1 sultana/cherry cake",
+      "visible_line": true,
+      "product_id": "28",
+      "source_region": 3,
+      "quantity": 1,
+      "confidence": 0.96
+    },
+    {
+      "line_no": 33,
+      "as_written": "1 pkt ASDA shortbread",
+      "visible_line": true,
+      "product_id": "16",
+      "source_region": 3,
+      "quantity": 1,
+      "confidence": 0.97
+    },
+    {
+      "line_no": 34,
+      "as_written": "2 pkts ASDA hayfever tabs",
+      "visible_line": true,
+      "product_id": "107",
+      "source_region": 3,
+      "quantity": 2,
+      "confidence": 0.97
+    },
+    {
+      "line_no": 35,
+      "as_written": "1 box Ariel 22 pods",
+      "visible_line": true,
+      "product_id": "50",
+      "source_region": 3,
+      "quantity": 1,
+      "confidence": 0.86
+    },
+    {
+      "line_no": 36,
+      "as_written": "1 Febreze fabric spray",
+      "visible_line": true,
+      "product_id": "30",
+      "source_region": 3,
+      "quantity": 1,
+      "confidence": 0.97
+    },
+    {
+      "line_no": 37,
+      "as_written": "1 can Dettol spray",
+      "visible_line": true,
+      "product_id": "119",
+      "source_region": 3,
+      "quantity": 1,
+      "confidence": 0.98
+    },
+    {
+      "line_no": 38,
+      "as_written": "1 pack Kleenex tissues",
+      "visible_line": true,
+      "product_id": "13",
+      "source_region": 3,
+      "quantity": 1,
+      "confidence": 0.98
+    }
+  ],
+  "grounded": {
+    "accepted": [
+      {
+        "line_no": 1,
+        "as_written": "4 x 4pts ASDA semi skimmed milk",
+        "visible_line": true,
+        "product_id": "2",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 4,
+        "quantity_evidence": 4,
+        "confidence": 0.66,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 2,
+        "as_written": "1 Warburtons Danish white sliced bread",
+        "visible_line": true,
+        "product_id": "88",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.92,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 3,
+        "as_written": "1 large white sliced bread",
+        "visible_line": true,
+        "product_id": "71",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.83,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 4,
+        "as_written": "2 chips with skins on",
+        "visible_line": true,
+        "product_id": "7",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 2,
+        "quantity_evidence": 2,
+        "confidence": 0.91,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 5,
+        "as_written": "1 pkt roast beef",
+        "visible_line": true,
+        "product_id": "80",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.92,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 6,
+        "as_written": "1 pkt ham on the bone",
+        "visible_line": true,
+        "product_id": "117",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.94,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 7,
+        "as_written": "16 Richmond skinless pork sausages",
+        "visible_line": true,
+        "product_id": "85",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": 16,
+        "confidence": 0.94,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 8,
+        "as_written": "1 pkt ham & tomato pasta",
+        "visible_line": true,
+        "product_id": "UNKNOWN_VISIBLE_ITEM",
+        "identified": false,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.71,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 9,
+        "as_written": "1 pkt Weetabix protein",
+        "visible_line": true,
+        "product_id": "26",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.9,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 10,
+        "as_written": "2 Batchelors pasta microwave",
+        "visible_line": true,
+        "product_id": "UNKNOWN_VISIBLE_ITEM",
+        "identified": false,
+        "source_region": 2,
+        "quantity": 2,
+        "quantity_evidence": 2,
+        "confidence": 0.68,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 11,
+        "as_written": "2 pasta & sauce chicken & bacon",
+        "visible_line": true,
+        "product_id": "77",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 2,
+        "quantity_evidence": 2,
+        "confidence": 0.84,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 12,
+        "as_written": "1 large Arla 4pt",
+        "visible_line": true,
+        "product_id": "4",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.85,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 13,
+        "as_written": "1 Princes lean corned beef",
+        "visible_line": true,
+        "product_id": "9",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.94,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 14,
+        "as_written": "1 Lurpak butter",
+        "visible_line": true,
+        "product_id": "89",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.94,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 15,
+        "as_written": "1 double Gloucester cheese",
+        "visible_line": true,
+        "product_id": "11",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.94,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 16,
+        "as_written": "1 pkt Birds Eye 4 quarter pounders",
+        "visible_line": true,
+        "product_id": "118",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.91,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 17,
+        "as_written": "1 VO5 gel",
+        "visible_line": true,
+        "product_id": "61",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.95,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 18,
+        "as_written": "3 Yazoo strawberry milk shake",
+        "visible_line": true,
+        "product_id": "59",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 3,
+        "quantity_evidence": 3,
+        "confidence": 0.95,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 19,
+        "as_written": "2 Yazoo choc milk shake",
+        "visible_line": true,
+        "product_id": "15",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 2,
+        "quantity_evidence": 2,
+        "confidence": 0.95,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 20,
+        "as_written": "2 pk Lucozade orange sport",
+        "visible_line": true,
+        "product_id": "3",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 2,
+        "quantity_evidence": 2,
+        "confidence": 0.95,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 21,
+        "as_written": "1 Always discreet panty liners normal",
+        "visible_line": true,
+        "product_id": "51",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.85,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 22,
+        "as_written": "Febreze air mist vanilla",
+        "visible_line": true,
+        "product_id": "44",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": null,
+        "confidence": 0.89,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 23,
+        "as_written": "Vanish oxi pink",
+        "visible_line": true,
+        "product_id": "56",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": null,
+        "confidence": 0.97,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 24,
+        "as_written": "Vanish oxi white",
+        "visible_line": true,
+        "product_id": "29",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": null,
+        "confidence": 0.97,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 25,
+        "as_written": "Vanish oxi gold",
+        "visible_line": true,
+        "product_id": "43",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": null,
+        "confidence": 0.97,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 26,
+        "as_written": "Calgon superfluo",
+        "visible_line": true,
+        "product_id": "37",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": null,
+        "confidence": 0.7,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 27,
+        "as_written": "Lenor outdoor",
+        "visible_line": true,
+        "product_id": "5",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": null,
+        "confidence": 0.98,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 28,
+        "as_written": "3 Gourmet cat food - fish",
+        "visible_line": true,
+        "product_id": "1",
+        "identified": true,
+        "source_region": 2,
+        "quantity": 3,
+        "quantity_evidence": 3,
+        "confidence": 0.94,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 29,
+        "as_written": "Dreamies cheese",
+        "visible_line": true,
+        "product_id": "12",
+        "identified": true,
+        "source_region": 2,
+        "quantity": null,
+        "quantity_evidence": null,
+        "confidence": 0.97,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 30,
+        "as_written": "2 pkts Twix icecream bars",
+        "visible_line": true,
+        "product_id": "114",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 2,
+        "quantity_evidence": 2,
+        "confidence": 0.95,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 31,
+        "as_written": "1 pkt Twix choc biscuit bars",
+        "visible_line": true,
+        "product_id": "115",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.95,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 32,
+        "as_written": "1 sultana/cherry cake",
+        "visible_line": true,
+        "product_id": "28",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.96,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 33,
+        "as_written": "1 pkt ASDA shortbread",
+        "visible_line": true,
+        "product_id": "16",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.97,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 34,
+        "as_written": "2 pkts ASDA hayfever tabs",
+        "visible_line": true,
+        "product_id": "107",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 2,
+        "quantity_evidence": 2,
+        "confidence": 0.97,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 35,
+        "as_written": "1 box Ariel 22 pods",
+        "visible_line": true,
+        "product_id": "50",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.86,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 36,
+        "as_written": "1 Febreze fabric spray",
+        "visible_line": true,
+        "product_id": "30",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.97,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 37,
+        "as_written": "1 can Dettol spray",
+        "visible_line": true,
+        "product_id": "119",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.98,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      },
+      {
+        "line_no": 38,
+        "as_written": "1 pack Kleenex tissues",
+        "visible_line": true,
+        "product_id": "13",
+        "identified": true,
+        "source_region": 3,
+        "quantity": 1,
+        "quantity_evidence": 1,
+        "confidence": 0.98,
+        "look_again": false,
+        "flags": [],
+        "duplicate_of": null,
+        "duplicate_collision": false,
+        "needs_human": false
+      }
+    ],
+    "rejected": [],
+    "duplicateGroups": [],
+    "lookAgainRegions": [],
+    "counts": {
+      "returned": 38,
+      "accepted": 38,
+      "rejected": 0,
+      "identified": 36,
+      "unknownVisible": 2,
+      "noIdentityClaim": 0,
+      "notALine": 0,
+      "regionRejected": 0,
+      "quantityNulled": 0,
+      "duplicateGroups": 0,
+      "crossRegionCollisions": 0
+    },
+    "enumVerified": true
+  },
+  "score": {
+    "denominator": 39,
+    "identityMode": "enum",
+    "correct": 18,
+    "omitted": 11,
+    "invented": 5,
+    "inventedByMechanism": {
+      "suppliedCandidateNoImageEvidence": 3,
+      "freeGeneration": 2
+    },
+    "wrongIdentity": 0,
+    "wrongQuantity": 9,
+    "explicitUnknown": 2,
+    "duplicates": 0,
+    "duplicateGroups": [],
+    "omittedProducts": [
+      "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+      "ASDA Crispy Skin-On Fries 750g",
+      "Exceptional by ASDA Creamy Mashed Potato 400g",
+      "Rustlers All Day Breakfast Sausage Muffin 155g",
+      "Bloo Toilet Rim Block",
+      "Loctite Super Glue Original 3g",
+      "ASDA Plain Toffees bag",
+      "Walkers Cheese & Onion Multipack Crisps 6x25g",
+      "Twix Chocolate & Caramel Ice Cream 4pk",
+      "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "ASDA Assorted Fruit Splits Lollies box"
+    ],
+    "rejectedByReason": {},
+    "details": [
+      {
+        "line_no": 1,
+        "as_written": "4 x 4pts ASDA semi skimmed milk",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "ASDA British Milk Semi Skimmed 6 Pints",
+        "expected": 1,
+        "got": 4
+      },
+      {
+        "line_no": 2,
+        "as_written": "1 Warburtons Danish white sliced bread",
+        "verdict": "CORRECT",
+        "truth": "Warburtons Danish Lighter White Bread 400g"
+      },
+      {
+        "line_no": 3,
+        "as_written": "1 large white sliced bread",
+        "verdict": "DUPLICATE_READ",
+        "truth": "Warburtons Danish Lighter White Bread 400g"
+      },
+      {
+        "line_no": 4,
+        "as_written": "2 chips with skins on",
+        "verdict": "INVENTED",
+        "mechanism": "supplied-candidate-no-image-evidence",
+        "named": "ASDA Crispy Skin-On Fries 750g"
+      },
+      {
+        "line_no": 5,
+        "as_written": "1 pkt roast beef",
+        "verdict": "CORRECT",
+        "truth": "Exceptional by ASDA Roast Topside of Beef 90g"
+      },
+      {
+        "line_no": 6,
+        "as_written": "1 pkt ham on the bone",
+        "verdict": "CORRECT",
+        "truth": "ASDA Sliced Ham on the Bone 400g"
+      },
+      {
+        "line_no": 7,
+        "as_written": "16 Richmond skinless pork sausages",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "Richmond 12 Skinless Pork Sausages 319g",
+        "expected": 1,
+        "got": null
+      },
+      {
+        "line_no": 8,
+        "as_written": "1 pkt ham & tomato pasta",
+        "verdict": "EXPLICIT_UNKNOWN",
+        "truth": null
+      },
+      {
+        "line_no": 9,
+        "as_written": "1 pkt Weetabix protein",
+        "verdict": "CORRECT",
+        "truth": "Weetabix Protein 24 pack cereal"
+      },
+      {
+        "line_no": 10,
+        "as_written": "2 Batchelors pasta microwave",
+        "verdict": "EXPLICIT_UNKNOWN",
+        "truth": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g"
+      },
+      {
+        "line_no": 11,
+        "as_written": "2 pasta & sauce chicken & bacon",
+        "verdict": "DUPLICATE_READ",
+        "truth": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g"
+      },
+      {
+        "line_no": 12,
+        "as_written": "1 large Arla 4pt",
+        "verdict": "INVENTED",
+        "mechanism": "supplied-candidate-no-image-evidence",
+        "named": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer"
+      },
+      {
+        "line_no": 13,
+        "as_written": "1 Princes lean corned beef",
+        "verdict": "CORRECT",
+        "truth": "Princes Lean Corned Beef 200g"
+      },
+      {
+        "line_no": 14,
+        "as_written": "1 Lurpak butter",
+        "verdict": "CORRECT",
+        "truth": "Lurpak Slightly Salted Butter 200g"
+      },
+      {
+        "line_no": 15,
+        "as_written": "1 double Gloucester cheese",
+        "verdict": "CORRECT",
+        "truth": "ASDA British Double Gloucester 400g"
+      },
+      {
+        "line_no": 16,
+        "as_written": "1 pkt Birds Eye 4 quarter pounders",
+        "verdict": "CORRECT",
+        "truth": "Birds Eye Quarter Pounders 4pk"
+      },
+      {
+        "line_no": 17,
+        "as_written": "1 VO5 gel",
+        "verdict": "INVENTED",
+        "mechanism": "free-generation",
+        "identity": "VO5 Volume Boost Gel Spray 165g"
+      },
+      {
+        "line_no": 18,
+        "as_written": "3 Yazoo strawberry milk shake",
+        "verdict": "CORRECT",
+        "truth": "Yazoo Strawberry Milk Drink 400ml"
+      },
+      {
+        "line_no": 19,
+        "as_written": "2 Yazoo choc milk shake",
+        "verdict": "CORRECT",
+        "truth": "Yazoo Chocolate Milk Drink 400ml"
+      },
+      {
+        "line_no": 20,
+        "as_written": "2 pk Lucozade orange sport",
+        "verdict": "CORRECT",
+        "truth": "Lucozade Sport Drink Orange 4 x 500ml"
+      },
+      {
+        "line_no": 21,
+        "as_written": "1 Always discreet panty liners normal",
+        "verdict": "CORRECT",
+        "truth": "Always Discreet Incontinence Pads Women Normal 39 Count"
+      },
+      {
+        "line_no": 22,
+        "as_written": "Febreze air mist vanilla",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
+        "expected": 1,
+        "got": null
+      },
+      {
+        "line_no": 23,
+        "as_written": "Vanish oxi pink",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
+        "expected": 1,
+        "got": null
+      },
+      {
+        "line_no": 24,
+        "as_written": "Vanish oxi white",
+        "verdict": "DUPLICATE_READ",
+        "truth": "Vanish Oxi Action Laundry Stain Remover Powder, 450g"
+      },
+      {
+        "line_no": 25,
+        "as_written": "Vanish oxi gold",
+        "verdict": "DUPLICATE_READ",
+        "truth": "Vanish Oxi Action Laundry Stain Remover Powder, 450g"
+      },
+      {
+        "line_no": 26,
+        "as_written": "Calgon superfluo",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "Calgon washing machine cleaner tablets",
+        "expected": 1,
+        "got": null
+      },
+      {
+        "line_no": 27,
+        "as_written": "Lenor outdoor",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "Lenor Outdoorable Spring Awakening Fabric Conditioner 86 Washes",
+        "expected": 1,
+        "got": null
+      },
+      {
+        "line_no": 28,
+        "as_written": "3 Gourmet cat food - fish",
+        "verdict": "CORRECT",
+        "truth": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g"
+      },
+      {
+        "line_no": 29,
+        "as_written": "Dreamies cheese",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "Dreamies Cat Treat Biscuits With Cheese Flavour 200g",
+        "expected": 1,
+        "got": null
+      },
+      {
+        "line_no": 30,
+        "as_written": "2 pkts Twix icecream bars",
+        "verdict": "INVENTED",
+        "mechanism": "supplied-candidate-no-image-evidence",
+        "named": "Twix Chocolate & Caramel Ice Cream 4pk"
+      },
+      {
+        "line_no": 31,
+        "as_written": "1 pkt Twix choc biscuit bars",
+        "verdict": "CORRECT",
+        "truth": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g"
+      },
+      {
+        "line_no": 32,
+        "as_written": "1 sultana/cherry cake",
+        "verdict": "CORRECT",
+        "truth": "The BAKERY at ASDA Sultana & Cherry Cake"
+      },
+      {
+        "line_no": 33,
+        "as_written": "1 pkt ASDA shortbread",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "ASDA Shortbread Fingers 210g",
+        "expected": 2,
+        "got": 1
+      },
+      {
+        "line_no": 34,
+        "as_written": "2 pkts ASDA hayfever tabs",
+        "verdict": "WRONG_QUANTITY",
+        "truth": "ASDA Allergy & Hayfever Relief 30 Tablets",
+        "expected": 1,
+        "got": 2
+      },
+      {
+        "line_no": 35,
+        "as_written": "1 box Ariel 22 pods",
+        "verdict": "INVENTED",
+        "mechanism": "free-generation",
+        "identity": "Ariel 4in1 PODS®, Washing Capsules 22 | ariel pods"
+      },
+      {
+        "line_no": 36,
+        "as_written": "1 Febreze fabric spray",
+        "verdict": "CORRECT",
+        "truth": "Febreze Fabric Freshener Spray Lenor Spring Awakening 385ML"
+      },
+      {
+        "line_no": 37,
+        "as_written": "1 can Dettol spray",
+        "verdict": "CORRECT",
+        "truth": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml"
+      },
+      {
+        "line_no": 38,
+        "as_written": "1 pack Kleenex tissues",
+        "verdict": "CORRECT",
+        "truth": "Kleenex Original Tissues - Twin Pack"
+      }
+    ],
+    "limits": [
+      "The 39-line ground truth carries {product, qty} and no product IDs, so every identity verdict ends in a text-similarity join between the chosen candidate's catalogue name/aliases and the ground-truth product string. This table is NOT ID-level truth.",
+      "The ground-truth list's own provenance is unrecorded (see the committed ground-truth document). It grades RELATIVE MOVEMENT between runs; it cannot by itself declare an absolute pass.",
+      "Matching is token-overlap plus containment. Handwritten shorthand that shares no token with the catalogue name (an alias nobody recorded) scores as a miss even when a human would call it right."
+    ]
+  }
+}

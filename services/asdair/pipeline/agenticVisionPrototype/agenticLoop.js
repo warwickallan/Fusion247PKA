@@ -66,6 +66,42 @@ import { estimateUsdCost, visionAgenticTurn } from '../../../obsidiwikai/src/cor
 export const DEFAULT_MAX_TOOL_CALL_ROUNDS = 4;
 
 /**
+ * ── WO-2026-08-12-01-v2 (WP-B15-29), AC1 — BOTH sides of the
+ * split-representation defect, resolved in ONE place ──────────────────────
+ *
+ * The loop used to resolve requested regions to crops TWICE, in two branches,
+ * with two DIFFERENT failure behaviours:
+ *
+ *   - the normal branch threw when a requested region had no crop;
+ *   - the iteration-cap branch used `.filter(Boolean)`, which SILENTLY dropped
+ *     an unavailable region and carried on as though the model had been given
+ *     what it asked for.
+ *
+ * The silent one is the dangerous one: a model that asked for a closer look at
+ * a region and was quietly handed nothing still answers, and nothing anywhere
+ * records that its request went unmet. Both branches now call this single
+ * function, so an unavailable region fails LOUDLY on every path there is.
+ *
+ * @param {Record<number, string>} regionImageUrls
+ * @param {number[]} requestedRegions
+ * @param {string} where - the branch name, so the error says which path failed.
+ * @returns {string[]} one data URL per requested region, in request order.
+ */
+export function cropsForRegions(regionImageUrls, requestedRegions, where) {
+  if (!Array.isArray(requestedRegions) || requestedRegions.length === 0) {
+    throw new Error(`runAgenticVisionLoop (${where}): the model made a tool call with no parseable region number`);
+  }
+  const missing = requestedRegions.filter((r) => !regionImageUrls[r]);
+  if (missing.length > 0) {
+    throw new Error(
+      `runAgenticVisionLoop (${where}): model requested region(s) ${requestedRegions.join(', ')}, `
+      + `no crop available for ${missing.join(', ')} - available: ${Object.keys(regionImageUrls).join(', ')}`,
+    );
+  }
+  return requestedRegions.map((r) => regionImageUrls[r]);
+}
+
+/**
  * `/v1/responses` usage is `{input_tokens, output_tokens, ...}` -
  * DIFFERENT field names from estimateUsdCost()'s expected
  * `{prompt_tokens, completion_tokens}` (the /v1/chat/completions shape).
@@ -137,6 +173,7 @@ export async function runAgenticVisionLoop({
   tool,
   maxIterations = DEFAULT_MAX_TOOL_CALL_ROUNDS,
   callModel = visionAgenticTurn,
+  textFormat = null,
 } = {}) {
   if (typeof prompt !== 'string' || prompt === '') {
     throw new Error('runAgenticVisionLoop: prompt is required');
@@ -172,6 +209,14 @@ export async function runAgenticVisionLoop({
       tools: currentTools,
       previousResponseId,
       toolOutputs: currentToolOutputs,
+      // AC2: the strict schema is sent on EVERY turn, not only the last.
+      // Live probing established that image input, tool calling and a strict
+      // schema compose in one request, and the model may end the loop on any
+      // turn - so constraining only a turn we predicted would be final is a
+      // constraint that is absent exactly when it is needed. `null` here
+      // leaves the request body byte-identical to the unconstrained loop,
+      // which is what makes Arm A a fair comparison.
+      textFormat,
     });
 
     const costUsd = estimateUsdCost(normalizeResponsesUsage(result.usage));
@@ -227,7 +272,9 @@ export async function runAgenticVisionLoop({
       // ONE more call with NO tools offered, forcing a best-effort final
       // answer instead of honouring the request or looping unboundedly.
       hitIterationCap = true;
-      const cropUrls = requestedRegions.map((r) => regionImageUrls[r]).filter(Boolean);
+      // AC1: was `.filter(Boolean)` - a silent drop. Now the SAME loud
+      // resolution the normal branch uses.
+      const cropUrls = cropsForRegions(regionImageUrls, requestedRegions, 'iteration-cap branch');
       currentPrompt = 'You have used every available inspection round for this photograph. Give your best final JSON answer now, based on everything you have already seen - do not request another crop.';
       currentImageUrls = cropUrls;
       currentTools = [];
@@ -237,10 +284,7 @@ export async function runAgenticVisionLoop({
     }
 
     toolCallRounds += 1;
-    const cropUrls = requestedRegions.map((r) => regionImageUrls[r]);
-    if (requestedRegions.length === 0 || cropUrls.some((u) => !u)) {
-      throw new Error(`runAgenticVisionLoop: model requested region(s) ${requestedRegions.join(', ') || '(none parsed)'}, no crop available for at least one of them`);
-    }
+    const cropUrls = cropsForRegions(regionImageUrls, requestedRegions, 'crop-granting branch');
     currentPrompt = requestedRegions.length > 1
       ? `Here are the crops of regions ${requestedRegions.join(', ')} you requested. Continue inspecting - call request_crop again if you still need another look, or give your final JSON answer when confident you have covered the whole page.`
       : `Here is the crop of region ${requestedRegions[0]} you requested. Continue inspecting - call request_crop again if you still need another look, or give your final JSON answer when confident you have covered the whole page.`;
