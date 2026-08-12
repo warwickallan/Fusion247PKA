@@ -266,8 +266,32 @@ export async function visionWithUsage(prompt, imageUrl) {
 // here, loudly. Asdair's live run against the real gateway (AC5, the actual
 // point of this WP) is what proves or falsifies this, not a unit test with a
 // mocked fetch.
+//
+// ── WO-2026-08-12-B15-VISION-PROTOTYPE-02, AC1 — `function_call_output` ────
+// Asdair's first live run crashed on turn 2 of every run, identical cause:
+// this function never told the gateway what happened with the pending tool
+// call before sending the next request, so the gateway correctly 400'd
+// ("No tool output found for function call ..."). `toolOutputs` (an array of
+// `{callId, output}`, one entry per pending `call_id` from the turn just
+// received) fixes that: each entry becomes a `function_call_output` item,
+// placed AHEAD of the new user-message item in the `input` array.
+//
+// A SECOND GAP, NAMED RATHER THAN HIDDEN, same discipline as the multimodal
+// gap above: no committed probe captured a SUCCESSFUL continuation after a
+// tool call - toolcall2-results.json and results.json between them only show
+// (a) a tool-call turn's own response shape, and (b) the 400 this function
+// used to trigger by omitting the output entirely. Neither shows what a
+// GOOD request looks like. The shape built below - one
+// `{type:'function_call_output', call_id, output}` item per pending call,
+// `output` a short text acknowledgement, with the actual crop delivered
+// separately via the accompanying user message's own `input_image` content
+// part exactly as this loop already sends it - is the standard documented
+// Responses API convention, NOT independently proven by this WP's own
+// evidence. Asdair's next live run (dispatched immediately after this WP,
+// per its own Sequencing) is what proves or falsifies this, not a unit test
+// with a mocked fetch.
 export async function visionAgenticTurn({
-  prompt, imageUrls = [], tools = [], previousResponseId = null,
+  prompt, imageUrls = [], tools = [], previousResponseId = null, toolOutputs = [],
 } = {}) {
   if (!GATEWAY) {
     throw new Error(
@@ -284,18 +308,37 @@ export async function visionAgenticTurn({
       throw new Error('fusion-gateway visionAgenticTurn: every image reference must be a non-empty data: or http(s): URL');
     }
   }
+  if (!Array.isArray(toolOutputs)) {
+    throw new Error('fusion-gateway visionAgenticTurn: toolOutputs must be an array of {callId, output}');
+  }
+  for (const t of toolOutputs) {
+    if (!t || typeof t.callId !== 'string' || t.callId === '') {
+      throw new Error('fusion-gateway visionAgenticTurn: every toolOutputs entry needs a non-empty callId');
+    }
+  }
+  // One function_call_output item per pending call, per AC1 - see the header
+  // comment above for what evidence this shape is and is not grounded in.
+  const functionCallOutputItems = toolOutputs.map((t) => ({
+    type: 'function_call_output',
+    call_id: t.callId,
+    output: typeof t.output === 'string' ? t.output : JSON.stringify(t.output ?? ''),
+  }));
+  const userMessageItem = {
+    role: 'user',
+    content: [
+      { type: 'input_text', text: prompt },
+      ...images.map((url) => ({ type: 'input_image', image_url: url })),
+    ],
+  };
   const body = {
     model: answerModel(),
     store: true,
-    input: images.length > 0
-      ? [{
-        role: 'user',
-        content: [
-          { type: 'input_text', text: prompt },
-          ...images.map((url) => ({ type: 'input_image', image_url: url })),
-        ],
-      }]
-      : prompt,
+    // Bare-string `input` is preserved EXACTLY as before for the plain
+    // text-only, no-pending-tool-call case (the committed probe's proven
+    // shape) - only a pending tool call or an image forces the array form.
+    input: functionCallOutputItems.length > 0
+      ? [...functionCallOutputItems, userMessageItem]
+      : (images.length > 0 ? [userMessageItem] : prompt),
   };
   if (previousResponseId) body.previous_response_id = previousResponseId;
   if (tools.length > 0) {

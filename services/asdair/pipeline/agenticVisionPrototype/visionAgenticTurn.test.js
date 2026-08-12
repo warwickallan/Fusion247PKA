@@ -141,6 +141,105 @@ test('visionAgenticTurn: a continuation turn sends previous_response_id and only
 });
 
 // ---------------------------------------------------------------------
+// WO-2026-08-12-B15-VISION-PROTOTYPE-02, AC1 - `function_call_output`
+// construction: the exact defect that crashed Asdair's first live run
+// (turn 2, all 3 runs, "No tool output found for function call ...").
+// ---------------------------------------------------------------------
+
+test('visionAgenticTurn: a continuation with ONE pending tool call sends ONE function_call_output item, ahead of the new user message', async () => {
+  const { calls, restore } = mockFetch({
+    id: 'resp_final_1',
+    output: [{ type: 'message', content: [{ type: 'output_text', text: '{"lines":[]}' }] }],
+    usage: { input_tokens: 200, output_tokens: 40, total_tokens: 240 },
+  });
+  try {
+    await visionAgenticTurn({
+      prompt: 'Here is the crop of region 3 you requested.',
+      imageUrls: ['data:image/jpeg;base64,CROP3'],
+      previousResponseId: 'resp_tool_1',
+      toolOutputs: [{ callId: 'call_region3', output: 'Crop rendered and attached to the next message.' }],
+    });
+    const { input } = calls[0].body;
+    assert.ok(Array.isArray(input), 'a pending tool call forces the array input form, never the bare-string form');
+    assert.equal(input.length, 2, 'one function_call_output item, then the new user message item');
+    assert.deepEqual(input[0], {
+      type: 'function_call_output', call_id: 'call_region3', output: 'Crop rendered and attached to the next message.',
+    });
+    assert.equal(input[1].role, 'user');
+    assert.equal(input[1].content[0].type, 'input_text');
+    assert.equal(input[1].content[1].type, 'input_image');
+  } finally {
+    restore();
+  }
+});
+
+test('visionAgenticTurn: a continuation with TWO pending tool calls sends a function_call_output for EACH call_id - the exact multi-call shape Asdair\'s live run needed', async () => {
+  const { calls, restore } = mockFetch({
+    id: 'resp_final_2',
+    output: [{ type: 'message', content: [{ type: 'output_text', text: '{"lines":[]}' }] }],
+    usage: { input_tokens: 300, output_tokens: 50, total_tokens: 350 },
+  });
+  try {
+    await visionAgenticTurn({
+      prompt: 'Here are the crops of regions 2, 3 you requested.',
+      imageUrls: ['data:image/jpeg;base64,CROP2', 'data:image/jpeg;base64,CROP3'],
+      previousResponseId: 'resp_tool_1',
+      toolOutputs: [
+        { callId: 'call_region2', output: 'Crop rendered and attached to the next message.' },
+        { callId: 'call_region3', output: 'Crop rendered and attached to the next message.' },
+      ],
+    });
+    const { input } = calls[0].body;
+    assert.equal(input.length, 3, 'two function_call_output items, then the one new user message item');
+    assert.deepEqual(
+      input.slice(0, 2).map((i) => i.type),
+      ['function_call_output', 'function_call_output'],
+    );
+    assert.deepEqual(
+      input.slice(0, 2).map((i) => i.call_id),
+      ['call_region2', 'call_region3'],
+      'one output per call_id, in the order supplied - neither dropped',
+    );
+    assert.equal(input[2].role, 'user');
+  } finally {
+    restore();
+  }
+});
+
+test('visionAgenticTurn: no pending tool calls (toolOutputs omitted) keeps the EXISTING behaviour - no regression to the round-1 continuation shape', async () => {
+  const { calls, restore } = mockFetch({
+    id: 'resp_final_3',
+    output: [{ type: 'message', content: [{ type: 'output_text', text: '{"lines":[]}' }] }],
+    usage: null,
+  });
+  try {
+    await visionAgenticTurn({
+      prompt: 'Here is the crop of region 3 you requested.',
+      imageUrls: ['data:image/jpeg;base64,CROP3'],
+      previousResponseId: 'resp_tool_1',
+    });
+    assert.equal(calls[0].body.input.length, 1, 'no function_call_output items when toolOutputs is empty/omitted');
+    assert.equal(calls[0].body.input[0].role, 'user');
+  } finally {
+    restore();
+  }
+});
+
+test('visionAgenticTurn: toolOutputs must be an array, refused otherwise', async () => {
+  await assert.rejects(
+    visionAgenticTurn({ prompt: 'x', toolOutputs: 'not-an-array' }),
+    /toolOutputs must be an array/,
+  );
+});
+
+test('visionAgenticTurn: every toolOutputs entry needs a non-empty callId, refused otherwise', async () => {
+  await assert.rejects(
+    visionAgenticTurn({ prompt: 'x', toolOutputs: [{ output: 'ok' }] }),
+    /toolOutputs entry needs a non-empty callId/,
+  );
+});
+
+// ---------------------------------------------------------------------
 // Validation and error paths, matching vision()'s own established discipline.
 // ---------------------------------------------------------------------
 
