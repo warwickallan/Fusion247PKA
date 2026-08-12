@@ -2223,6 +2223,77 @@ output, rather than either architecture alone.
 
 ## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (latest) — **REGION GRANULARITY + A TRUSTWORTHY MEASUREMENT.** Authorised by Warwick. **START HERE. This is the current frontier.**
 
+**Status: WP-B15-33 AUTHORISED AND DISPATCHED. ⭐ THE VISION QUESTION IS CLOSED BY WARWICK'S RULING — "TERRA HAS THE GLASSES. The remaining failures are ours." Three bounded defects plus the instrument. NO architecture work.**
+
+### AMENDMENT — Warwick, 2026-08-12 (post-variance). **His ruling, quoted. Larry's record-keeping is labelled Larry's.**
+
+> **⛔ THE VISION QUESTION IS CLOSED.** *"This is the point to stop treating vision as an open research
+> problem. The three frozen runs are the decisive evidence... **That means Terra can now SEE the whole list
+> reliably with the current image-prep process. The glasses work.** Do NOT redesign the vision architecture
+> again. Do NOT start another model experiment. Do NOT go back to prompt whack-a-mole. **Do NOT describe
+> this as a coverage problem anymore.** The remaining failures are now bounded process defects around a
+> vision system that is seeing the page."*
+>
+> **1. DUPLICATES ARE OUR DETERMINISTIC GEOMETRY BUG.** *"That is not model instability. Those are the same
+> physical handwritten lines being seen in adjacent overlapping regions."* The invariant: **SAME PHYSICAL
+> SOURCE LINE seen from overlapping regions → ONE retained observation. TWO DIFFERENT SOURCE LINES, even if
+> semantically similar → TWO purchases.** ⛔ *"Do NOT reconcile by: fuzzy product-name similarity alone;
+> catalogue identity alone; model confidence; 'these look close enough'. **Use application-owned region
+> geometry/source-line evidence.** The previous Yazoo / Twix / milk merges prove why this distinction is
+> load-bearing."*
+>
+> **2. QUANTITY IS NOW A NARROW EXTRACTION DEFECT.** *"Do not call quantity solved. **The useful denominator
+> is not 39.**"* 27 of 39 are default-one; the informative set is **12**. *"Current real performance: 9/12,
+> 9/12, 10/12. **That is not acceptable yet.** But the failure class is now narrow: the count arrives, but a
+> few digits are misread repeatedly. Pages 11, 16 and 19 recur. **Characterise those exact visual conditions
+> and fix the narrow upstream extraction seam.**"* ⛔ Do not weaken default-one; do not turn pack numbers
+> back into quantities.
+>
+> **3. HOUSEHOLD CATALOGUE ITEMS MUST NOT BECOME PHOTO WITHOUT VISUAL EVIDENCE — "the most important
+> grounding defect".** Milky Way, TRESemme, Walls sausage rolls are *"valid catalogue products. They are NOT
+> on the photograph. That means the closed enum has successfully killed arbitrary brand invention, but
+> **household context is still gaining authority to manufacture PHOTO truth. That must become
+> impossible.**"* The invariant: **a PHOTO-derived item may only become durable PHOTO truth if it has
+> supporting visual evidence from an actual application-owned source region.** Household context may answer
+> *"which known product does this visible handwritten line mean?"* — it may **NOT** answer *"what additional
+> products probably belong on this photograph?"* ⛔ *"This is NOT a prompt politeness rule. **Enforce it
+> structurally in the acceptance/reconciliation path.**"*
+>
+> **4. DO NOT TOUCH THE EYESIGHT ARCHITECTURE** — orientation/reading-axis correction · application-owned
+> regions · actual 3× enlargement · individual region inspection · household context · strict closed
+> candidate set · UNKNOWN allowed · explicit quantity field · source truth separated from catalogue
+> identity. *"These are now regression-protected territory."*
+>
+> **5. FIX THE INSTRUMENT TOO.** *"The current metrics have repeatedly lied by omission."* Five families —
+> PHOTO COVERAGE · PHOTO INVENTION (catalogue-valid-but-unsupported **vs** arbitrary out-of-set) ·
+> DUPLICATES (raw · correctly reconciled · **incorrect cross-line merges**) · QUANTITY (explicit-count total
+> · preserved · **correct** · default-one · pack digits ignored) · IDENTITY. *"Do not report 'quantity
+> errors 3/39' when only 12 lines can actually expose the defect."*
+>
+> **6. FREEZE, FIX THESE THREE, THEN PROVE AGAIN** — *"rerun the SAME known photograph **multiple times**."*
+> Target, across all runs: **39/39 · 0 omissions · 0 unsupported PHOTO inventions · 0 incorrect duplicate
+> merges · 0 explicit quantity errors on the informative count-bearing lines · identity correct or explicit
+> UNKNOWN.** *"A genuine uncertain line may go to Cockpit. **A silently wrong line may not.**"*
+>
+> **7. AFTER THAT, PRODUCTION** — converge branches · prove production `imagePrep` carries the same visual
+> process · Gate Zero / Gate 1 / Gate 2 under the amended Veritas rules · then **ONE fresh production
+> photograph**, which *"is the live proof. **Until then, no claim that AsdAIr is accepted.**"*
+>
+> **8. NO MORE DECISION REQUESTS.** *"Warwick has already ruled: keep going until it is sorted. These are
+> not new product decisions... **Do not ask whether to fix them. Fix them and prove them.**"*
+
+**Larry's execution record:** dispatched as **WP-B15-33**, `WO-2026-08-12-06`, from `e087de5`. Ceiling
+**$2.00** with a projection required before run 1. AC7 requires all three structural invariants
+**mutation-proved** — including that two genuinely different lines with near-identical names do **NOT**
+merge, because a fix collapsing the four recurring duplicates while re-merging Yazoo/Twix/milk would be
+worse than today. The envelope-table generator defect is **pre-answered in the order** so it cannot cost a
+third round trip. **Still unanswered by Warwick and NOT chased:** the one-word `register`/`deregister`
+tightening.
+
+---
+
+### ⛔ SUPERSEDED AS FRONTIER — WP-B15-32, COMPLETE. Its variance result below remains the evidence base.
+
 **Status: WP-B15-32 COMPLETE, `e087de5`, pushed. ⭐ THE VARIANCE IS MEASURED. Detection is STABLE at 39/39 three times. The largest remaining defect is DETERMINISTIC GEOMETRY, not model instability. ⛔ Warwick's "near-zero invention" case is NOT met and is deliberately not rounded to.**
 
 ### ⭐ THE VARIANCE RESULT — three frozen runs, identity PROVEN not asserted
