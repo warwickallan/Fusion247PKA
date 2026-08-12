@@ -2223,7 +2223,80 @@ output, rather than either architecture alone.
 
 ## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (latest) — **REGION GRANULARITY + A TRUSTWORTHY MEASUREMENT.** Authorised by Warwick. **START HERE. This is the current frontier.**
 
-**Status: WP-B15-30 COMPLETE and pushed (`14d14dd`). ⭐ STEP CHANGE ACHIEVED ON COVERAGE — and the cause was NOT what the order predicted. ⛔ The bar is STILL NOT MET, on quantity. Result and its root cause below.**
+**Status: WP-B15-31 COMPLETE (PARTIAL), `54e1743`, pushed. The leading-count fix WORKS. ⛔ Warwick's bar is STILL NOT MET, and Keel stopped rather than iterating, per his standing instruction. ⭐ THE MEASUREMENT FINDING BELOW MATTERS MORE THAN ANY RESULT IN THIS MAP — read it before acting on a single number here.**
+
+### ⛔⭐ THE MEASUREMENT PROBLEM UNDERNEATH EVERY NUMBER IN THIS BUILD — established 2026-08-12
+
+**Arm D scored 0 invented and 0 duplicates. Arm E scored 3 invented and 2 duplicates. SAME architecture,
+SAME photograph, SAME upscale.** Inventions moved 0 → 3 and duplicates 10 → 2 between two runs of
+essentially the same configuration.
+
+**A difference that size sits inside single-sample noise — and NO ARM IN THIS BUILD HAS EVER BEEN
+REPEATED.** Every figure in this map, including the "38/39 step change", is **one draw from a
+non-deterministic model.**
+
+**Consequence, stated plainly: "39/39, zero invented" was never a stable property.** Architectures have
+been compared on one sample each and their differences read as signal.
+
+**What Larry still believes is real, labelled as Larry's judgement rather than measurement:** the
+resolution finding (Arm C 28/39 at ×1 vs Arm D 38/39 at ×3) is a large enough delta with a concrete enough
+mechanism — a pure `extract` cannot add information — to survive this. **The fine distinctions cannot.**
+Zero-versus-three inventions, and which arm is "better", are **NOT established.**
+
+**Larry's recommendation, Warwick's to decide:** repeat one arm three times and measure the spread —
+~$0.38 a run, about a pound — **before any further architecture work.** Otherwise every future decision,
+including the decision to stop, is taken on noise.
+
+### WP-B15-31 result — arm E vs arm D **re-scored on the current instrument** (never the stale block)
+
+| | arm D (re-scored) | **arm E** | Warwick's bar |
+|---|---|---|---|
+| **leading count preserved** | 18/39 (46.2%) | **34/38 (89.5%)** | — |
+| **quantity errors** | 7 | **3** | 0 silent guesses |
+| duplicates | 10 | 2 | **0 — FAILED** |
+| detected | 39/39 | 38/39 | ~38–39 |
+| **invented** | 0 | **3** | **0 — FAILED** |
+| identity correct | — | **35/35 (100%)** | — |
+| cost | $0.2671 | $0.3789 · 7 calls · 227.7 s | measure only |
+
+**The fix worked and the failure CLASS changed** — every remaining quantity error is a **misread digit**,
+not a lost count (page `3`→`2`, `4`→`1`, `1`→`7`). The count now *arrives* and is occasionally wrong: a
+smaller, different problem from evidence being destroyed before the rule ever saw it.
+
+**Why the bar failed:** 3 inventions, of which **`TRESemme CONDITIONER` and `TGI FRIDAYS BBQ PULLED PORK`
+are free-generated from the household catalogue** — precisely the *"household enrichment masquerading as
+PHOTO"* Warwick named. Plus 2 duplicates and 1 omission.
+
+⚠️ **The Richmond line passed BY ACCIDENT.** The model returned a leading bullet before the `16`, so the
+rule found no leading digit and the default supplied 1 — which happened to equal the expected 1. **Luck,
+not correctness**, and it would not survive a different mark.
+
+### What landed, and what is honestly NOT evidenced
+
+- **All five arms re-scored**, stale figures **retained** at `twoLayerScore_SUPERSEDED` with the reason.
+- **Two metrics added to the instrument** so they cannot live only in a report: `leadingCountPreservationPct`
+  (the fault itself, not its overlap with the default) and the contested-line exclusion **printed beside the
+  number, never folded in**.
+- **AC2 integrated, option (a):** `imagePrep.js` is canonical and `bandPlan.js` is a **pure re-export**, so
+  the prototype's 218 tests exercise the production implementation. The raster is decoded from the
+  **prepared** page — planning on un-rotated pixels would have been correct only while EXIF happened to be
+  zero. Mutation proof: the old planner is asserted to **fail** the whole-line property.
+- Package suite **920 / 917 pass / 0 fail / 3 skipped** (from 888/885/0/3). Prototype **218/218**.
+- ⚠️ **`deps.js`'s `realInterpretPhoto` body is covered by NO executed test** — the suite binds fakes at the
+  orchestrator contract. Evidenced by planner/renderer tests, module load and no regression across 920
+  tests; **NOT** by a live photograph event. **This is prototype-and-integration capability, NOT end-to-end
+  automation, and may not be reported as one.**
+- ⚠️ **Cost ceiling breached: $0.4317 against $0.35 authorised.** Keel reported it at the top of its return
+  rather than burying it. `leading_mark` adds output tokens across all seven bands; the run came in 42%
+  above the rate budgeted from.
+- **NOT DONE — the 38-line fixture sanity check.** It is **free**, needs no gateway, and should be the next
+  thing done rather than a new run.
+
+---
+
+### ⛔ SUPERSEDED AS FRONTIER — WP-B15-30. Its result table below is CORRECTED; the corrections are the record, not the original figures.
+
+**Status: WP-B15-30 COMPLETE and pushed (`14d14dd`). ⭐ STEP CHANGE ACHIEVED ON COVERAGE — and the cause was NOT what the order predicted. ⛔ The bar is STILL NOT MET, on quantity. ⚠️ Its figures are stale-instrument output — see the correction under its table.**
 
 ### ⭐ THE RESULT — and the finding that matters more than the numbers
 
