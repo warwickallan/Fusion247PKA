@@ -1927,6 +1927,57 @@ bug rather than guess-fixed. 662/662 + 53/53 tests pass. **None of this is prove
 — that requires the live re-run, dispatched to Asdair now, same discipline as before (two runs, not
 one).**
 
+**⛔ ROUND 3's LIVE RE-TEST LANDED. VERDICT: A REAL REGRESSION, NOT MERELY "NOT THERE YET."** Asdair
+ran two more live runs against the identical photo and ground truth, with a direct before/after table
+against round 2's own numbers. **Omission got WORSE, not better: 50.0% average (19.5/39) vs. round 2's
+41.0% (16/39).** Root cause of the regression, confirmed against round 3's own new observability field:
+run-a's `initialSilentRegions: []` — no region produced literally zero lines, so the new fix (which only
+targets the zero-line case) correctly did not fire, and the run stood on a single unchallenged pass that
+still missed 22/39 items. **This is exactly the untested hypothesis AC1 itself named and did not claim
+to cover** — "the model sees a region but reports nothing for SOME lines within it," as distinct from a
+region producing nothing at all. The dominant failure mode remains genuinely unaddressed.
+
+**One of the two "must never reappear" items got WORSE, not fixed**: Lucozade Raspberry recurred in
+BOTH round-3 runs (round 2: only 1 of 2). AC2's prompt hardening explicitly targeted this item by name
+and did not hold on live evidence.
+
+**AC3's dedup fix is working exactly as designed and that is now the problem.** It correctly collapses
+two lines resolving to the same catalogue product+quantity — but round 3's live run exposed that the
+underlying catalogue-matching layer had ALREADY misidentified two genuinely different real products
+(Lenor Outdoorable Fabric Conditioner and Febreze Fabric Freshener Spray) as the same `matched_regular_
+id`. The new "authoritative" exclusion then **silently deleted a real, different, correctly-on-the-photo
+item from the basket** — a materially worse failure shape than round 2's "appears twice, at least
+visible."
+
+**A regression nobody asked about, caught only because Asdair checked the mechanism behind a metric
+rather than trusting it**: `wrongQuantity: 0` in both round-3 runs looked like an improvement, but the
+same runs show quantity ASSERTED on only ~25% of lines, down from ~70-87% in round 2 — the metric
+improved because the model mostly stopped stating quantities at all, not because it got better at
+stating them correctly. Less silent guessing in the narrow sense; a materially less usable list in the
+practical sense. **This is exactly the "measure through the enforcing mechanism, not a proxy" discipline
+this build has learned the hard way before, working as intended** — the metric alone would have hidden
+this.
+
+**Cost got less predictable, not more**: round 2 held $0.173-0.175 across both runs; round 3 spans
+$0.076-$0.263 — the CHEAPEST run was also the WORST-scoring one (the follow-up that should have fired,
+didn't), meaning cost is now inversely correlated with correctness in exactly the wrong direction.
+
+**What genuinely held**: TRESemme did not reappear in either round-3 run. Yazoo Chocolate's specific
+wrong-quantity shape did not recur (though it now asserts no quantity at all rather than a correct one
+— see the quantity finding above, not a clean win). The zero-line silent-region fix (AC1) and the
+exact-duplicate fix (AC3) both work precisely as built — they were simply narrower than the actual
+problem, and AC3's narrowness combined with a pre-existing catalogue bug to create a new, worse failure.
+
+**Round 4 is needed, and it needs to be more careful than a narrow patch**: (1) the dedup exclusion
+should stop being "authoritative" — surface a same-product-same-quantity collapse as `needs_confirmation`
+rather than silently dropping the second line, since the identity it trusts can itself be wrong; (2) the
+dominant omission mode (partial misses within a region that DOES produce lines) needs its own targeted
+fix, not a second attempt at the zero-line case already closed; (3) the quantity-assertion collapse
+needs its own investigation — likely a side effect of round 3's prompt/schema changes swinging too far
+toward "when in doubt, state nothing" rather than staying calibrated. **Not stopping. Continuing per
+Warwick's standing instruction — this is real information about what fixing Terra's process actually
+requires, not a reason to slow down.**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
