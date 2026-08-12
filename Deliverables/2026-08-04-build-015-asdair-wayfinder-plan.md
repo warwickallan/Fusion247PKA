@@ -2026,6 +2026,17 @@ own return value, and require an INTEGRATION-level test exercising the real
 Asdair's own recommendation, not a fixture that can bypass the break. Explicit AC3 requires Keel to
 name why round 4's own test missed this, so the fixture-only-proof pattern isn't repeated silently.
 
+**Round 5 COMPLETED** — `f8d0e1e`, pushed. **Genuinely mutation-tested, not just passing**: Keel reverted
+its own fix (`git stash`), confirmed the two new integration tests actually FAIL and reproduce the
+exact live regression shape, then restored the fix and confirmed they pass — a control proven to
+exercise the break, not merely coexist with it. All 5 ACs met: `source_region` now survives the
+orchestrator's return; proven twice over (direct-to-resolver AND full production `stepInterpret` path
+through to durable `shop_line` rows); named precisely why round 4's test and a SECOND, previously
+undocumented bypass (`harness.js`'s `deps.interpretPhoto` fake, used by most of `runPipeline.test.js`,
+never calls the orchestrator at all) both missed it; existing coverage unaffected. 682/679/0/3 pipeline
++ 53/53 interpret + 15/15 real-Postgres DB-gated, all non-vacuous. **Fifth live re-test dispatched to
+Asdair** — this is the one that decides whether the defect is actually closed.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
