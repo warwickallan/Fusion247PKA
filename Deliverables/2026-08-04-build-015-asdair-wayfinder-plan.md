@@ -1836,6 +1836,24 @@ escalated tonight per the hobby-brain bar (no credential exposed, Asdair's own e
 own normal job) — but worth Warwick knowing it happened, and worth settling properly rather than
 re-deciding ad hoc each time it comes up.
 
+**Warwick's full architecture ruling landed, same session: no model switch, fix Terra's process.**
+Recorded in full as Amendment 4 of `Deliverables/2026-08-11-cockpit-and-vision-pipeline-design.md`.
+Key correction: the test denominator was wrong — the photo has **39 source lines**, not 41 (the
+41-line trolley is 39 photo + 3 Regulars − 1 skip; grading OCR against it double-counted enrichment as
+photo accuracy). Round-2 Work Order issued (`WO-2026-08-12-B15-VISION-02`,
+`Deliverables/2026-08-12-wo-b15-24-vision-pipeline-round2-order.md`), dispatched to Keel on the SAME
+branch as round 1 (`build-015/b15-24-vision-pipeline`, merged forward to pick up Amendment 4). Fixes,
+each at its own root cause per Warwick's explicit instruction not to conflate them: quantity semantics
+as a class (a number in a product name is never automatically the requested quantity — not a threshold
+move); the wrong-milk identity-resolution bug, in the resolver, not the vision prompt; the duplicate
+Vanish-line reconciliation gap; the provenance leak reintroducing previously-excluded items; the Yazoo
+regression. Also replaces blanket "one batched follow-up call" with adaptive targeted re-inspection —
+individual calls for actually-suspect regions only, never routine per-line calls, matching the A/B
+evidence without over-generalising it. Requires real cost instrumentation from actual gateway usage.
+The live re-run against the corrected 39-line denominator (with the seven-category breakdown Warwick
+specified) is queued as Asdair's next task once this WP lands — not attempted by Keel, which has no
+gateway credentials. **No pause. Carrying on, per explicit instruction.**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
