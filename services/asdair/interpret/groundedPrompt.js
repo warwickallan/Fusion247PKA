@@ -36,11 +36,13 @@
 
 // Bumped whenever this template's WORDING or JSON-output contract changes in
 // a way that could change what the model returns - the region-citation
-// contract above is what earned v2. Recorded on every PHOTO provenance row
-// (shop_line_provenance.prompt_version, migration 020) specifically so a
-// future accuracy regression is debuggable ("did the model change or did the
-// prompt change" - migration 020's own reasoning for carrying this at all).
-const PROMPT_VERSION = 'grounded-v2-region-citation';
+// contract above is what earned v2; the quantity-evidence rewording below
+// (WO-2026-08-12-B15-VISION-02, AC1) earns v3. Recorded on every PHOTO
+// provenance row (shop_line_provenance.prompt_version, migration 020)
+// specifically so a future accuracy regression is debuggable ("did the model
+// change or did the prompt change" - migration 020's own reasoning for
+// carrying this at all).
+const PROMPT_VERSION = 'grounded-v3-quantity-evidence';
 
 const STATUSES = Object.freeze([
   'matched',
@@ -157,8 +159,14 @@ TASK
    DO NOT pick the least-bad candidate just to fill the field. A wrong confident match is far worse than an
    honest "I don't know" - it puts the wrong thing in a real shopping basket.
 5. If two candidates are both plausible, set status "needs_confirmation" and list BOTH in alternatives.
-6. Quantity: only record a number you can actually SEE. If the quantity is unreadable or ambiguous, set
-   quantity to null and status "unreadable". Never guess a quantity.
+6. Quantity: only record a number that is SEPARATE evidence of how many to buy - a count written before the
+   product name (e.g. "2 Yazoo choc"), or an explicit multiplier like "x3" or "buy 2". A number that is part
+   of the product's own printed name or pack size is NEVER the quantity by itself - for example the "16" in
+   "Richmond 16 Pork Sausages" names a 16-sausage pack, it is not an instruction to buy sixteen packs, so
+   quantity there is null (or 1 only if a separate count says so) even though "16" is visibly written. If
+   there is no separate count and the only number present belongs to the product's own name, leave quantity
+   null. If the quantity is unreadable or ambiguous, also set quantity to null and status "unreadable".
+   Never guess a quantity, and never infer one from a number embedded in a product descriptor.
 7. If the same product appears twice, mark the later one "possible_duplicate".${sourceRegionTask}
 
 Return ONLY strict JSON, no prose and no code fences:

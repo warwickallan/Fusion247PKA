@@ -52,6 +52,18 @@ export function answerModel() {
   return process.env.FUSION_MODEL_ANSWER || 'gpt-5.6-terra';
 }
 
+// ── AC7 (WO-2026-08-12-B15-VISION-02) - REAL COST INSTRUMENTATION ──────────
+// gatewayChat used to discard the gateway's `usage` field entirely (only
+// `choices[0].message.content` ever reached a caller). This checked run's
+// own scratchpad diagnostic captures (asdair-vision-test/new-pipeline-
+// output.json, ab-harness-output.json) confirmed no usage data was ever
+// recorded from them either - there was nothing to extract, so this
+// instruments the orchestrator to capture it GOING FORWARD, per the order's
+// own fallback instruction. `gatewayChat` now returns `{content, usage}`
+// always; every EXISTING exported role (reason/answer/vision) keeps
+// returning a bare string - see the thin wrappers below - so no existing
+// caller's contract changes. `visionWithUsage` is the new, additive export
+// a caller can reach for the usage alongside the content.
 async function gatewayChat(role, prompt, imageUrl = null, modelOverride = null) {
   // Text-only when no imageUrl is given (identical wire body to before); OpenAI-style
   // multimodal content parts when one is given.
@@ -78,12 +90,25 @@ async function gatewayChat(role, prompt, imageUrl = null, modelOverride = null) 
     throw new Error(`fusion-gateway ${role} -> ${res.status}: ${t.slice(0, 200)}`);
   }
   const j = await res.json();
-  return j.choices?.[0]?.message?.content ?? '';
+  // OpenAI-style `usage: {prompt_tokens, completion_tokens, total_tokens}` -
+  // the shape LiteLLM (this gateway) passes through from the underlying
+  // provider. NEVER assumed present - a gateway/provider that omits it
+  // yields `usage: null`, an honest "not reported" rather than a fabricated
+  // zero (a caller computing cost must be able to tell "zero tokens" apart
+  // from "the gateway never said").
+  const usage = j.usage && typeof j.usage === 'object'
+    ? {
+      prompt_tokens: Number.isFinite(Number(j.usage.prompt_tokens)) ? Number(j.usage.prompt_tokens) : null,
+      completion_tokens: Number.isFinite(Number(j.usage.completion_tokens)) ? Number(j.usage.completion_tokens) : null,
+      total_tokens: Number.isFinite(Number(j.usage.total_tokens)) ? Number(j.usage.total_tokens) : null,
+    }
+    : null;
+  return { content: j.choices?.[0]?.message?.content ?? '', usage };
 }
 
 // The reasoning role: canonicaliser tie-breaks, Warwick-relevance, suggestions.
 export async function reason(prompt) {
-  if (GATEWAY) return gatewayChat('reason', prompt);
+  if (GATEWAY) return (await gatewayChat('reason', prompt)).content;
   return lightrag.generate(prompt); // fallback via the box; OpenAI key stays Coolify-only
 }
 
@@ -115,7 +140,7 @@ export async function answer(prompt) {
       + 'Refusing to fall back to a text-only box model for a household shopping decision.'
     );
   }
-  return gatewayChat('answer', prompt, null, answerModel());
+  return (await gatewayChat('answer', prompt, null, answerModel())).content;
 }
 
 // The vision role: read an IMAGE (e.g. a photographed handwritten shopping list) plus a prompt.
@@ -134,13 +159,7 @@ export async function answer(prompt) {
 // exactly the failure mode a household shopping list must never have. With no gateway configured
 // this throws instead. "Capable" is only proven at call time: a configured gateway without a
 // vision-bound `fusion.vision` alias surfaces the gateway's own error, it is never papered over.
-export async function vision(prompt, imageUrl) {
-  if (!GATEWAY) {
-    throw new Error(
-      'fusion-gateway: no vision-capable gateway configured (set FUSION_GATEWAY_URL). ' +
-      'Refusing to fall back to a text-only model for an image task.'
-    );
-  }
+function assertValidVisionImages(imageUrl) {
   const images = Array.isArray(imageUrl) ? imageUrl : [imageUrl];
   if (images.length === 0) {
     throw new Error('fusion-gateway vision: at least one image reference (data: or http(s): URL) is required');
@@ -150,7 +169,95 @@ export async function vision(prompt, imageUrl) {
       throw new Error('fusion-gateway vision: every image reference must be a non-empty data: or http(s): URL');
     }
   }
+}
+
+export async function vision(prompt, imageUrl) {
+  if (!GATEWAY) {
+    throw new Error(
+      'fusion-gateway: no vision-capable gateway configured (set FUSION_GATEWAY_URL). ' +
+      'Refusing to fall back to a text-only model for an image task.'
+    );
+  }
+  assertValidVisionImages(imageUrl);
+  return (await gatewayChat('vision', prompt, imageUrl)).content;
+}
+
+/**
+ * AC7 (WO-2026-08-12-B15-VISION-02): the SAME vision call as vision() above,
+ * additionally returning the gateway's own reported token usage alongside
+ * the content - `{content, usage}`, where `usage` is
+ * `{prompt_tokens, completion_tokens, total_tokens}` or `null` when the
+ * gateway/provider did not report it. Every validation and error path is
+ * identical to vision() - this is purely an additive sibling for a caller
+ * that wants to CAPTURE cost, never a replacement for vision()'s existing
+ * string-returning contract, which every current pipeline collaborator
+ * (interpretPhotoOrchestrator.js) still relies on unchanged.
+ *
+ * @param {string} prompt
+ * @param {string|string[]} imageUrl
+ * @returns {Promise<{content: string, usage: {prompt_tokens:number|null, completion_tokens:number|null, total_tokens:number|null}|null}>}
+ */
+export async function visionWithUsage(prompt, imageUrl) {
+  if (!GATEWAY) {
+    throw new Error(
+      'fusion-gateway: no vision-capable gateway configured (set FUSION_GATEWAY_URL). ' +
+      'Refusing to fall back to a text-only model for an image task.'
+    );
+  }
+  assertValidVisionImages(imageUrl);
   return gatewayChat('vision', prompt, imageUrl);
+}
+
+// ── AC7 (WO-2026-08-12-B15-VISION-02) - AUTHORED PRICING CONFIGURATION ─────
+//
+// NOT AN EXISTING, PREVIOUSLY-CONFIGURED VALUE. No pricing configuration
+// existed anywhere in this repository before this Work Order (checked:
+// services/obsidiwikai/src/config.mjs and a repo-wide grep for pricing/cost
+// constants near any model name found nothing). AUTHORED here, sourced
+// EXACTLY from Deliverables/2026-08-11-pax-vision-pipeline-and-luna-sol-
+// terra-research.md ("Pricing (per 1M tokens, input/output)"), cited
+// verbatim rather than approximated:
+//
+//   "Vellum (post-30-July-2026 price cut) gives Sol $5/$30, Terra $2/$12,
+//    Luna $0.80/$4; a slightly older/different-dated source gives Sol
+//    $5/$30, Terra $2.50/$15, Luna $1/$6."
+//
+// TWO figures are on record for Terra because GPT-5.6 pricing moved once in
+// its first month (that research's own finding). The CURRENT constant below
+// uses the POST-CUT figure ($2/$12, the more recent of the two, per Vellum)
+// - the OLDER $2.50/$15 figure is kept alongside it, named, so a future
+// reader can see exactly what changed and by how much rather than losing
+// the superseded number entirely. Recorded as a documented, overridable
+// constant rather than a bare number buried in a calculation, so the NEXT
+// price change (near-certain, per that same research) is a one-line diff,
+// not an archaeology exercise - and per AC8, a live gateway pricing check
+// remains Asdair's job, not re-derived here from an env var this order was
+// not given.
+//
+// USD, per 1,000,000 tokens - the unit that source publishes in, so this
+// needs no unit conversion at the point of use.
+export const TERRA_PRICING_USD_PER_MILLION_TOKENS_OLDER = Object.freeze({
+  input: 2.50, output: 15.00, // superseded - kept for traceability only, NOT used by estimateUsdCost
+});
+export const TERRA_PRICING_USD_PER_MILLION_TOKENS = Object.freeze({
+  input: 2.00,  // prompt_tokens - Pax's research, Vellum post-30-July-2026 cut, GPT-5.6 Terra
+  output: 12.00, // completion_tokens - Pax's research, Vellum post-30-July-2026 cut, GPT-5.6 Terra
+});
+
+/**
+ * Approximate USD cost of one gateway usage record, using the authored
+ * pricing above. PURE - no I/O, no gateway call. Returns null when usage
+ * itself is null (the gateway never reported it - an honest "cannot cost
+ * this", never a fabricated zero).
+ * @param {{prompt_tokens:number|null, completion_tokens:number|null}|null} usage
+ * @returns {number|null}
+ */
+export function estimateUsdCost(usage) {
+  if (!usage) return null;
+  const inputTokens = Number.isFinite(Number(usage.prompt_tokens)) ? Number(usage.prompt_tokens) : 0;
+  const outputTokens = Number.isFinite(Number(usage.completion_tokens)) ? Number(usage.completion_tokens) : 0;
+  return (inputTokens / 1_000_000) * TERRA_PRICING_USD_PER_MILLION_TOKENS.input
+    + (outputTokens / 1_000_000) * TERRA_PRICING_USD_PER_MILLION_TOKENS.output;
 }
 
 // extract/keyword/query are LightRAG-internal roles today (bound on the box). They move behind the

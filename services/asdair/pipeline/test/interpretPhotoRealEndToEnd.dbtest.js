@@ -121,8 +121,17 @@ test('CAPSTONE: real imagePrep + real sharp rendering + real Postgres writes, wi
         // Number.isInteger("1") === false bug in an earlier draft of this
         // test (passing the raw string mis-modelled the model's own output
         // shape, not a product defect).
+        // raw_reading carries a GENUINE LEADING count ("2 ...") ahead of the
+        // product's own name/size descriptor - WO-2026-08-12-B15-VISION-02,
+        // AC1's unjustified-quantity check (photoSanityChecks.js) would
+        // otherwise correctly flag "Cravendale Milk 2L" alone as unjustified
+        // (the "2" in "2L" is the product's own size, not purchase-count
+        // evidence, the exact same defect class as "Richmond 16 Pork
+        // Sausages") and trigger an AC2 follow-up call this test does not
+        // expect - this fixture predates AC1/AC2 and is updated here to stay
+        // a genuinely clean read, not to work around the new check.
         return JSON.stringify({
-          lines: [{ line_no: 1, raw_reading: 'Cravendale Milk 2L', quantity: 2, matched_regular_id: Number(regular.id), confidence: 0.9, status: 'matched', source_region: 1 }],
+          lines: [{ line_no: 1, raw_reading: '2 Cravendale Milk 2L', quantity: 2, matched_regular_id: Number(regular.id), confidence: 0.9, status: 'matched', source_region: 1 }],
         });
       },
       extractJson: async (text) => JSON.parse(text),
@@ -157,7 +166,7 @@ test('CAPSTONE: real imagePrep + real sharp rendering + real Postgres writes, wi
 
     await t.test('the returned line matches what the (mocked) model said', () => {
       assert.equal(result.lines.length, 1);
-      assert.equal(result.lines[0].raw_reading, 'Cravendale Milk 2L');
+      assert.equal(result.lines[0].raw_reading, '2 Cravendale Milk 2L');
       assert.equal(result.lines[0].quantity, 2);
     });
   } finally {

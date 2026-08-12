@@ -1,8 +1,13 @@
 // =====================================================================
 // BUILD-015 AsdAIr Stage 1 - pipeline/followUpTrigger.js
 //
-// WO-2026-08-11-B15-VISION-01, AC5: decides whether the SINGLE, at-most-one
-// batched follow-up vision call fires - and which regions it covers.
+// WO-2026-08-11-B15-VISION-01, AC5: decides whether a follow-up vision call
+// fires - and which regions it covers. This module is the DECISION only;
+// interpretPhotoOrchestrator.js decides HOW the follow-up is shaped, and
+// since WO-2026-08-12-B15-VISION-02 (AC2) that shape is one INDIVIDUAL call
+// per region returned below, never one call bundling all of them. Nothing in
+// THIS file changed for that Work Order - it already returned "every
+// flagged region", which is exactly the input the new per-region loop needs.
 //
 // PURE. Takes the lines already annotated by photoSanityChecks.runSanityChecks
 // (confidence, hasAnomaly, supersededByIndex, source_region) and decides.
@@ -60,11 +65,13 @@ export function needsFollowUp(lines) {
 }
 
 /**
- * The distinct, sorted set of source_region numbers the ONE batched
- * follow-up call must cover - every live line whose confidence is low OR
- * which carries a deterministic anomaly, deduplicated to its region (AC5:
- * "covering every flagged region in a single request", never one call per
- * line).
+ * The distinct, sorted set of source_region numbers that need re-inspection
+ * - every live line whose confidence is low OR which carries a
+ * deterministic anomaly, deduplicated to its region. Each region in this
+ * list gets its OWN individual follow-up vision() call (interpretPhoto-
+ * Orchestrator.js, AC2, WO-2026-08-12-B15-VISION-02) - never bundled into
+ * one request, and never one call per LINE (a region can carry several
+ * flagged lines and is still re-inspected only once).
  *
  * @param {Array<object>} lines
  * @returns {number[]}

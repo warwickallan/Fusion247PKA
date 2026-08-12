@@ -17,7 +17,7 @@ import fs from 'node:fs';
 
 import {
   parseTrolleyGroundTruth, loadGroundTruth, scoreInterpretation,
-  runBundledStrategy, runIndividualStrategy, GROUND_TRUTH_PATH,
+  runBundledStrategy, runIndividualStrategy, runAdaptiveStrategy, scoreSevenWay, GROUND_TRUTH_PATH,
 } from './abAcceptanceHarness.js';
 
 const SAMPLE_TABLE = `
@@ -116,4 +116,106 @@ test('a custom renderRegionImage is genuinely used when injected (the Finding-2 
   deps.renderRegionImage = (buf, region) => { seenRegions.push(region.region_no); return 'data:image/jpeg;base64,REAL-CROP-' + region.region_no; };
   await runIndividualStrategy(Buffer.from('x'), {}, deps);
   assert.deepEqual(seenRegions, [1, 2, 3]);
+});
+
+// ---------------------------------------------------------------------
+// runAdaptiveStrategy (WO-2026-08-12-B15-VISION-02, AC2/AC8) - the REAL
+// production shape, reached through interpretPhotoOrchestrator.js itself
+// so this arm can never drift from what production actually does.
+// ---------------------------------------------------------------------
+
+function adaptiveDeps({ visionCallLog, followUpNeeded }) {
+  return {
+    prepareImage: () => ({
+      rotate: 0, flip: null, imageFingerprint: 'abc123abc123abc1',
+      regions: [
+        { region_no: 1, region_kind: 'full_page' },
+        { region_no: 2, region_kind: 'strip' },
+      ],
+    }),
+    renderAllRegions: async (buf, transform, regions) => regions.map((r) => ({ region_no: r.region_no, buffer: Buffer.from('r' + r.region_no) })),
+    toDataUrl: (buf) => 'data:image/jpeg;base64,' + buf.toString('utf8'),
+    insertRegionBatch: async (deps, shopId, regions) => new Map(regions.map((r, i) => [r.region_no, 900 + i])),
+    buildGroundedPrompt: () => 'PROMPT',
+    vision: async (prompt, imageUrls) => {
+      visionCallLog.push(Array.isArray(imageUrls) ? imageUrls.length : 1);
+      return JSON.stringify({
+        lines: [{ line_no: 1, raw_reading: 'Milk 2L', quantity: 2, matched_regular_id: 1, confidence: followUpNeeded ? 0.3 : 0.95, status: 'matched', source_region: 1 }],
+      });
+    },
+    extractJson: async (text) => JSON.parse(text),
+    runSanityChecks: (lines) => ({
+      lines: lines.map((l) => ({ ...l, hasAnomaly: l.confidence < 0.5, supersededByIndex: null })),
+      anyAnomaly: lines.some((l) => l.confidence < 0.5),
+    }),
+    needsFollowUp: (lines) => {
+      const trigger = lines.some((l) => l.confidence < 0.5);
+      return { needsFollowUp: trigger, reasons: { lowConfidence: trigger, deterministicAnomaly: false } };
+    },
+    flaggedRegionsForFollowUp: (lines) => lines.filter((l) => l.confidence < 0.5).map((l) => l.source_region),
+    insertPhotoProvenanceBatch: async () => [],
+    writeQuery: async () => ({ rows: [] }),
+  };
+}
+
+test('runAdaptiveStrategy: a clean pass costs exactly ONE vision call - the same production behaviour AC2 requires', async () => {
+  const visionCallLog = [];
+  const result = await runAdaptiveStrategy(Buffer.from('img'), {}, adaptiveDeps({ visionCallLog, followUpNeeded: false }));
+  assert.equal(result.strategy, 'adaptive');
+  assert.equal(result.callCount, 1);
+  assert.equal(result.followUpFired, false);
+});
+
+test('runAdaptiveStrategy: a flagged region triggers exactly one additional individual call - real interpretPhotoOrchestrator wiring, not a re-implementation', async () => {
+  const visionCallLog = [];
+  const result = await runAdaptiveStrategy(Buffer.from('img'), {}, adaptiveDeps({ visionCallLog, followUpNeeded: true }));
+  assert.equal(result.callCount, 2, 'one first-pass call + one individual follow-up for the one flagged region');
+  assert.equal(result.followUpFired, true);
+});
+
+// ---------------------------------------------------------------------
+// scoreSevenWay - Warwick's seven-category breakdown (Amendment 4, point 1)
+// ---------------------------------------------------------------------
+
+const SEVEN_WAY_TRUTH = [
+  { product: 'ASDA British Milk Semi Skimmed 6 Pints', qty: 1 },
+  { product: 'Yazoo Chocolate Milk Drink 400ml', qty: 2 },
+];
+
+test('scoreSevenWay: an exact product+qty match is CORRECTLY IDENTIFIED', () => {
+  const score = scoreSevenWay([{ raw_reading: 'ASDA British Milk Semi Skimmed 6 Pints', quantity: 1 }], SEVEN_WAY_TRUTH);
+  assert.equal(score.correctlyIdentified, 1);
+  assert.equal(score.omitted, 1, 'the Yazoo line was never interpreted at all');
+});
+
+test('scoreSevenWay: a ground-truth product never interpreted at all is OMITTED', () => {
+  const score = scoreSevenWay([], SEVEN_WAY_TRUTH);
+  assert.equal(score.omitted, 2);
+});
+
+test('scoreSevenWay: an interpreted line matching NOTHING in the ground truth is INVENTED', () => {
+  const score = scoreSevenWay([{ raw_reading: 'Completely Invented Item Nobody Bought', quantity: 1 }], SEVEN_WAY_TRUTH);
+  assert.equal(score.invented, 1);
+});
+
+test('scoreSevenWay: a right product, wrong quantity is WRONG QUANTITY, never silently correct', () => {
+  const score = scoreSevenWay([{ raw_reading: 'ASDA British Milk Semi Skimmed 6 Pints', quantity: 99 }], SEVEN_WAY_TRUTH);
+  assert.equal(score.wrongQuantity, 1);
+  assert.equal(score.correctlyIdentified, 0);
+});
+
+test('scoreSevenWay: a low-confidence or needs_confirmation/unreadable line is GENUINELY UNCERTAIN, not silently right or wrong', () => {
+  const lowConfidence = scoreSevenWay([{ raw_reading: 'Yazoo Chocolate Milk Drink 400ml', quantity: 2, confidence: 0.3 }], SEVEN_WAY_TRUTH);
+  assert.equal(lowConfidence.genuinelyUncertain, 1);
+  assert.equal(lowConfidence.correctlyIdentified, 0);
+
+  const needsConfirmation = scoreSevenWay([{ raw_reading: 'something ambiguous', quantity: null, status: 'needs_confirmation' }], SEVEN_WAY_TRUTH);
+  assert.equal(needsConfirmation.genuinelyUncertain, 1);
+  assert.equal(needsConfirmation.invented, 0, 'an honest "not sure" must never be scored as a confident invention');
+});
+
+test('scoreSevenWay: wrongIdentity is honestly reported as NOT computable by this pure text-matching function', () => {
+  const score = scoreSevenWay([], SEVEN_WAY_TRUTH);
+  assert.equal(score.wrongIdentity, 0);
+  assert.match(score.wrongIdentityNote, /resolveByCatalogue\.js output/);
 });

@@ -37,6 +37,85 @@ function aliasesOf(reg) {
   return Array.isArray(reg.aka) ? reg.aka.filter(Boolean) : [];
 }
 
+// ── AC3 (WO-2026-08-12-B15-VISION-02) - THE SIZE/IDENTITY GUARD ────────────
+//
+// The diagnostic run's real wrong-milk confusion: "1 pkt ASDA semi skimmed
+// milk 6 pints" resolved against "Cravendale Arla Filtered Fresh Semi
+// Skimmed Milk 2L Fresher for Longer" - a DIFFERENT product at a DIFFERENT
+// size. Traced to its ROOT CAUSE (Amendment 4, point 8, and this order's
+// own instruction: fix it HERE, never by touching the vision prompt or
+// enlarging a crop): pass 3 below matches on ANY alias that token-contains
+// the reading, and the Cravendale regular's own alias list includes the
+// bare word "milk" - which token-contains EVERY milk reading regardless of
+// size, hijacking resolution before the more size-aware word-overlap pass
+// (4) ever gets a turn. A household's pack size/volume is part of a
+// regular's IDENTITY, not incidental wording, so this guard runs BEFORE
+// every pass below, not just pass 4: when the reading carries an explicit
+// size/volume/count marker, any candidate whose OWN recorded size markers
+// (its name AND every alias) actively DISAGREE is excluded from the whole
+// candidate pool for this reading - it can never again be the sole
+// confident match, via any pass.
+//
+// LENIENT BY DESIGN, matching this codebase's own real, messy household
+// data: regular id 4 in the live catalogue is literally named "...2L..."
+// but carries the alias "arla 4pt milk" for the SAME physical product (2L
+// is colloquially "about 4 pints" to this household) - a candidate is only
+// EXCLUDED when it has AT LEAST ONE recorded size marker and NONE of them
+// agree with the reading's; a candidate with NO recorded size information
+// anywhere is never excluded by this guard, because absence of a size claim
+// is not a claim it disagrees.
+//
+// DELIBERATELY VOLUME/WEIGHT UNITS ONLY - "pk"/"pack"/"packs" is EXCLUDED
+// even though it looks size-shaped: "1 pk small Mars bars" uses "pk" as a
+// PURCHASE-COUNT marker (buy one multipack), not a claim about the
+// product's own physical size, and the live catalogue's own "Mars Caramel
+// Multipack... 8 x 34.5g" carries a real weight token that would otherwise
+// wrongly exclude the correct match. Pack-count is AC1's concern
+// (photoSanityChecks.js), not this identity guard's.
+const SIZE_TOKEN_RE = /(\d+(?:\.\d+)?)\s*(l|litre|litres|ltr|ml|millilitre|millilitres|pt|pts|pint|pints|kg|kilogram|kilograms|g|gram|grams)\b/i;
+
+const SIZE_UNIT_ALIASES = Object.freeze({
+  litre: 'l', litres: 'l', ltr: 'l',
+  millilitre: 'ml', millilitres: 'ml',
+  pts: 'pt', pint: 'pt', pints: 'pt',
+  kilogram: 'kg', kilograms: 'kg',
+  gram: 'g', grams: 'g',
+});
+
+/** The one size/volume/count token found in `text`, normalised, or null. PURE. */
+function sizeToken(text) {
+  const m = String(text || '').toLowerCase().match(SIZE_TOKEN_RE);
+  if (!m) return null;
+  const unit = SIZE_UNIT_ALIASES[m[2]] || m[2];
+  return `${Number(m[1])}${unit}`;
+}
+
+/** Every DISTINCT size token recorded anywhere on a regular - its name and every alias. */
+function regularSizeTokens(reg) {
+  const tokens = [];
+  const nameSize = sizeToken(reg.name);
+  if (nameSize !== null) tokens.push(nameSize);
+  aliasesOf(reg).forEach((a) => {
+    const s = sizeToken(a);
+    if (s !== null && tokens.indexOf(s) === -1) tokens.push(s);
+  });
+  return tokens;
+}
+
+/**
+ * Is `reg` compatible with the reading's size claim? True when the reading
+ * carries no size claim at all, OR the regular carries no recorded size
+ * information at all, OR at least ONE of the regular's recorded size tokens
+ * agrees with the reading's. False only when the regular has recorded size
+ * information and NONE of it agrees - the only case this guard excludes.
+ */
+function sizeCompatible(termSizeToken, reg) {
+  if (termSizeToken === null) return true;
+  const candTokens = regularSizeTokens(reg);
+  if (candTokens.length === 0) return true;
+  return candTokens.indexOf(termSizeToken) !== -1;
+}
+
 // Does `haystack` contain every WHOLE WORD of `needle`? Word-boundary aware,
 // unlike the raw substring test this replaces - see pass 3 below for why.
 function tokensContain(haystack, needle) {
@@ -155,6 +234,16 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
   const none = { matched_regular_id: null, matched_product_name: null, match_basis: null, alternatives: [], status: 'unmatched_new_item' };
   if (!term) return { ...none, status: 'unreadable' };
 
+  // AC3 SIZE/IDENTITY GUARD - applied ONCE, before every pass below, so a
+  // size-mismatched candidate can never win via ANY pass (see the guard's
+  // own header comment above `sizeToken` for the real bug this closes:
+  // pass 3's generic "milk" alias used to hijack resolution before pass 4's
+  // word-overlap scoring ever ran).
+  const termSizeToken = sizeToken(rawReading);
+  const candidates = termSizeToken === null
+    ? regulars
+    : regulars.filter((r) => sizeCompatible(termSizeToken, r));
+
   const hit = (regs, basis) => {
     if (regs.length === 1) {
       const r = regs[0];
@@ -182,11 +271,11 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
   const squashedTerm = termMatch.squashMatchText(term);
 
   // 1. Exact alias - the household's own shorthand. Strongest signal there is.
-  let out = hit(regulars.filter((r) => aliasesOf(r).some((a) => termMatch.squashMatchText(a) === squashedTerm)), BASIS.EXACT_ALIAS);
+  let out = hit(candidates.filter((r) => aliasesOf(r).some((a) => termMatch.squashMatchText(a) === squashedTerm)), BASIS.EXACT_ALIAS);
   if (out) return out;
 
   // 2. Exact canonical name.
-  out = hit(regulars.filter((r) => termMatch.squashMatchText(r.name) === squashedTerm), BASIS.REGULAR);
+  out = hit(candidates.filter((r) => termMatch.squashMatchText(r.name) === squashedTerm), BASIS.REGULAR);
   if (out) return out;
 
   // 2b. TOLERANT alias match (WO-Y). Word order and one-letter spelling only,
@@ -195,7 +284,7 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
   //     "Double Glouester cheese" reach "double gloucester" - both real
   //     2026-08-03 failures against real stored aliases.
   out = hit(
-    regulars.filter((r) => termMatch.bestMatch(rawReading, [r.name].concat(aliasesOf(r))).confident),
+    candidates.filter((r) => termMatch.bestMatch(rawReading, [r.name].concat(aliasesOf(r))).confident),
     BASIS.APPROX_ALIAS,
   );
   if (out) return out;
@@ -214,7 +303,7 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
   //    other. "dreamies cheese" still matches "1 dreamies cheese large";
   //    "bread" no longer matches "shortbread".
   out = hit(
-    regulars.filter((r) => aliasesOf(r).some((a) => {
+    candidates.filter((r) => aliasesOf(r).some((a) => {
       const na = normaliseTerm(a);
       return na.length >= 4 && (tokensContain(term, na) || tokensContain(na, term));
     })),
@@ -225,7 +314,7 @@ function resolveReadingByCatalogue(rawReading, regulars, opts = {}) {
   // 4. Strong word overlap with the canonical name (brand + variant).
   //    Requires >= 2 shared significant words, and a single clear winner.
   const words = new Set(term.split(' ').filter((w) => w.length > 3));
-  const scored = regulars
+  const scored = candidates
     .map((r) => {
       const nw = normaliseTerm(r.name).split(' ').filter((w) => w.length > 3);
       const overlap = nw.filter((w) => words.has(w)).length;
@@ -295,4 +384,7 @@ function resolveAll(lines, regulars, opts = {}) {
 module.exports = {
   resolveReading, resolveAll, normaliseTerm, stripLeadingQuantity, BASIS,
   VISION_CONFIDENCE_THRESHOLD, applyVisionConfidenceGate,
+  // AC3 (WO-2026-08-12-B15-VISION-02) - exported so the size/identity guard
+  // is testable in isolation, not only through resolveReading's end result.
+  sizeToken, regularSizeTokens, sizeCompatible,
 };

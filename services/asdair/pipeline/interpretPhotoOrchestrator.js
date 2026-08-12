@@ -4,9 +4,19 @@
 // WO-2026-08-11-B15-VISION-01, Amendment 3: the real, complete
 // "ONE household-aware vision call" pipeline stage - deterministic prep,
 // real region rendering, the region-grounded call, deterministic sanity
-// checks, at most one batched follow-up, and durable PHOTO provenance
-// persisted BEFORE this function returns (AC6: enrichment is a LATER,
-// separate stage in stepInterpret/beyond - this function never runs it).
+// checks, ADAPTIVE per-region re-inspection of only the regions actually
+// flagged, and durable PHOTO provenance persisted BEFORE this function
+// returns (AC6: enrichment is a LATER, separate stage in stepInterpret/
+// beyond - this function never runs it).
+//
+// ── AC2 UPDATED, WO-2026-08-12-B15-VISION-02 (Amendment 4, point 6) ────────
+// The follow-up step used to bundle every flagged region into ONE additional
+// request. The A/B test proved individual-region inspection materially more
+// accurate (35/41 named vs. 24/41 bundled) - but that is a lesson about
+// PER-REGION FIDELITY, never a licence to call every region by default. The
+// follow-up now issues ONE INDIVIDUAL vision() call PER FLAGGED REGION -
+// never bundled, never blanket, and never fired at all when nothing was
+// flagged (a clean pass still costs exactly one vision call).
 //
 // FULLY INJECTABLE, DELIBERATELY - matching deps.js's own stated
 // philosophy ("Nothing... imports a component directly... the whole test
@@ -100,9 +110,12 @@ export async function interpretPhotoWithDeps(
   // unmatched lines, missing source_region; resolves cross-strip duplicates.
   let { lines: checked } = runSanityChecks(lines);
 
-  // 6. THE FOLLOW-UP DECISION (AC5) - low confidence OR a deterministic
-  // anomaly, either alone sufficient, covering every flagged region in ONE
-  // additional request (never more than one).
+  // 6. THE FOLLOW-UP DECISION (AC5/AC2) - low confidence OR a deterministic
+  // anomaly, either alone sufficient. Each flagged region is now
+  // re-inspected as its OWN individual vision() call (WO-2026-08-12-B15-
+  // VISION-02, AC2) - never bundled into one request, and never fired for a
+  // region nothing flagged. A clean list (0 suspect regions) costs exactly
+  // the one call from step 4, unchanged.
   const { needsFollowUp: shouldFollowUp } = needsFollowUp(checked);
   let followUpFired = false;
 
@@ -110,24 +123,37 @@ export async function interpretPhotoWithDeps(
     followUpFired = true;
     const flaggedRegionNos = flaggedRegionsForFollowUp(checked);
     const flaggedRegions = prepared.regions.filter((r) => flaggedRegionNos.includes(r.region_no));
-    const flaggedUrls = flaggedRegions.map((r) => toDataUrl(renderedByRegionNo.get(r.region_no)));
-    const followUpPrompt = buildGroundedPrompt(catalogue, { regions: flaggedRegions });
 
-    let followUpParsed = await extractJson(await vision(followUpPrompt, flaggedUrls));
-    if (!followUpParsed || !Array.isArray(followUpParsed.lines)) {
-      followUpParsed = await extractJson(await vision(`${followUpPrompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`, flaggedUrls));
+    // ONE INDIVIDUAL CALL PER FLAGGED REGION - the A/B-proven shape. A
+    // single region's follow-up failing to return usable JSON is not fatal
+    // to the others: that region's original-pass reading stands, flagged as
+    // it already was, while every OTHER flagged region still gets its own
+    // individual re-inspection.
+    const followUpLines = [];
+    for (const region of flaggedRegions) {
+      const url = toDataUrl(renderedByRegionNo.get(region.region_no));
+      const followUpPrompt = buildGroundedPrompt(catalogue, { regions: [region] });
+
+      let regionParsed = await extractJson(await vision(followUpPrompt, [url]));
+      if (!regionParsed || !Array.isArray(regionParsed.lines)) {
+        regionParsed = await extractJson(await vision(`${followUpPrompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`, [url]));
+      }
+      if (regionParsed && Array.isArray(regionParsed.lines)) {
+        followUpLines.push(...regionParsed.lines.map(normaliseModelLine));
+      }
     }
-    if (followUpParsed && Array.isArray(followUpParsed.lines)) {
-      const followUpLines = followUpParsed.lines.map(normaliseModelLine);
+
+    if (followUpLines.length > 0) {
       const merged = mergeFollowUp(checked, followUpLines, flaggedRegionNos);
       // Re-run sanity checks on the MERGED set: a follow-up read of one
-      // strip can newly duplicate a line from an adjacent strip that was
+      // region can newly duplicate a line from an adjacent region that was
       // never re-read, and that is only detectable once both are together.
       checked = runSanityChecks(merged).lines;
     }
-    // A follow-up that STILL returns nothing usable is not fatal: the
-    // original pass's readings stand, flagged as they already were -
-    // never silently discarded for having failed to improve.
+    // A follow-up round that recovered NOTHING usable across every flagged
+    // region is not fatal: the original pass's readings stand, flagged as
+    // they already were - never silently discarded for having failed to
+    // improve.
   }
 
   // 7. PERSIST PHOTO PROVENANCE (AC6) - BEFORE this function returns, i.e.

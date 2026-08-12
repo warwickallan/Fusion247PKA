@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import {
   buildPhotoProvenanceRow, buildRegularsProvenanceRow, buildRuleProvenanceRow,
   buildWarwickProvenanceRow, insertPhotoProvenanceBatch, insertProvenanceRow,
+  latestPhotoProvenancePerLine, currentPhotoProvenance,
 } from './lineProvenance.js';
 
 const PHOTO_LINE = {
@@ -194,4 +195,127 @@ test('insertProvenanceRow: sends the row through deps.writeQuery and returns the
   assert.equal(inserted.length, 1);
   assert.equal(result.provenance, 'REGULARS');
   assert.equal(result.matched_regular_id, 44);
+});
+
+// ---------------------------------------------------------------------
+// AC5 (WO-2026-08-12-B15-VISION-02) - latestPhotoProvenancePerLine /
+// currentPhotoProvenance: the CURRENT-truth selector over an INSERT-ONLY
+// ledger, closing the "excluded item silently reappears on a re-run"
+// provenance-leak root cause.
+// ---------------------------------------------------------------------
+
+function provRow(overrides) {
+  return {
+    id: 1, shop_id: 7, line_no: 1, provenance: 'PHOTO', source_region_id: 3,
+    interpreter_model: 'gpt-5.6-terra', prompt_version: 'v3', raw_text: 'Milk',
+    matched_regular_id: 101, quantity: 2, confidence: 0.9, superseded_by_id: null,
+    interpreted_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z',
+    ...overrides,
+  };
+}
+
+test('latestPhotoProvenancePerLine: a re-run\'s NEWER row (higher id) for the same line_no wins over the older one', () => {
+  // The EXACT AC5 shape: an OLDER interpretation attempt (lower id) wrote
+  // TRESemme at line 12; a LATER, corrected attempt (higher id) never wrote
+  // TRESemme again at all - line 12 in the newer attempt is something else
+  // entirely. The stale TRESemme row must not survive the reduction.
+  const rows = [
+    provRow({ id: 100, line_no: 12, raw_text: 'TRESemme Shampoo' }), // OLDER attempt, now stale
+    provRow({ id: 205, line_no: 12, raw_text: 'Viakal Descaler' }),  // NEWER attempt, the current truth
+  ];
+  const current = latestPhotoProvenancePerLine(rows);
+  assert.equal(current.length, 1, 'exactly one CURRENT row for line_no 12');
+  assert.equal(current[0].raw_text, 'Viakal Descaler', 'the newer attempt\'s row wins, not the stale excluded one');
+  assert.equal(current[0].id, 205);
+});
+
+test('latestPhotoProvenancePerLine: a NEWER row at the SAME line_no correctly retires an excluded item\'s older row', () => {
+  // The realistic AC5 shape for THIS build specifically: AC2's adaptive
+  // re-inspection reconciles every correction "back onto the SAME
+  // source_region identity" (interpretPhotoOrchestrator.js's own design
+  // principle), so a re-run of the same photograph keeps line/region
+  // identity STABLE - an excluded item's line_no gets correctly overwritten,
+  // not orphaned under a new number.
+  const rows = [
+    provRow({ id: 100, line_no: 12, raw_text: 'TRESemme Shampoo' }), // OLDER attempt, now excluded
+    provRow({ id: 205, line_no: 12, raw_text: 'Viakal Descaler' }),  // NEWER attempt, line 12 is now something else
+    provRow({ id: 201, line_no: 1, raw_text: 'Milk' }),
+  ];
+  const current = latestPhotoProvenancePerLine(rows);
+  assert.equal(current.length, 2, 'one current row per distinct line_no');
+  assert.equal(current.some((r) => r.raw_text === 'TRESemme Shampoo'), false,
+    'the excluded item\'s STALE row at line 12 must not survive the reduction');
+});
+
+test('KNOWN LIMIT, documented not hidden: a line_no the newer attempt DROPS entirely (never re-uses the number) still returns the OLDER row', () => {
+  // Reported honestly rather than silently assumed fixed: this selector
+  // reduces PER LINE_NO, not per "attempt" as a whole - there is no
+  // attempt/run-boundary column in migration 020's schema to group by, and
+  // adding one is a schema decision outside this Work Order's
+  // `schema_decision: n/a` scope (the order's own instruction: "if
+  // implementation reveals a genuine schema need, stop and report; do not
+  // extend migration 020 or invent one"). If a corrected re-run genuinely
+  // stops using a line_no altogether (rather than overwriting it, as the
+  // test above shows is this build's normal shape), that line_no's stale
+  // row is NOT excluded by id/line_no alone. Reported in the final return
+  // as a residual limitation, not fixed here.
+  const rows = [
+    provRow({ id: 100, line_no: 12, raw_text: 'TRESemme Shampoo' }), // stale, and NOTHING newer ever reuses line 12
+    provRow({ id: 201, line_no: 1, raw_text: 'Milk' }),
+  ];
+  const current = latestPhotoProvenancePerLine(rows);
+  assert.equal(current.length, 2, 'BOTH rows survive - the stale line 12 row has no newer competitor at its OWN line_no');
+  assert.ok(current.some((r) => r.raw_text === 'TRESemme Shampoo'),
+    'documents the limit: closing this fully needs a run/attempt-boundary column, a schema decision out of this WP\'s scope');
+});
+
+test('latestPhotoProvenancePerLine: independent of insertion/array order - id is the only authority', () => {
+  const rows = [
+    provRow({ id: 300, line_no: 5, raw_text: 'Current' }),
+    provRow({ id: 100, line_no: 5, raw_text: 'Stale' }),
+    provRow({ id: 200, line_no: 5, raw_text: 'Also stale' }),
+  ];
+  const current = latestPhotoProvenancePerLine(rows);
+  assert.equal(current.length, 1);
+  assert.equal(current[0].raw_text, 'Current');
+});
+
+test('latestPhotoProvenancePerLine: a within-attempt superseded row (cross-strip/same-region dedup) is untouched - a DIFFERENT concern', () => {
+  // supersededByIndex/superseded_by_id already resolved WITHIN one insert
+  // batch (see insertPhotoProvenanceBatch) - this function reduces ACROSS
+  // attempts only, by line_no+id, and must not also try to interpret
+  // superseded_by_id, which is a different, already-solved problem.
+  const rows = [
+    provRow({ id: 10, line_no: 1, raw_text: 'Vanish oxi pink (survivor)', superseded_by_id: null }),
+    provRow({ id: 11, line_no: 2, raw_text: 'Vanish oxi pink (superseded)', superseded_by_id: 10 }),
+  ];
+  const current = latestPhotoProvenancePerLine(rows);
+  assert.equal(current.length, 2, 'both rows kept - they are different line_nos, within-attempt superseding is not this function\'s concern');
+});
+
+test('latestPhotoProvenancePerLine: an empty/undefined input is handled without throwing', () => {
+  assert.deepEqual(latestPhotoProvenancePerLine([]), []);
+  assert.deepEqual(latestPhotoProvenancePerLine(undefined), []);
+});
+
+test('currentPhotoProvenance: reads via deps.readQuery, scoped to PHOTO provenance for the one shop, reduced to current rows', async () => {
+  let capturedSql = null;
+  let capturedParams = null;
+  const readQuery = async (sql, params) => {
+    capturedSql = sql;
+    capturedParams = params;
+    return {
+      rows: [
+        provRow({ id: 100, line_no: 12, raw_text: 'TRESemme Shampoo' }),
+        provRow({ id: 205, line_no: 12, raw_text: 'Viakal Descaler' }),
+        provRow({ id: 201, line_no: 1, raw_text: 'Milk' }),
+      ],
+    };
+  };
+  const current = await currentPhotoProvenance({ readQuery }, 7);
+  assert.match(capturedSql, /provenance = 'PHOTO'/);
+  assert.match(capturedSql, /WHERE shop_id = \$1/);
+  assert.deepEqual(capturedParams, [7]);
+  assert.equal(current.length, 2, 'one current row per distinct line_no');
+  assert.equal(current.find((r) => r.line_no === 12).raw_text, 'Viakal Descaler');
 });

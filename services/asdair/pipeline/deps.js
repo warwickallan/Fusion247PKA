@@ -224,8 +224,9 @@ async function realVisionModel() {
  * Amendment 3). Not a daemon, not a conversation, not an agent.
  *
  * Deterministic prep, real rendering, ONE household-aware vision call (page +
- * every numbered strip, region-cited), deterministic sanity checks, at most
- * ONE batched follow-up, and durable PHOTO provenance persisted before this
+ * every numbered strip, region-cited), deterministic sanity checks, ADAPTIVE
+ * per-region re-inspection of only the regions actually flagged (WO-2026-08-
+ * 12-B15-VISION-02, AC2), and durable PHOTO provenance persisted before this
  * function returns - see interpretPhotoOrchestrator.js's own header for the
  * full design and interpretPhotoOrchestrator.test.js for the wiring-order
  * proof. THIS function's only job is to supply that orchestrator with the
@@ -241,6 +242,21 @@ async function realVisionModel() {
  * a basket whatever the model claims. This function's own sanity checks use
  * the model's claimed id only as a DETERMINISTIC signal (is a line
  * unmatched, does it look implausible) - never as identity.
+ *
+ * ── AC7 (WO-2026-08-12-B15-VISION-02) - REAL COST INSTRUMENTATION ─────────
+ * The `vision` collaborator passed to interpretPhotoOrchestrator.js is now a
+ * thin WRAPPER around models.mjs's `visionWithUsage`, not `vision` directly:
+ * it still returns the same bare string the orchestrator's contract expects
+ * (interpretPhotoOrchestrator.test.js's fakes are unaffected), but it also
+ * CAPTURES every call's gateway-reported usage into `usageLog` and logs a
+ * structured line per call - "instrument the orchestrator to capture and
+ * log it going forward", per this order's own required evidence, since
+ * neither of this session's diagnostic runs had captured usage to extract
+ * from instead (checked: scratchpad/asdair-vision-test/*.json, no `usage`
+ * field in either). One structured summary line is logged after the whole
+ * interpretation completes, covering EVERY vision call this run made
+ * (the first pass plus every individual AC2 follow-up) - never per-call
+ * noise for what may now be several individual re-inspection calls.
  */
 async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
   const fs = require('node:fs');
@@ -256,9 +272,20 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
   // on a box where `services/asdair/pipeline`'s own dependencies were never
   // installed - the same guarantee `pg` has always had here.
   const { renderAllRegions, toDataUrl } = await import('./imageRender.js');
-  const { vision } = await import('../../obsidiwikai/src/core/models.mjs');
+  const { visionWithUsage, estimateUsdCost } = await import('../../obsidiwikai/src/core/models.mjs');
   const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
   const interpreterModel = await realVisionModel();
+
+  // AC7 - captures every vision() call this ONE interpretation makes (the
+  // first pass, plus every individual AC2 follow-up), scoped to this
+  // function invocation only (a fresh array per call, never shared/global
+  // state that could leak one shop's usage into another's log line).
+  const usageLog = [];
+  const vision = async (prompt, imageUrls) => {
+    const { content, usage } = await visionWithUsage(prompt, imageUrls);
+    usageLog.push({ usage, cost_usd: estimateUsdCost(usage) });
+    return content;
+  };
 
   const { lines } = await interpretPhotoWithDeps(
     { catalogue, imageBuffer, shopId, interpreterModel, promptVersion: PROMPT_VERSION },
@@ -270,6 +297,22 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
       writeQuery: realWriteQuery,
     },
   );
+
+  // ONE structured summary line, logged AFTER every call this interpretation
+  // made is known - never one line per call. SANITIZED: counts and USD only,
+  // the same discipline store.recordGroundingEvidence already applies to the
+  // grounding-evidence record above (never a raw reading, never the prompt,
+  // never the photograph) - this is an operational cost log, not a second
+  // copy of the shopping list.
+  const totalCostUsd = usageLog.reduce((sum, u) => sum + (u.cost_usd ?? 0), 0);
+  const anyUsageUnreported = usageLog.some((u) => u.usage === null);
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify({
+    event: 'asdair_vision_usage', shop_id: shopId, vision_calls: usageLog.length,
+    total_cost_usd: anyUsageUnreported ? null : Number(totalCostUsd.toFixed(6)),
+    any_usage_unreported: anyUsageUnreported,
+  }));
+
   return lines;
 }
 

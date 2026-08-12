@@ -246,4 +246,105 @@ export async function insertPhotoProvenanceBatch(deps, lines, { shopId, regionId
   return persisted;
 }
 
-export const _internal = { INSERT_SQL, INSERT_COLUMNS, assertRowSatisfiesChecks };
+// ---------------------------------------------------------------------
+// AC5 (WO-2026-08-12-B15-VISION-02) - READING the CURRENT truth back out of
+// an INSERT-ONLY ledger.
+//
+// THE GAP THIS CLOSES: migration 020 grants asdair_rw SELECT+INSERT ONLY on
+// this table (see the module header) - deliberately, as a durable audit
+// trail. A RE-INTERPRETATION of the SAME shop_id (a genuine, supported case
+// - shopLines.upsertLines' own comment: "a re-read UPDATES line 7 and never
+// appends a second copy" describes shop_line, a DIFFERENT table) therefore
+// leaves the OLDER attempt's PHOTO rows sitting in this table alongside the
+// newer, corrected ones, with nothing marking which attempt is CURRENT. A
+// naive "every PHOTO row for this shop" read - which is what a raw table
+// scan is - can surface a STALE row for an item this build's later,
+// corrected interpretation no longer produces: an item explicitly excluded
+// once already can appear to "silently reappear" from this ledger's own
+// perspective, even though the shop's actual current interpretation
+// (shop_line, upserted per line_no) never re-asserted it.
+//
+// THE FIX: id is a monotonically increasing, database-assigned column on an
+// INSERT-ONLY table, so "the highest id for a given (shop_id, line_no)" is
+// an unambiguous, timestamp-precision-independent definition of "the most
+// recently written row for that line" - the append-only-log materialised-
+// latest-state pattern. This is exposed here as the selector every reader
+// of "what does the photo currently say" SHOULD use instead of a raw scan.
+//
+// WHAT THIS DOES NOT CLOSE, NAMED HONESTLY - TWO residual limits, both
+// reported in this Work Order's return rather than silently assumed fixed:
+//
+//   1. NO CURRENT CONSUMER IS WIRED TO CALL THIS SELECTOR. packet/
+//      buildExecutionPacket.js and the cockpit-api/** surface are both
+//      outside this Work Order's declared file_surface (the order's own
+//      "Explicitly out of scope" section excludes cockpit-api/** entirely),
+//      so this Work Order cannot verify or change what either of them
+//      actually reads.
+//   2. THE REDUCTION IS PER LINE_NO, NOT PER "ATTEMPT" AS A WHOLE. There is
+//      no attempt/run-boundary column in migration 020's schema - adding
+//      one is a schema decision this order's own `schema_decision: n/a`
+//      explicitly puts out of scope. If a corrected re-run genuinely stops
+//      reusing a line_no at all (rather than overwriting it, which is this
+//      build's normal shape - AC2's adaptive re-inspection reconciles every
+//      correction "back onto the SAME source_region identity", so line/
+//      region numbering is designed to stay stable across a re-run of the
+//      same photograph), that line_no's stale row is NOT excluded by this
+//      selector. See lineProvenance.test.js's own "KNOWN LIMIT" test for
+//      the exact shape this does not close.
+// ---------------------------------------------------------------------
+
+const SELECT_PHOTO_BY_SHOP_SQL =
+  `SELECT ${SELECT_LIST} FROM asdair.shop_line_provenance ` +
+  "WHERE shop_id = $1 AND provenance = 'PHOTO' ORDER BY id ASC";
+
+/**
+ * PURE. Reduce a full, unfiltered list of PHOTO-provenance rows for ONE shop
+ * down to the CURRENT row per line_no - the highest-id (most recently
+ * inserted) row for each line_no, discarding every earlier interpretation
+ * attempt's row for that same line_no. A line_no that the LATEST attempt
+ * did not write at all (because the item is genuinely gone, or line
+ * numbering shifted between attempts) never reappears here, regardless of
+ * how many older attempts once wrote it.
+ *
+ * Does NOT re-apply cross-strip/same-region dedup (`supersededByIndex`) -
+ * that already happened before these rows were ever inserted (see
+ * insertPhotoProvenanceBatch above), and a `superseded_by_id`-carrying row
+ * is a WITHIN-ATTEMPT audit record, not a stale cross-attempt one. Both
+ * concerns are independent and this function only ever addresses the
+ * cross-attempt one.
+ *
+ * @param {Array<object>} rows - every PHOTO row for one shop_id, as returned
+ *   by SELECT_LIST (must include `id` and `line_no`).
+ * @returns {Array<object>} one row per distinct line_no, the current one.
+ */
+export function latestPhotoProvenancePerLine(rows) {
+  const latestByLineNo = new Map();
+  for (const row of (rows || [])) {
+    const key = row.line_no;
+    const existing = latestByLineNo.get(key);
+    if (!existing || Number(row.id) > Number(existing.id)) {
+      latestByLineNo.set(key, row);
+    }
+  }
+  return Array.from(latestByLineNo.values()).sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+/**
+ * The CURRENT PHOTO-provenance row per line_no for one shop, read from the
+ * database and reduced by latestPhotoProvenancePerLine above. This is the
+ * query any future consumer should call instead of scanning
+ * asdair.shop_line_provenance directly for "what did the photo say for this
+ * shop" - see the AC5 header comment above for the gap this closes.
+ *
+ * @param {object} deps - {readQuery}
+ * @param {number} shopId
+ * @returns {Promise<Array<object>>}
+ */
+export async function currentPhotoProvenance(deps, shopId) {
+  const res = await deps.readQuery(SELECT_PHOTO_BY_SHOP_SQL, [shopId]);
+  return latestPhotoProvenancePerLine(rowsOf(res));
+}
+
+export const _internal = {
+  INSERT_SQL, INSERT_COLUMNS, assertRowSatisfiesChecks, SELECT_PHOTO_BY_SHOP_SQL,
+};

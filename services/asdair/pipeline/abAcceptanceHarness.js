@@ -7,15 +7,45 @@
 // run against the one photograph this build has a verified-correct answer
 // for (Deliverables/2026-08-11-trolley-reconciliation-41-lines.md).
 //
+// ── UPDATED, WO-2026-08-12-B15-VISION-02, AC8 ──────────────────────────
+// The A/B QUESTION this harness was built to answer is now SETTLED
+// (Amendment 4, point 6: individual beat bundled, 35/41 named vs. 24/41,
+// 27/41 correct vs. 21/41) and Warwick's ruling adopted a THIRD shape for
+// production - ADAPTIVE TARGETED re-inspection (interpretPhotoOrchestrator.
+// js, AC2): one first pass, then an INDIVIDUAL follow-up call per region
+// the deterministic checks actually flag, never every region and never one
+// bundled call. `runAdaptiveStrategy` below is added to let a live re-run
+// measure the REAL production algorithm, not just the two exploratory
+// extremes this file already measured. `runBundledStrategy` and
+// `runIndividualStrategy` are KEPT UNCHANGED - historical/reference arms,
+// still useful for confirming the A/B finding still holds, never removed.
+//
+// TWO THINGS THIS FILE STILL DOES NOT DO, NAMED FOR ASDAIR RATHER THAN
+// GUESSED AT HERE: (1) `loadGroundTruth()` still parses the 41-line
+// trolley file, which this order's own instruction is explicit is NOT the
+// scoring denominator - the real photo has 39 source lines (see Amendment
+// 4, point 1: 39 photo lines − 1 deliberately-skipped Bloo + 3 Regulars-
+// added stages = 41). Deriving the correct 39-line photo-truth list from
+// the trolley's own multi-stage Regulars-addition history (see that
+// document's "first/second/third Regulars batch" breakdown) needs domain
+// judgement this Work Order does not have grounds to invent - it is
+// Asdair's job, per AC8's own text, not silently guessed at here. (2) the
+// SEVEN-CATEGORY breakdown Warwick specified (correctly identified /
+// omitted / invented / wrong identity / wrong quantity / genuinely
+// uncertain / confident-but-wrong) is added below as `scoreSevenWay`, ready
+// to run against whatever ground-truth list Asdair supplies - it does not
+// invent the 39-line list itself.
+//
 // ── BUILT, CALLABLE, NOT EXECUTED BY KEEL ───────────────────────────────
 // This Work Order's explicit "Explicitly out of scope": "Calling the live
 // fusion gateway with real credentials, for any reason, including 'just to
 // test AC8's harness once.'" credential_scope/live_authority/network are
 // all `none`. So this script is proven CALLABLE (its CLI argument parsing,
-// its ground-truth parser, and its scoring function are all unit-tested
+// its ground-truth parser, and its scoring functions are all unit-tested
 // with zero network access) but its `main()` - the part that actually
 // calls models.mjs's vision() - has never been executed by this Work
-// Order. That run is Asdair's, later, with real credentials.
+// Order, including its new adaptive arm. That run is Asdair's, later, with
+// real credentials, against the corrected 39-line denominator.
 //
 // USAGE (Asdair, later, with a real gateway configured):
 //   FUSION_GATEWAY_URL=... node abAcceptanceHarness.js <path-to-photo.jpg> [--household=1]
@@ -177,6 +207,125 @@ export async function runIndividualStrategy(imageBuffer, catalogue, { vision, bu
     raw.push(await vision(stripPrompt, renderRegionImage(imageBuffer, region, imageToDataUrl)));
   }
   return { strategy: 'individual', callCount: raw.length, raw };
+}
+
+/**
+ * ADAPTIVE (WO-2026-08-12-B15-VISION-02, AC2/AC8): the REAL production
+ * shape - one first pass, then an INDIVIDUAL follow-up call for ONLY the
+ * regions the deterministic checks (photoSanityChecks.js) or the follow-up
+ * decision (followUpTrigger.js) actually flag. This is a thin re-wiring of
+ * interpretPhotoOrchestrator.interpretPhotoWithDeps itself - not a THIRD,
+ * separately-maintained copy of the adaptive logic - so this arm can never
+ * silently drift from what production actually does. A clean list costs
+ * exactly one call, the same as `runBundledStrategy`'s single request; a
+ * difficult list costs one call per flagged region, individually, the same
+ * as `runIndividualStrategy`'s per-strip calls but ONLY for the regions
+ * that need it rather than every one of them.
+ *
+ * @param {object} collaborators - {vision, buildGroundedPrompt, prepareImage,
+ *   imageToDataUrl, renderAllRegions, insertRegionBatch, insertPhotoProvenanceBatch,
+ *   runSanityChecks, needsFollowUp, flaggedRegionsForFollowUp, extractJson, writeQuery}
+ *   - the SAME collaborator shape interpretPhotoOrchestrator.js already takes,
+ *   so a real run supplies the real modules exactly as deps.js's
+ *   realInterpretPhoto does.
+ */
+export async function runAdaptiveStrategy(imageBuffer, catalogue, collaborators) {
+  const { interpretPhotoWithDeps } = await import('./interpretPhotoOrchestrator.js');
+  const callLog = { count: 0 };
+  const countingVision = async (prompt, imageUrls) => {
+    callLog.count += 1;
+    return collaborators.vision(prompt, imageUrls);
+  };
+  const result = await interpretPhotoWithDeps(
+    { catalogue, imageBuffer, shopId: collaborators.shopId ?? -1, interpreterModel: collaborators.interpreterModel ?? 'gpt-5.6-terra', promptVersion: collaborators.promptVersion ?? 'harness' },
+    { ...collaborators, vision: countingVision },
+  );
+  return { strategy: 'adaptive', callCount: callLog.count, followUpFired: result.followUpFired, lines: result.lines };
+}
+
+// ---------------------------------------------------------------------
+// AC8's seven-category scoring, per Warwick's own specification (Amendment
+// 4, point 1): correctly identified / omitted / invented / wrong identity /
+// wrong quantity / genuinely uncertain / confident-but-wrong. Separate from
+// the older three-category scoreInterpretation above (kept for the existing
+// bundled/individual comparison), this is the shape a LIVE re-run against
+// the corrected denominator should use. PURE - takes whatever ground-truth
+// list the caller supplies; does NOT itself decide what that list is (see
+// the module header's note on the 39-line denominator being Asdair's job).
+// ---------------------------------------------------------------------
+
+/**
+ * @param {Array<{raw_reading:string, product_name?:string, quantity:number|null, confidence?:number|null, status?:string}>} interpretedLines
+ * @param {Array<{product:string, qty:number}>} groundTruth
+ * @returns {{correctlyIdentified:number, omitted:number, invented:number, wrongIdentity:number,
+ *   wrongQuantity:number, genuinelyUncertain:number, confidentButWrong:number, details:Array<object>}}
+ */
+export function scoreSevenWay(interpretedLines, groundTruth) {
+  const UNCERTAIN_STATUSES = new Set(['needs_confirmation', 'unreadable', 'unmatched_new_item']);
+  const details = [];
+  let correctlyIdentified = 0;
+  let invented = 0;
+  let wrongIdentity = 0;
+  let wrongQuantity = 0;
+  let genuinelyUncertain = 0;
+  let confidentButWrong = 0;
+
+  const matchedGroundTruth = new Set();
+
+  for (const line of interpretedLines) {
+    const productName = line.product_name ?? line.raw_reading;
+    const candidate = groundTruth.find((g) => fuzzyMatches(g.product, productName));
+    const isUncertainStatus = typeof line.status === 'string' && UNCERTAIN_STATUSES.has(line.status);
+    const isLowConfidence = Number.isFinite(line.confidence) && line.confidence < 0.6;
+
+    if (!candidate) {
+      if (isUncertainStatus || isLowConfidence) {
+        genuinelyUncertain += 1;
+        details.push({ line, verdict: 'GENUINELY_UNCERTAIN' });
+      } else {
+        invented += 1;
+        details.push({ line, verdict: 'INVENTED' });
+      }
+      continue;
+    }
+
+    matchedGroundTruth.add(candidate.product);
+
+    if (isUncertainStatus || isLowConfidence) {
+      genuinelyUncertain += 1;
+      details.push({ line, candidate, verdict: 'GENUINELY_UNCERTAIN' });
+      continue;
+    }
+
+    if (line.quantity !== null && line.quantity !== undefined && line.quantity !== candidate.qty) {
+      wrongQuantity += 1;
+      details.push({ line, candidate, verdict: 'WRONG_QUANTITY' });
+      continue;
+    }
+
+    correctlyIdentified += 1;
+    details.push({ line, candidate, verdict: 'CORRECTLY_IDENTIFIED' });
+  }
+
+  const omitted = groundTruth.filter((g) => !matchedGroundTruth.has(g.product)).length;
+
+  // wrongIdentity is DELIBERATELY not populated by this function alone: it
+  // requires knowing the interpretation MEANT to name a different real
+  // ground-truth product than the one it actually named (a confusion
+  // between two catalogue items), which needs the household catalogue's
+  // own identity-resolution output (resolveByCatalogue.js's matched_
+  // regular_id), not just fuzzy text matching against the trolley list.
+  // Reported as a KNOWN GAP rather than silently approximated by this pure
+  // text-matching function - Asdair's live re-run has that richer signal
+  // available and should compute it there.
+  const wrongIdentityNote = 'wrongIdentity requires resolveByCatalogue.js output (matched_regular_id), not available to this pure text-matching function - compute it at the live re-run, where that signal exists.';
+
+  const confidentButWrongTotal = confidentButWrong; // always 0 here - see wrongIdentityNote; a future caller with resolveByCatalogue signal can compute it.
+
+  return {
+    correctlyIdentified, omitted, invented, wrongIdentity: 0, wrongQuantity,
+    genuinelyUncertain, confidentButWrong: confidentButWrongTotal, details, wrongIdentityNote,
+  };
 }
 
 // ---------------------------------------------------------------------
