@@ -2708,36 +2708,36 @@
   "twoLayerScore": {
     "layerA": {
       "expected": 39,
-      "detected": 29,
-      "omitted": 10,
-      "invented": 4,
-      "inventedFromSuppliedCandidate": 2,
+      "detected": 30,
+      "omitted": 9,
+      "invented": 3,
+      "inventedFromSuppliedCandidate": 1,
       "inventedFreeGeneration": 2,
       "duplicates": 5,
-      "quantityErrors": 4,
+      "quantityErrors": 5,
       "explicitUnknownOnRealLine": 1,
       "notALineDeclared": 0,
-      "visibleTextExact": 14,
-      "visibleTextDivergent": 15,
-      "detectedPct": 74.4,
-      "omittedPct": 25.6,
-      "visibleTextAccuracyPct": 48.3,
+      "visibleTextExact": 25,
+      "visibleTextDivergent": 5,
+      "detectedPct": 76.9,
+      "omittedPct": 23.1,
+      "visibleTextAccuracyPct": 83.3,
       "visibleTextGrading": "NOT INDEPENDENTLY GRADED - the fixture transcription is non-independent"
     },
     "layerB": {
-      "gradableDetected": 28,
-      "correctIdentity": 25,
-      "wrongIdentity": 2,
+      "gradableDetected": 29,
+      "correctIdentity": 27,
+      "wrongIdentity": 1,
       "unresolvedUnknown": 1,
       "noIdentityClaim": 0,
       "notGradable": 1,
-      "correctIdentityPct": 89.3,
+      "correctIdentityPct": 93.1,
       "denominatorNote": "DETECTED lines with an ESTABLISHED catalogue identity - never 39"
     },
     "omittedPageLines": [
       {
-        "page_order": 2,
-        "source_text": "1 x 6pts ASDA SEMI Skimmed MiLk"
+        "page_order": 1,
+        "source_text": "4 x 4pts. ARLA SEMI Skimmed MiLk"
       },
       {
         "page_order": 5,
@@ -2770,10 +2770,6 @@
       {
         "page_order": 36,
         "source_text": "1 BOX ASDA FRUiT LOLLY iCES"
-      },
-      {
-        "page_order": 37,
-        "source_text": "1 FERBREEZE FABRiC SPAY"
       }
     ],
     "duplicateGroups": [],
@@ -2781,15 +2777,15 @@
     "details": [
       {
         "as_written": "4 x 4pts ASDA semi skimmed milk",
-        "page_line": 1,
-        "source_text": "4 x 4pts. ARLA SEMI Skimmed MiLk",
+        "page_line": 2,
+        "source_text": "1 x 6pts ASDA SEMI Skimmed MiLk",
         "verdict": "DETECTED",
-        "identity": "WRONG_IDENTITY",
-        "expected_product": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+        "identity": "CORRECT_IDENTITY",
+        "expected_product": "ASDA British Milk Semi Skimmed 6 Pints",
         "named_product_id": "2",
-        "expected_quantity": 4,
+        "expected_quantity": 1,
         "got_quantity": 4,
-        "quantity_ok": true
+        "quantity_ok": false
       },
       {
         "as_written": "1 Warburtons Danish white sliced bread",
@@ -3026,7 +3022,7 @@
       {
         "as_written": "Vanish oxi white",
         "verdict": "DUPLICATE",
-        "page_line": 22
+        "page_line": 3
       },
       {
         "as_written": "Vanish oxi gold",
@@ -3149,9 +3145,15 @@
       },
       {
         "as_written": "1 Febreze fabric spray",
-        "verdict": "INVENTED",
-        "mechanism": "supplied-candidate-no-image-evidence",
-        "named": "Febreze Fabric Freshener Spray Lenor Spring Awakening 385ML"
+        "page_line": 37,
+        "source_text": "1 FERBREEZE FABRiC SPAY",
+        "verdict": "DETECTED",
+        "identity": "CORRECT_IDENTITY",
+        "expected_product": "Febreze Fabric Freshener Spray Lenor Spring Awakening 385ML",
+        "named_product_id": "30",
+        "expected_quantity": 1,
+        "got_quantity": 1,
+        "quantity_ok": true
       },
       {
         "as_written": "1 can Dettol spray",

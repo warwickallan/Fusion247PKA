@@ -283,7 +283,7 @@ export function proveCoverage({
   let checked = 0;
 
   // ── PART 2 FIRST: does a band even span a WHOLE line lengthways? ────────
-  // A band that truncates a line along the READING direction is exactly as
+  // A band that clips a line along the READING direction is exactly as
   // broken as one that cuts it across, and it is the failure mode of the
   // current production plan on this photograph: its strips split the axis the
   // writing runs ALONG, so no strip has ever held a complete line.
@@ -369,7 +369,26 @@ export function planOrientationAwareBands(raster, {
   const axisLimit = detection.axis === 'x' ? raster.width - 1 : raster.height - 1;
 
   const extent = inkExtent(stackingProfile, stackFrom, stackTo);
-  const cross = inkExtent(crossProfile, crossFrom, crossTo);
+
+  // ── THE CROSS AXIS IS **NOT** INK-TRIMMED, AND THIS COST A LIVE RUN ─────
+  // Measured in Arm D: SIX of seven quantity errors were the LEADING COUNT
+  // missing from the model's reading - "BLOO TOILET RIM" for "2 BLOO TOILET
+  // Rim", "RUSTLERS SAUSAGE muffins" for "2 RUSTLERS...", and, worst,
+  // "6 RICHMOND..." for a written "16".
+  //
+  // The cause was here. The cross extent was ink-trimmed with a floor at 10%
+  // of mean ink, and the rows where the lines BEGIN carry only the leading
+  // digits - far less ink than the rows through the middle of the words. So
+  // the trim cut the start of every line off the crop, and the digits never
+  // reached the model at all. The application then supplied the household
+  // default of 1, producing a confident, silent wrong quantity from evidence
+  // the crop had destroyed. That is precisely the "ZERO silent quantity
+  // guesses" bar, failed by the image pipeline rather than by the model.
+  //
+  // A band therefore spans the FULL PAPER across the reading direction. The
+  // cost is a slightly larger crop; the alternative is deleting written
+  // evidence before anybody looks at it.
+  const cross = { start: crossFrom, end: crossTo, length: crossTo - crossFrom + 1 };
   const pitch = estimateLinePitch(stackingProfile, extent.start, extent.end);
 
   // ⚠️ BANDS MUST BE PADDED PAST THE INK, and omitting this was the second
@@ -402,7 +421,7 @@ export function planOrientationAwareBands(raster, {
   });
 
   // Bands become pixel boxes spanning the FULL written width across the
-  // reading direction - a band must never truncate a line lengthways either.
+  // reading direction - a band must never clip a line lengthways either.
   const regions = bands.map((b) => (detection.axis === 'x'
     ? {
       region_no: b.band_no + 1,

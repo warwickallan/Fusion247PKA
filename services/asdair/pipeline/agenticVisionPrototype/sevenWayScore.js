@@ -93,6 +93,51 @@ export function fuzzyMatches(a, b) {
  * catalogue where one brand covers dozens of products, so overlap is measured
  * as a PROPORTION of the smaller token set rather than as any single hit.
  */
+/** Levenshtein distance. Small strings only - this is token-sized work. */
+export function editDistance(a, b) {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i += 1) {
+    const cur = [i];
+    for (let j = 1; j <= n; j += 1) {
+      cur[j] = Math.min(
+        prev[j] + 1,
+        cur[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/**
+ * ── WP-B15-30: TWO TOKENS THAT ARE THE SAME WORD, SPELLED DIFFERENTLY ────
+ *
+ * Measured, not theorised. In the Arm D run the model read "SUPERGLUE" where
+ * the page transcription says "SUPERGLU", and "FEBREEZE ... SPRAY" where it
+ * says "FERBREEZE ... SPAY". Exact token equality scored both as sharing NO
+ * token at all, so each counted as an OMISSION and an INVENTION
+ * simultaneously - the same double-charging Warwick identified in WP-B15-29,
+ * in a different place.
+ *
+ * The bound is deliberately TIGHT and length-relative: one edit for a short
+ * token, two for a long one. It absorbs a transcription variant of the same
+ * word; it does not make different products match. A mutation guard in the
+ * test file asserts that - loosen this and that test fails.
+ */
+export function tokensEquivalent(a, b) {
+  if (a === b) return true;
+  const shorter = Math.min(a.length, b.length);
+  if (shorter < 4) return false; // too short to tell a typo from a different word
+  const allowed = shorter >= 7 ? 2 : 1;
+  return editDistance(a, b) <= allowed;
+}
+
 export function similarity(a, b) {
   const na = normalise(a);
   const nb = normalise(b);
@@ -102,10 +147,16 @@ export function similarity(a, b) {
   const ta = contentTokens(a);
   const tb = contentTokens(b);
   if (ta.length === 0 || tb.length === 0) return 0;
-  const setA = new Set(ta);
-  const shared = tb.filter((t) => setA.has(t));
-  if (shared.length === 0) return 0;
-  return shared.length / Math.min(ta.length, tb.length);
+  // Each token of `tb` may claim at most ONE token of `ta`, so a repeated word
+  // cannot inflate the overlap.
+  const remaining = [...ta];
+  let shared = 0;
+  for (const t of tb) {
+    const at = remaining.findIndex((r) => tokensEquivalent(r, t));
+    if (at !== -1) { shared += 1; remaining.splice(at, 1); }
+  }
+  if (shared === 0) return 0;
+  return shared / Math.min(ta.length, tb.length);
 }
 
 /** Below this proportion of shared distinguishing tokens, it is not a match. */

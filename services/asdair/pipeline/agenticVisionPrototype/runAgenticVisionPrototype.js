@@ -440,7 +440,7 @@ export async function runBandArm({
 
   if (!plan.coverageProof.passes) {
     throw new Error('runBandArm: REFUSING TO SPEND - the band plan does not pass the AC5 coverage proof '
-      + `(${plan.coverageProof.failureCount} interior failure(s), ${plan.coverageProof.spanFailureCount} band(s) truncating a line)`);
+      + `(${plan.coverageProof.failureCount} interior failure(s), ${plan.coverageProof.spanFailureCount} band(s) clipping a line)`);
   }
 
   const bandRegions = plan.regions.filter((r) => r.region_kind === 'strip');
@@ -483,7 +483,7 @@ async function main() {
     process.stdout.write(`  estimated lines/pitch . ${proof.estimatedLines} lines, ${proof.estimatedLinePitchPx.toFixed(1)} px pitch\n`);
     process.stdout.write(`  bands ................. ${proof.bands.map((b) => `${b.band_no}:${b.from}-${b.to}`).join('  ')}\n`);
     const fmt = (p) => `${p.passes ? 'PASS' : 'FAIL'} - ${p.checked} positions checked, ${p.failureCount} interior failure(s), `
-      + `${p.spanFailureCount} band(s) truncating a line lengthways, ${p.frameClippedCount} frame-clipped`;
+      + `${p.spanFailureCount} band(s) clipping a line lengthways, ${p.frameClippedCount} frame-clipped`;
     process.stdout.write(`  NEW orientation-aware plan .. ${fmt(proof.newPlanProof)}\n`);
     process.stdout.write(`  CURRENT production plan ..... ${fmt(proof.productionPlanProof)}\n`);
     const outDir = argValue('out', path.join(__dirname, 'runs'));

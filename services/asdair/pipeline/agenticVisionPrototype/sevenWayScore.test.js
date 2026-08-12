@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   scoreSevenWay, loadGroundTruth, fuzzyMatches, normalise, SCORER_LIMITS,
-  quantityAgreesUnderDefaultOne,
+  quantityAgreesUnderDefaultOne, similarity, MATCH_FLOOR, tokensEquivalent, editDistance,
 } from './sevenWayScore.js';
 import { UNKNOWN_VISIBLE_ITEM } from './lineSchema.js';
 
@@ -205,4 +205,64 @@ test('AC2 MUTATION GUARD: the tolerance must not have made the check permissive'
 test('AC2: unchanged cases still behave exactly as before', () => {
   assert.equal(quantityAgreesUnderDefaultOne(3, 3), true);
   assert.equal(quantityAgreesUnderDefaultOne(null, null), true);
+});
+
+// ── WP-B15-30: SPELLING-VARIANT TOKENS, AND THE GUARD THAT KEEPS IT TIGHT ──
+
+test('the measured Arm D join failures now reconcile - same word, different spelling', () => {
+  assert.ok(similarity('1 LOCTITE SUPERGLU', 'SUPERGLUE') >= MATCH_FLOOR, 'superglu/superglue');
+  assert.ok(similarity('1 FERBREEZE FABRiC SPAY', '1 FEBREEZE FABRIC SPRAY') >= MATCH_FLOOR, 'ferbreeze/febreeze, spay/spray');
+});
+
+test('MUTATION GUARD: the fuzzy token bound must NOT make UNRELATED products match', () => {
+  // If these start matching, the bound has been loosened past the point where
+  // an INVENTION would score as a detection - the failure this scorer exists
+  // to detect.
+  assert.ok(similarity('1 Lurpak butter', 'Ferrero Rocher') < MATCH_FLOOR);
+  assert.ok(similarity('1 VO5 gel', '1 Calgon') < MATCH_FLOOR);
+  assert.ok(similarity('2 chips with skins on', '1 box Ariel 22 pods') < MATCH_FLOOR);
+});
+
+// ⚠️ KNOWN LIMITATION, PINNED RATHER THAN HIDDEN. This test asserts the
+// scorer's CURRENT behaviour, and it is a defect rather than a property.
+//
+// A VARIANT PAIR - two products differing by one flavour/colour word - scores
+// ABOVE the match floor, because the three shared tokens outvote the one
+// discriminating token. This is NOT caused by the fuzzy-token bound: it is
+// true with exact matching too, and it predates WP-B15-30.
+//
+// CONSEQUENCE, and it is why this is pinned: the one-to-one assignment still
+// gives the two variants the two fixture entries, so nothing is lost or
+// double-counted - but they can be SWAPPED, which surfaces as two WRONG
+// IDENTITY verdicts rather than two correct ones. The scorer is therefore
+// PESSIMISTIC on variant pairs, never optimistic, which is the safe direction.
+//
+// This is exactly the in-enum variant-confusion class Warwick named in AC10.
+// It is REPORTED, not fixed here - fixing it means weighting discriminating
+// tokens, which is a scorer redesign and not this Work Order's business. If
+// someone does fix it, this test fails and forces the limitation to be
+// re-stated rather than silently dropped.
+test('KNOWN LIMITATION: a variant pair still collides in the join - pessimistic, never optimistic', () => {
+  assert.ok(similarity('Yazoo strawberry milk shake', 'Yazoo chocolate milk shake') >= MATCH_FLOOR,
+    'currently collides - see the comment above; this is a recorded defect, not a property');
+  assert.ok(similarity('2 Vanish oxi pink', '2 Vanish oxi gold') >= MATCH_FLOOR);
+});
+
+test('tokensEquivalent refuses to guess on SHORT tokens', () => {
+  assert.equal(tokensEquivalent('ham', 'jam'), false, 'three letters cannot distinguish a typo from a word');
+  assert.equal(tokensEquivalent('milk', 'milk'), true);
+  assert.equal(tokensEquivalent('bread', 'break'), true, 'one edit in a five-letter token');
+  assert.equal(tokensEquivalent('paracetamol', 'paracetemol'), true);
+  assert.equal(tokensEquivalent('chocolate', 'strawberry'), false);
+});
+
+test('a repeated word cannot inflate the overlap', () => {
+  assert.ok(similarity('milk milk milk', 'milk butter cheese bread') < 1);
+});
+
+test('editDistance is correct on the cases this rule depends on', () => {
+  assert.equal(editDistance('superglu', 'superglue'), 1);
+  assert.equal(editDistance('spay', 'spray'), 1);
+  assert.equal(editDistance('febreeze', 'ferbreeze'), 1);
+  assert.equal(editDistance('', 'abc'), 3);
 });

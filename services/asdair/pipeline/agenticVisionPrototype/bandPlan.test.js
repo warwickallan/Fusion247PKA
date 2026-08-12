@@ -122,7 +122,7 @@ test('AC5 PROOF: deriving the overlap from the measured line pitch makes the sam
   assert.equal(proof.failureCount, 0);
 });
 
-test('AC5 PROOF: a band that TRUNCATES a line lengthways fails, however good its stacking coverage', () => {
+test('AC5 PROOF: a band that CLIPS a line lengthways fails, however good its stacking coverage', () => {
   // This is exactly how the current production plan fails on the photograph:
   // its strips split the axis the writing runs ALONG, so no strip has ever
   // contained a whole line even though the strips tile the page perfectly.
@@ -211,4 +211,41 @@ test('estimateLinePitch over-estimates rather than under-estimates when lines to
   const extent = inkExtent(cols, box.left, box.right);
   const { pitch } = estimateLinePitch(cols, extent.start, extent.end);
   assert.ok(pitch >= 20, `pitch ${pitch} must not be optimistically small`);
+});
+
+// ── THE CROP DEFECT THAT COST A LIVE RUN ──────────────────────────────────
+// Six of seven Arm D quantity errors were the LEADING COUNT missing from the
+// reading, because the cross axis was ink-trimmed and the rows where lines
+// BEGIN carry only the sparse leading digits. The crop deleted the evidence
+// before the model saw it, and the application then supplied a default.
+
+test('AC5: a band spans the FULL paper across the reading direction - line starts are never cropped off', () => {
+  const page = syntheticPage({ width: 600, height: 300, axis: 'x', lineCount: 24, pitch: 20 });
+  const plan = planOrientationAwareBands(page, { bandCount: 7 });
+  const box = plan.detection.box;
+  for (const band of plan.regions.filter((r) => r.region_kind === 'strip')) {
+    assert.equal(band.pixel_top, box.top, 'a band must start at the paper edge, not at the first dense ink');
+    assert.equal(band.pixel_bottom, box.bottom + 1);
+  }
+});
+
+test('AC5: sparse leading marks at the START of every line survive the crop', () => {
+  // Lines whose first few columns carry a tiny mark (a written count) and
+  // whose body is dense. An ink-trimmed cross axis discards the marks.
+  const width = 600; const height = 300; const border = 20;
+  const data = new Uint8Array(width * height).fill(30);
+  for (let y = border; y < height - border; y += 1) {
+    for (let x = border; x < width - border; x += 1) data[y * width + x] = 240;
+  }
+  const markY = border + 2; // the leading count sits at the very start of each line
+  for (let i = 0; i < 20; i += 1) {
+    const col = 60 + i * 20;
+    data[markY * width + col] = 20;                       // the sparse leading digit
+    for (let y = border + 40; y < height - border - 10; y += 1) data[y * width + col] = 20; // the dense body
+  }
+  const plan = planOrientationAwareBands({ data, width, height, channels: 1 }, { bandCount: 7 });
+  for (const band of plan.regions.filter((r) => r.region_kind === 'strip')) {
+    assert.ok(band.pixel_top <= markY,
+      `band starts at ${band.pixel_top} but the leading marks are at ${markY} - the count would be cropped away`);
+  }
 });
