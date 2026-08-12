@@ -72,8 +72,19 @@ function mergeFollowUp(original, followUpLines, flaggedRegionNos) {
  *   initialSilentRegions: number[], droppedLines: Array<object>}>}
  *   `lines` matches the EXTERNAL shape deps.js's realInterpretPhoto has
  *   always returned: {line_no, raw_reading, quantity, confidence,
- *   model_status} - unchanged, so runPipeline.js's stepInterpret and every
- *   offline test that fakes deps.interpretPhoto wholesale need no change.
+ *   model_status} - PLUS `source_region` (AC1, WO-2026-08-12-B15-VISION-05).
+ *   `source_region` was carried on every internal `checked` line all along
+ *   (normaliseModelLine sets it, photoSanityChecks.js's runSanityChecks
+ *   preserves it by spreading `{...line}` throughout) but THIS return
+ *   statement dropped it before it ever left the function - so
+ *   runPipeline.js:stepInterpret's own `source_region` mapping (added by
+ *   WO-2026-08-12-B15-VISION-04) and resolveByCatalogue.js's regionsAgree
+ *   cross-region dedup guard (the SAME Work Order) never received it on the
+ *   real path, even though round 4's own unit test proved the guard correct
+ *   in isolation by injecting source_region directly into resolveAll's
+ *   input. Adding the field here is the fix; every existing consumer reads
+ *   it defensively (`Number.isInteger(l.source_region) ? ... : null`), so
+ *   nothing downstream needed to change to receive it.
  *   `initialSilentRegions` and `droppedLines` are ADDITIVE (AC6,
  *   WO-2026-08-12-B15-VISION-03) - see their own inline comments below for
  *   what each observes and why a future live re-test needs it.
@@ -208,6 +219,13 @@ export async function interpretPhotoWithDeps(
       .map((l) => ({
         line_no: l.line_no, raw_reading: l.raw_reading, quantity: l.quantity,
         confidence: l.confidence, model_status: l.model_status,
+        // AC1 (WO-2026-08-12-B15-VISION-05) - THE FIX. This field was already
+        // present on `l` (normaliseModelLine sets it; runSanityChecks
+        // preserves it) but was never included in this return object, so it
+        // never reached deps.js's realInterpretPhoto, runPipeline.js's
+        // stepInterpret, or resolveByCatalogue.js's cross-region dedup guard
+        // on the real path - see this function's own doc comment above.
+        source_region: l.source_region,
       })),
     promptChars: prompt.length,
     followUpFired,
