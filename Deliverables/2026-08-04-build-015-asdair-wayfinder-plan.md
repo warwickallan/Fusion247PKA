@@ -1904,6 +1904,14 @@ while confident-but-wrong lines remain at this rate.
 root-cause the omission rate (the new dominant failure, not previously targeted by either round) and
 the AC5 residual (why the visible symptom persists despite a DB-level fix testing clean).
 
+**Round 3 dispatched** (`WO-2026-08-12-B15-VISION-03`), investigate-first, grounded in Asdair's actual
+raw diagnostic data rather than a prescribed fix. **Clean ACCEPT read-back, no amendment needed** — Keel
+independently re-ran the scorer against Asdair's data itself (confirmed 17/39 and 15/39 omission,
+confirmed the TRESemme/Lucozade-Raspberry/conditioner hallucinations are real, not a scoring artefact),
+and correctly declined to assert either the omission mechanism or the Febreze-duplicate mechanism as
+proven — both are named as unverified candidates for Step 2's actual investigation, not conclusions.
+Proceeding to implementation.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
