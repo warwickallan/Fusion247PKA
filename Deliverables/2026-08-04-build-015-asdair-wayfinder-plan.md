@@ -2023,7 +2023,8 @@ call to confirm the defect, not a normal-path cost).
 **Round 5 dispatched** — narrow, exact fix location known: wire `source_region` through the orchestrator's
 own return value, and require an INTEGRATION-level test exercising the real
 `interpretPhotoWithDeps → deps.js → runPipeline.js → resolveByCatalogue.js` chain this time, per
-Asdair's own recommendation, not a fixture that can bypass the break.
+Asdair's own recommendation, not a fixture that can bypass the break. Explicit AC3 requires Keel to
+name why round 4's own test missed this, so the fixture-only-proof pattern isn't repeated silently.
 
 ---
 
