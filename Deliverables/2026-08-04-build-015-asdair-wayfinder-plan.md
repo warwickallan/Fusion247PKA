@@ -2221,9 +2221,131 @@ output, rather than either architecture alone.
 
 ---
 
-## ⟦ROTATION CLOSE⟧ 2026-08-12 — read this block first on resume, everything above is history
+## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (later) — **AGENTIC VISUAL COVERAGE + STRUCTURAL GROUNDING.** Authorised by Warwick. **START HERE — this supersedes the rotation-close block's "exact next action", which is re-cut below in the same commit.**
 
-**START HERE. This is the current, truthful state as of `/rotate`, superseding any impression given by
+**Status: AUTHORISED, recon in flight, nothing built yet.** No Veritas gate sought. Nothing merged.
+
+### AMENDMENT — Warwick, 2026-08-12. **His ruling, quoted. Larry's consequent record-keeping is labelled as Larry's and is NOT in this heading.**
+
+> **KEEP the new model-directed re-inspection loop.** *"It has done the one thing the old pipeline never
+> managed: omission dropped from roughly 49% to roughly 18%. That is real progress. DO NOT throw that
+> away."*
+>
+> *"But invention is now the dominant failure because the standalone prototype deliberately removed the
+> production grounding discipline. So the next move is NOT another prompt tweak and NOT another heuristic
+> round. Combine the two halves properly: **AGENTIC VISUAL COVERAGE + STRUCTURAL GROUNDING.**"*
+>
+> **On free generation** — *"Giving Terra 101 possible products in context is NOT a hard constraint...
+> the output space is still generative. That must stop."* For every PHOTO-derived line, Terra must return
+> one of: **an allowed candidate/product ID from the supplied candidate set; `UNKNOWN_VISIBLE_ITEM`;
+> `NOT_A_LINE`.** *"It must NOT be allowed to create an arbitrary new product name and have that become
+> PHOTO truth. Use the strongest structured-output / schema constraint the actual Fusion gateway supports...
+> Establish the DEPLOYED gateway capability by execution, not public-doc assumption."*
+>
+> **On splitting the question** — do not ask one fuzzy question. Split the semantics: **(A) VISUAL
+> EXISTENCE** — is there actually a handwritten line in this application-owned image region? **(B) PRODUCT
+> RESOLUTION** — if yes, which supplied candidate does that visible line correspond to? B's answer set must
+> include **NONE / UNKNOWN**. *"Uncertainty is a valid successful outcome. Inventing Ferrero Rocher because
+> the model feels helpful is not."*
+>
+> **On household context** — *"Do NOT remove Regulars/Favourites/aliases.* Warwick already established
+> that context-free interpretation is materially worse. Household context may help disambiguate
+> handwriting. **It may NOT create a PHOTO line.**" The invariant: **PHOTO provenance requires visible
+> image evidence. REGULARS may add an item later, explicitly as REGULARS. RULE may add/change an item
+> later, explicitly as RULE. WARWICK may resolve/change an item later, explicitly as HUMAN.** *"These
+> origins must never silently collapse into each other."*
+>
+> **On regions** — *"Do not trust Terra saying 'this came from the image' merely because it outputs a
+> region number. The application owns the regions/crops. Every PHOTO line must reference a real supplied
+> region. No valid region → cannot become PHOTO truth."* He states its limit himself: *"This still does
+> not mathematically prove the handwriting says the proposed product, but it makes the current class of
+> context-only invention structurally rejectable."*
+>
+> **On narrowing candidates** — cheap semantic retrieval down to a small plausible candidate set per crop
+> is welcome *"only if it stays simple and cheap. **Do not build a giant retrieval framework for Mum's
+> shopping list.**"*
+>
+> **On keeping the two axes apart** — *"COVERAGE: did the process actually inspect enough of the page...
+> GROUNDING: are the resulting lines genuinely supported by the image and mapped to permitted products...
+> **Do not weaken coverage again just to reduce hallucinations. Do not increase hallucination tolerance
+> just to improve recall.** The desired behaviour is: **see more + guess less.**"*
+>
+> **On confidence** — restore the broken confidence wiring, *"but do not use confidence as acceptance
+> authority. Terra can be confidently wrong. Use confidence to decide 'look again', not 'therefore this is
+> true.'"* Structural provenance/candidate constraints decide durability, not confidence.
+>
+> **On quantity** — *"A product number is not automatically purchase quantity. 'Richmond 16 Pork Sausages'
+> must not become quantity 16. Quantity requires explicit quantity evidence or an authorised household
+> rule/decision. Keep that invariant independent of the vision loop."*
+>
+> **On the recurring inventions** — *"The recurring Lucozade Raspberry finding remains diagnostic
+> evidence. Trace its provenance. If it came from household/history context with no supporting image
+> region, the new structural rule must reject it. **Do NOT special-case the product name.** The same must
+> apply to Nivea, Fairy, Hovis, Ferrero, M&S, Coccolino and any future invention."*
+>
+> **On cost** — *"Do not turn this into 39 mandatory API calls... Use the minimum number of targeted
+> inspections needed to get trustworthy coverage. Normal shop should stay cheap. Difficult shop can cost
+> somewhat more."* Measure real calls, wall time and gateway cost, and **optimise cost per trustworthy
+> shop, not minimum call count.**
+>
+> **On naming the work** — *"**Do not describe the next work as 'Round 8.'**"* The shape is **A/B/C/D**
+> below. *"If that architecture still cannot approach Warwick's trustworthiness bar, say so plainly. But
+> do not return to symptom-by-symptom prompt whack-a-mole."*
+>
+> **His closing framing, and the one-line statement of the goal:** *"THE PROCESS CAN NOW SEE FAR MORE OF
+> THE PAGE. Now make it impossible for that better eyesight to invent what it saw."*
+
+### The four numbered functional requirements — **Warwick's own A/B/C/D, his words, not Larry's re-slicing**
+
+| # | Requirement | Status |
+|---|---|---|
+| **A** | **Make the inspection loop run cleanly.** Fix the region-1 crop-map wiring defect narrowly (the loop invites Terra to request region 1 while the crop map excludes it), then rerun the known photo. | NOT STARTED |
+| **B** | **Constrain its output structurally.** Photo-derived lines become a closed choice — allowed candidate ID, `UNKNOWN_VISIBLE_ITEM`, or `NOT_A_LINE` — enforced by the strongest mechanism the DEPLOYED gateway actually supports. Visual existence and product resolution asked as two separate questions. | NOT STARTED |
+| **C** | **Restore production grounding/sanity discipline** onto the loop's higher-coverage output: four-way provenance that never silently collapses, every PHOTO line referencing a real application-supplied region, the quantity invariant, duplicate and UNKNOWN handling. | NOT STARTED |
+| **D** | **Prove it against the known photograph** — the **39-line** ground truth, **NOT** the 41-line final trolley. | NOT STARTED |
+
+### The acceptance bar — **Warwick's, quoted; it is the grading contract for D**
+
+Report, for the next run: **correct PHOTO lines · omissions · inventions · wrong identity · wrong quantity
+· explicit UNKNOWNs · duplicates.**
+
+Target behaviour: **~95%+ automatically correct · ZERO invented PHOTO lines · ZERO silent quantity guesses
+· ZERO household enrichment masquerading as PHOTO · NO large silent omission class.**
+
+His own worked examples, which calibrate what "good" means better than the percentage does:
+- **38 correct / 1 UNKNOWN needing Warwick / 0 inventions** → *"is SUCCESS."*
+- **34 correct / 5 UNKNOWN / 0 inventions** → *"may also be trustworthy enough to move forward."*
+- **39 "answers" obtained by inventing six products** → *"is FAILURE."*
+
+**Larry's reading of that calibration, labelled as Larry's:** the bar is not a single number. An honest
+UNKNOWN costs far less than a confident invention, so the design should prefer surfacing uncertainty over
+resolving it. That is the intended asymmetry, and it should be visible in the code, not just the report.
+
+### Larry's execution record — **Larry's, not Warwick's**
+
+- **Recon dispatched, two agents, background, 2026-08-12.** (1) Asdair — establish by execution which
+  output-constraint mechanism the DEPLOYED gateway really enforces (strict `json_schema` vs. tool-argument
+  schema), whether the constraint is real or merely advisory when the model is pushed to escape it, whether
+  a ~101-value closed enum is accepted, and whether the constraint COMPOSES with image input, tool-calling
+  and `previous_response_id` continuation. This is Warwick's "by execution, not public-doc assumption"
+  instruction, discharged before design rather than after. (2) A recon agent mapping the region-1 defect
+  precisely, the prototype's architecture and broken confidence wiring, the production grounding mechanisms
+  and their portability, the four-way provenance representation in code and schema, the 39-line ground-truth
+  artefact and existing scoring harness, and the Lucozade Raspberry entry MECHANISM (not the name).
+- **Prior capability findings this builds on, already established by execution and recorded in
+  `Deliverables/2026-08-12-gateway-capability-audit-and-agentic-loop-design.md`:** tool/function-calling
+  CONFIRMED WORKING on both endpoints; genuine server-side continuation via `previous_response_id` on
+  `/v1/responses` ONLY; prompt caching real at ~90% discount on repeated household context. **Strict
+  structured output was NOT among them — it is the open capability question requirement B depends on.**
+- **Known open item folded in here rather than left loose:** the stale pricing constant in `models.mjs`
+  (hard-codes $2.00/$12.00 per million; live `/model/info` bills $2.50/$15.00), which made every cost
+  figure across all six rounds ~25% too low. Relevant to Warwick's cost measurement in this package.
+
+---
+
+## ⟦ROTATION CLOSE⟧ 2026-08-12 — **superseded as the frontier by the ACTIVE SESSION WORK PACKAGE above.** Its state census (phase, branch/head map, parked residue) remains CURRENT and accurate; only its "exact next action" is answered and re-cut.
+
+**This was the truthful state as of `/rotate`, superseding any impression given by
 reading the narrative above out of order.**
 
 ### Phase and gate
@@ -2234,21 +2356,24 @@ correctly labelled "builder self-test evidence, not independent review" througho
 merged to `main` on GitHub** (`origin/main` remains deliberately unmoved — Warwick's standing
 `merge-decision`, unchanged tonight).
 
-### The exact next action — a genuine open product/priority decision, not a default to invent
+### ⛔ SUPERSEDED 2026-08-12 (later) — "the exact next action is an open decision" is ANSWERED. **Warwick decided it. See the ⟦ACTIVE SESSION WORK PACKAGE⟧ block immediately above this rotation-close block. This section directs nothing.**
 
-Warwick's own words, closing tonight's live-test report: *"that's your call on priority from here, not
-mine to just keep grinding on."* **There is no single obvious next action — this is the frontier a fresh
-session must ask Warwick about, not guess.** The concrete options on the table, all real and evidenced,
-none yet authorised:
-1. Fix the region-1 crop-map bug in the agentic prototype (narrow, precisely diagnosed: `agenticLoop.js`
-   excludes region 1 from its crop map while the prompt advertises it as requestable) — a clean, small
-   Work Order.
-2. Port the production pipeline's grounding/provenance/sanity-check discipline onto the agentic loop's
-   output, to address the new dominant failure (invention, ~19-25% of output lines) the coverage fix
-   exposed.
-3. Some other priority Warwick names — the invention finding may change his view of what matters most.
-**Do not begin a "Round 7" or equivalent without asking first** — this exact loop is what Warwick's
-redirect this session existed to stop.
+> **Retained for its accurate statement of what was open at rotation.** The three options below were the
+> real, evidenced choices put to Warwick. He took **options 1 and 2 together**, as one architecture, and
+> added the structural-constraint requirement that neither option alone contained. The prohibition on
+> starting a "Round 7" without asking was correct and was honoured — the decision came from him.
+>
+> ~~**The exact next action — a genuine open product/priority decision, not a default to invent.**~~
+> Warwick's own words, closing that live-test report: *"that's your call on priority from here, not mine
+> to just keep grinding on."* The concrete options then on the table, none at that time authorised:
+> 1. Fix the region-1 crop-map bug in the agentic prototype (narrow, precisely diagnosed: `agenticLoop.js`
+>    excludes region 1 from its crop map while the prompt advertises it as requestable) — a clean, small
+>    Work Order. **→ NOW AUTHORISED as requirement A.**
+> 2. Port the production pipeline's grounding/provenance/sanity-check discipline onto the agentic loop's
+>    output, to address the new dominant failure (invention, ~19-25% of output lines) the coverage fix
+>    exposed. **→ NOW AUTHORISED as requirements B and C.**
+> 3. Some other priority Warwick names. **→ He named one: structural output constraint, so the model
+>    classifies against a supplied candidate set instead of generating product names freely.**
 
 ### Branch/head map — every worktree touched this session, verified by execution at rotation
 
