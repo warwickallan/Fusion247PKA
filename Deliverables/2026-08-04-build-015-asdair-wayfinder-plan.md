@@ -2098,6 +2098,27 @@ whatever gets built: ~95%+ correctly resolved on the known photo, zero invented 
 quantity guesses, no large silent omission class, genuine uncertainty surfaced honestly — or come back
 with evidence the architecture cannot meet that economically, not another incremental percentage.
 
+**⛔ CAPABILITY AUDIT LANDED — the answer is YES, buildable, and it names exactly how.**
+`Deliverables/2026-08-12-gateway-capability-audit-and-agentic-loop-design.md`. **The decisive finding**:
+tool/function-calling is CONFIRMED WORKING on this deployment — the model itself correctly emitted a
+real `request_crop` tool call, unprompted by any deterministic trigger. **Genuine multi-turn
+continuation is also confirmed, but only via `/v1/responses`, not the `/v1/chat/completions` endpoint
+this build has used throughout** — `previous_response_id` chaining proven with a real cross-request
+recall test. Prompt caching confirmed working with a real ~90% discount, directly useful for the
+repeated household context. Two bonus findings: the codebase's own pricing constant has been ~25%
+under-costing every figure reported this session (real gateway bills $2.50/$15 per M tokens, code
+assumed $2.00/$12); reasoning-token overhead is real and non-trivial even on trivial calls.
+
+**The architecture this unlocks, matching Warwick's own diagram exactly**: move the re-inspection
+DECISION from the application's deterministic triage (which cannot see what the model never returned —
+this is WHY every downstream heuristic this session tried has failed to touch omission) to the MODEL
+ITSELF, mid-conversation, via a `request_crop` tool call it can invoke when it isn't confident it has
+covered the page — chained via `/v1/responses`' genuine continuation so each turn has full memory of
+what's already been read, not a fresh blind call. Bounded by a hard iteration cap for cost control.
+
+**Next: a standalone PROTOTYPE, not a pipeline integration** — per Warwick's own sequencing ("build the
+simplest version, prove it on the known photograph, integrate it, and move on"). Dispatched to Keel.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
