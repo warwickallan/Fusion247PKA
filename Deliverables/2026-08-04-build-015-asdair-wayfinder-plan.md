@@ -2119,6 +2119,15 @@ what's already been read, not a fresh blind call. Bounded by a hard iteration ca
 **Next: a standalone PROTOTYPE, not a pipeline integration** — per Warwick's own sequencing ("build the
 simplest version, prove it on the known photograph, integrate it, and move on"). Dispatched to Keel.
 
+**First dispatch correctly CLARIFY-refused, twice-compounding process gap found and fixed**: (1) the
+prototype worktree was cut from local `main`, which does not yet contain the pricing constant/cost-
+estimation code AC4 needs to fix — that code only exists on the unmerged `build-015/b15-24-vision-
+pipeline` branch (six rounds of vision-pipeline work have never been merged to main). Re-cut from that
+branch's tip instead. (2) The real capability-probe evidence (the actual captured tool-calling and
+`/v1/responses` continuation proof) lived only in a session-scoped ephemeral scratchpad, invisible to a
+fresh Keel instance — committed durably to `Deliverables/2026-08-12-capability-probe-evidence/` (checked
+for secrets first; none — auth is referenced via env var, never a literal key). Reissued as v2, dispatched.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
