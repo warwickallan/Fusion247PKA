@@ -1818,6 +1818,9 @@
         "quantity": 4,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 4,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "4 ARLA SEMI SKIMMED",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.91,
@@ -1837,6 +1840,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "DREAMIES CHEESE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -1856,6 +1862,9 @@
         "quantity": 3,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 3,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "3 GOURMET CAT FOOD • FISH",
         "model_quantity": 3,
         "model_quantity_disagreed": false,
         "confidence": 0.92,
@@ -1875,6 +1884,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "LOCTITE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -1894,6 +1906,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "CALGON • SUPERGLUE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.91,
@@ -1913,6 +1928,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "LENOR O",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.7,
@@ -1932,6 +1950,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "FEBREZE AIR MIST VANILLA",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -1951,6 +1972,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "BLOO TOILET RIM",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -1970,6 +1994,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "VANISH OXI PINK",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -1989,6 +2016,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "LENOR OUTDOOR",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -2008,6 +2038,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "Yazoo strawberry milk shake.",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.91,
@@ -2027,6 +2060,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "Yazoo chocolate milk shake.",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -2046,6 +2082,9 @@
         "quantity": 4,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 4,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "4 pk Lucozade orange sport.",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2065,6 +2104,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "Always discreet panty liners normal.",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.9,
@@ -2084,6 +2126,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "PRINCES LEAN CORNED BEEF",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.92,
@@ -2103,6 +2148,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "LURPAK BUTTER",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -2122,6 +2170,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "DOUBLE GLOUCESTER CHEESE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -2141,6 +2192,9 @@
         "quantity": 4,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 4,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "4 PK BIRDS EYE QUARTER POUNDERS",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.84,
@@ -2160,6 +2214,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "YAZOO STRAWBERRY MILK SHAKE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2179,6 +2236,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "BLOO",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.52,
@@ -2198,6 +2258,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 FEBREEZE FABRIC SPRAY",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.92,
@@ -2217,6 +2280,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 CAN DETTOL SPRAY",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2236,6 +2302,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 2 PACK KLEENEX TISSUES",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2255,6 +2324,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 BOX ASDA FRUIT LOLLY ICE B...",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.7,
@@ -2274,6 +2346,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 PKT ASDA HAYFEVER TABS.",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2293,6 +2368,9 @@
         "quantity": 2,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 2,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "2 PKTS ASDA PARACETAMOL.",
         "model_quantity": 2,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -2312,6 +2390,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 SULTANA & CHERRY CAKE.",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -2331,6 +2412,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "FEBREZE FABRIC SPRAY.",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.91,
@@ -2350,6 +2434,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 PKT. WEETABIX PROTEIN",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -2369,6 +2456,9 @@
         "quantity": 2,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 2,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "2 RUSTLERS SAUSAGE MUFFINS.",
         "model_quantity": 2,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2388,6 +2478,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "BATCHELORS PASTA 'N CHEESE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -2407,6 +2500,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "(CHEESE, LEEK and HAM)",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.93,
@@ -2426,6 +2522,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "PRINCES LEAN CORNED BEEF.",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.97,
@@ -2445,6 +2544,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "MASHED POTATO",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.96,
@@ -2464,6 +2566,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 6PK CHEESE ONION CRISPS",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -2483,6 +2588,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "PKT. ROAST BEEF",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.95,
@@ -2502,6 +2610,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "PKT. HAM ON THE BONE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.97,
@@ -2521,6 +2632,9 @@
         "quantity": 6,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 6,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "6 RICHMOND SKINLESS PORK SAUSAGES",
         "model_quantity": 6,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2540,6 +2654,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 WALLS SAUSAGE ROLLS",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2559,6 +2676,9 @@
         "quantity": 2,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 2,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "2 PKTS. TWIX ICECREAM BARS",
         "model_quantity": 2,
         "model_quantity_disagreed": false,
         "confidence": 0.97,
@@ -2578,6 +2698,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 PKT. TWIX CHOC BISCUIT BARS",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.97,
@@ -2597,6 +2720,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "SULTANA & CHERRY CAKE",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.88,
@@ -2616,6 +2742,9 @@
         "quantity": 2,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 2,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "2 x 4pts. ARLA SEMI SKIMMED MILK",
         "model_quantity": 2,
         "model_quantity_disagreed": false,
         "confidence": 0.89,
@@ -2635,6 +2764,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "x 6pts. ASDA SEMI SKIMMED MILK",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.9,
@@ -2654,6 +2786,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "WARBURTONS DANISH WHITE SLICED BREAD",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -2673,6 +2808,9 @@
         "quantity": 2,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 2,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "2 CHIPS WITH SKINS ON",
         "model_quantity": 2,
         "model_quantity_disagreed": false,
         "confidence": 0.88,
@@ -2692,6 +2830,9 @@
         "quantity": 1,
         "quantity_basis": "household-default-one",
         "quantity_evidence": null,
+        "leading_mark": null,
+        "quantity_evidence_source": null,
+        "quantity_probe_text": "ASDA POTATO.",
         "model_quantity": null,
         "model_quantity_disagreed": false,
         "confidence": 0.69,
@@ -2711,6 +2852,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 6PK CHEESE ONION CRISPS",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.93,
@@ -2730,6 +2874,9 @@
         "quantity": 1,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 1,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "1 BAG ASDA PLAIN TOFFEES",
         "model_quantity": 1,
         "model_quantity_disagreed": false,
         "confidence": 0.82,
@@ -2749,6 +2896,9 @@
         "quantity": 2,
         "quantity_basis": "explicit-on-page",
         "quantity_evidence": 2,
+        "leading_mark": null,
+        "quantity_evidence_source": "as-written",
+        "quantity_probe_text": "2 PKTS. ASDA SHORTBREAD FINGERS",
         "model_quantity": 2,
         "model_quantity_disagreed": false,
         "confidence": 0.94,
@@ -3027,7 +3177,7 @@
       "duplicateGroups": 8,
       "crossRegionCollisions": 7
     },
-    "enumVerified": true
+    "enumVerified": false
   },
   "reconciliation": {
     "reconciled": [
@@ -4115,42 +4265,39 @@
   "twoLayerScore": {
     "layerA": {
       "expected": 39,
-      "detected": 37,
-      "omitted": 2,
+      "detected": 39,
+      "omitted": 0,
       "invented": 1,
       "inventedFromSuppliedCandidate": 0,
       "inventedFreeGeneration": 1,
-      "duplicates": 1,
-      "quantityErrors": 7,
+      "duplicates": 10,
+      "quantityErrors": 6,
+      "quantityErrorsContestedExcluded": 1,
+      "detectedWherePageCarriesCount": 39,
+      "leadingCountPreserved": 20,
       "explicitUnknownOnRealLine": 1,
       "notALineDeclared": 0,
-      "visibleTextExact": 34,
-      "visibleTextDivergent": 3,
-      "detectedPct": 94.9,
-      "omittedPct": 5.1,
-      "visibleTextAccuracyPct": 91.9,
+      "visibleTextExact": 38,
+      "visibleTextDivergent": 1,
+      "detectedPct": 100,
+      "omittedPct": 0,
+      "sourceLinesWithWrittenCount": 39,
+      "leadingCountPreservationPct": 51.3,
+      "quantityErrorsNote": "6 quantity error(s); 1 CONTESTED page line(s) excluded (page text and the pack-size ruling genuinely disagree - see fixture contested_lines)",
+      "visibleTextAccuracyPct": 97.4,
       "visibleTextGrading": "NOT INDEPENDENTLY GRADED - the fixture transcription is non-independent"
     },
     "layerB": {
-      "gradableDetected": 34,
-      "correctIdentity": 32,
-      "wrongIdentity": 1,
+      "gradableDetected": 36,
+      "correctIdentity": 35,
+      "wrongIdentity": 0,
       "unresolvedUnknown": 1,
       "noIdentityClaim": 0,
       "notGradable": 3,
-      "correctIdentityPct": 94.1,
+      "correctIdentityPct": 97.2,
       "denominatorNote": "DETECTED lines with an ESTABLISHED catalogue identity - never 39"
     },
-    "omittedPageLines": [
-      {
-        "page_order": 17,
-        "source_text": "2 YAZZO CHOCOLATE MiLK SHAKE"
-      },
-      {
-        "page_order": 32,
-        "source_text": "1 PK. TWiX CHOC BiSCUiT BARS"
-      }
-    ],
+    "omittedPageLines": [],
     "duplicateGroups": [
       {
         "key": "p:5|1",
@@ -4463,6 +4610,11 @@
         "quantity_ok": true
       },
       {
+        "as_written": "LENOR OUTDOOR",
+        "verdict": "DUPLICATE",
+        "page_line": 23
+      },
+      {
         "as_written": "Yazoo strawberry milk shake.",
         "page_line": 16,
         "source_text": "3 YAZZO STRAWBERRY MiLK SHAKE",
@@ -4471,6 +4623,18 @@
         "expected_product": "Yazoo Strawberry Milk Drink 400ml",
         "named_product_id": "59",
         "expected_quantity": 3,
+        "got_quantity": 1,
+        "quantity_ok": false
+      },
+      {
+        "as_written": "Yazoo chocolate milk shake.",
+        "page_line": 17,
+        "source_text": "2 YAZZO CHOCOLATE MiLK SHAKE",
+        "verdict": "DETECTED",
+        "identity": "CORRECT_IDENTITY",
+        "expected_product": "Yazoo Chocolate Milk Drink 400ml",
+        "named_product_id": "15",
+        "expected_quantity": 2,
         "got_quantity": 1,
         "quantity_ok": false
       },
@@ -4545,6 +4709,11 @@
         "expected_quantity": 1,
         "got_quantity": 4,
         "quantity_ok": false
+      },
+      {
+        "as_written": "YAZOO STRAWBERRY MILK SHAKE",
+        "verdict": "DUPLICATE",
+        "page_line": 16
       },
       {
         "as_written": "BLOO",
@@ -4636,6 +4805,11 @@
         "quantity_ok": true
       },
       {
+        "as_written": "FEBREZE FABRIC SPRAY.",
+        "verdict": "DUPLICATE",
+        "page_line": 37
+      },
+      {
         "as_written": "1 PKT. WEETABIX PROTEIN",
         "page_line": 9,
         "source_text": "1 PKT. WHEETABIX PROTEIN",
@@ -4661,6 +4835,11 @@
       },
       {
         "as_written": "BATCHELORS PASTA 'N CHEESE",
+        "verdict": "DUPLICATE",
+        "page_line": 11
+      },
+      {
+        "as_written": "(CHEESE, LEEK and HAM)",
         "page_line": 11,
         "source_text": "4 BATCHELORS PASTA in SAUCE. (CHEESE, LEEK and HAM)",
         "verdict": "DETECTED",
@@ -4670,6 +4849,11 @@
         "expected_quantity": 4,
         "got_quantity": 1,
         "quantity_ok": false
+      },
+      {
+        "as_written": "PRINCES LEAN CORNED BEEF.",
+        "verdict": "DUPLICATE",
+        "page_line": 12
       },
       {
         "as_written": "MASHED POTATO",
@@ -4751,16 +4935,38 @@
         "quantity_ok": true
       },
       {
+        "as_written": "1 PKT. TWIX CHOC BISCUIT BARS",
+        "page_line": 32,
+        "source_text": "1 PK. TWiX CHOC BiSCUiT BARS",
+        "verdict": "DETECTED",
+        "identity": "CORRECT_IDENTITY",
+        "expected_product": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
+        "named_product_id": "115",
+        "expected_quantity": 1,
+        "got_quantity": 1,
+        "quantity_ok": true
+      },
+      {
+        "as_written": "SULTANA & CHERRY CAKE",
+        "verdict": "DUPLICATE",
+        "page_line": 33
+      },
+      {
         "as_written": "2 x 4pts. ARLA SEMI SKIMMED MILK",
+        "verdict": "DUPLICATE",
+        "page_line": 1
+      },
+      {
+        "as_written": "x 6pts. ASDA SEMI SKIMMED MILK",
         "page_line": 2,
         "source_text": "1 x 6pts ASDA SEMI Skimmed MiLk",
         "verdict": "DETECTED",
-        "identity": "WRONG_IDENTITY",
+        "identity": "CORRECT_IDENTITY",
         "expected_product": "ASDA British Milk Semi Skimmed 6 Pints",
-        "named_product_id": "4",
+        "named_product_id": "2",
         "expected_quantity": 1,
-        "got_quantity": 2,
-        "quantity_ok": false
+        "got_quantity": 1,
+        "quantity_ok": true
       },
       {
         "as_written": "WARBURTONS DANISH WHITE SLICED BREAD",
@@ -4785,6 +4991,16 @@
         "expected_quantity": 2,
         "got_quantity": 2,
         "quantity_ok": true
+      },
+      {
+        "as_written": "ASDA POTATO.",
+        "verdict": "DUPLICATE",
+        "page_line": 2
+      },
+      {
+        "as_written": "1 6PK CHEESE ONION CRISPS",
+        "verdict": "DUPLICATE",
+        "page_line": 30
       },
       {
         "as_written": "1 BAG ASDA PLAIN TOFFEES",
@@ -4817,5 +5033,716 @@
       "The fixture inherits the committed 39-line list, whose own provenance is unrecorded. One line (page 8, Richmond) is CONTESTED on both quantity and identity and is reported rather than resolved.",
       "The join between a model reading and a page line is still a text similarity - but between two readings of the same handwriting, not between a reading and a catalogue name. A shorthand sharing no token with the transcription still scores as a miss."
     ]
+  },
+  "twoLayerScore_SUPERSEDED": {
+    "SUPERSEDED_BY": "WP-B15-31 re-score on the corrected instrument",
+    "WHY": "Written by an older scorer and never refreshed after the scorer was corrected. Retained because these figures are already in circulation (Warwick, the Wayfinder, the WP-B15-30 report) and the delta must stay legible.",
+    "SAME_RAW_DATA": true,
+    "block": {
+      "layerA": {
+        "expected": 39,
+        "detected": 37,
+        "omitted": 2,
+        "invented": 1,
+        "inventedFromSuppliedCandidate": 0,
+        "inventedFreeGeneration": 1,
+        "duplicates": 1,
+        "quantityErrors": 7,
+        "explicitUnknownOnRealLine": 1,
+        "notALineDeclared": 0,
+        "visibleTextExact": 34,
+        "visibleTextDivergent": 3,
+        "detectedPct": 94.9,
+        "omittedPct": 5.1,
+        "visibleTextAccuracyPct": 91.9,
+        "visibleTextGrading": "NOT INDEPENDENTLY GRADED - the fixture transcription is non-independent"
+      },
+      "layerB": {
+        "gradableDetected": 34,
+        "correctIdentity": 32,
+        "wrongIdentity": 1,
+        "unresolvedUnknown": 1,
+        "noIdentityClaim": 0,
+        "notGradable": 3,
+        "correctIdentityPct": 94.1,
+        "denominatorNote": "DETECTED lines with an ESTABLISHED catalogue identity - never 39"
+      },
+      "omittedPageLines": [
+        {
+          "page_order": 17,
+          "source_text": "2 YAZZO CHOCOLATE MiLK SHAKE"
+        },
+        {
+          "page_order": 32,
+          "source_text": "1 PK. TWiX CHOC BiSCUiT BARS"
+        }
+      ],
+      "duplicateGroups": [
+        {
+          "key": "p:5|1",
+          "kind": "cross_region",
+          "regions": [
+            2,
+            3
+          ],
+          "survivorIndex": null,
+          "members": [
+            {
+              "index": 5,
+              "line_no": 7,
+              "as_written": "LENOR O",
+              "product_id": "5",
+              "source_region": 2
+            },
+            {
+              "index": 9,
+              "line_no": 12,
+              "as_written": "LENOR OUTDOOR",
+              "product_id": "5",
+              "source_region": 3
+            }
+          ]
+        },
+        {
+          "key": "p:87|1",
+          "kind": "cross_region",
+          "regions": [
+            3,
+            5
+          ],
+          "survivorIndex": null,
+          "members": [
+            {
+              "index": 7,
+              "line_no": 10,
+              "as_written": "BLOO TOILET RIM",
+              "product_id": "87",
+              "source_region": 3
+            },
+            {
+              "index": 19,
+              "line_no": 23,
+              "as_written": "BLOO",
+              "product_id": "87",
+              "source_region": 5
+            }
+          ]
+        },
+        {
+          "key": "p:59|1",
+          "kind": "cross_region",
+          "regions": [
+            4,
+            5
+          ],
+          "survivorIndex": null,
+          "members": [
+            {
+              "index": 10,
+              "line_no": 13,
+              "as_written": "Yazoo strawberry milk shake.",
+              "product_id": "59",
+              "source_region": 4
+            },
+            {
+              "index": 18,
+              "line_no": 22,
+              "as_written": "YAZOO STRAWBERRY MILK SHAKE",
+              "product_id": "59",
+              "source_region": 5
+            }
+          ]
+        },
+        {
+          "key": "p:9|1",
+          "kind": "cross_region",
+          "regions": [
+            5,
+            6
+          ],
+          "survivorIndex": null,
+          "members": [
+            {
+              "index": 14,
+              "line_no": 18,
+              "as_written": "PRINCES LEAN CORNED BEEF",
+              "product_id": "9",
+              "source_region": 5
+            },
+            {
+              "index": 32,
+              "line_no": 36,
+              "as_written": "PRINCES LEAN CORNED BEEF.",
+              "product_id": "9",
+              "source_region": 6
+            }
+          ]
+        },
+        {
+          "key": "p:30|1",
+          "kind": "cross_region",
+          "regions": [
+            5,
+            6
+          ],
+          "survivorIndex": null,
+          "members": [
+            {
+              "index": 20,
+              "line_no": 24,
+              "as_written": "1 FEBREEZE FABRIC SPRAY",
+              "product_id": "30",
+              "source_region": 5
+            },
+            {
+              "index": 27,
+              "line_no": 31,
+              "as_written": "FEBREZE FABRIC SPRAY.",
+              "product_id": "30",
+              "source_region": 6
+            }
+          ]
+        },
+        {
+          "key": "p:28|1",
+          "kind": "cross_region",
+          "regions": [
+            6,
+            7
+          ],
+          "survivorIndex": null,
+          "members": [
+            {
+              "index": 26,
+              "line_no": 30,
+              "as_written": "1 SULTANA & CHERRY CAKE.",
+              "product_id": "28",
+              "source_region": 6
+            },
+            {
+              "index": 41,
+              "line_no": 45,
+              "as_written": "SULTANA & CHERRY CAKE",
+              "product_id": "28",
+              "source_region": 7
+            }
+          ]
+        },
+        {
+          "key": "p:14|1",
+          "kind": "same_region",
+          "region": 6,
+          "survivorIndex": 30,
+          "members": [
+            {
+              "index": 30,
+              "line_no": 34,
+              "as_written": "BATCHELORS PASTA 'N CHEESE",
+              "product_id": "14",
+              "source_region": 6
+            },
+            {
+              "index": 31,
+              "line_no": 35,
+              "as_written": "(CHEESE, LEEK and HAM)",
+              "product_id": "14",
+              "source_region": 6
+            }
+          ]
+        },
+        {
+          "key": "p:6|1",
+          "kind": "cross_region",
+          "regions": [
+            7,
+            8
+          ],
+          "survivorIndex": null,
+          "members": [
+            {
+              "index": 34,
+              "line_no": 38,
+              "as_written": "1 6PK CHEESE ONION CRISPS",
+              "product_id": "6",
+              "source_region": 7
+            },
+            {
+              "index": 47,
+              "line_no": 51,
+              "as_written": "1 6PK CHEESE ONION CRISPS",
+              "product_id": "6",
+              "source_region": 8
+            }
+          ]
+        }
+      ],
+      "rejectedByReason": {
+        "not_a_line": 3
+      },
+      "details": [
+        {
+          "as_written": "4 ARLA SEMI SKIMMED",
+          "page_line": 1,
+          "source_text": "4 x 4pts. ARLA SEMI Skimmed MiLk",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+          "named_product_id": "4",
+          "expected_quantity": 4,
+          "got_quantity": 4,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "DREAMIES CHEESE",
+          "page_line": 27,
+          "source_text": "1 DREAMiES CHEESE",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Dreamies Cat Treat Biscuits With Cheese Flavour 200g",
+          "named_product_id": "12",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "3 GOURMET CAT FOOD • FISH",
+          "page_line": 26,
+          "source_text": "3 GOURMET CAT FOOD. FISH",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
+          "named_product_id": "1",
+          "expected_quantity": 3,
+          "got_quantity": 3,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "LOCTITE",
+          "page_line": 25,
+          "source_text": "1 LOCTITE SUPERGLU",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Loctite Super Glue Original 3g",
+          "named_product_id": "116",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "CALGON • SUPERGLUE",
+          "page_line": 24,
+          "source_text": "1 CALGON",
+          "verdict": "DETECTED",
+          "identity": "UNRESOLVED_UNKNOWN",
+          "expected_product": "Calgon washing machine cleaner tablets",
+          "named_product_id": "UNKNOWN_VISIBLE_ITEM",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "LENOR O",
+          "page_line": 23,
+          "source_text": "1 LENOR OUTDOOR",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Lenor Outdoorable Spring Awakening Fabric Conditioner 86 Washes",
+          "named_product_id": "5",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "FEBREZE AIR MIST VANILLA",
+          "page_line": 20,
+          "source_text": "1 FERBREEZE AIR MIST VANILLA",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
+          "named_product_id": "44",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "BLOO TOILET RIM",
+          "page_line": 21,
+          "source_text": "2 BLOO TOILET Rim",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Bloo Toilet Rim Block",
+          "named_product_id": "87",
+          "expected_quantity": 2,
+          "got_quantity": 1,
+          "quantity_ok": false
+        },
+        {
+          "as_written": "VANISH OXI PINK",
+          "page_line": 22,
+          "source_text": "1 VANISH OXi PiNK",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
+          "named_product_id": "56",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "Yazoo strawberry milk shake.",
+          "page_line": 16,
+          "source_text": "3 YAZZO STRAWBERRY MiLK SHAKE",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Yazoo Strawberry Milk Drink 400ml",
+          "named_product_id": "59",
+          "expected_quantity": 3,
+          "got_quantity": 1,
+          "quantity_ok": false
+        },
+        {
+          "as_written": "4 pk Lucozade orange sport.",
+          "page_line": 18,
+          "source_text": "2 4PK. LUCOZADE ORANGE SPORT",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Lucozade Sport Drink Orange 4 x 500ml",
+          "named_product_id": "3",
+          "expected_quantity": 2,
+          "got_quantity": 4,
+          "quantity_ok": false
+        },
+        {
+          "as_written": "Always discreet panty liners normal.",
+          "page_line": 19,
+          "source_text": "1 ALWAYS DESCREE PANTY LiNERS normal",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Always Discreet Incontinence Pads Women Normal 39 Count",
+          "named_product_id": "51",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "PRINCES LEAN CORNED BEEF",
+          "page_line": 12,
+          "source_text": "1 PRINCESS LEAN CORNED BEEF",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Princes Lean Corned Beef 200g",
+          "named_product_id": "9",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "LURPAK BUTTER",
+          "page_line": 13,
+          "source_text": "1 LURPACK BUTTER",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Lurpak Slightly Salted Butter 200g",
+          "named_product_id": "89",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "DOUBLE GLOUCESTER CHEESE",
+          "page_line": 14,
+          "source_text": "1 DOUBLE GLOUSTER CHEESE",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "ASDA British Double Gloucester 400g",
+          "named_product_id": "11",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "4 PK BIRDS EYE QUARTER POUNDERS",
+          "page_line": 15,
+          "source_text": "1 4PK. BIRDS EYE QUARTER POUNDERS",
+          "verdict": "DETECTED",
+          "identity": "NOT_GRADABLE",
+          "expected_product": "Birds Eye Quarter Pounders 4pk",
+          "named_product_id": "19",
+          "expected_quantity": 1,
+          "got_quantity": 4,
+          "quantity_ok": false
+        },
+        {
+          "as_written": "BLOO",
+          "verdict": "DUPLICATE",
+          "page_line": 21
+        },
+        {
+          "as_written": "1 FEBREEZE FABRIC SPRAY",
+          "page_line": 37,
+          "source_text": "1 FERBREEZE FABRiC SPAY",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Febreze Fabric Freshener Spray Lenor Spring Awakening 385ML",
+          "named_product_id": "30",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 CAN DETTOL SPRAY",
+          "page_line": 38,
+          "source_text": "1 CAN DETTOL SPRAY",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
+          "named_product_id": "119",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 2 PACK KLEENEX TISSUES",
+          "page_line": 39,
+          "source_text": "1 2pack. KLEENEX TiSSUES",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Kleenex Original Tissues - Twin Pack",
+          "named_product_id": "13",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 BOX ASDA FRUIT LOLLY ICE B...",
+          "page_line": 36,
+          "source_text": "1 BOX ASDA FRUiT LOLLY iCES",
+          "verdict": "DETECTED",
+          "identity": "NOT_GRADABLE",
+          "expected_product": "ASDA Assorted Fruit Splits Lollies box",
+          "named_product_id": "UNKNOWN_VISIBLE_ITEM",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 PKT ASDA HAYFEVER TABS.",
+          "page_line": 35,
+          "source_text": "1 PKt. ASDA HAYFEVER TABS",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "ASDA Allergy & Hayfever Relief 30 Tablets",
+          "named_product_id": "107",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "2 PKTS ASDA PARACETAMOL.",
+          "page_line": 34,
+          "source_text": "2 PKTS. ASDA PARACETAMOL",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+          "named_product_id": "57",
+          "expected_quantity": 2,
+          "got_quantity": 2,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 SULTANA & CHERRY CAKE.",
+          "page_line": 33,
+          "source_text": "1 SULTARA + CHERRY CAKE",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "The BAKERY at ASDA Sultana & Cherry Cake",
+          "named_product_id": "28",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 PKT. WEETABIX PROTEIN",
+          "page_line": 9,
+          "source_text": "1 PKT. WHEETABIX PROTEIN",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Weetabix Protein 24 pack cereal",
+          "named_product_id": "26",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "2 RUSTLERS SAUSAGE MUFFINS.",
+          "page_line": 10,
+          "source_text": "2 RUSTLERS SAUSAGE muffins",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Rustlers All Day Breakfast Sausage Muffin 155g",
+          "named_product_id": "23",
+          "expected_quantity": 2,
+          "got_quantity": 2,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "BATCHELORS PASTA 'N CHEESE",
+          "page_line": 11,
+          "source_text": "4 BATCHELORS PASTA in SAUCE. (CHEESE, LEEK and HAM)",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g",
+          "named_product_id": "14",
+          "expected_quantity": 4,
+          "got_quantity": 1,
+          "quantity_ok": false
+        },
+        {
+          "as_written": "MASHED POTATO",
+          "page_line": 5,
+          "source_text": "1 MASHED POTATO",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Exceptional by ASDA Creamy Mashed Potato 400g",
+          "named_product_id": "72",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 6PK CHEESE ONION CRISPS",
+          "page_line": 30,
+          "source_text": "1 6PK CHEESE ONION CRISPS",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Walkers Cheese & Onion Multipack Crisps 6x25g",
+          "named_product_id": "6",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "PKT. ROAST BEEF",
+          "page_line": 6,
+          "source_text": "1 PKT. ROAST BEEF",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Exceptional by ASDA Roast Topside of Beef 90g",
+          "named_product_id": "81",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "PKT. HAM ON THE BONE",
+          "page_line": 7,
+          "source_text": "1 PKT. HAM ON THE BONE",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "ASDA Sliced Ham on the Bone 400g",
+          "named_product_id": "117",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "6 RICHMOND SKINLESS PORK SAUSAGES",
+          "page_line": 8,
+          "source_text": "16 Richmond SKiNLESS PORK SAUSAGES",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Richmond 12 Skinless Pork Sausages 319g",
+          "named_product_id": "85",
+          "expected_quantity": 1,
+          "got_quantity": 6,
+          "quantity_ok": false,
+          "contested": true
+        },
+        {
+          "as_written": "1 WALLS SAUSAGE ROLLS",
+          "verdict": "INVENTED",
+          "mechanism": "free-generation",
+          "named": "102"
+        },
+        {
+          "as_written": "2 PKTS. TWIX ICECREAM BARS",
+          "page_line": 31,
+          "source_text": "2 PKTS. TWiX iCECREAM BARS",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Twix Chocolate & Caramel Ice Cream 4pk",
+          "named_product_id": "114",
+          "expected_quantity": 2,
+          "got_quantity": 2,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "2 x 4pts. ARLA SEMI SKIMMED MILK",
+          "page_line": 2,
+          "source_text": "1 x 6pts ASDA SEMI Skimmed MiLk",
+          "verdict": "DETECTED",
+          "identity": "WRONG_IDENTITY",
+          "expected_product": "ASDA British Milk Semi Skimmed 6 Pints",
+          "named_product_id": "4",
+          "expected_quantity": 1,
+          "got_quantity": 2,
+          "quantity_ok": false
+        },
+        {
+          "as_written": "WARBURTONS DANISH WHITE SLICED BREAD",
+          "page_line": 3,
+          "source_text": "1 WARBURTS DANISH WHITE SLiCED BREAD",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "Warburtons Danish Lighter White Bread 400g",
+          "named_product_id": "88",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "2 CHIPS WITH SKINS ON",
+          "page_line": 4,
+          "source_text": "2 CHiPS WiTH SKiNS ON",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "ASDA Crispy Skin-On Fries 750g",
+          "named_product_id": "7",
+          "expected_quantity": 2,
+          "got_quantity": 2,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "1 BAG ASDA PLAIN TOFFEES",
+          "page_line": 28,
+          "source_text": "1 BAG ASDA PLAIN TOFFEES",
+          "verdict": "DETECTED",
+          "identity": "NOT_GRADABLE",
+          "expected_product": "ASDA Plain Toffees bag",
+          "named_product_id": "49",
+          "expected_quantity": 1,
+          "got_quantity": 1,
+          "quantity_ok": true
+        },
+        {
+          "as_written": "2 PKTS. ASDA SHORTBREAD FINGERS",
+          "page_line": 29,
+          "source_text": "2 PKTS. ASDA SHORTBREAD Fingers",
+          "verdict": "DETECTED",
+          "identity": "CORRECT_IDENTITY",
+          "expected_product": "ASDA Shortbread Fingers 210g",
+          "named_product_id": "16",
+          "expected_quantity": 2,
+          "got_quantity": 2,
+          "quantity_ok": true
+        }
+      ],
+      "limits": [
+        "LAYER A visible-text/interpretation accuracy is NOT INDEPENDENTLY GRADED. The fixture's source_text column was transcribed from the photograph by a model, so that sub-metric compares one model reading with another. Detection, omission, invention, duplicate and identity counts do NOT depend on it.",
+        "LAYER B grades only the lines whose intended catalogue identity was ESTABLISHED (36 of 39). The other three name products the 109-item household catalogue does not carry, so no answer can be graded right or wrong there; they are reported separately and excluded from B's denominator.",
+        "The fixture inherits the committed 39-line list, whose own provenance is unrecorded. One line (page 8, Richmond) is CONTESTED on both quantity and identity and is reported rather than resolved.",
+        "The join between a model reading and a page line is still a text similarity - but between two readings of the same handwriting, not between a reading and a catalogue name. A shorthand sharing no token with the transcription still scores as a miss."
+      ]
+    }
   }
 }

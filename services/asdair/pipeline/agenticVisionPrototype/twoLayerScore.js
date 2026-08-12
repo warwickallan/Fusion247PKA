@@ -147,6 +147,25 @@ export function scoreTwoLayer({
     inventedFreeGeneration: 0,
     duplicates: 0,
     quantityErrors: 0,
+    // ── AC3(b): a CONTESTED page line is excluded from quantityErrors and
+    //    the exclusion is PRINTED BESIDE the number, never folded into it ──
+    // Fixture line 8 reads "16 Richmond SKiNLESS PORK SAUSAGES" while its
+    // expected_quantity is 1 per Warwick's pack-size ruling. A PERFECT reading
+    // therefore yields 16 against an expected 1 - a permanent graded error no
+    // amount of AC1 work can remove. Counting it forever would train everyone
+    // to discount the metric; hiding it would be dishonest. So it is excluded
+    // AND named.
+    quantityErrorsContestedExcluded: 0,
+    // ── AC1: THE METRIC THAT MEASURES THE FAULT ITSELF ──────────────────
+    // `quantityErrors` measures only the OVERLAP between a lost leading count
+    // and a true count that is not 1: where the true count IS 1, the household
+    // default supplies the same answer and the loss is invisible. Measured on
+    // Arm D, that hid roughly two thirds of the fault - 39 of 39 page lines
+    // carry a written count, and only 38.8% of readings preserved one.
+    // This pair is the direct measurement, and it belongs in the instrument
+    // rather than in one report nobody will find again.
+    detectedWherePageCarriesCount: 0,
+    leadingCountPreserved: 0,
     explicitUnknownOnRealLine: 0,
     notALineDeclared: 0,
     visibleTextExact: 0,
@@ -213,8 +232,23 @@ export function scoreTwoLayer({
     const exact = similarity(exp.source_text, written) >= 0.95;
     if (exact) A.visibleTextExact += 1; else A.visibleTextDivergent += 1;
 
+    // AC1 - was the count the page actually carries still available to the
+    // application? Evidence is the dedicated `leading_mark` field, or a
+    // reading that still begins with a digit (the pre-WP-B15-31 route).
+    if (/^\s*\d/.test(String(exp.source_text || ''))) {
+      A.detectedWherePageCarriesCount += 1;
+      const markPreserved = typeof line.leading_mark === 'string' && line.leading_mark.trim() !== '';
+      if (markPreserved || /^\s*\d/.test(written)) A.leadingCountPreserved += 1;
+    }
+
     const quantityOk = quantityAgreesUnderDefaultOne(exp.expected_quantity, line.quantity ?? null);
-    if (!quantityOk) A.quantityErrors += 1;
+    // AC3(b): contested lines are excluded from the headline and counted
+    // separately. Warwick's ruling and the page text genuinely disagree here;
+    // that is a product question, not a defect in this run.
+    if (!quantityOk) {
+      if (exp.contested) A.quantityErrorsContestedExcluded += 1;
+      else A.quantityErrors += 1;
+    }
 
     let identityVerdict;
     if (!exp.identity_established) {
@@ -267,6 +301,14 @@ export function scoreTwoLayer({
       ...A,
       detectedPct: pct(A.detected, A.expected),
       omittedPct: pct(A.omitted, A.expected),
+      // AC1 - the direct measurement of the leading-count fault. Quote this
+      // BESIDE quantityErrors, never instead of it: the error count is the
+      // subset that happened to be visible, this is the fault itself.
+      sourceLinesWithWrittenCount: expected.filter((e) => /^\s*\d/.test(String(e.source_text || ''))).length,
+      leadingCountPreservationPct: pct(A.leadingCountPreserved, A.detectedWherePageCarriesCount),
+      quantityErrorsNote: A.quantityErrorsContestedExcluded > 0
+        ? `${A.quantityErrors} quantity error(s); ${A.quantityErrorsContestedExcluded} CONTESTED page line(s) excluded (page text and the pack-size ruling genuinely disagree - see fixture contested_lines)`
+        : `${A.quantityErrors} quantity error(s); 0 contested lines excluded`,
       // Reported, and explicitly labelled, so it can never be quoted bare.
       visibleTextAccuracyPct: pct(A.visibleTextExact, A.detected),
       visibleTextGrading: 'NOT INDEPENDENTLY GRADED - the fixture transcription is non-independent',
@@ -296,7 +338,10 @@ export function formatTwoLayer(score, label) {
     `    omitted ................... ${a.omitted} (${a.omittedPct}%)`,
     `    invented PHOTO lines ...... ${a.invented}  (supplied-candidate ${a.inventedFromSuppliedCandidate}, free ${a.inventedFreeGeneration})`,
     `    duplicates ................ ${a.duplicates}`,
-    `    explicit quantity errors .. ${a.quantityErrors}`,
+    `    explicit quantity errors .. ${a.quantityErrors}   [${a.quantityErrorsNote}]`,
+    `    leading count preserved ... ${a.leadingCountPreserved}/${a.detectedWherePageCarriesCount} (${a.leadingCountPreservationPct}%) of detected lines whose page text carries a count`,
+    `      ^ THE FAULT ITSELF. The error count above is only the subset where the true count was NOT 1;`,
+    `        where it IS 1 the household default hides the loss. ${a.sourceLinesWithWrittenCount}/${a.expected} page lines carry a written count.`,
     `    UNKNOWN on a real line .... ${a.explicitUnknownOnRealLine}  (a correct, cheap outcome)`,
     `    declared NOT_A_LINE ....... ${a.notALineDeclared}`,
     `    visible-text exact ........ ${a.visibleTextExact}/${a.detected} (${a.visibleTextAccuracyPct}%) - ${a.visibleTextGrading}`,

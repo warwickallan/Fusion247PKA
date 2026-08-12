@@ -1,0 +1,118 @@
+{
+  "note": "WP-B15-31 step 1. Same raw data, current instrument. Stale blocks retained in each artefact as twoLayerScore_SUPERSEDED.",
+  "rows": [
+    {
+      "label": "arm-a",
+      "upscale": "-",
+      "accepted": 42,
+      "was": {},
+      "now": {
+        "detected": 33,
+        "omitted": 6,
+        "invented": 5,
+        "duplicates": 4,
+        "quantityErrors": 8,
+        "contestedExcluded": 1,
+        "leadingCountPreserved": "31/33",
+        "leadingCountPreservationPct": 93.9,
+        "visibleTextAccuracyPct": 81.8
+      }
+    },
+    {
+      "label": "arm-b",
+      "upscale": "-",
+      "accepted": 38,
+      "was": {
+        "detected": 30,
+        "omitted": 9,
+        "invented": 3,
+        "duplicates": 5,
+        "quantityErrors": 5,
+        "visibleTextAccuracyPct": 83.3
+      },
+      "now": {
+        "detected": 30,
+        "omitted": 9,
+        "invented": 3,
+        "duplicates": 5,
+        "quantityErrors": 4,
+        "contestedExcluded": 1,
+        "leadingCountPreserved": "25/30",
+        "leadingCountPreservationPct": 83.3,
+        "visibleTextAccuracyPct": 83.3
+      }
+    },
+    {
+      "label": "arm-c",
+      "upscale": 1,
+      "accepted": 51,
+      "was": {
+        "detected": 28,
+        "omitted": 11,
+        "invented": 7,
+        "duplicates": 4,
+        "quantityErrors": 9,
+        "visibleTextAccuracyPct": 78.6
+      },
+      "now": {
+        "detected": 30,
+        "omitted": 9,
+        "invented": 9,
+        "duplicates": 12,
+        "quantityErrors": 7,
+        "contestedExcluded": 1,
+        "leadingCountPreserved": "16/30",
+        "leadingCountPreservationPct": 53.3,
+        "visibleTextAccuracyPct": 76.7
+      }
+    },
+    {
+      "label": "arm-d",
+      "upscale": 3,
+      "accepted": 49,
+      "was": {
+        "detected": 38,
+        "omitted": 1,
+        "invented": 0,
+        "duplicates": 0,
+        "quantityErrors": 7,
+        "visibleTextAccuracyPct": 92.1
+      },
+      "now": {
+        "detected": 39,
+        "omitted": 0,
+        "invented": 0,
+        "duplicates": 10,
+        "quantityErrors": 7,
+        "contestedExcluded": 1,
+        "leadingCountPreserved": "18/39",
+        "leadingCountPreservationPct": 46.2,
+        "visibleTextAccuracyPct": 100
+      }
+    },
+    {
+      "label": "arm-d2",
+      "upscale": 3,
+      "accepted": 50,
+      "was": {
+        "detected": 37,
+        "omitted": 2,
+        "invented": 1,
+        "duplicates": 1,
+        "quantityErrors": 7,
+        "visibleTextAccuracyPct": 91.9
+      },
+      "now": {
+        "detected": 39,
+        "omitted": 0,
+        "invented": 1,
+        "duplicates": 10,
+        "quantityErrors": 6,
+        "contestedExcluded": 1,
+        "leadingCountPreserved": "20/39",
+        "leadingCountPreservationPct": 51.3,
+        "visibleTextAccuracyPct": 97.4
+      }
+    }
+  ]
+}
