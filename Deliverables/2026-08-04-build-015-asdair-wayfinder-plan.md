@@ -1912,6 +1912,21 @@ and correctly declined to assert either the omission mechanism or the Febreze-du
 proven — both are named as unverified candidates for Step 2's actual investigation, not conclusions.
 Proceeding to implementation.
 
+**Round 3 COMPLETED** — `e075440`, real root causes found by reading code, not guessed. **AC1 (omission):
+found the actual mechanism** — `followUpTrigger.js` could only ever flag a region that produced at
+least one line; a region that produced ZERO lines had no line to attach a flag to, so it could never
+trigger re-inspection. Fixed with a new independent `silentRegions()` trigger. **AC3 (duplicate
+collapse): found the actual mechanism** — the existing `possible_duplicate` label was computed but
+**never read by anything downstream**; `runPipeline.js` materialised every line into a real basket
+intent unconditionally. Fixed properly: `resolveByCatalogue.js` now authoritatively excludes a second
+reading resolving to the same product at the same quantity (status `excluded`, never silently dropped
+from the record). AC2 (hallucination guard) hardened the prompt against "known products" priors
+licensing invented lines. AC4 (Yazoo): omission case covered by the AC1 fix; the wrong-quantity cases
+carry genuine leading-count evidence in their own raw text, so correctly reported as not a deterministic
+bug rather than guess-fixed. 662/662 + 53/53 tests pass. **None of this is proven to actually work yet
+— that requires the live re-run, dispatched to Asdair now, same discipline as before (two runs, not
+one).**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
