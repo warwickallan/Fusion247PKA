@@ -1985,6 +1985,19 @@ dominant omission mode (partial misses within a region that DOES produce lines, 
 already-fixed zero-line case); traces and fixes the quantity-assertion collapse. Highest-consequence
 defect (silent deletion of a real item) sequenced first.
 
+**Round 4 COMPLETED** — `f442b2f`. AC1/AC3/AC4/AC5 all met with real evidence: cross-region collisions
+now demote BOTH lines to `needs_confirmation` (proven against the exact captured Lenor/Febreze shape);
+the quantity-assertion collapse's actual cause found by `git diff` comparison, not guessed — rule 6
+(quantity) was byte-identical across rounds, the real culprit was rule 1's caution clause scoped too
+broadly, now narrowed to line-existence only; 689/691 real DB-gated tests pass (2 pre-existing failures,
+confirmed unrelated via `git stash` comparison against the unmodified base, correctly reported not
+fixed). **AC2 (the harder omission-density investigation) correctly NOT shipped** — Keel judged an
+uncalibrated ink-density heuristic would repeat the exact "confidently wrong, unproven" pattern this
+build has paid for three times already (Gate Zero, the milk-identity bug, the hallucination guard), and
+recommended a calibrated follow-up instead of forcing something in now. Also caught and fixed its own
+scope error mid-round (a test written into a non-granted file, corrected before handback). **Live
+re-test dispatched to Asdair — the fourth.**
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
