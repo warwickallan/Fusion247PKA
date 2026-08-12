@@ -112,6 +112,40 @@ export function similarity(a, b) {
 export const MATCH_FLOOR = 0.5;
 
 /**
+ * ── WO-2026-08-12-02 (WP-B15-30), AC2: STOP MARKING CORRECT BEHAVIOUR WRONG ─
+ *
+ * Warwick, on the WP-B15-29 result: the scorer was "materially noisy", and
+ * SIX of its NINE `wrongQuantity` verdicts penalised the model for returning
+ * `null` on a line the page carries no count for - which is exactly what the
+ * prompt contract, the sanity checks and the Work Order all REQUIRED it to do.
+ * A measurement that punishes compliance is worse than no measurement: it
+ * pushes the next round to "fix" behaviour that was already right.
+ *
+ * The rule: where the household default-one rule supplies the answer, an
+ * absent quantity and an explicit 1 are THE SAME ANSWER. Everywhere else the
+ * comparison is unchanged and just as strict as before - a wrong number is
+ * still wrong, and `null` against an expected 4 is still wrong.
+ *
+ * This is belt-and-braces, not the primary mechanism. quantityRule.js now
+ * resolves an absent quantity to 1 BEFORE scoring, so a freshly grounded line
+ * should never reach here with `null`. This tolerance is what lets an artefact
+ * banked BEFORE that rule existed - the WP-B15-29 Arm A and Arm B runs - be
+ * re-scored like for like on the corrected instrument.
+ *
+ * @param {number|null} expected - the fixture's quantity for the line.
+ * @param {number|null} got - the quantity the application believes.
+ * @returns {boolean}
+ */
+export function quantityAgreesUnderDefaultOne(expected, got) {
+  if (expected === null && got === null) return true;
+  // AC2, both directions: the default-one rule makes these the same answer.
+  if (got === null && Number(expected) === 1) return true;
+  if (expected === null && Number(got) === 1) return true;
+  if (expected === null || got === null) return false;
+  return Number(expected) === Number(got);
+}
+
+/**
  * Read the committed 39-line ground truth: a JSON array of `{product, qty}`.
  * @param {string} groundTruthPath
  * @returns {Array<{product:string, qty:number|null}>}
@@ -307,7 +341,7 @@ export function scoreSevenWay({
 
     const expected = truth.qty ?? null;
     const got = line.quantity ?? null;
-    const quantityAgrees = expected === null || got === null ? expected === got : Number(expected) === Number(got);
+    const quantityAgrees = quantityAgreesUnderDefaultOne(expected, got);
     if (!quantityAgrees) {
       wrongQuantity += 1;
       details.push({

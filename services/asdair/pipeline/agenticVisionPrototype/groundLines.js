@@ -78,6 +78,7 @@ import {
   checkImplausibleQuantity,
 } from '../photoSanityChecks.js';
 import { UNKNOWN_VISIBLE_ITEM, NOT_A_LINE } from './lineSchema.js';
+import { resolveQuantity, QUANTITY_BASIS } from './quantityRule.js';
 
 /** Below this, the application may decide to LOOK AGAIN. It accepts nothing. */
 export const DEFAULT_LOOK_AGAIN_BELOW = 0.6;
@@ -263,14 +264,29 @@ export function groundLines({ lines, productIdEnum, regionNos, lookAgainBelow = 
       return;
     }
 
-    // AC7 - quantity survives only on independent evidence. Fed the VERBATIM
-    // reading, never a catalogue name.
+    // ── QUANTITY: the model's number is EVIDENCE ABOUT THE MODEL; the
+    //    APPLICATION decides the number (WP-B15-29 AC7 + WP-B15-30 AC1) ──────
+    //
+    // Both sanity checks still run and still record their flags - they are how
+    // "the model inferred a pack size as a purchase count" stays VISIBLE, and
+    // AC8 pins that class with a test. What WP-B15-30 AC1 changed is only what
+    // happens afterwards: an absent quantity is no longer carried onward as
+    // `null`. Warwick ruled the household default is ONE retail unit, so
+    // quantityRule.js resolves the value from the VERBATIM page text alone.
+    //
+    // The rule reads the PAGE, never the model, so a quantity the checks just
+    // rejected cannot leak back in through the default.
     const quantityProbe = { raw_reading: written, quantity: line.quantity ?? null };
-    let quantity = line.quantity ?? null;
     const unjustified = checkUnjustifiedQuantity(quantityProbe);
-    if (unjustified) { flags.push(unjustified); quantity = null; }
+    if (unjustified) flags.push(unjustified);
     const implausible = checkImplausibleQuantity(quantityProbe);
-    if (implausible) { flags.push(implausible); quantity = null; }
+    if (implausible) flags.push(implausible);
+    const resolvedQuantity = resolveQuantity({
+      asWritten: written,
+      reportedQuantity: line.quantity ?? null,
+      isPurchaseLine: true,
+    });
+    const quantity = resolvedQuantity.quantity;
 
     // AC6 - confidence records, and may trigger another look. Nothing else.
     const confidence = Number.isFinite(Number(line.confidence)) ? Number(line.confidence) : null;
@@ -293,7 +309,13 @@ export function groundLines({ lines, productIdEnum, regionNos, lookAgainBelow = 
         && line.product_id !== NOT_A_LINE,
       source_region: Number(line.source_region),
       quantity,
+      // AC1 - a 1 the household default supplied is never indistinguishable
+      // from a 1 the page actually wrote. Both the basis and the model's own
+      // discarded claim travel with the line.
+      quantity_basis: resolvedQuantity.basis,
       quantity_evidence: leadingQuantityEvidence(written),
+      model_quantity: resolvedQuantity.modelQuantity,
+      model_quantity_disagreed: resolvedQuantity.modelDisagreed,
       confidence,
       look_again: lookAgain,
       flags,
@@ -316,6 +338,12 @@ export function groundLines({ lines, productIdEnum, regionNos, lookAgainBelow = 
     notALine: rejected.filter((r) => r.reasons.includes('not_a_line')).length,
     regionRejected: rejected.filter((r) => r.reasons.includes('source_region_not_supplied')).length,
     quantityNulled: marked.filter((l) => l.flags.length > 0).length,
+    // AC1 - how many lines took Warwick's household default rather than a
+    // count actually written on the page, and how many model-claimed numbers
+    // were discarded on the way. Both are reported; neither is silent.
+    quantityDefaulted: marked.filter((l) => l.quantity_basis === QUANTITY_BASIS.HOUSEHOLD_DEFAULT).length,
+    quantityFromPage: marked.filter((l) => l.quantity_basis === QUANTITY_BASIS.EXPLICIT).length,
+    modelQuantityDiscarded: marked.filter((l) => l.model_quantity_disagreed).length,
     duplicateGroups: duplicateGroups.length,
     crossRegionCollisions: duplicateGroups.filter((g) => g.kind === 'cross_region').length,
   };

@@ -17,6 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   scoreSevenWay, loadGroundTruth, fuzzyMatches, normalise, SCORER_LIMITS,
+  quantityAgreesUnderDefaultOne,
 } from './sevenWayScore.js';
 import { UNKNOWN_VISIBLE_ITEM } from './lineSchema.js';
 
@@ -177,4 +178,31 @@ test('loadGroundTruth: a malformed entry is refused rather than scored around', 
   try {
     assert.throws(() => loadGroundTruth(tmp), /string `product`/);
   } finally { fs.unlinkSync(tmp); }
+});
+
+// ── AC2 (WP-B15-30): THE SCORER STOPS MARKING CORRECT BEHAVIOUR WRONG ──────
+// Warwick: six of nine `wrongQuantity` verdicts in WP-B15-29 penalised the
+// model for returning null on a line the page carries no count for - the
+// behaviour every other layer required of it.
+
+test('AC2: a null quantity against an expected 1 is CORRECT, not a wrong quantity', () => {
+  assert.equal(quantityAgreesUnderDefaultOne(1, null), true);
+});
+
+test('AC2: the tolerance runs BOTH ways - an explicit 1 against an absent expectation also agrees', () => {
+  assert.equal(quantityAgreesUnderDefaultOne(null, 1), true);
+});
+
+test('AC2 MUTATION GUARD: the tolerance must not have made the check permissive', () => {
+  // If any of these start passing, AC2 has been implemented as "quantity no
+  // longer graded", which is not the correction that was asked for.
+  assert.equal(quantityAgreesUnderDefaultOne(4, null), false, 'null against an expected 4 is still WRONG');
+  assert.equal(quantityAgreesUnderDefaultOne(null, 3), false, 'a claimed 3 against no expectation is still WRONG');
+  assert.equal(quantityAgreesUnderDefaultOne(2, 3), false, 'a wrong number is still wrong');
+  assert.equal(quantityAgreesUnderDefaultOne(1, 2), false, 'default-one does not excuse a claimed 2');
+});
+
+test('AC2: unchanged cases still behave exactly as before', () => {
+  assert.equal(quantityAgreesUnderDefaultOne(3, 3), true);
+  assert.equal(quantityAgreesUnderDefaultOne(null, null), true);
 });

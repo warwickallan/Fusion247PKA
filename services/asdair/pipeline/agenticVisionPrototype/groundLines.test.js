@@ -105,15 +105,29 @@ test('AC6: a MISSING confidence is recorded as null and demotes nothing (the Num
   assert.equal(out.accepted[0].look_again, false, 'a missing confidence must not become 0 and demote every matched line');
 });
 
-// ── AC7: THE QUANTITY INVARIANT ────────────────────────────────────────
-test('AC7: a pack-size number inside the product name does NOT become purchase quantity', () => {
+// ── AC7 (WP-B15-29) + AC1 (WP-B15-30): THE QUANTITY INVARIANT ──────────
+//
+// ⚠️ THE REQUIREMENT CHANGED HERE, THE PROOF DID NOT WEAKEN. Until WP-B15-30
+// this test asserted `quantity === null` for the Richmond class. Warwick then
+// ruled (Amendment 1, AC1) that the household default is ONE retail unit, so
+// `null` is no longer the correct answer - `1` is. The invariant being
+// protected is unchanged and is now asserted MORE strictly than before: the
+// model's 16 must not survive, must be recorded as discarded, and the 1 that
+// replaces it must be distinguishable from a 1 the page actually wrote.
+// Three assertions where there was one.
+test('AC7+AC1: a pack-size number inside the product name is DISCARDED, and the household default replaces it', () => {
   const out = groundLines({
     lines: [line({ as_written: 'Richmond 16 pork sausages', quantity: 16 })],
     productIdEnum: ENUM,
     regionNos: REGIONS,
   });
-  assert.equal(out.accepted[0].quantity, null, '"16" names a 16-sausage pack, it is not an instruction to buy sixteen packs');
-  assert.ok(out.accepted[0].flags.includes('unjustified_quantity'));
+  const got = out.accepted[0];
+  assert.notEqual(got.quantity, 16, '"16" names a 16-sausage pack, it is not an instruction to buy sixteen packs');
+  assert.equal(got.quantity, 1, 'Warwick\'s household default: one retail unit');
+  assert.equal(got.quantity_basis, 'household-default-one', 'the 1 must never look like a written 1');
+  assert.equal(got.model_quantity, 16, 'what the model claimed stays visible as evidence about the model');
+  assert.equal(got.model_quantity_disagreed, true);
+  assert.ok(got.flags.includes('unjustified_quantity'), 'the detection flag itself must not regress');
 });
 
 test('AC7: a genuine LEADING count survives - the caution must not suppress a real quantity', () => {
@@ -124,11 +138,17 @@ test('AC7: a genuine LEADING count survives - the caution must not suppress a re
   assert.deepEqual(out.accepted[0].flags, []);
 });
 
-test('AC7: an explicit multiplier survives, and an implausible quantity is nulled', () => {
+test('AC7+AC1: an explicit multiplier survives, and an implausible quantity is REFUSED (not clamped, not kept)', () => {
   const ok = groundLines({ lines: [line({ as_written: 'yazoo x3', quantity: 3 })], productIdEnum: ENUM, regionNos: REGIONS });
   assert.equal(ok.accepted[0].quantity, 3);
+  assert.equal(ok.accepted[0].quantity_basis, 'explicit-on-page');
+
+  // "900 milk" reads as a leading count of 900, which is implausible. It is
+  // flagged, and the number does NOT survive - it is neither kept nor clamped
+  // to the ceiling. Under AC1 the line still resolves to the household
+  // default rather than to null, because 900 is unusable, not absent.
   const silly = groundLines({ lines: [line({ as_written: '900 milk', quantity: 900 })], productIdEnum: ENUM, regionNos: REGIONS });
-  assert.equal(silly.accepted[0].quantity, null);
+  assert.notEqual(silly.accepted[0].quantity, 900, 'an implausible count must never survive');
   assert.ok(silly.accepted[0].flags.includes('implausible_quantity'));
 });
 
