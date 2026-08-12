@@ -2151,6 +2151,13 @@ shape of miss). Secondary finding: this photo's region plan produced only 3 regi
 expected — worth revisiting once the crash is fixed. **Narrow, precisely-located fix dispatched next —
 not another open-ended round.**
 
+**Fix COMPLETED** — `f9c45a0`, pushed. Both bugs closed: `function_call_output` now constructed per
+pending `call_id`; the loop handles every tool call in a turn, not just the first. Proven against a
+mocked two-call shape matching the real capture doubled, not a single-call fixture. 729/717/0/12,
++7 tests, zero regressions. **The `function_call_output` shape itself is still unproven against the
+real gateway** — this is the honest limit every mock carries. Live re-test dispatched — this is the
+one that actually decides whether the architecture works.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
