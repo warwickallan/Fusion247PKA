@@ -150,7 +150,19 @@ jobs:
       # against an in-memory pg carrying migration 006 and 008's ACTUAL unique
       # indexes and CHECKs, so a duplicate is refused by the same mechanism
       # Postgres uses rather than by a mock told to say no.
-      - name: Run the pipeline orchestrator suite (offline)
+      #
+      # ADDED 2026-08-12, closing the SAME defect class this file's own comments
+      # already warn about twice above: BUILD-015-VISION-01 gave this package a
+      # real dependency (sharp, for imageRender.js's real rotate/deskew/crop
+      # proof) and this step had no install before it. Without npm ci, sharp is
+      # missing and 7 of imageRender.test.js's tests SKIP rather than run --
+      # silently, no failure, indistinguishable from green. Reproduced live by
+      # Larry against this exact worktree before this fix landed.
+      - name: Install dependencies for the pipeline orchestrator (sharp, pg)
+        working-directory: services/asdair/pipeline
+        run: npm ci
+
+      - name: Run the pipeline orchestrator suite (offline; DB-gated proofs skip here, run in `integration` below)
         working-directory: services/asdair/pipeline
         run: node --test
 
@@ -245,3 +257,17 @@ jobs:
       - name: Run the DB-gated outcome + promotion proof on a clean Postgres
         working-directory: services/asdair/outcome
         run: node --test test/outcome.dbtest.js
+
+      # ADDED 2026-08-12, BUILD-015-VISION-01. The AC3 acceptance_property (a
+      # PHOTO-provenance row with no source_region is refused by the database
+      # itself, not application code) and the real sharp-rendering capstone
+      # test are the actual proof this WP exists to deliver -- they must not
+      # be left to skip silently in `unit`, same reasoning as constraints.dbtest.js
+      # and outcome.dbtest.js above. Separate step so a failure names the module.
+      - name: Install dependencies for the pipeline orchestrator (sharp, pg)
+        working-directory: services/asdair/pipeline
+        run: npm ci
+
+      - name: Run the pipeline's DB-gated provenance + capstone proofs on a clean Postgres
+        working-directory: services/asdair/pipeline
+        run: node --test test/provenanceConstraints.dbtest.js test/lineProvenance.dbtest.js test/interpretPhotoRealEndToEnd.dbtest.js

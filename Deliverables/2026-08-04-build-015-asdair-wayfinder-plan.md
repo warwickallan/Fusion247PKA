@@ -1669,6 +1669,173 @@ once that decision lands.
 
 **Closing head at time of writing: `0aaaa23`.**
 
+**Progress update, same session, later:** Silas's schema decision landed
+(`Deliverables/2026-08-12-silas-schema-decision-photo-truth-and-cockpit-state.md`, migration
+`services/asdair/db/020_shop_line_provenance_and_human_state.sql` — corrected Larry's stale migration
+number, 020 not 018). The vision-pipeline Work Order was then properly issued and dispatched
+(`Deliverables/2026-08-11-wo-b15-24-vision-pipeline-order.md`) — all three legs of tonight's parallel
+dispatch now in flight. **Keel's Cockpit-backend work returned PARTIAL, honestly**: AC1/AC2/AC3(amended)/
+AC5 confirmed MET with real evidence (163/163 and 188/188 executed test passes); AC4 blocked on a
+test file, `renderMessages.test.js`, that pinned an exact message-key set and was outside Keel's
+declared surface — Keel correctly refused to force its (design-correct) url-button renderers into
+that test's callback_data-only shape rather than game it. Fixed by AMENDMENT 2: surface widened by
+exactly that one file. Also found and reported, not fixed (correctly out of scope): a real
+`correctLine`/`markCorrected` identifier-space mismatch (string item_name vs. integer lineNo), and a
+missing "mark not this week" command for an already-resolved line — both flagged residuals for later,
+not chased tonight.
+
+**Closing head at time of writing: `8866659`.**
+
+**Cockpit-backend WP (`WO-2026-08-11-B15-COCKPIT-BE-01`) COMPLETED, same session** — all 5 acceptance
+criteria MET with executed evidence (cockpit-api 163/163, bot 196/196, secret-scan clean across 74
+files). Pushed to `build-015/b15-25-cockpit-backend` @ `82e7618`. **This is builder self-test evidence,
+not independent review** — no Veritas gate has run, and it is NOT integrated into `main`. The maximum
+honest statement right now is: built, tested, pushed to its own branch. Residuals correctly carried
+forward rather than silently closed: `canonicalState.js` is a fixture-evidenced placeholder never
+proven against a live DB; the three new Telegram renderers exist and pass tests but nothing yet
+enqueues them (no `runtime.js`/`runPipeline.js` caller); the `correctLine`/`markCorrected`
+identifier-space mismatch and the missing "not this week" command remain open, flagged follow-ons.
+
+**Vision-pipeline WP (`WO-2026-08-11-B15-VISION-01`) — CLARIFY then amended, same pattern as Cockpit-
+backend.** Keel's preflight found `services/asdair/interpret/groundedPrompt.js` (the actual canonical
+prompt-builder, not the file named in `file_surface`) must carry the region-citation contract, and
+`services/obsidiwikai/package.json` needs widening solely to register a new test file. AMENDMENT 1
+widened the surface by exactly those two files and approved a disposable local Postgres plan for AC3's
+database-level proof (no Docker available here; a throwaway instance substitutes, matching the CI
+job's own allowance). Implementation now proceeding.
+
+**All three legs now at real, honestly-reported progress:**
+- **Felix's Cockpit-UI is IMPLEMENTED** (`build-015/b15-26-cockpit-ui`, commit `f7bf71a`, local-commits-
+  only per its contract's disclosed gap) — four-tab nav, canonical-state-driven Shop screen, a
+  write-capable Questions board routed through one command function, Diagnostics-gated developer
+  content. Not self-certified visually (no browser tool in Felix's grant, and `node server.mjs` fails
+  to start in that worktree on an unrelated dependency gap) — **Vera dispatched** for the real
+  visual/WCAG/responsive gate.
+- **Keel's vision-pipeline hit a genuine product decision**: no image-processing library exists
+  anywhere in this repo, and real rotate/deskew/crop — the exact mechanism that made the manual read
+  beat Terra — cannot be built zero-dependency. Put to Warwick directly as a two-option choice; his
+  answer: authorise a minimal library, scoped to `services/asdair/pipeline/**` only (`sharp`, pinned).
+  Everything else in this WP is DONE and proven while that was pending, including **AC3's acceptance_
+  property proven against a real disposable Postgres** — an actual `23514` CHECK-constraint refusal
+  captured, not paraphrased. One finding fixed directly by Larry (not the worker, per an established
+  precedent in the test itself): `invariants.test.js`'s `OWNED` writer-list needed two new table names,
+  committed as `9dd980f` on Keel's own branch. `interpretPhoto`'s rewrite (the held piece) now
+  unblocked.
+- **Cockpit-backend is COMPLETE** — all 5 acceptance criteria met, pushed to
+  `build-015/b15-25-cockpit-backend` @ `82e7618`.
+
+**Genuine cross-WP reconciliation still owed, not yet done:** Cockpit-backend's `canonicalState.js` and
+Felix's UI both read a PLACEHOLDER field name; the vision-pipeline WP's real column is
+`asdair.shop.human_state`. Reconciling that rename is Larry's job once all three branches are ready to
+converge — not attempted mid-flight while each WP is still moving.
+
+**Vision-pipeline WP now COMPLETED for every criterion**, including AC1/AC2 (the piece that was held on
+Warwick's dependency decision) — real proof, not mocked: a genuine capstone test rendering real JPEGs
+through `sharp`, sending real region crops in one `vision()` call, and writing real
+`shop_image_region`/`shop_line_provenance` rows against a real disposable Postgres, in the exact call
+order AC6 requires. 620/623 pipeline tests pass locally (3 correctly skip without DB/sharp opt-in).
+Pushed to `build-015/b15-24-vision-pipeline` @ `3eb0dc3`. **One honest residual, reported not fixed,
+outside every granted surface**: `.github/workflows/asdair-tests.yml`'s pipeline job never runs
+`npm install`, so CI will silently SKIP (not fail) the new sharp/DB-gated tests rather than exercise
+them — proven locally only, not yet proven in CI. Parked as a small, later, `.github/workflows/**`-
+scoped fix; non-blocking, not chased tonight.
+
+**⛔ CORRECTION, Warwick, same session, immediately after: "vision pipeline: complete" was the wrong
+claim.** His words: *"What they've proved is that the mechanism works... What they have not yet told
+you is the one thing you actually care about: Does Terra, with its new glasses, now read Mum's
+troublesome photograph materially better?... That's the difference between we successfully built
+spectacles and Terra can actually fucking read through them."* **Restated precisely: vision mechanics
+PROVEN (real sharp rendering, real Postgres constraints, executed tests). The actual outcome — does
+Terra now read the known photograph correctly — is NOT YET PROVEN.** Cockpit is "largely built," not
+complete (Vera's gate still open). Nothing is converged.
+
+**Four things Warwick named, all actioned this same session, not parked:**
+1. **The discriminating test itself — the most important open item.** Dispatched to Asdair (only actor
+   with live gateway credentials): run the known photograph through the NEW pipeline code and compare
+   against the verified 41-line trolley, real count, real check on whether the specific named errors
+   (Richmond ×16, the 9+ missing items) are actually fixed. ALSO run Keel's built-but-unrun A/B harness
+   (bundled vs. individually-called strips) against this same real photo — Warwick's explicit
+   instruction: let the real photo decide that question, don't reopen the abstract argument. Diagnostic
+   run only, no live shop/basket/Telegram action. In progress.
+2. **The "620/623" claim — independently re-verified by Larry, not just relayed.** Confirmed exactly:
+   623 tests, 620 pass, 0 fail, 3 skip (the three DB-gated files, correctly gated on
+   `ASDAIR_DB_TEST_ALLOW_DESTRUCTIVE`, separately run by Keel with real Postgres and reported 15/15
+   pass). **But also found, by re-running it cold myself: without `npm install`, sharp is missing and 7
+   MORE tests silently skip instead of running** (13/623 total, not 3) — reproducing, live, the exact
+   defect class item 3 addresses.
+3. **The CI dependency-install gap — fixed now, not parked**, per Warwick: *"not really a later nicety
+   if CI silently skips the very sharp/database tests that constitute the new vision proof."* Committed
+   directly by Larry to `main` (`6923ad6`) — small, mechanical, matches an already-established pattern
+   in the same file for two sibling packages, Warwick's explicit go-ahead. Adds the missing install step
+   in `unit`, and moves the pipeline's three DB-gated proofs (including the AC3 database-constraint
+   acceptance_property) into `integration` against the real Postgres service container, so CI actually
+   exercises them rather than only proving them locally.
+4. **Cross-WP state-field reconciliation** (the placeholder rename across Cockpit-backend/UI to the
+   real `asdair.shop.human_state`) — **not done yet, queued as the next Keel task** once Vera and the
+   discriminating test land. Not silently parked past merge — explicitly sequenced, not forgotten.
+
+**Convergence status, stated honestly:** vision mechanics proven; production-outcome proof in progress;
+Cockpit largely built, QA gate open; CI gap fixed; state-field reconciliation queued. **Nothing is
+merged. Nothing is "complete" until the discriminating test and Vera's gate both land.**
+
+**Vera's QA gate returned, same session: HOLD (0 CRITICAL, 2 HIGH, 2 MEDIUM), genuinely execution-based
+— she fixed a real server-startup blocker herself (without touching live credentials) to actually get
+the UI rendering first-person, rather than trusting Felix's own build claims.** Two HIGH findings, both
+narrow: the six-state colour mapping is computed but never wired into CSS (every state renders the same
+grey dot — text-only, so not a WCAG failure, but an unfinished wire-up); mobile tap targets on the
+write-action controls (`.as-choice`, `.act`) miss the 44×44 house bar (they clear WCAG's actual 24×24
+floor). Two MEDIUM: a focus-ring scoping gap on the action-sheet modal and its parent heading; no focus
+trap on that same modal. All four sent back to Felix in one pass with exact fix locations; Vera will
+re-inspect on completion, no second-hand confirmation.
+
+**Felix fixed all four, same session** — commit `86cfc08`, local-only. Sensible narrow choices: scoped
+the tap-target fix to AsdAIr's own screens rather than the shared global `.act` primitive every other
+screen also uses; used `inert` on the sheet's actual sibling elements rather than a hand-rolled
+tab-cycle. **Vera's re-inspection: PASS** — genuinely execution-verified, not a diff-read. Real CDP-dispatched Tab
+keypresses (not JS `.click()`) confirmed the focus trap holds across 11+ presses in both directions on
+two different sheets; real device-metrics viewports (not `--window-size`, which she'd already found
+silently clamps below ~540px in this environment) confirmed all three write-action controls now measure
+44px; all eight state/fallback presentations confirmed visibly distinct on both text and colour. 3 LOW
+residuals recorded, none blocking: a pre-existing shared tab-switcher primitive at 39px (clears WCAG's
+real 24×24 floor, wasn't the original finding's target), a cosmetic body-bounce on the focus-trap edge,
+and one Chromium focus-visible heuristic for scripted (non-Tab) focus that neither Vera nor the codebase
+controls. **Cockpit-UI's visual/accessibility gate is closed.** This is Vera's gate only — not a
+completion claim; still not merged, still not reviewed by Veritas at whatever boundary eventually
+applies.
+
+**⛔ THE DISCRIMINATING TEST LANDED. THE ANSWER IS NO, NOT YET.** Asdair ran the known photo through
+the real new pipeline (real sharp crops, real grounded vision call, real follow-up, real catalogue
+resolution) and scored it against the 41-line verified trolley. **Result: 20/41 correct on name AND
+quantity (49%). 23/41 named at all. 18/41 never appeared.** Richmond sausages read correctly (1, not
+16) in THIS run — **but recurred as 16 in a sibling run**, proving it is NOT structurally fixed, only
+non-deterministic. **Root cause found and it is a real, concrete, fixable bug**:
+`photoSanityChecks.js`'s `MAX_PLAUSIBLE_QUANTITY = 24` cannot catch 16 — the exact flagship failure the
+whole design doc cites as motivating this check sits under its own threshold. 5 of the 13 previously-
+missing items recovered, 1 partial, 7 still fully missing. **New regressions found, not present before**:
+Yazoo Chocolate now missing entirely; a genuine identity-resolution bug (6-pint milk mismatched to the
+Cravendale 2L regular, corrupting both lines); a duplicate Vanish line; persisting hallucinated extras
+that were explicitly supposed to be excluded (TRESemme ×2, Viakal, Minced Beef Hotpot, Lucozade
+Raspberry).
+
+**The A/B question is now empirically settled by the real photo, per Warwick's own instruction — not
+by further argument.** Individual per-region calls clearly beat the bundled single call: 35/41 products
+named vs. 24/41, 27/41 correct quantity vs. 21/41, confirming Pax's literature-based flag. Cost: 3 calls
+/ 108s vs. 1 call / 45s. 6 items (Batchelors Mac 'n' Cheese, ASDA Allergy tablets, Fruit Splits Lollies,
+Febreze Vanilla Butterscotch, Vanish Pre-Treat Gel, Ariel Pods) were missed by BOTH strategies — a
+separate catalogue/alias gap, not a call-strategy problem.
+
+**Verdict, in Asdair's own words: "measurably better, not yet trustworthy."** Mechanism proven; outcome
+NOT yet achieved. This WP is not ready to close on the strength of tonight's build alone.
+
+**One disclosed process note, not resolved**: Asdair ran this using its own long-established, documented
+credential-consumption pattern (`node --env-file=...`, per its own runtime README) rather than reading
+any secret file directly — but this Work Order carried no explicit `private_surface` declaration, and
+the GL-012 shape mismatch flagged earlier this session (`C:/.fusion247/asdair/**` vs. the stated
+`C:/.fusion247/private/<project>/**` pattern) is still genuinely open, now surfaced a third time. Not
+escalated tonight per the hobby-brain bar (no credential exposed, Asdair's own established method, its
+own normal job) — but worth Warwick knowing it happened, and worth settling properly rather than
+re-deciding ad hoc each time it comes up.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.

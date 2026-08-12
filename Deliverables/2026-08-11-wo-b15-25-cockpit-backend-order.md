@@ -161,6 +161,26 @@ Everything else in this order (AC1, AC2, AC5, all "Required evidence," all "Expl
 is unchanged. Proceed on the amended scope; no further read-back required per SOP-022's one-additional-
 fresh-read-back allowance — this amendment already reflects Larry's acceptance of Keel's finding.
 
+---
+
+## AMENDMENT 2 — Larry, 2026-08-12, after Keel's PARTIAL report on Amendment 1
+
+AC1/AC2/AC3(amended)/AC5 confirmed MET, with real evidence (163/163 and 188/188 test passes, an
+executed grep trace for AC2, the exact `stepApplyCorrections` call site named for AC3's follow-on).
+AC4 came back PARTIAL for a genuine, correctly-reported reason: `services/asdair/bot/renderMessages.js`
+was in `file_surface`, but `services/asdair/bot/renderMessages.test.js` — which pins the exact
+`MESSAGES` key set and asserts every button is `callback_data`-shaped — was not, and Keel correctly
+declined to either touch a file outside its surface or force its new (correctly `url`-button-shaped,
+per the design doc) renderers into a `callback_data` shape just to satisfy an out-of-surface test.
+That is the right call, not a gap to route around.
+
+**`file_surface` is widened by exactly one file:** `services/asdair/bot/renderMessages.test.js`.
+Nothing else changes. Proceed to: register the three new renderer functions in `MESSAGES`, extend the
+pinned key-set assertion and `SAMPLES` to include them (adjusting the `callback_data`-only assertion
+loop to also accept the `url`-button shape your renderers correctly use), and report AC4 as MET or
+PARTIAL again with the same evidence discipline as your first report. This constitutes Larry's
+acceptance of an amended read-back per SOP-022 — proceed without a further hold.
+
 ## Sequencing
 
 1. Standard gate: read back (outcome, plan, what this order failed to settle, what looks wrong) and HOLD for Larry's explicit acceptance before writing any code.
