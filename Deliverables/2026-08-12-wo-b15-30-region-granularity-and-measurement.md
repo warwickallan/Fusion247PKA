@@ -297,3 +297,129 @@ can reach the bar at all.** Warwick has asked for exactly that rather than anoth
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-12, after Keel's CLARIFY read-back
+
+**All thirteen findings resolved below. This amendment is OPERATIVE and supersedes anything above it that
+it contradicts.** Per `CLAUDE.md`, this earns ONE further read-back; after that, proceed.
+
+## The finding that changes the experiment — F1 UPHELD, AC5's geometry is REDEFINED
+
+**Keel established by execution that the photograph is rotated ~90° and written in two columns.**
+Ink-density profiling of the paper box found **~21 alternating ink bands along the X axis and none along
+Y**; EXIF orientation reads `null`, so nothing ever corrected for it. **The handwritten lines stack along
+X and run along Y.**
+
+**Every horizontal strip ever cut has sliced every line perpendicular. No strip has ever contained a whole
+line — only the full-page region has.** That is almost certainly why the model requested region 1 mid-loop
+in both WP-B15-29 arms: it was reaching for the only region in which the writing was legible.
+
+**Consequence: AC5 as written would have made the result WORSE**, cutting each line into 6–8 fragments.
+Overlap does not rescue it, because the failure is not lines falling near a seam — it is no line being
+whole in any band.
+
+**AUTHORISED, and this is Larry's ruling within Warwick's stated intent** (*"smaller deterministic
+application-owned regions/bands... give Terra enough visual resolution per handwritten line"*): build the
+finer plan **in-surface** and make it **orientation-aware**. Determine the text-stacking axis
+**deterministically from the ink profile — application-owned, model-free; Terra never proposes
+coordinates** — then cut 6–8 bands **perpendicular to the reading direction**, retaining modest overlap.
+The band COUNT and the overlap are Warwick's; the AXIS was wrong in the order and is corrected here.
+**Handle the two columns explicitly**: report whether you band per column or across both, and why.
+
+## F2 UPHELD — the coverage proof was vacuous. Use Keel's form.
+
+*"Every line falls inside at least one region"* is trivially true forever, because region 1 covers the
+page. **Replaced by:** for every position on the stacking axis, a band of one line-height centred there is
+**fully contained, with margin, inside at least one NON-full-page region**. That is what *"no line sits
+only at a boundary"* actually means, it is checkable by geometry, and it **fails on the current plan** — a
+decision-grade fact available before any spend. Report the old plan's failure and the new plan's pass.
+
+## F8 UPHELD — resolution is likely the binding constraint. Upscaling AUTHORISED, as its own arm.
+
+~22 px per handwritten line, and `renderRegionCrop()` is a pure `extract` with **no resize** — so every
+crop to date has handed the model *exactly the same pixels*, reducing competing content without adding one
+bit of information. **Authorised: deterministic, application-owned upscaling of each band** (e.g. 3×
+lanczos).
+
+**Run TWO arms so the gain is attributable, because this moves two variables:**
+- **Arm C — orientation-aware bands, NO upscale.**
+- **Arm D — orientation-aware bands, WITH upscale.**
+
+Warwick on cost, quoted: *"If better region coverage doubles or even modestly exceeds that cost but
+produces a trustworthy weekly shop, that is economically sane... **Do not save pennies by accepting
+rubbish.**"* **If Arm C already clears the bar, Arm D is optional — say so rather than spending for
+symmetry.**
+
+## F3 UPHELD — read main's blob; that is not merging
+
+`Deliverables/2026-08-12-photo-ground-truth-39-lines.json` is on `main` but was never committed to this
+branch. **AUTHORISED: `git show <main-sha>:Deliverables/2026-08-12-photo-ground-truth-39-lines.json` is a
+READ, not a merge.** Author the AC3 fixture **in-surface** under `agenticVisionPrototype/fixtures/` and
+repoint `DEFAULT_GROUND_TRUTH_PATH` there. Larry copies it to `Deliverables/` afterwards (**F12** — you
+cannot write there and are not expected to).
+
+## F4 — take option (b), and the limit is stated in the result, not buried
+
+No human-authored record of the *visible* handwriting exists; the committed list is catalogue product names
+only. **Transcribe it yourself, label that column plainly as NON-INDEPENDENT, and commit the fixture in its
+own commit BEFORE any re-score** so the ordering is checkable in history. **Report layer A's
+visible-text/interpretation sub-metric as `NOT INDEPENDENTLY GRADED`** and do not let it flatter the
+headline. Coverage, omission, invention, duplicates and identity resolution are unaffected — they grade
+against the human-anchored catalogue list. *(Warwick has been told a transcription from him would upgrade
+this; it is optional and explicitly not blocking.)*
+
+## F13 — REAL, and it may indict the denominator itself. Report, never silently resolve.
+
+GT entry 8 reads `Richmond 12 Skinless Pork Sausages 319g`; the page appears to read **16**, and Warwick's
+own AC1 example says *"Richmond 16 sausages"*. **Either the 39-line list is wrong or the household regular
+differs from what was written.** Surface it as a named finding with your evidence. **This is the
+"reconcile to the SOURCE, not the derived list" hazard pointed at our own instrument** — if the denominator
+is defective, six rounds of percentages inherit the error invisibly. **Do not adjust the list.**
+
+## F5, F6, F7 — your resolutions accepted as written
+
+- **F5:** the **default-one rule is authoritative**; the scorer tolerance is belt-and-braces for artefacts
+  scored before the rule existed — exactly what the Arm B re-score needs. Confirmed.
+- **F6:** correct, and good news. `leadingQuantityEvidence` already implements Warwick's semantics; the new
+  part is only the default-one step after nulling. **Your assumption is confirmed:** default-one applies to
+  accepted visible lines only, never to `NOT_A_LINE`, and never overrides explicit evidence.
+- **F7:** confirmed — **one constrained call per band, no tool loop, no `previous_response_id`**, with the
+  **application stamping `source_region`** rather than asking for it. That matches Warwick's own
+  architecture line, which is a deterministic fan-out. **The agentic tool-loop is SUPERSEDED on the new
+  path, not deleted** — keep it working and covered. AC8's "region-1 defect fixed" therefore becomes a
+  **module-level regression assertion** rather than a live-path property; state that honestly rather than
+  implying the live path still exercises it.
+
+## F9 — env grant made explicit
+
+`C:\.fusion247\.env keys\shopper.env.txt` and `C:\.fusion247\asdair.env`. **Consumed ONLY via
+`node --env-file=`. Never opened, parsed, printed, echoed, logged or written.** They are deliberately NOT
+in `machine_surface` — that is a WRITE list, and the v1 error of putting an env file there is not being
+repeated. This is a consumption route under `credential_scope`, per `services/asdair/CONFIGURATION.md`.
+
+## F10, F11 — both correct, both report-only, neither blocking
+
+- **F10:** governance-head mismatch is benign — `9181b45` is an ancestor of `d363a3a` and your contract
+  blob is identical at both. Verified. No drift.
+- **F11:** **a real generator defect.** The envelope table prints template DEFAULTS (`none` × 4) while the
+  operative frontmatter carries BOUNDED deviations — so a generated order contradicts itself on every
+  deviating dispatch. **You are right to read the frontmatter as operative.** Larry owns the fix.
+
+## The standing contract conflict — acknowledged, and it is mine
+
+You are right that this is the **second** order carrying the same unamended `credential_scope` /
+`live_authority` conflict. **Larry carries it to Nolan; it is not yours and it is not grounds to refuse.**
+Recorded here so a third order does not make you say it again.
+
+## Sequencing, unchanged except where amended
+
+MEASUREMENT FIRST — **AC1 → AC2 → AC3 (fixture in its own commit) → AC4 → re-score the banked Arm B
+artefact and report that baseline BEFORE any region change.** Then the orientation-aware band plan with the
+**F2 coverage proof before any spend**. Then AC8's regression pins. Then **Arm C, then Arm D if warranted**.
+Then both score layers, calls, wall time, cost, and the honest report.
+
+⛔ **Warwick's calibration is unchanged and still governs:** another 60–70% is **not** convergence, and if
+finer bands do not produce a large improvement, **say so plainly with your assessment of whether this
+architecture can reach the bar at all.** That is the correct discharge of this order.
