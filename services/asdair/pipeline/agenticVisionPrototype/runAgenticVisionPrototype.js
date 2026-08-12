@@ -62,6 +62,7 @@ import { groundLines } from './groundLines.js';
 import { loadGroundTruth, scoreSevenWay, formatSevenWay } from './sevenWayScore.js';
 import { loadFixture, scoreTwoLayer, formatTwoLayer } from './twoLayerScore.js';
 import { planOrientationAwareBands, proveCoverage, DEFAULT_BAND_COUNT } from './bandPlan.js';
+import { inspectBandsIndividually, reconcileAcrossBands } from './bandInspection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -391,6 +392,84 @@ export async function proveCoverageForPhoto(imagePath, { bandCount = DEFAULT_BAN
   };
 }
 
+/**
+ * Render one band as a JPEG data URL.
+ *
+ * ── AC5/F8: `upscale` IS THE SECOND ARM, AND IT MOVES A REAL VARIABLE ───
+ * `imageRender.renderRegionCrop()` is a pure `extract` with NO resize, so a
+ * crop hands the model EXACTLY the same pixels as the full page did. Cropping
+ * can reduce competing content per call; it cannot add one bit of information.
+ * With ~15 px per handwritten line on this photograph, resolution is a
+ * candidate for the binding constraint, so upscaling is run as its own arm
+ * rather than folded in - otherwise a gain could not be attributed.
+ *
+ * Deterministic and application-owned: a fixed factor and a fixed kernel.
+ */
+async function renderBand(sharp, buf, region, upscale) {
+  const width = region.pixel_right - region.pixel_left;
+  const height = region.pixel_bottom - region.pixel_top;
+  let pipeline = sharp(buf).extract({
+    left: region.pixel_left, top: region.pixel_top, width, height,
+  });
+  if (upscale > 1) {
+    pipeline = pipeline.resize({
+      width: Math.round(width * upscale), height: Math.round(height * upscale), kernel: 'lanczos3',
+    });
+  }
+  return pipeline.jpeg({ quality: 92 }).toBuffer();
+}
+
+/**
+ * AC6/AC7 - one arm of the band experiment, end to end.
+ *
+ * ⚠️ IT REFUSES TO SPEND ON AN UNPROVEN PLAN. If the coverage proof does not
+ * pass, no gateway call is made at all: a run over regions that do not cover
+ * the page answers nothing, and paying for one would produce a number that
+ * looks like evidence and is not.
+ */
+export async function runBandArm({
+  imagePath, catalogueItems = [], bandCount = DEFAULT_BAND_COUNT, upscale = 1, callModel,
+}) {
+  const sharp = (await import('sharp')).default;
+  const { toDataUrl } = await import('../imageRender.js');
+  const buf = fs.readFileSync(imagePath);
+  const { data, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const plan = planOrientationAwareBands({
+    data, width: info.width, height: info.height, channels: info.channels,
+  }, { bandCount });
+
+  if (!plan.coverageProof.passes) {
+    throw new Error('runBandArm: REFUSING TO SPEND - the band plan does not pass the AC5 coverage proof '
+      + `(${plan.coverageProof.failureCount} interior failure(s), ${plan.coverageProof.spanFailureCount} band(s) truncating a line)`);
+  }
+
+  const bandRegions = plan.regions.filter((r) => r.region_kind === 'strip');
+  const bandImageUrls = {};
+  let renderedBytes = 0;
+  for (const region of bandRegions) {
+    const rendered = await renderBand(sharp, buf, region, upscale);
+    renderedBytes += rendered.length;
+    bandImageUrls[region.region_no] = toDataUrl(rendered);
+  }
+
+  const startedAt = Date.now();
+  const inspection = await inspectBandsIndividually({
+    bandRegions, bandImageUrls, candidates: catalogueItems, ...(callModel ? { callModel } : {}),
+  });
+  const elapsedMs = Date.now() - startedAt;
+
+  const grounded = groundLines({
+    lines: inspection.lines,
+    productIdEnum: inspection.productIdEnum,
+    regionNos: bandRegions.map((r) => r.region_no),
+  });
+  const reconciliation = reconcileAcrossBands({ lines: grounded.accepted });
+
+  return {
+    plan, bandRegions, inspection, grounded, reconciliation, elapsedMs, renderedBytes, upscale, bandCount,
+  };
+}
+
 async function main() {
   const coveragePath = argValue('coverage-proof');
   if (coveragePath) {
@@ -441,6 +520,79 @@ async function main() {
       ...artefact, grounded, twoLayerScore: twoLayer, score: sevenWay ?? artefact.score ?? null,
     }, null, 2)}\n`);
     process.stdout.write(`  artefact updated in place: ${rescorePath}\n`);
+    return;
+  }
+
+  // ── ARM C / ARM D: the orientation-aware band experiment ────────────────
+  if (hasFlag('bands')) {
+    const imgPath = process.argv[2];
+    if (!imgPath) throw new Error('usage: node --env-file=<env> runAgenticVisionPrototype.js <photo.jpg> --bands [--upscale=3] [--band-count=7] --from-db');
+    const upscale = Number(argValue('upscale', '1'));
+    const bandCount = Number(argValue('band-count', String(DEFAULT_BAND_COUNT)));
+    const label = argValue('label', upscale > 1 ? 'arm-d' : 'arm-c');
+    const householdId = Number(argValue('household', '1'));
+    const catalogueItems = hasFlag('from-db')
+      ? await loadCatalogueFromDb(householdId)
+      : loadCatalogue(argValue('catalogue'));
+    process.stdout.write(`catalogue: ${catalogueItems.length} candidate(s)${hasFlag('from-db') ? ` (household ${householdId}, SELECT-only)` : ''}\n`);
+
+    const arm = await runBandArm({
+      imagePath: imgPath, catalogueItems, bandCount, upscale,
+    });
+    const fixture = loadFixture(argValue('fixture', DEFAULT_FIXTURE_PATH));
+    const score = scoreTwoLayer({
+      accepted: arm.reconciliation.reconciled,
+      rejected: arm.grounded.rejected,
+      duplicateGroups: arm.grounded.duplicateGroups,
+      fixture,
+    });
+
+    process.stdout.write(`\n${label.toUpperCase()} - orientation-aware bands, upscale x${arm.upscale}\n`);
+    process.stdout.write(`  axis ${arm.plan.axis} | ${arm.bandRegions.length} bands | coverage proof PASS\n`);
+    process.stdout.write(`  calls ${arm.inspection.calls} | wall time ${arm.elapsedMs}ms | gateway cost ${arm.inspection.totalCostUsd === null ? 'unknown' : `$${arm.inspection.totalCostUsd.toFixed(4)}`}\n`);
+    process.stdout.write(`  raw lines ${arm.inspection.lines.length} -> accepted ${arm.grounded.counts.accepted} -> reconciled ${arm.reconciliation.reconciled.length} `
+      + `(merged away ${arm.reconciliation.mergedAway}, confirmed by two bands ${arm.reconciliation.confirmedByTwoBands})\n`);
+    process.stdout.write(`  per band: ${arm.inspection.perBand.map((b) => `${b.region_no}:${b.parseFailed ? 'PARSE-FAIL' : b.lineCount}`).join(' ')}\n`);
+    process.stdout.write(`${formatTwoLayer(score, label)}\n`);
+    process.stdout.write(`  omitted page lines: ${score.omittedPageLines.map((o) => `#${o.page_order} ${o.source_text}`).join(' | ') || '(none)'}\n`);
+    process.stdout.write('  LIMITS (print these WITH the numbers, never without):\n');
+    score.limits.forEach((l) => process.stdout.write(`    - ${l}\n`));
+
+    const outDir = argValue('out', path.join(__dirname, 'runs'));
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, `${new Date().toISOString().replace(/[:.]/g, '-')}-${label}.json`);
+    fs.writeFileSync(outPath, `${JSON.stringify({
+      label,
+      strategy: 'orientation-aware bands, inspected individually (AC6), reconciled deterministically (AC7)',
+      upscale: arm.upscale,
+      bandCount: arm.bandCount,
+      householdId: hasFlag('from-db') ? householdId : null,
+      catalogueSize: catalogueItems.length,
+      catalogue: catalogueItems,
+      plan: {
+        axis: arm.plan.axis,
+        detection: arm.plan.detection,
+        linePitch: arm.plan.linePitch,
+        regions: arm.plan.regions,
+        coverageProof: {
+          passes: arm.plan.coverageProof.passes,
+          checked: arm.plan.coverageProof.checked,
+          failureCount: arm.plan.coverageProof.failureCount,
+          spanFailureCount: arm.plan.coverageProof.spanFailureCount,
+          frameClippedCount: arm.plan.coverageProof.frameClippedCount,
+        },
+      },
+      perBand: arm.inspection.perBand,
+      calls: arm.inspection.calls,
+      elapsedMs: arm.elapsedMs,
+      totalCostUsd: arm.inspection.totalCostUsd,
+      renderedBytes: arm.renderedBytes,
+      rawLines: arm.inspection.lines,
+      grounded: arm.grounded,
+      reconciliation: arm.reconciliation,
+      twoLayerScore: score,
+    }, null, 2)}\n`);
+    process.stdout.write(`\nrun artefact: ${outPath}\n`);
     return;
   }
 
