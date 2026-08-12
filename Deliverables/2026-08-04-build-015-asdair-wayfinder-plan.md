@@ -1998,6 +1998,33 @@ recommended a calibrated follow-up instead of forcing something in now. Also cau
 scope error mid-round (a test written into a non-granted file, corrected before handback). **Live
 re-test dispatched to Asdair — the fourth.**
 
+**⛔ ROUND 4's LIVE RE-TEST FOUND THE FIX WAS NEVER ACTUALLY WIRED IN — a precise, exactly-located
+defect, not a repeat of the design problem.** Asdair reproduced the exact Lenor/Febreze silent-deletion
+shape LIVE, TWICE (run-b, run-c), despite round 4's own unit test passing 6/6. **Root cause, pinned to
+the exact line**: `interpretPhotoOrchestrator.js:205-211` strips `source_region` from its own return
+value before it ever leaves the function — every downstream consumer, including `resolveByCatalogue.js`'s
+new `regionsAgree()` check, only ever sees `source_region: null`. With every value null,
+`regionsAgree()`'s own guard (`if (known.length < 2) return true`) fires every time, so the OLD
+one-survivor auto-collapse still runs for every collision, cross-region or not — Amendment 1's fix never
+executes on the live path at all. **Round 4's unit test could not catch this because it calls
+`resolveAll` directly with hand-built fixtures that already carry `source_region`, bypassing the exact
+chain that's broken.** Asdair did not stop at an ambiguous first result — added diagnostic fields and
+ran a confirming THIRD live call specifically to convert "plausible hypothesis" into "directly confirmed,
+line-cited defect" before reporting it. This is the same defect *class* this build has hit before
+("comment says wired / executable path says unwired") — not a new design failure, a wiring gap in code
+the Work Order's own file_surface already covered but the diff never touched.
+
+**Other numbers, same honesty standard:** quantity-assertion rate only partially recovered — 29-36%
+average, nowhere near round 2's 78% baseline, and one run (20.5%) sat BELOW round 3's collapse. Omission
+sits at 46-48%, statistically indistinguishable from round 3's 50% — expected, since AC2 was correctly
+deferred. Real cost: $0.52-0.79 across the three runs (the third run was a deliberate extra diagnostic
+call to confirm the defect, not a normal-path cost).
+
+**Round 5 dispatched** — narrow, exact fix location known: wire `source_region` through the orchestrator's
+own return value, and require an INTEGRATION-level test exercising the real
+`interpretPhotoWithDeps → deps.js → runPipeline.js → resolveByCatalogue.js` chain this time, per
+Asdair's own recommendation, not a fixture that can bypass the break.
+
 ---
 
 ### ⛔ SUPERSEDED 2026-08-11 (earlier same evening) — bundled vision-pipeline and Cockpit as one item; corrected above. Retained for its "no shop pending" correction, which still stands.
