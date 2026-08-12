@@ -1082,14 +1082,20 @@ createApp({
   },
   template: `
 <div class="app">
-  <nav class="nav" aria-label="Main">
+  <!-- BUILD-015 B15-26, MEDIUM 2 — focus trap for the AsdAIr action sheet. The sheet renders as a
+       LATER SIBLING of both .nav and .shell-main (not nested inside either), so containing Tab means
+       removing every OTHER top-level sibling from the tab order while the sheet is open — inert
+       does that in one primitive rather than a hand-rolled Tab-cycle with its own edge cases
+       (Shift+Tab from the first element, dynamically-added focusables inside the sheet). Left off
+       the generic detail sheet below (pre-existing, outside this WP's surface). -->
+  <nav class="nav" aria-label="Main" :inert="!!asdairSheet">
     <button v-for="a in AREAS" :key="a.key" class="nav-btn" :class="{on: area===a.key}" @click="go(a.key)">
       <span class="nav-ico">{{ a.icon }}</span><span class="nav-lbl">{{ a.label }}</span>
       <span v-if="a.key==='home' && needsYou.length" class="nav-badge">{{ needsYou.length }}</span>
     </button>
   </nav>
 
-  <div class="shell-main">
+  <div class="shell-main" :inert="!!asdairSheet">
     <header class="topbar">
       <div class="brand" @click="go('home')" title="Home" style="cursor:pointer"><span class="dot" :class="{red: statusTone==='red'}"></span> Fusion247</div>
       <div class="status-mini" :class="{red: statusTone==='red'}">{{ statusLine }}</div>
@@ -2581,7 +2587,7 @@ createApp({
        modal (BUILD-015 B15-26, AC4/AC5). Kept separate from the generic detail sheet below, whose
        header is shared by idea/opp/output/doc and would need a fifth branch for no benefit. -->
   <div v-if="asdairSheet" class="sheet" @click.self="asdairCloseSheet()">
-    <div class="sheet-card" role="dialog" aria-modal="true"
+    <div class="sheet-card asdair-sheet" role="dialog" aria-modal="true"
       :aria-label="asdairSheet.kind==='photo' ? 'Original photo' : asdairSheet.kind==='question' ? 'Answer this question' : 'Change this line'"
       @keydown.esc="asdairCloseSheet()">
       <button class="back" @click="asdairCloseSheet()">‹ Back</button>
