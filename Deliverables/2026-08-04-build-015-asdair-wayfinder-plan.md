@@ -2297,12 +2297,34 @@ output, rather than either architecture alone.
 
 ### The four numbered functional requirements — **Warwick's own A/B/C/D, his words, not Larry's re-slicing**
 
-| # | Requirement | Status |
+| # | Requirement | Status — re-cut 2026-08-12 after WP-B15-29 (`ed36ae1`, pushed) |
 |---|---|---|
-| **A** | **Make the inspection loop run cleanly.** Fix the region-1 crop-map wiring defect narrowly (the loop invites Terra to request region 1 while the crop map excludes it), then rerun the known photo. | NOT STARTED |
-| **B** | **Constrain its output structurally.** Photo-derived lines become a closed choice — allowed candidate ID, `UNKNOWN_VISIBLE_ITEM`, or `NOT_A_LINE` — enforced by the strongest mechanism the DEPLOYED gateway actually supports. Visual existence and product resolution asked as two separate questions. | NOT STARTED |
-| **C** | **Restore production grounding/sanity discipline** onto the loop's higher-coverage output: four-way provenance that never silently collapses, every PHOTO line referencing a real application-supplied region, the quantity invariant, duplicate and UNKNOWN handling. | NOT STARTED |
-| **D** | **Prove it against the known photograph** — the **39-line** ground truth, **NOT** the 41-line final trolley. | NOT STARTED |
+| **A** | **Make the inspection loop run cleanly.** Fix the region-1 crop-map wiring defect narrowly, then rerun the known photo. | **BUILT.** Both sides fixed — the throwing lookup AND the silent `.filter(Boolean)` twin. **Proven load-bearing, not theoretical: the model requested region 1 in turn 2 of BOTH live arms**, so without this fix both runs would have thrown. Mutation-tested (restoring the defect turns a test RED). |
+| **B** | **Constrain its output structurally.** Closed choice — allowed candidate ID, `UNKNOWN_VISIBLE_ITEM`, or `NOT_A_LINE` — by the strongest mechanism the DEPLOYED gateway supports; existence and resolution asked separately. | **BUILT AND STRUCTURALLY EFFECTIVE.** 111-value closed enum (109 candidates + 2 escapes), `strict:true`, FLAT `text.format`. **Free brand generation is now impossible by construction — 0 escapes in 38 lines.** Client-side enum re-verification passes on every line, mutation-tested. |
+| **C** | **Restore production grounding/sanity discipline** — provenance that never silently collapses, region membership, the quantity invariant, duplicate and UNKNOWN handling. | **BUILT at prototype level.** The quantity invariant is **demonstrated on the exact case Warwick named**: unconstrained arm returned quantity **16** for the Richmond pack-size line; constrained arm returned **null**. ⚠️ **NOT** done: four-way provenance PERSISTENCE — the prototype still writes no DB rows. That is a deliberate architectural step, not an omission. |
+| **D** | **Prove it against the known photograph** — the **39-line** ground truth, NOT the 41-line trolley. | **MEASURED. ⛔ WARWICK'S BAR IS NOT MET BY EITHER ARM.** In-surface seven-category scorer built; `abAcceptanceHarness.js` untouched and still pointing at the forbidden 41-line denominator (Larry's follow-up). Numbers and their heavy caveats below. |
+
+**The measured result — both arms, one photograph, one run each. Builder self-test evidence, NOT independent review. No Veritas gate sought.**
+
+| | Arm A — unconstrained + real catalogue | Arm B — full constraint + real catalogue |
+|---|---|---|
+| correct | 20 (51.3%) | 18 (46.2%) |
+| omitted | 8 (20.5%) | **11 (28.2%)** |
+| invented | 7 | **5 — but see caveat 1** |
+| wrong identity | not separable in this arm | **0** |
+| wrong quantity | 11 | 9 — but see caveat 2 |
+| explicit UNKNOWN | 0 (no mechanism exists) | 2 |
+| duplicates | 0 | 0 |
+| cost / wall time | $0.1034 / 45.8 s | $0.1375 / 50.4 s (**+33%**) |
+
+**Four things that must travel with those numbers, or they will be misread:**
+
+1. **Three of Arm B's five "inventions" are the SCORER's join failures, not inventions.** *"2 chips with skins on"* IS the Crispy Skin-On Fries; *"1 large Arla 4pt"* IS the Cravendale. Handwritten shorthand shares no token with the truth string. True invention is ~2, and both of those name real catalogue products simply absent from the 39-line list. **Both arms scored with the identical matcher.**
+2. **Six of Arm B's nine wrong-quantity verdicts are `null` vs truth `1`** — the model correctly returning no count where the page shows none, and the grader penalising **exactly the behaviour requirement C mandates**. If unmarked-means-one were an authorised household rule, Arm B reads **24/39 = 61.5%**. **That is a Warwick decision (`product-decision`), put to him 2026-08-12 and OPEN.** His own rule: quantity needs explicit evidence *or an authorised household rule*.
+3. **The failure MIGRATED rather than vanished — the pre-build probe predicted this exactly.** Arm B reports **three Vanish variants where the page has one**, and the wrong pasta flavour. In-enum near-misses on variant-heavy families are **harder to detect than an invented brand**, which is precisely why `as_written` was made mandatory and unconstrained.
+4. ⚠️ **Constraint COST coverage: 4 fewer lines, 3 more omissions, 33% more money.** **That is the trade Warwick explicitly said not to make** (*"do not weaken coverage just to reduce hallucinations"*). Recorded loudly rather than netted off against the grounding win.
+
+**The assessment, Keel's and Larry's agreeing: prompt wording is NOT the gap.** Three region crops (full page + 2 strips, `TARGET_STRIP_HEIGHT_PX = 700`) for a 39-line dense page is the dominant residual — every omitted line came from that. **Region granularity was deliberately held OUT of scope so grounding was measured with one variable moving; unlocking it is the obvious next move.** Second constraint, independent of the model: **~95% cannot be *demonstrated* against a 39-line list carrying no product IDs** — the last step is a text join, so that ceiling is in the MEASUREMENT, not only in the pipeline.
 
 ### The acceptance bar — **Warwick's, quoted; it is the grading contract for D**
 
