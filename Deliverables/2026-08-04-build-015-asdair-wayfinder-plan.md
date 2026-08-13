@@ -2528,6 +2528,54 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+## ✅✅ MUM'S COCKPIT — **VERA GATE 3: PASS** at `490c7b7`. **No CRITICAL, no HIGH. Clause 6 is built and assured.**
+
+**Both HIGHs closed, all three MEDIUMs closed, both disclosed instrument defects closed.** Vera reinstated
+the exact shipped declaration under her own probe and **reproduced Felix's figures to the pixel** —
+`88/30`, `88/81`, the zero-painted note at 640×400, the 146px clip at 320×800.
+
+**Post-send is genuinely rendered, not simulated** — proven three ways: the state is asserted and passes at
+all 10 · the `[after SEND]` rows carry **different** measurements from their resting twins · and her
+independent drive reproduces it. **20 viewport-states, 0 violations. Self-test 12/12. Token parity 13/13
+pinned.**
+
+> **⭐ HER TRAJECTORY NOTE, and it is the fairest summary of the three rounds:** *"gate 1 found a scope defect
+> that hid a genuine product bug; gate 2 found a silent narrowing that defanged a check; gate 3 found
+> **nothing on the product surface at all** and two record-keeping defects in the harness… **Disclosing the
+> two lying instruments rather than quietly fixing them is what moved this from a third FAIL to a PASS.**"*
+
+**🟡 AND THERE IS A THIRD THING — MEDIUM-A, and it is the same shape as her first two findings.** The
+self-test **never renders the post-send state**: the mutation battery runs `setMutation → readMeasurement`
+only, and `drivePostSend()` is never called under self-test. **So "12/12 caught" is evidence for the resting
+10 of the 20 states the gate reports on.** Every assertion whose failure mode is post-send-only is unproven
+by injected fault. *A coverage figure quoted over ground the fault injection never reached — for the third
+gate running.* **Not a blocker: the post-send measurement IS made and IS fed to the verdict.**
+
+**Her answer on 6/10, which Larry asked her to judge:** *"the number is honest and the detector is proven,
+but 6/10 is resting-state coverage of a defect that is predominantly a POST-SEND defect."* Under the shipped
+declaration the footer clips at rest at only **3 of 10**, but **post-send at 6 of 10 — including 320×800 and
+1024×600, where the resting state does not clip at all**, and 320×800 is one of the cases Felix himself
+listed as a shipped failure. **"Adequate proof that `footClipped` fires. NOT proof that the post-send half of
+the gate can go red."**
+
+**🟡 MEDIUM-B — the "NO MUTATION" comment block was NOT re-cut and is now false in three ways.** She diffed
+it: **byte-identical to `18b0f98`.** What `490c7b7` re-cut was the *verdict-side* block; this standalone one
+survived. It still says the footer assertion has no mutation (**two were added**), that it "has read false at
+all seven viewports" (**there are ten, and it reads true at four**), and that `unreachableAtEnd` is unmutated
+and kept as the guard against a `position: fixed` change (**it is mutated by exactly that shape, firing
+10/10**). *And the block instructs the next maintainer NOT to add mutations there.* **Felix's own durable line
+recurring in his own file: "a stale comment defending a defanged check is worse than no comment — it is the
+thing a reviewer reads INSTEAD of re-deriving the argument."**
+
+**LOW-C** — `shopping.js` warns against a backtick hazard **it does not have** (the template is an array of
+single-quoted strings) and cites a guard that **does not cover that file**. *For the record she checked and
+cleared the sibling: the `app.js` guard IS fireable and correctly built — not the same class as the deleted
+one, and Felix was right to keep it and right to distinguish them.*
+
+**⛔ HER PASS COVERS design-system fidelity, WCAG 2.2 AA and ten responsive viewports IN CHROMIUM.** It says
+**nothing** about Silk, her tablet, the fourteen MUM criteria, or the Tailscale path. **All fourteen MUM
+criteria remain HOLD; criterion 2 still needs a curated `display_name`.**
+
 ### 🔄 BOTH FAIL CONDITIONS ADDRESSED — **`490c7b7`**, back with Vera. **⭐ AND TWO MORE INSTRUMENTS THAT LIED.**
 
 **Felix accepted every point and says both HIGHs were his.** His account of HIGH-3 matches Vera's diagnosis
