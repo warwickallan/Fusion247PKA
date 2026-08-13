@@ -2282,6 +2282,85 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+## ⟦PHASE SCOPE — INGESTION END-TO-END + MUM'S COCKPIT⟧ Warwick, 2026-08-13. **His destination, quoted.**
+
+> *"The entire AsdAIr input-ingestion journey is working correctly end-to-end and reaches the browser
+> stage in the real production path."* · *"Do not stop merely to tell Warwick that one of those defects
+> has been fixed."* · *"The known photograph has already demonstrated stable visual coverage at 39/39 with
+> zero omissions. **Do not reopen the eyesight architecture** or start another vision research cycle unless
+> genuinely new evidence disproves that result."*
+
+**His seven acceptance clauses:** (1) Mum's real list enters through the intended production ingestion path ·
+(2) PHOTO truth complete and grounded, **unsupported catalogue/history items unable to masquerade as things
+written on the photograph** · (3) duplicates, explicit quantities and catalogue identity behave under the
+agreed invariants · (4) **provenance survives the actual production path, not merely schemas or tests** ·
+(5) the result reaches the browser stage · (6) **Mum has a separate Cockpit view Warwick can open on the
+Fire tablet** · (7) the whole journey demonstrated as a working user experience, **not inferred from unit
+tests, fixtures or disconnected components**.
+
+### 🔴 VERITAS GATE 1 ON WP-B15-40 — **HOLD.** AC1 held; AC2–AC7 PASS. Receipt `132de83a…`
+
+**`services/asdair/pipeline/deps.js:46` imports exactly ONE provenance writer.** REGULARS, RULE and WARWICK
+land only in a test that calls the writer directly and pre-dates the work package. **By the contract's
+definition they are not on the journey.**
+
+> **Veritas, and it is right: *"You accepted something you should not have."*** And its sharper point is not
+> the wiring gap — a legitimate frontier split — but that **the residual existed only in Larry's dispatch
+> message while the map's `AC1 provenance persists` row read as satisfied.** Two older map lines (`:3220`,
+> `:3315`) were *more accurate than the current block*. **Currently latent, not harmful:** the artefact is
+> `{"PHOTO": 39}` with `additions: 0`.
+
+**Warwick's clause 4 makes it blocking. Dispatched as WP-B15-46 (Lane G).**
+
+**Veritas also verified what Larry asked it to test rather than accepting it:** the re-baseline re-executed
+from source (`resolved 30, routed 9`, 39 lines, quantity sum 53) · no emitted output labels photo evidence
+verified, **including `browser-handoff.json`, which Keel's own test does not cover** · three mutants
+re-run independently in an export **outside the repo** · and the two edited tests **vindicated by evidence
+rather than argument** — removing the AC5 routing cause turned one of them red, and *"a relaxed assertion
+does not detect the removal of the control it was relaxed around."*
+
+**⚠️ And it caught a claim Larry had passed on: `ZERO SKIPPED` is true, but the suite is NOT green on a
+fresh checkout.** `git -c core.autocrlf=true checkout-index` of `58c86ef` gives **1078 pass / 1 fail** — a
+guard test byte-compares a CRLF-converted `.md`. Non-blocking, no product effect, **but the evidence claim
+must be stated as "green in the authoring worktree; 1 CRLF-sensitive failure on a fresh Windows checkout."**
+Now AC5 of Lane G.
+
+### 🟢 MUM'S COCKPIT — the deferred phase is IN SCOPE. **Warwick corrected Larry mid-turn, and he was right.**
+
+Larry was about to author Mum's view from scratch. **A deferred phase already specifies it in five
+documents** — Warwick: *"There was a deferred phase for mums cockpit view which should already be visible
+on the wayfinder. I now want that brought into scope."*
+
+`POST-BUILD-ADDENDUM-mum-self-service-cockpit` (North Star, what is reused unchanged) ·
+**`addendum-B-mum-cockpit-ux` — the screen-flow and wireframe spec, PRIMARY** ·
+`addendum-A-fire-platform-truth` (Fire/Silk, accessibility numbers with sources) ·
+`addendum-E-acceptance-matrix` (the fourteen "MUM can use it" criteria) · `addendum-C-pipeline-seam`.
+
+**Dispatched as WP-B15-45 to Felix**, worktree `C:/Fusion247PKA-mumview`. Two spec points held hardest:
+**a SEPARATE surface, never a mode** — *"any control that switches into her view is a control that can
+switch out of it"* — and **the word "Cockpit" must not appear on her screen**, enforced by a harness
+assertion rather than a sweep.
+
+> **⛔ SCOPE BOUNDARY, stated in the order: Addendum E's fourteen MUM-OBSERVED criteria are NOT claimable
+> tonight.** They require an 84-year-old woman sitting in front of the device. *An honest "not yet observed"
+> is the correct result; a green one would be a lie about her ability to use software.*
+
+**Live fact that made this cheap:** `asdair.households id=1` is `name=mum, display_name=Mum`, and
+`cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
+problem, not a new application — which is the reuse Warwick asked for.
+
+### ⚠️ TWO THINGS RECORDED BECAUSE THEY ARE NOT LARRY'S TO FIX
+
+**1. Felix's contract has NO integration-role section.** The envelope generator flagged
+`git_authority: UNRESOLVED` and was correct — **Felix committed and pushed all night on WP-B15-42 with no
+clause granting it.** Larry granted it per-order under CLAUDE.md § Git ownership and recorded the scope in
+the envelope row. **The contract repair needs Warwick's explicit approval** — CLAUDE.md forbids modifying
+any canonical specialist contract without it, so **Nolan has NOT been dispatched.** Warwick's call.
+
+**2. Migration 020's idempotency guard is not schema-safe** (`conname` is unique per *table*, and the lookup
+is qualified by neither schema nor table). **Verified not yet bitten in live** — both FKs exist and only one
+`asdair` schema is present. **Silas's decision, and Warwick's.** Explicitly out of scope for Lane G.
+
 ### ⭐ LANE E DELIVERED — WHY TERRA INVENTS. The answer is a switch, not an argument.
 
 **`Deliverables/2026-08-13-terra-in-enum-false-positive-mechanism.md`, branch `b15-38-terra-invention-analysis` @ `9798648`.**
