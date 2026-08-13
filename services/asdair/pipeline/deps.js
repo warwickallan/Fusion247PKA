@@ -258,7 +258,29 @@ async function realVisionModel() {
  * (the first pass plus every individual AC2 follow-up) - never per-call
  * noise for what may now be several individual re-inspection calls.
  */
-async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
+/**
+ * ── WP-B15-47: THE SECOND PARAMETER, AND WHY IT IS NOT A TEST HOOK ────────
+ * `options` is OPTIONAL and defaults to no behaviour change whatsoever, so
+ * the production binding below (`interpretPhoto: realInterpretPhoto`) calls
+ * this exactly as it always did.
+ *
+ * It exists for ONE caller: the capture harness that records this function's
+ * real vision traffic over the committed photograph. The alternative was to
+ * hand-assemble a parallel copy of the collaborator container below - which
+ * would diverge from the real path the moment either changed, and the whole
+ * value of the captured artefact is that it IS the real orchestrator's real
+ * traffic. A parameter that keeps one assembly is safer than two assemblies
+ * that agree today.
+ *
+ * @param {{catalogue:object, imagePath:string, shopId:number}} args
+ * @param {{onVisionCall?:function, collaboratorOverrides?:object}} [options]
+ *   `onVisionCall` observes each real vision call; it can never change the
+ *   value the orchestrator receives. `collaboratorOverrides` is merged LAST
+ *   over the real collaborator container - the harness uses it to make
+ *   persistence inert, and nothing else in this estate uses it at all.
+ */
+export async function realInterpretPhoto({ catalogue, imagePath, shopId }, options = {}) {
+  const { onVisionCall = null, collaboratorOverrides = {}, argOverrides = {} } = options;
   const fs = require('node:fs');
   const path = require('node:path');
   const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
@@ -318,14 +340,32 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
   // function invocation only (a fresh array per call, never shared/global
   // state that could leak one shop's usage into another's log line).
   const usageLog = [];
-  const vision = async (prompt, imageUrls) => {
+  let visionSeq = 0;
+  const vision = async (prompt, imageUrls, meta = {}) => {
+    const seq = ++visionSeq;
     const { content, usage } = await visionWithUsage(prompt, imageUrls);
-    usageLog.push({ usage, cost_usd: estimateUsdCost(usage) });
+    const costUsd = estimateUsdCost(usage);
+    usageLog.push({ usage, cost_usd: costUsd });
+    // WP-B15-47 - the ONE observation seam the capture harness needs. It is a
+    // notification, never a substitution: `content` is returned verbatim
+    // whatever the hook does, and a throwing hook must not corrupt an
+    // interpretation that has already been paid for.
+    if (typeof onVisionCall === 'function') {
+      try {
+        onVisionCall({ seq, kind: meta.kind ?? null, regions: meta.regions ?? null, retry: meta.retry === true, response: content, usage, cost_usd: costUsd });
+      } catch { /* a recorder must never break the interpretation it observes */ }
+    }
     return content;
   };
 
   const { lines, initialSilentRegions, droppedLines } = await interpretPhotoWithDeps(
-    { catalogue, imageBuffer, shopId, interpreterModel, promptVersion: PROMPT_VERSION },
+    // `argOverrides` LAST for the same reason as collaboratorOverrides. The
+    // REPLAY runner sets interpreterModel/promptVersion from the captured
+    // artefact, because those two values are written onto every PHOTO
+    // provenance row: defaulting them to whatever THIS process's env resolves
+    // would put a false claim about which model read the page into the
+    // database. Absent an override, production behaviour is unchanged.
+    { catalogue, imageBuffer, shopId, interpreterModel, promptVersion: PROMPT_VERSION, ...argOverrides },
     {
       prepareImage: prepareImageOrientationAware,
       runSanityChecks,
@@ -338,6 +378,9 @@ async function realInterpretPhoto({ catalogue, imagePath, shopId }) {
       toDataUrl,
       buildGroundedPrompt, vision, extractJson,
       writeQuery: realWriteQuery,
+      // LAST, deliberately: the capture harness substitutes ONLY the
+      // persistence collaborators, and everything above is the real thing.
+      ...collaboratorOverrides,
     },
   );
 

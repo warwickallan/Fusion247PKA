@@ -54,7 +54,12 @@ test('AC5: the support vocabulary is a CLOSED set about agreement, and no member
   const values = Object.values(SUPPORT);
   assert.deepEqual(
     [...values].sort(),
-    ['corroborated', 'unanimous', 'uncorroborated'],
+    // `single-reading` was added by WO-2026-08-13-15 (WP-B15-47, AC7), authorised
+    // by Larry in AMENDMENT 1 (A4) under Warwick's standing ruling that a line is
+    // CORROBORATED, never VERIFIED. Recorded here as the product decision this
+    // assertion demands - not slipped in as a refactor. corroborate.js's SUPPORT
+    // doc comment carries the defect it closes.
+    ['corroborated', 'single-reading', 'unanimous', 'uncorroborated'],
     'SUPPORT is the closed agreement vocabulary; adding a member is a product decision, not a refactor',
   );
   for (const v of values) {

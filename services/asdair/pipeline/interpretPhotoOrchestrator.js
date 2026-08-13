@@ -119,9 +119,16 @@ export async function interpretPhotoWithDeps(
   // repair, never a second opinion.
   const prompt = buildGroundedPrompt(catalogue, { regions: prepared.regions });
   const imageUrls = prepared.regions.map((r) => toDataUrl(renderedByRegionNo.get(r.region_no)));
-  let parsed = await extractJson(await vision(prompt, imageUrls));
+  // The THIRD argument is call METADATA and is purely additive (WP-B15-47):
+  // `vision` collaborators that take two parameters are unaffected, and every
+  // existing fake in this suite is one. It exists so a recorder can label a
+  // captured call WITHOUT re-deriving the orchestration order from outside -
+  // which is the only part of "which call was this?" that cannot be recovered
+  // from the prompt string afterwards. Nothing here reads it back.
+  const allRegionNos = prepared.regions.map((r) => r.region_no);
+  let parsed = await extractJson(await vision(prompt, imageUrls, { kind: 'first_pass', regions: allRegionNos, retry: false }));
   if (!parsed || !Array.isArray(parsed.lines)) {
-    parsed = await extractJson(await vision(`${prompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`, imageUrls));
+    parsed = await extractJson(await vision(`${prompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`, imageUrls, { kind: 'first_pass', regions: allRegionNos, retry: true }));
   }
   if (!parsed || !Array.isArray(parsed.lines)) {
     throw new Error('pipeline: the grounded vision request did not return usable JSON');
@@ -176,9 +183,10 @@ export async function interpretPhotoWithDeps(
       const url = toDataUrl(renderedByRegionNo.get(region.region_no));
       const followUpPrompt = buildGroundedPrompt(catalogue, { regions: [region] });
 
-      let regionParsed = await extractJson(await vision(followUpPrompt, [url]));
+      const followUpMeta = { kind: 'follow_up', regions: [region.region_no], retry: false };
+      let regionParsed = await extractJson(await vision(followUpPrompt, [url], followUpMeta));
       if (!regionParsed || !Array.isArray(regionParsed.lines)) {
-        regionParsed = await extractJson(await vision(`${followUpPrompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`, [url]));
+        regionParsed = await extractJson(await vision(`${followUpPrompt}\n\nReturn ONLY valid JSON. No prose, no markdown, no code fences.`, [url], { ...followUpMeta, retry: true }));
       }
       if (regionParsed && Array.isArray(regionParsed.lines)) {
         followUpLines.push(...regionParsed.lines.map(normaliseModelLine));

@@ -55,14 +55,40 @@
 
 'use strict';
 
-/** How a corroborated observation was classified. Always reported. */
+/**
+ * How a corroborated observation was classified. Always reported.
+ *
+ * ── A FOURTH MEMBER, ADDED DELIBERATELY (WO-2026-08-13-15 / WP-B15-47, AC7) ──
+ * `agreementIsNotCertainty.test.js` calls this a CLOSED vocabulary and says
+ * plainly that "adding a member is a product decision, not a refactor". It is,
+ * and this one was decided: Larry authorised it in AMENDMENT 1 (A4) on the back
+ * of Warwick's standing ruling that a line is CORROBORATED, never VERIFIED.
+ *
+ * THE DEFECT IT CLOSES, because a fourth class needs a reason and not a taste.
+ * The classifier below elected UNANIMOUS whenever `support === runCount`. With
+ * ONE reading that is trivially true of EVERY observation, so a single-reading
+ * run shipped the STRONGEST agreement label in the vocabulary onto every
+ * delivered line - `finalList.js` carries `support_class` straight through to
+ * the human-readable list. "Unanimous" off one reading is not a weaker claim
+ * than "corroborated"; it is a louder one, and nothing had ever supplied a
+ * second opinion for it to be unanimous WITH.
+ *
+ * One reading cannot corroborate itself. SINGLE_READING says exactly that and
+ * claims nothing further.
+ */
 export const SUPPORT = Object.freeze({
-  /** Seen by every run that was consulted. */
+  /** Seen by every run that was consulted. Requires at least TWO runs. */
   UNANIMOUS: 'unanimous',
   /** Seen by more than one run but not all. */
   CORROBORATED: 'corroborated',
-  /** Seen by exactly one run. Cannot be distinguished from a phantom here. */
+  /** Seen by exactly one run OUT OF SEVERAL. Cannot be distinguished from a phantom here. */
   UNCORROBORATED: 'uncorroborated',
+  /**
+   * Only ONE reading was consulted, so corroboration was never available to
+   * this observation - it is neither supported nor contradicted by anything.
+   * NOT a weaker grade of agreement: an ABSENCE of the mechanism.
+   */
+  SINGLE_READING: 'single-reading',
 });
 
 /** Collapse a verbatim reading to a comparison key. Never used across ids. */
@@ -278,12 +304,23 @@ export function corroborate(runs) {
     }
   }
 
+  // ── THE SINGLE-READING GUARD (WP-B15-47, AC7) ────────────────────────────
+  // Evaluated ONCE, from runCount alone, and deliberately NOT folded into the
+  // ternary below. With one run, `support === runCount` is trivially true for
+  // every observation, so the unguarded classifier below would elect UNANIMOUS
+  // for all of them - the strongest agreement label in the vocabulary, off a
+  // reading nothing ever corroborated. Corroboration is not weak here; it is
+  // ABSENT, and the class has to say so.
+  const singleReading = runCount < 2;
+
   const observations = [];
   for (const entry of merged.values()) {
     const support = entry.runs.size;
-    const supportClass = support === runCount
-      ? SUPPORT.UNANIMOUS
-      : (support > 1 ? SUPPORT.CORROBORATED : SUPPORT.UNCORROBORATED);
+    const supportClass = singleReading
+      ? SUPPORT.SINGLE_READING
+      : (support === runCount
+        ? SUPPORT.UNANIMOUS
+        : (support > 1 ? SUPPORT.CORROBORATED : SUPPORT.UNCORROBORATED));
 
     // The delivered reading is elected the same deterministic way as within a
     // run - evidence basis, then fullest reading - across the runs that saw it.
@@ -352,12 +389,24 @@ export function corroborate(runs) {
   // Stable order: identified products by id, then unidentified by text.
   observations.sort((a, b) => a.identity_key.localeCompare(b.identity_key, 'en'));
 
-  const counts = { unanimous: 0, corroborated: 0, uncorroborated: 0 };
-  for (const o of observations) counts[o.support_class] += 1;
+  // Derived from the vocabulary itself rather than a hand-listed literal: the
+  // hand-listed form silently produced NaN the moment a fourth class existed,
+  // because `counts[o.support_class] += 1` on an absent key is `undefined + 1`.
+  const counts = Object.fromEntries(Object.values(SUPPORT).map((v) => [v, 0]));
+  for (const o of observations) {
+    if (!(o.support_class in counts)) {
+      throw new Error(`corroborate: support_class "${o.support_class}" is outside the closed vocabulary`);
+    }
+    counts[o.support_class] += 1;
+  }
 
   return {
     observations,
     runCount,
+    // TRUE when only one reading was consulted, so no observation in this
+    // result carries corroborating support of any kind. Callers that render
+    // support to a human read this rather than inferring it from `runCount`.
+    singleReading,
     runLabels: perRun.map((r) => r.label),
     collapsedByRun: Object.fromEntries(perRun.map((r) => [r.label, r.collapsed])),
     counts,
