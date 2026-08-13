@@ -2236,12 +2236,48 @@ Work Order and would resolve a held line (*"toffees with no qualifier"*); **(3)*
 Double Gloucester / Febreze resolver gap — a **data write to `asdair.regulars`**, which is Warwick's or a
 granted worker's, not Larry's.
 
-**SESSION REPORT — OUTSTANDING, NAMED, NOT SILENT.** Pax was commissioned at rotation and **may return after
-the `/clear`**. Expected at `Deliverables/2026-08-13-session-report-overnight-asdair-list.md` +
-`-payload.json`. **When it lands: commit it, run `tools/session-report/populate.mjs` (step 7b) and
-`capae-sync.mjs` (step 7c), and fold it into this map.** Its input, already committed:
-`Deliverables/2026-08-13-subagent-token-ledger-overnight-asdair-list.md` (`6723dfa`).
-**Steps 7 / 7b / 7c are therefore OUTSTANDING at this rotation, by design, not by omission.**
+**SESSION REPORT — ✅ LANDED AND DISCHARGED 2026-08-13 08:1x. Steps 7 / 7b / 7c are CLOSED.** *(This
+paragraph previously read "OUTSTANDING… by design, not by omission." It is superseded in place rather than
+amended below, because the rows describing the state are the state — see the CAPAE note at the end of this
+block.)* Pax returned after the `/clear` exactly as predicted, from primary sources — `.git/logs/HEAD` (975
+entries), the `origin/main` reflog (161) and the three branch reflogs.
+
+- **Step 7** — both artefacts committed at **`55558ec`**: `Deliverables/2026-08-13-session-report-overnight-asdair-list.md` + `-payload.json`.
+- **Step 7b** — `populate.mjs` → `{"ok":true,"why":"populated","mode":"database-url","verified":true}`, rotation id `6c0e97a0-9af3-4be9-8c81-b298055e074a`.
+- **Step 7c** — `capae-sync.mjs` → exit 0, **`unknown: []`**, 4 families synced, brief rewritten. *(Invocation note for the next session: it takes the payload **positionally**, not `--file`. `--file` crashes it.)*
+- **Larry's addendum** at **`107c059`** — the `--stat` figures Pax could not reach without a shell.
+
+**⭐ What the independent witness corrected, and it corrected ME, twice:**
+
+1. **First-dispatch Work Order quality fell from ~73% to 30%** (3 of 10 clean). Four orders carried **five falsified premises**, one of which **had already gone to Warwick as fact**. In every case the falsifying evidence was already in the repository when I wrote the order. **12 of 27 dispatches (44.4%) were amendment resumes** — the read-back gate is firing on nearly every input, which makes it a second author paid for in worker tokens rather than a control. Pax proposes `order-premise-not-verified` as a new family; **naming it is Warwick's, and it is carried as `proposed_family` so no script invents it.**
+2. **I reported the review-gate stacking recurrence as "an hour" after writing myself a note. The reflog says 17m02s** — too generous to myself by ~3.5×. And it was **PARTIAL**, which I got wrong in my own disfavour: the stacking repeated, **the premature push did not** (second time, push followed verdict by 32 seconds). I erased my own credit by describing it as total.
+
+**⚠️ THE FINDING I WOULD NOT HAVE FOUND, and it bears on the one item needing Warwick:** the morning report
+was **rejected by Telegram at 5,139 bytes** (`http 400 message is too long`) and **the retry sent 2,771 — 46%
+of the content did not reach the phone.** The **migration-020 item is section 8 of 8**, at the very end, which
+is the first thing a length-driven shortening removes. **Whether it arrived is UNESTABLISHED** — the ding log
+records bytes, never bodies. `ding.mjs` has **no pre-send length guard** on a Rule 4a-critical path. It failed
+loudly, not silently, so recovery depended on the sender noticing a non-zero exit.
+
+**Line-count correction worth carrying:** Pax's `record_to_product_ratio` of 1.52 is by **commit count**. By
+**volume** it inverts — 5,232 documentation lines against ~25,404 lines of hand-authored source, ~**1 : 4.9**.
+And **105,041 of the vision branch's 131,859 insertions are machine output** (31 frozen run JSONs, committed
+so the measurements Warwick's rulings rest on can be re-derived rather than believed). Counting that as work
+would overstate the session fivefold.
+
+**One grading is explicitly reversible and is Warwick's to overrule:** Pax graded
+`record-amended-body-not-recut` a **recurrence** (last map commit 00:34:07Z, next 06:17:23Z — a **5h43m**
+window in which four work packages completed and three of four lanes reached their final heads). That family
+stood at **4 clean, one exposure from EFFECTIVE**; the streak resets. **If batched overnight map maintenance
+is acceptable to Warwick, it becomes `clean` and the family closes at 5/5.** Pax recommends `recurrence` and
+flags rather than settles it. **I am not deciding it either.**
+
+**CAPAE — qualified exposure, recorded at the moment it arose.** Folding this in required superseding the
+"OUTSTANDING" paragraph above rather than appending a correction beneath it. That is
+`record-amended-body-not-recut`'s exact prevention — *"supersede the body, or do not append the amendment"* —
+and it was done in the same commit as the state change it describes.
+
+Its input, already committed: `Deliverables/2026-08-13-subagent-token-ledger-overnight-asdair-list.md` (`6723dfa`).
 
 **Assurance owed and NOT met, recorded as a finding rather than papered over:** **no Veritas gate was sought
 on any of the overnight product work** (WP-B15-34 → 37). Vera gave the Cockpit UI a **CONDITIONAL PASS**;
