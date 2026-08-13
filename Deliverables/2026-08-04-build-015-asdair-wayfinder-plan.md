@@ -2225,6 +2225,29 @@ output, rather than either architecture alone.
 
 **Status: ⭐ THE OVERNIGHT MISSION IS DELIVERED. THE LIST EXISTS. Vision is FINAL and PARKED. Five work packages complete (WP-B15-33 → 37). ⚠️ ONE ITEM NEEDS WARWICK: migration 020 is committed but UNAPPLIED. Full report: `Deliverables/2026-08-13-overnight-morning-report.md`.**
 
+### ⟦ROTATION CLOSE⟧ 2026-08-13 07:5x — closing head **`80b5cd3`** (+ ledger `6723dfa`)
+
+**THE EXACT NEXT ACTION for a fresh session:** ⚠️ **Migration 020 is committed but UNAPPLIED to the live
+database — that is WARWICK'S to run, not Larry's** (Larry attempted it; a safety classifier declined and he
+did not route around it). **A fresh Larry does NOT re-attempt it and does NOT re-open vision.** The next
+*Larry-actionable* work, in value order: **(1)** the Telegram confirmation card — the only lane untouched
+overnight, deliberately; **(2)** the rulebook consult, which needs **one extra authority line** in the next
+Work Order and would resolve a held line (*"toffees with no qualifier"*); **(3)** two `aka` rows for the
+Double Gloucester / Febreze resolver gap — a **data write to `asdair.regulars`**, which is Warwick's or a
+granted worker's, not Larry's.
+
+**SESSION REPORT — OUTSTANDING, NAMED, NOT SILENT.** Pax was commissioned at rotation and **may return after
+the `/clear`**. Expected at `Deliverables/2026-08-13-session-report-overnight-asdair-list.md` +
+`-payload.json`. **When it lands: commit it, run `tools/session-report/populate.mjs` (step 7b) and
+`capae-sync.mjs` (step 7c), and fold it into this map.** Its input, already committed:
+`Deliverables/2026-08-13-subagent-token-ledger-overnight-asdair-list.md` (`6723dfa`).
+**Steps 7 / 7b / 7c are therefore OUTSTANDING at this rotation, by design, not by omission.**
+
+**Assurance owed and NOT met, recorded as a finding rather than papered over:** **no Veritas gate was sought
+on any of the overnight product work** (WP-B15-34 → 37). Vera gave the Cockpit UI a **CONDITIONAL PASS**;
+Veritas passed only the *contract amendment*, which is a different boundary. **Nothing overnight is
+accepted, and no completion is claimed.**
+
 ### ⭐ WHERE THIS BUILD ACTUALLY STANDS — 2026-08-13, post-overnight. **A fresh Larry reads THIS block and nothing above it.**
 
 | Lane | Branch | HEAD | State |
