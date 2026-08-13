@@ -48,6 +48,30 @@ tailscale serve --bg --https=8443 http://127.0.0.1:8090
 ```
 Install on the phone: open that URL in Chrome → menu → **Add to Home screen**.
 
+### ⚠️ The HTTPS route does NOT work in Silk on the Fire HD 8 — there is a second, HTTP route for Mum
+
+**Added 2026-08-13.** Silk on Warwick's Fire HD 8 (`kfonwi` on the tailnet) fails the `:8443` HTTPS route
+with *"unexpectedly closed the connection"*. **Mum's URL is the HTTP one, and it is the short name:**
+
+```sh
+tailscale serve --bg --http=80 http://127.0.0.1:8090
+# → http://warwick-yoga/shopping.html            (tailnet only — THE URL MUM USES)
+# → http://warwick-yoga.tailbc1fe3.ts.net/…      (same route, full name)
+# disable with: tailscale serve --http=80 off
+```
+
+**Both routes are live and the HTTPS one is deliberately kept.** `tailscale serve status` labels the HTTP
+route **"(tailnet only)"** and it is **absent from the Funnel set** — Funnel remains on only for
+`https://warwick-yoga.tailbc1fe3.ts.net` → `127.0.0.1:8787`, which is a different service. Plain HTTP is
+not a downgrade here: WireGuard is the encryption layer, and nothing on this route ever leaves the tailnet.
+
+**What was RULED OUT, so nobody re-runs it:** the HTTPS endpoint accepts **TLS 1.2 and TLS 1.3** and
+answers `200` on both from a modern client, so it is not refusing old TLS. **The cause of Silk's failure
+was NOT established** — it could not be reproduced from the Windows host, and Warwick's instruction was
+explicitly not to reopen the Fire/Tailscale architecture. The HTTP route removes TLS from the path, which
+makes the cause moot rather than answered. *Verification from a second tailnet client was NOT possible:
+Tailscale SSH is not enabled on `fusion247-core`, the only shell-capable peer.*
+
 ## Endpoints
 - `GET /api/state` — attention (open+deferred), outputs, ingested, wins, builds
 - `POST /api/decide` — `{id, decision: accept|decline|defer|reopen, intent?, args?}`

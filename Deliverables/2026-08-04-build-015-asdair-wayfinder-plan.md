@@ -2282,22 +2282,40 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
-## ⟦ROTATION CLOSE⟧ 2026-08-13 — closing head **`c1fcb46`** on `main`. **READ THIS FIRST.**
+## ⟦ROTATION CLOSE⟧ 2026-08-13 — closing head **`c1fcb46`** on `main`. **Its next action is DISCHARGED — see the session block below it.**
 
-### 📄 SESSION REPORT — **OUTSTANDING BY DESIGN, NAMED, NOT SILENT**
+### 📄 SESSION REPORT — ✅ **DISCHARGED 2026-08-13 (later session). Steps 7 / 7b / 7c are DONE.**
 
-**Pax commissioned at rotation and may return AFTER the `/clear`.** Expected at
-`Deliverables/2026-08-13-session-report-asdair-finishing.md` + `-payload.json`.
-**Its input is already committed:** `Deliverables/2026-08-13-subagent-token-ledger-asdair-finishing.md`
-(`90a49a2`) — **Total A 4,404,873 deduplicated tokens · 19 agents · 32 returns · 1,657 tool uses**, with the
-cumulative-vs-per-dispatch question **re-tested rather than inherited** (tokens monotonic 8/8; `tool_uses`
-monotonic only 5/8, so it is per-dispatch).
+**Body re-cut, not appended to** — the `record-amended-body-not-recut` family was a live exposure at this
+edit and its MUST is *"supersede the body, or do not append the amendment."*
 
-**When it lands: commit it, run `tools/session-report/populate.mjs` (7b) and `capae-sync.mjs` (7c) — note
-capae-sync takes the payload POSITIONALLY, not `--file` — and fold it into this map.**
-**Steps 7 / 7b / 7c are therefore OUTSTANDING at this rotation, by design, not by omission.**
+**Pax's report landed after the `/clear`, exactly as this block predicted**, and is committed at
+**`b365ff2`**: `Deliverables/2026-08-13-session-report-asdair-finishing.md` + `-payload.json`.
+Its input remains `…-subagent-token-ledger-asdair-finishing.md` (`90a49a2`) — **Total A 4,404,873
+deduplicated tokens · 19 agents · 32 returns · 1,657 tool uses.**
 
-### 🎯 THE EXACT NEXT ACTION — **BUILD THE WRITE / ACTION PATH. Nothing else.**
+| Step | Command actually run | Result |
+|---|---|---|
+| **7** | commit | `b365ff2` |
+| **7b** | `node tools/session-report/populate.mjs --file <payload>` | `ok:true` · `verified:true` · rotation `56e42a7c` · closing head **`90a49a2`** |
+| **7c** | `node tools/session-report/capae-sync.mjs <payload>` *(positional)* | **`unknown: []`**, `rejected: []` — every family slug resolved |
+
+**⚠️ The map's own note had the two flags the wrong way round and cost a round trip: `populate.mjs` takes
+`--file`; `capae-sync.mjs` takes the payload POSITIONALLY.** Corrected here at the point of use.
+
+**CAPAE movement from 7c:** `control-cannot-reach-what-it-checks` → **EFFECTIVE** (5 clean exposures) ·
+`built-tested-never-activated` 6 occurrences / 1 clean · `record-amended-body-not-recut` **RECURRENCE**,
+5 occurrences / 0 clean · `work-order-not-generated` **RECURRENCE — broken 22 m 22 s after being graded
+clean**, which is Pax's correction to the "barely an hour" I recorded.
+
+**Pax's three findings worth Warwick's eye, recorded here rather than actioned** (a finding is an
+observation, not an instruction): **five parallel lanes were bound to ONE shared mutable Postgres** — the
+estate isolates files via worktrees and does not isolate databases, and Pax rates it the one defect that
+recurs unchanged unless fixed structurally · **39 pushes to `main` in one session** under an `ask` rule
+raising a modal for each · **`tools/governor/permission-invariant.mjs:78` never inspects
+`settings.local.json.permissions.ask`** — latent today, HOBBY-BRAIN park, three-word fix if ever convenient.
+
+### 🎯 THE EXACT NEXT ACTION — ⛔ **SUPERSEDED. It is IN PROGRESS as of 2026-08-13 (later session); the current frontier is the block below. This section is retained for its still-accurate statement of what was missing.**
 
 **Warwick, 2026-08-13, verbatim: *"Do not stop merely because /shopping.html becomes visible. A page whose
 SEND button says it cannot send yet is not a finished product."*** He has given **standing merge authority**
