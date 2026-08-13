@@ -2282,6 +2282,70 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+## ⟦ROTATION CLOSE⟧ 2026-08-13 — closing head **`c1fcb46`** on `main`. **READ THIS FIRST.**
+
+### 🎯 THE EXACT NEXT ACTION — **BUILD THE WRITE / ACTION PATH. Nothing else.**
+
+**Warwick, 2026-08-13, verbatim: *"Do not stop merely because /shopping.html becomes visible. A page whose
+SEND button says it cannot send yet is not a finished product."*** He has given **standing merge authority**
+and told Larry to **finish AsdAIr**.
+
+**What is missing, precisely — established, not guessed:**
+
+1. **The Cockpit proxies GET ONLY.** `services/cockpit/server.mjs` (`ASDAIR_ORIGIN = http://127.0.0.1:8710`)
+   has **no write proxy**. Mum's SEND therefore cannot reach any durable store from the browser.
+2. **Lane C's three resolution endpoints EXIST BUT ARE UNMERGED** — `build-015/b15-25-cockpit-backend` at
+   **`4d1b060`**, builder-evidenced at 272/272 subtests with a mutation proof, **never gated by Vera or
+   Veritas.** Free text · candidate selection · "not this week", over the **unchanged** `answerQuestion`
+   command. Route count moves 7 → 10.
+3. **Mum's `send()` renders an honest not-connected state** and never claims success. **That copy is correct
+   and must not be faked away — it must become true.**
+
+**The sequence a fresh Larry should follow:** gate and merge `b15-25-cockpit-backend` → add the **write**
+proxy to the Cockpit → wire Mum's SEND to the real command surface → prove it **through the real production
+modules**, not a fixture. **Warwick's constraint: *"Do not message Mum unexpectedly merely to satisfy a test.
+Use a controlled test route/fixture where necessary; if the final proof genuinely requires one real Mum
+action or one fresh photograph, prepare everything first and ask for that single exact action only."***
+
+### ✅ WHAT IS DONE, LIVE AND ASSURED
+
+- **Mum's Cockpit is MERGED and LIVE.** **`https://warwick-yoga.tailbc1fe3.ts.net:8443/shopping.html`** —
+  **tailnet-only, NOT on the public funnel.** Verified over the tailnet: 200, loads only Vue + `shopping.js`,
+  **no operator bundle, no route into Warwick's console**, the banned word appears nowhere she can see.
+  *Warwick and GPT are still getting Tailscale onto the Fire HD 8 via ADB — Amazon's installer refuses the
+  supported device.*
+- **Vera Gate 3 PASS** on Mum's Cockpit (`490c7b7`) · **Vera PASS** on the Cockpit UI (`111c8cd`).
+- **The journey runs end-to-end on Terra** to a brand-sorted handoff — **three consecutive identical runs**
+  (shops 108, 109, 111): 8 regions · PHOTO 40 · REGULARS 12 · **40/40 citing their own** · 34 lines · 3 held ·
+  **halts at 3 open questions by design.**
+- **Migration 020 live and verified. Production vision corrected to `gpt-5.6-terra`.**
+
+### ⚠️ OPEN, AND HONEST
+
+**RULE and WARWICK provenance unexercised** (one needs a second gateway call, one needs a human answer) ·
+**live Telegram trigger never fired** — *`runtime.js` sends whatever is queued, so firing it would message Mum
+unprompted; that is Larry's refusal, not a missing grant* · **all 14 MUM criteria HOLD** — Warwick has ruled
+these a **soak/acceptance programme that does NOT justify leaving the product incomplete today** · **criterion
+2 needs a curated `display_name`** · **everything measured is Chromium, NOT Silk, NOT her tablet** · the
+**Tailscale power-cycle test with the kill-switch off is unrun** and is the only item with real
+product-failure potential · **Veritas Gate 2 on the journey has NOT been sought.**
+
+**Vera's three non-blocking items for the next touch of the geometry gate:** the self-test **never renders the
+post-send state** (so "12/12" covers the resting 10 of 20) · the "NO MUTATION" comment block at `:549-570` is
+**byte-identical to the pre-fix head and now false in three ways** · `shopping.js` warns against a backtick
+hazard it does not have.
+
+### 📌 STATE, VERIFIED BY EXECUTION AT ROTATION
+
+`main` **`c1fcb46`**, clean, **0 unpushed** · **16 worktrees, all clean, sampled twice six seconds apart** ·
+tonight's four branches all pushed. **Pre-existing residue, NOT tonight's and not urgent:** nine local-only
+`build-015/*` branches with no remote, and one unpushed commit on `b15-08-answer-not-a-list` **dated
+2026-08-10**.
+
+**Disposable PostgreSQL 17.4 at `127.0.0.1:55432/asdair_test`** — 31 tables at parity with live, **real
+catalogue: 109 regulars, 40 rules, household 1 = `mum`.** *It is a live process; a reboot ends it and it must
+be re-created.*
+
 ## 🔴🔴 PRODUCTION DOES NOT READ THE PHOTOGRAPH WITH TERRA. **Established by execution, 2026-08-13. WARWICK'S DECISION.**
 
 **Every measurement this phase rests on — the 39/39 coverage, the 2-of-3 reconciliation, Lane E's phantom
