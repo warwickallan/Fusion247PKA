@@ -2333,6 +2333,38 @@ describes**, while `inventedFreeGeneration` absorbs three different mechanisms u
 unconstrained invention on a closed-enum run. Recorded as an observation. **No Work Order. Vision stays
 parked.** Band 7 flags itself via `lookAgainRegions: [5,7]` and **nothing downstream consumes that flag.**
 
+### ✅ LANE D COMPLETE — Cockpit is one surface now. **`152e4a0`** on `build-015/b15-26-cockpit-ui`. **With Vera; NOT accepted.**
+
+**Three exception surfaces became ONE board.** Shop's "Needs your attention", Questions' "Still waiting on
+you" and Basket's `held` were three places to look; the Questions view (relabelled **Exceptions**) is now
+the single board, and the other two route to it and render no controls of their own. **X NEED YOU / Y
+RESOLVED / Z STILL BLOCKING come from one partition**, so two screens cannot disagree. Brand-grouped list,
+compact `BRAND · PRODUCT · ×QTY`, provenance on expansion, exceptions separated. Skipped-with-reason and the
+total item count were rendered **nowhere** before and now are.
+
+**Felix's correction to Larry, in his words and worth keeping:** the `execution_packet` retraction changed
+**not one line of logic** — the code already degraded correctly. What changed is what the comments *claim*,
+*"and that mattered: a branch whose comment says 'until X arrives' is a bug when X is not coming, because
+the next reader deletes it."*
+
+**Three controls were caught reporting success while doing nothing** — each found by making it fail rather
+than by trusting it: `instanceof SyntaxError` is false across a `node:vm` realm · `--window-size=375` gave a
+**492px** viewport · an assertion stayed green under a broken join.
+
+**Evidence:** render-vm **48 scenarios / 136 assertions / 0 failed** · self-test 10/10 · secret-scan exit 0
+(43 files) · rendered at 375/768/1280 in both colour schemes · cache version moved so installed PWAs get the
+bundle. **No shop figure is hardcoded** — grep-confirmed, which is why the 30/9 re-baseline needed no change.
+
+**⚠️ CODE-VERIFIED ONLY, and labelled as such by Felix rather than by a reviewer catching it:** the
+`.as-remember` durable-knowledge panel has never been exercised against a live command surface, because
+none exists. **Capability evidence, not acceptance.**
+
+**Larry fixed one thing Felix correctly refused to touch:** `render-vm-check.mjs`'s header claimed shopping
+payloads are *"personal data that must never be committed"* — **false, and the third inversion of Warwick's
+thrice-given ruling.** The practice (synthetic fixtures) was never wrong; the reason was. It now reads
+*a gate must be deterministic*, with the correction and its dates recorded so the next reader inherits the
+ruling instead of the inversion. Comment-only; gate re-run at the new head, same 48/136/0.
+
 ### 🔢 ACCEPTANCE RE-BASELINED — `resolved: 31 → 30`, `routed: 8 → 9`. **Larry's decision, recorded before the work, not after.**
 
 **Keel found the real control one layer below where Lane E and Larry had both placed it.** Not
