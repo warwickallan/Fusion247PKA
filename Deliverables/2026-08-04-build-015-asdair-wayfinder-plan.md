@@ -2333,6 +2333,34 @@ describes**, while `inventedFreeGeneration` absorbs three different mechanisms u
 unconstrained invention on a closed-enum run. Recorded as an observation. **No Work Order. Vision stays
 parked.** Band 7 flags itself via `lookAgainRegions: [5,7]` and **nothing downstream consumes that flag.**
 
+### 🔢 ACCEPTANCE RE-BASELINED — `resolved: 31 → 30`, `routed: 8 → 9`. **Larry's decision, recorded before the work, not after.**
+
+**Keel found the real control one layer below where Lane E and Larry had both placed it.** Not
+`corroborate.js`, which only *labels* — **`finalise/produceFinalList.mjs:168-169`, where `support >= 2`
+establishes a line.** *That threshold of two is the 3-of-3 hole in one expression:* a phantom present in all
+three runs sails straight through. It confirms Lane E from a second direction.
+
+**And a second dead signal.** `vision_needs_human` is computed at `corroborate.js:347-348` and **consumed by
+nothing**. Measured against the 39 established lines: **5 carry `vision_needs_human: true`, 4 of them
+unanimous 3-of-3, and all 5 have `identity_disagreement: false` and `settled: true`** — so every one passes
+every existing certainty test and enters the shop as shoppable.
+
+**Keel then reported that Larry's own AC5 and AC6 could not both be true**, and refused to move an
+acceptance baseline himself. Correct on both counts. The three options and the ruling:
+
+1. ⛔ **Wire it wholesale** — honest, but flips ~5 lines and **undoes Warwick's pack-identity ruling**: the 4 `leading_mark_disagreement` lines are exactly the Richmond-16 class that convention deliberately settles.
+2. ⛔ **Prove it over a fixture only** — AC6 survives and the control never bites on real data. Keel named this as theatre rather than take the easy green.
+3. ✅ **ADOPTED — wire only the unresolved class**, `cross_region_duplicate_unresolved`, excluding `leading_mark_disagreement` which `settleQuantity` resolves by deterministic rule.
+
+**Effect: ONE line moves to HUMAN — `4 x 4pts. ARLA SEMI SKIMMED MILK`, a cross-region duplicate that three
+correlated readings agreed on.** That is the precise case Warwick's §4 ruling names, and agreement there
+proves nothing.
+
+> **⚠️ WHAT WARWICK WILL SEE CHANGE, stated plainly rather than buried:** the shop reports **30 shoppable
+> and 9 held**, not 31 and 8. **The 39 products / 53 items accounting is UNCHANGED and still closes** —
+> 47 observed, 47 accounted, none missing, none doubled. **The list did not get worse; it got more honest.**
+> *This is Larry's decision under the authority Warwick gave, taken rather than escalated at 4am.*
+
 ### 🔧 THE THREE KEEL LANES WERE REFUSED, CORRECTLY, AND RE-ISSUED
 
 **Larry hand-authored all five orders instead of generating them. Every Keel lane refused on sight.** The
