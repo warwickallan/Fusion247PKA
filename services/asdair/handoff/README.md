@@ -217,8 +217,16 @@ boundary confirmations, held lines, missing/unknown lines, reporter notes. `veri
 none of those and they must not be discarded to fit its shape.
 
 `query` is **always injected**: `(text, params) => Promise<{ rows }>`, against the **write** pool.
-This module has **zero dependencies**, never imports `pg`, and never opens a connection. It is
-CommonJS so that both the ESM `pipeline/` and the CommonJS `reconcile/` can consume it.
+**No production module here imports `pg` or opens a connection**, and that is what keeps this
+package consumable from both the ESM `pipeline/` and the CommonJS `reconcile/`.
+
+> **Amended 2026-08-13 (WP-B15-44).** This paragraph used to say the package had "zero
+> dependencies" flatly. `pg` is now a **devDependency**, used only by `readReconciled.dbtest.js`
+> and `test/claimWorker.js` to reach a throwaway Postgres — because the SQL and the durability
+> claims in "What is NOT proven here" could not otherwise be proven at all. The production modules
+> are unchanged and still import nothing. The distinction is load-bearing rather than pedantic: a
+> devDependency is not shipped, and `handoffCli.test.js` still fails the suite if `handoffCli.js`
+> ever grows a `require('pg')`, a `new Pool`, or a literal connection string.
 
 ### The intended sequence
 
@@ -242,10 +250,15 @@ await completeHandoff(query, { requestId: claimed.id, writerId,
 
 ## What is NOT proven here
 
-- **The SQL is not proven.** `test/fakeRequestStore.js` reproduces the protocol offline; it cannot
-  demonstrate `for update skip locked` atomicity or the partial unique index. Those properties are
-  **inherited** from statement shapes proven against real Postgres in `browser-runner/RUNNER-PROOF.md`
-  and are **not re-proven** here. No database was available to this build.
+- **~~The SQL is not proven.~~ SUPERSEDED 2026-08-13 (WP-B15-44), and only in part.** A disposable
+  PostgreSQL 17.4 with migrations 001-020 applied is now available, so `readReconciled.dbtest.js`
+  proves the reconciled-truth SELECTs, the grants, the append-only ledger and **AC6 durability by
+  kill-and-revive with two real OS processes** — a `SIGKILL`ed writer, a lease that expires on the
+  database clock, and a second process resuming the same request without double-shopping a line.
+  **What is still inherited rather than re-proven here:** `for update skip locked` atomicity under
+  genuine concurrent contention, which `RUNNER-PROOF.md` demonstrated and this suite does not
+  reproduce. The original sentence, "no database was available to this build", was true when written
+  and is no longer true.
 - **The seam to `verifyBasket` was matched by READING it, not by agreeing it.** Both modules were
   built in parallel. `toBasketObservation` was written against `reconcile/verifyBasket.js` as it stood
   at the time of writing; the two have never been executed together, and no integration test spans
@@ -262,9 +275,69 @@ await completeHandoff(query, { requestId: claimed.id, writerId,
   present — it cannot enforce it in the browser. That is a real reduction in guarantee, accepted
   deliberately in exchange for a process that works at human speed.
 
+---
+
+## 4. The reconciled-truth read — `readReconciled.js` (WP-B15-44)
+
+**The handoff reads the database, not a file somebody wrote earlier.**
+
+`buildHandoff(packet)` still takes a packet and still verifies it. What changed is where the packet
+comes from on the production path: `buildHandoffFromDb(query, { shopRef })` reads `asdair.shop`,
+`asdair.shop_line` and the post-020 `asdair.shop_line_provenance`, joined to the household
+catalogue, and produces the packet from those rows.
+
+The two halves stay separate on purpose. **`readReconciled.js` PRODUCES** — it may sort, it may
+exclude. **`buildHandoff.js` VERIFIES** — it re-derives every count and refuses. A producer that
+also grades its own output is not a control, which is why the sort is asserted independently by the
+module that did not perform it.
+
+```js
+const { handoff, exclusions, shop } = await buildHandoffFromDb(query, { shopRef: 'SHOP-2026-08-13' });
+// shop.status      -> the GATE
+// shop.human_state -> DISPLAY truth, carried, never gated on
+```
+
+### The emission gate is `shop.status`, and never `human_state`
+
+`shop.status === 'READY_TO_SHOP'` is the only thing that opens the gate. Three reasons, and the
+third is the one that decides it:
+
+1. `human_state` is a **projection**: migration 020 maps several statuses onto one human_state, so a
+   human_state test cannot distinguish the states it collapses.
+2. The existing reconciliation guard in `services/asdair/pipeline/applyDecisions.js` — proven at
+   `decisionSpine.test.js:338`, *"READY_TO_SHOP is UNREACHABLE while any line is unresolved"* —
+   already gates on status. Two controls over one property must agree, or one of them is noise.
+3. **020 installs NO trigger.** It adds `human_state` with a default and backfills it once; nothing
+   keeps it tracking `status` afterwards. Established by execution: a row inserted with
+   `status = 'READY_TO_SHOP'` comes back `human_state = 'ASDAIR_WORKING'`. **Whoever writes one must
+   write both** — and a gate resting on a column nothing maintains is a gate resting on someone's
+   memory.
+
+### The four things it refuses
+
+| Refusal | What it prevents |
+|---|---|
+| `SHOP_NOT_READY_TO_SHOP` | a trolley built around a question nobody answered |
+| `BRAND_SENTINEL_LEAKED` | `"ZZ (no brand recorded)"` reaching a human as a manufacturer. It is a **sort key**; a line with no brand carries `null`, which `compareLines` already ranks last by explicit rank |
+| `PACK_SIZE_TREATED_AS_QUANTITY` | sixteen packs of Richmond sausages. Pack size is **identity** — one 16-pack is one thing to buy — and every emitted quantity must match a quantity actually recorded on the reconciled rows. Written as a **traceability** assertion, so an explicit human "16" is honoured and only an invented number is refused |
+| `RECONCILED_LINE_DROPPED` / `LINE_WITHOUT_PROVENANCE` / `UNKNOWN_LINE_STATUS` | a line vanishing, a line with no recorded origin, or a new upstream status silently defaulting into (or out of) the trolley |
+
+Pack size is Lane AB's semantics, not this module's: the canonical implementation is
+`services/asdair/pipeline/finalise/settleQuantity.js`. This module **asserts against** it.
+
 ## Tests
 
 ```
-node --test        # the suite
-node mutation-proof.js   # the guards, removed on purpose
+node --test              # the offline suite
+node mutation-proof.js   # the guards, removed on purpose - 14 of them
+npm run dbtest           # the real-Postgres proofs (needs ASDAIR_WRITE_DB_URL)
 ```
+
+**The connection string is never written into a file here.** It comes from `ASDAIR_WRITE_DB_URL` in
+the environment, and two independent mechanisms enforce that: `handoffCli.test.js` fails on a
+literal in the source, and the repository secret scanner carries a
+`connection-string-with-credentials` detection class.
+
+`npm run dbtest` is **additive and non-destructive**: it inserts its own shop under a unique
+`shop_ref` per run and touches nobody else's rows. It cannot do otherwise — the runtime role holds
+no DELETE on any `asdair` table, which is production-faithful rather than a limitation.

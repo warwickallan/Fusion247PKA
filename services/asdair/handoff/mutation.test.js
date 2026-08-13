@@ -19,7 +19,11 @@ const {
 
 test('MUTATION: every guard is load-bearing - removing it breaks the property', async () => {
   const results = await runMutations();
-  assert.equal(results.length, 9, 'a mutation was removed from the set');
+  // 9 (two-writers + Lane C) + 5 (Lane F, WP-B15-44: the reconciled-truth read).
+  // This literal is the inventory and it is held HERE, in the test, rather than
+  // derived from the set it checks - a count read off MUTATIONS.length would
+  // agree with any set at all, including one a guard had silently dropped out of.
+  assert.equal(results.length, 14, 'a mutation was removed from the set');
   for (const r of results) {
     assert.equal(r.honestFailed, false, `${r.name}: the property is ALREADY broken with the guard in place`);
     assert.equal(r.mutatedFailed, true, `${r.name}: removing the guard changed NOTHING - the corresponding proof is inert and proves nothing`);
@@ -48,6 +52,28 @@ test('MUTATION: all SIX named browser behaviours are covered, by name', async ()
   for (const m of MUTATIONS.filter((x) => required.includes(x.name))) {
     assert.ok(typeof m.behaviour === 'string' && m.behaviour.length > 0, `${m.name} does not say which behaviour it is`);
     assert.ok(typeof m.method_step === 'string' && m.method_step.length > 0, `${m.name} names no method step`);
+  }
+});
+
+test('MUTATION: the five Lane F guards between the reconciled rows and the trolley are all present', async () => {
+  // Same reasoning as the roster above, for WP-B15-44. These five stand between
+  // what was actually decided and what Warwick ends up buying; a set that
+  // quietly lost one would still report every REMAINING mutation as caught, so
+  // the names are pinned against a literal written out here.
+  const { MUTATIONS } = require('./mutation-proof');
+  const required = [
+    'emissionGateIgnored',      // a payload emitted while a genuine hold stands
+    'sentinelTreatedAsBrand',   // "ZZ (no brand recorded)" shown as a manufacturer
+    'packSizeBecomesQuantity',  // 16 sausages bought as sixteen packs
+    'silentDrop',               // a reconciled line neither shopped nor named
+    'provenanceNotRequired',    // a line shopped with no recorded origin
+  ];
+  const names = MUTATIONS.map((m) => m.name);
+  for (const r of required) assert.ok(names.includes(r), `Lane F mutation "${r}" has gone missing from the set`);
+
+  for (const m of MUTATIONS.filter((x) => required.includes(x.name))) {
+    assert.ok(typeof m.behaviour === 'string' && m.behaviour.length > 0, `${m.name} does not say which behaviour it is`);
+    assert.ok(typeof m.guard === 'string' && m.guard.length > 0, `${m.name} names no guard`);
   }
 });
 

@@ -213,6 +213,172 @@ async function requestOpenedWithoutMethod(mutate) {
   return opened && (!Array.isArray(handoff.method) || handoff.method.length === 0);
 }
 
+// =====================================================================
+// LANE F (WP-B15-44) - THE FIVE GUARDS BETWEEN THE RECONCILED ROWS AND THE
+// TROLLEY, each removed on purpose.
+//
+// Same in-memory mutation technique as Lane C: the real source text is edited
+// and compiled under its real filename, so relative requires resolve normally
+// and NOTHING is written to disk. An interrupted run leaves no mutated file
+// behind, which matters more here than anywhere else in this repository -
+// readReconciled.js is the file that decides what Warwick actually buys.
+// =====================================================================
+
+/** readReconciled, with the named guards removed from its real source. */
+function reconciledModule(flags) {
+  const f = flags || {};
+  if (!f.emissionGateIgnored && !f.sentinelTreatedAsBrand && !f.packSizeBecomesQuantity
+      && !f.silentDrop && !f.provenanceNotRequired) {
+    return require('./readReconciled');
+  }
+  return loadMutated('readReconciled.js', (src) => {
+    let out = src;
+    if (f.emissionGateIgnored) {
+      // The emission gate itself. Without it a held shop produces a payload.
+      out = out.replace('if (shop.status !== READY_STATUS) {', 'if (false) {');
+    }
+    if (f.sentinelTreatedAsBrand) {
+      // Both halves: the collapse to null, and the assertion on what travels.
+      out = out.replace('if (raw === BRAND_SENTINEL) return null;', ';');
+      out = out.replace('if (l.brand === BRAND_SENTINEL || l.normalized_brand === BRAND_SENTINEL) {', 'if (false) {');
+    }
+    if (f.packSizeBecomesQuantity) {
+      // THE INVERSION ITSELF: pack size, which is identity, is read as the
+      // number to buy - and the traceability assertion that would catch it is
+      // removed at the same time, because a guard that still fired would make
+      // this mutant prove the wrong thing.
+      out = out.replace(
+        'required_quantity: reconciledQuantities.length > 0 ? reconciledQuantities[0] : null,',
+        'required_quantity: packIdentity ? packIdentity.pack_size : (reconciledQuantities.length > 0 ? reconciledQuantities[0] : null),',
+      );
+      out = out.replace('if (!permitted.includes(line.required_quantity)) {', 'if (false) {');
+    }
+    if (f.silentDrop) {
+      // A line quietly filtered out on its way to the packet, with the
+      // arithmetic that would have noticed switched off.
+      out = out.replace('const settled = [];', 'const settled = []; let _dropped = false;');
+      out = out.replace('    settled.push(s);', '    if (!_dropped) { _dropped = true; return; }\n    settled.push(s);');
+      out = out.replace('  if (accounted !== allRows.length) {', '  if (false) {');
+    }
+    if (f.provenanceNotRequired) {
+      out = out.replace('if (!rows || rows.length === 0) {', 'if (false) {');
+    }
+    return out;
+  });
+}
+
+/** The reconciled-row fixtures the Lane F scenarios run against. */
+function reconciledFixture(over = {}) {
+  const line = (o) => ({
+    id: 1, line_no: 1, raw_reading: 'richmond sausages', quantity: 1, status: 'matched',
+    matched_regular_id: 3, match_basis: 'aka', corrected: false,
+    brand: 'Richmond', canonical_product_name: 'Richmond Thick Pork Sausages 16 Pack',
+    asda_product_id: null, asda_url: null, substitutes_allowed: false, ...o,
+  });
+  const prov = (o) => ({
+    id: 1, line_no: 1, provenance: 'REGULARS', quantity: 1, raw_text: null,
+    matched_regular_id: 3, interpreter_model: null, prompt_version: null,
+    confidence: null, interpreted_at: '2026-08-13T09:00:00.000Z', ...o,
+  });
+  return {
+    shop: {
+      id: 900, shop_ref: 'SHOP-2026-08-13', status: 'READY_TO_SHOP',
+      human_state: 'READY_FOR_WARWICK', household_id: 1, list_id: null,
+      created_at: '2026-08-13T09:00:00.000Z', ...(over.shop || {}),
+    },
+    rows: over.rows || [
+      line({ id: 1, line_no: 1, raw_reading: 'ariel pods', matched_regular_id: 4, brand: 'Ariel', canonical_product_name: 'Ariel All-in-1 Pods Original 33 Washes' }),
+      line({ id: 2, line_no: 2 }),
+    ],
+    provenanceByLineNo: over.provenanceByLineNo || new Map([
+      [1, [prov({ id: 1, line_no: 1, matched_regular_id: 4 })]],
+      [2, [prov({ id: 2, line_no: 2 })]],
+    ]),
+  };
+}
+
+/**
+ * LANE F (1) - a shop with a genuine hold outstanding must produce NOTHING.
+ * @returns {boolean} true when a held shop emitted a payload anyway (the failure)
+ */
+async function heldShopEmitted(mutate) {
+  const { toPacket: shape } = reconciledModule(mutate);
+  const held = reconciledFixture({ shop: { status: 'NEEDS_DECISION', human_state: 'NEEDS_WARWICK' } });
+  try {
+    const { packet } = shape(held);
+    return packet.lines.length > 0;
+  } catch (e) {
+    if (e.name === 'ReconciliationError') return false;
+    throw e;
+  }
+}
+
+/**
+ * LANE F (2) - the sort sentinel must never travel as a brand name.
+ * @returns {boolean} true when it reached a line as a brand (the failure)
+ */
+async function sentinelReachedTheShopper(mutate) {
+  const mod = reconciledModule(mutate);
+  const fx = reconciledFixture();
+  fx.rows[0].brand = mod.BRAND_SENTINEL;
+  try {
+    const { packet } = mod.toPacket(fx);
+    return packet.lines.some((l) => l.brand === mod.BRAND_SENTINEL);
+  } catch (e) {
+    if (e.name === 'ReconciliationError') return false;
+    throw e;
+  }
+}
+
+/**
+ * LANE F (3) - THE ONE THAT REACHES THE TROLLEY. Pack size is identity: one
+ * 16-pack of sausages is ONE thing to buy. Read as a quantity it becomes
+ * sixteen of them, and the same inversion turns Ariel's 33 washes into 33 packs.
+ * @returns {boolean} true when a pack size was shopped as a quantity (the failure)
+ */
+async function packSizeShoppedAsQuantity(mutate) {
+  const { toPacket: shape } = reconciledModule(mutate);
+  try {
+    const { packet } = shape(reconciledFixture());
+    return packet.lines.some((l) => l.pack_identity && l.required_quantity === l.pack_identity.pack_size);
+  } catch (e) {
+    if (e.name === 'ReconciliationError') return false;
+    throw e;
+  }
+}
+
+/**
+ * LANE F (4) - a reconciled line must be shopped or NAMED. Never neither.
+ * @returns {boolean} true when a line vanished unaccounted for (the failure)
+ */
+async function lineVanishedSilently(mutate) {
+  const { toPacket: shape } = reconciledModule(mutate);
+  const fx = reconciledFixture();
+  try {
+    const { packet, exclusions } = shape(fx);
+    return (packet.lines.length + exclusions.length) < fx.rows.length;
+  } catch (e) {
+    if (e.name === 'ReconciliationError') return false;
+    throw e;
+  }
+}
+
+/**
+ * LANE F (5) - post-020 every shopped line carries its origin.
+ * @returns {boolean} true when a line with no provenance was shopped (the failure)
+ */
+async function lineShoppedWithoutProvenance(mutate) {
+  const { toPacket: shape } = reconciledModule(mutate);
+  const fx = reconciledFixture({ provenanceByLineNo: new Map() });
+  try {
+    const { packet } = shape(fx);
+    return packet.lines.length > 0;
+  } catch (e) {
+    if (e.name === 'ReconciliationError') return false;
+    throw e;
+  }
+}
+
 /**
  * SCENARIO (e) - a basket that is genuinely WRONG (an expected product is not
  * in it) must never be reported verified.
@@ -433,6 +599,50 @@ const MUTATIONS = [
     mutate: { methodPayloadAbsent: true },
     failureMeans: 'a durable browser build request was opened carrying NO operating contract at all',
   },
+
+  // ── LANE F (WP-B15-44) - THE HANDOFF READS THE RECONCILED TRUTH ──────────
+  // Five guards in readReconciled.js, each removed on purpose below. These are
+  // the ones standing between the reconciled rows and Warwick's trolley.
+  {
+    name: 'emissionGateIgnored',
+    behaviour: 'a payload is emitted while a genuine hold is still outstanding',
+    guard: 'readReconciled refuses to emit unless shop.status is READY_TO_SHOP',
+    scenario: heldShopEmitted,
+    mutate: { emissionGateIgnored: true },
+    failureMeans: 'a shop sitting in NEEDS_DECISION produced a handoff, so the trolley was built around a question nobody answered',
+  },
+  {
+    name: 'sentinelTreatedAsBrand',
+    behaviour: 'the sort sentinel reaches a human as a manufacturer',
+    guard: 'brandFor() collapses "ZZ (no brand recorded)" to null; assertNoSentinelBrand refuses it on the lines that travel',
+    scenario: sentinelReachedTheShopper,
+    mutate: { sentinelTreatedAsBrand: true },
+    failureMeans: 'the phone showed a brand called "ZZ (no brand recorded)" - a sort key presented as a product fact',
+  },
+  {
+    name: 'packSizeBecomesQuantity',
+    behaviour: 'pack size is read as a purchase quantity',
+    guard: 'assertQuantityIsTraceable requires every emitted quantity to match a quantity actually recorded on the reconciled rows',
+    scenario: packSizeShoppedAsQuantity,
+    mutate: { packSizeBecomesQuantity: true },
+    failureMeans: 'SIXTEEN packs of Richmond sausages and THIRTY-THREE packs of Ariel pods went into Warwick\'s trolley',
+  },
+  {
+    name: 'silentDrop',
+    behaviour: 'a reconciled line disappears with nothing said',
+    guard: 'assertNothingDropped requires shopped + named exclusions to equal the lines actually read',
+    scenario: lineVanishedSilently,
+    mutate: { silentDrop: true },
+    failureMeans: 'a reconciled line was neither shopped nor named as an exclusion - it simply was not there',
+  },
+  {
+    name: 'provenanceNotRequired',
+    behaviour: 'a line is shopped that cannot say where it came from',
+    guard: 'assertProvenancePresent refuses a shoppable line with no surviving shop_line_provenance row',
+    scenario: lineShoppedWithoutProvenance,
+    mutate: { provenanceNotRequired: true },
+    failureMeans: 'a product entered the trolley with no recorded origin at all, post-020',
+  },
 ];
 
 /**
@@ -486,4 +696,8 @@ module.exports = {
   secondWriterClaimed, staleWriterWrote, secondLiveRowAppeared,
   secondProductTabOpened, regularFreeSearched, misSortedPacketAccepted,
   searchWentUnbounded, wrongBasketReportedVerified, requestOpenedWithoutMethod,
+
+  // Lane F - WP-B15-44
+  heldShopEmitted, sentinelReachedTheShopper, packSizeShoppedAsQuantity,
+  lineVanishedSilently, lineShoppedWithoutProvenance,
 };

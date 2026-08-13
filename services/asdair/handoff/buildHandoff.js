@@ -441,6 +441,20 @@ function copyLine(line) {
     applied_rules: Array.isArray(line.applied_rules) ? line.applied_rules.slice() : [],
     quantity_rationale: line.quantity_rationale == null ? null : line.quantity_rationale,
 
+    // PACK SIZE IS IDENTITY, NEVER A COUNT. "16 Pack" says what one unit IS;
+    // `required_quantity` says how many of them to put in the trolley. Carried
+    // through as a distinct field precisely so the two can never be read as one
+    // number - a handoff that confused them would buy sixteen packs of sausages.
+    // Produced by readReconciled.js from the catalogue name; null on a packet
+    // that carries no pack identity, which is the ordinary case.
+    pack_identity: line.pack_identity == null ? null : line.pack_identity,
+
+    // WHERE THIS LINE CAME FROM - PHOTO / REGULARS / RULE / WARWICK, from the
+    // post-020 asdair.shop_line_provenance ledger. Carried ON THE ARTEFACT
+    // because the artefact is what travels: a line whose origin is only
+    // knowable by re-querying the database is a line nobody will check.
+    provenance: Array.isArray(line.provenance) ? line.provenance.slice() : null,
+
     // null on every ordinary line. Non-null ONLY where a known household
     // product has no usable ASDA reference and must therefore be retrieved
     // and verified rather than looked up. See retrievalFor().

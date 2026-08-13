@@ -47,8 +47,22 @@ const {
 } = require('./completion');
 const claim = require('./claim');
 const instructions = require('./instructions');
+const {
+  buildHandoffFromDb, readReconciledShop, toPacket,
+  ReconciliationError, READY_STATUS, BRAND_SENTINEL,
+} = require('./readReconciled');
 
 module.exports = {
+  // THE PRODUCTION PATH - the handoff built from the reconciled database rows
+  // rather than from a side-artefact somebody wrote earlier. Refuses to emit
+  // while shop.status is not READY_TO_SHOP.
+  buildHandoffFromDb,
+  readReconciledShop,
+  toPacket,
+  ReconciliationError,
+  READY_STATUS,
+  BRAND_SENTINEL,
+
   // pure artefact
   buildHandoff,
   renderChecklist,
