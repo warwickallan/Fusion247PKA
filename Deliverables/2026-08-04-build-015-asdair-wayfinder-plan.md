@@ -2386,6 +2386,59 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### 🔴 LANE J REFUSED — correctly, on six findings. **Three are Larry repeating himself.**
+
+**🥇 M1 — THE FINDING THAT WOULD HAVE WRECKED THE RESULT, and it is the one Larry asked for and did not
+expect.** The disposable target held **4 regulars and ZERO rules**. `resolveByCatalogue` decides identity
+against that catalogue. **~39 read lines against a 4-item catalogue resolves to roughly 4 established and
+~35 routed** — against the frozen 39. Keel's words: *"a reader would see that number and conclude vision
+collapsed, when the true cause is an unseeded database. That is worse than a wrong number; it is a wrong
+number pointing at the parked mechanism you specifically protected."* **And `RULE` provenance cannot fire at
+all with zero rules, so AC1 and AC2 were jointly unsatisfiable** — it said so instead of bridging it, which
+is exactly what the order asked for.
+
+> **✅ RESOLVED BY LARRY.** The **real** household catalogue is now copied from live into the disposable
+> target: **109 regulars · 40 rules (31 for household 1, 28 active) · 10 products**, and household 1
+> corrected from Larry's earlier test row to **`mum` / `Mum`**. The catalogue includes **Richmond Thick Pork
+> Sausages 16 Pack** and **Ariel All-in-1 Pods Original 33 Washes** — AC4's two named cases, now genuinely
+> demonstrable rather than structurally simulated.
+
+**🔴 C2 — THE CREDENTIAL BOUNDARY CANNOT BE CROSSED BY ANY WORKER, AND THAT IS SETTLED.** The order named no
+env-file path, and **the only carrier the estate has sits at the ROOT of `C:\.fusion247\`** — which GL-012
+makes never a valid grant, against a declared `private_surface: none`. **THREE separate Keel instances have
+now refused on this same boundary.** Keel *did not go looking for the path* and opened nothing.
+
+> **Larry's ruling, and it is a boundary he is respecting rather than routing around: the gateway vision call
+> is LARRY'S, not delegable.** Passing a root-level `.env` to `--env-file` still lands the value in the
+> worker's process; GL-012 §1's own words are that *"a read-only escape from the declared subtree is
+> precisely the leak this boundary exists to close."* **The end-to-end run is therefore Larry's under a Rule 4
+> exception — delegation is not merely inconvenient here, it is structurally impossible.**
+
+**🔴 C1 — LARRY BOUNDED THE DEVIATION AT "ONE GROUNDED VISION REQUEST"; THE PRODUCTION PATH MAKES MANY.**
+`interpretPhotoOrchestrator.js` issues a first pass, a strict-JSON retry, then **one individual `vision()`
+call per flagged region** plus a retry each — realistically **5–20, and data-dependent, so not knowable
+before the run.** Its header says the per-region shape is deliberate. **Keel could satisfy neither limb: N
+calls exceed the deviation, and forcing one call means disabling the adaptive arm — tuning a parked
+mechanism AND the exact fixture-bridging AC1 forbids.** *"Any phrasing whose scope you would have to
+interpret is not a deviation — it is a missing field."* **The fix is to name the SHAPE and a ceiling, not a
+number.**
+
+**🟡 M3 — A REAL PRODUCT DEFECT A SINGLE-READING RUN WOULD HAVE SHIPPED.** `corroborate.js:284` classifies
+`support === runCount` as **`UNANIMOUS`**. With one run `runCount === 1`, so **every observation would be
+labelled unanimous**, and `finalList.js:133` carries `support_class` onto every delivered line. **A single
+reading would ship the STRONGEST agreement label in the vocabulary** — worse than the "corroborated" AC5
+forbids, and a direct violation of Warwick's ruling. Needs a `runCount < 2` guard.
+
+**🔵 Three corrections to Larry's own order, and the DB one is the third time:** the writer URL Larry named
+**breaks 7 existing proofs** (`42501`, `applyThrowawaySchema` needs CREATE on the database) — correct binding
+is owner→`ASDAIR_DB_URL`, writer→`ASDAIR_WRITE_DB_URL`, `asdair_rw`→`ASDAIR_DB_RW_URL` · the stated baseline
+**1091/1091/0 is not this tree's** — measured **1086/1085/0-fail/1-skip**, and the skip is honest and
+self-declaring · **Larry's own required-evidence scan line cannot pass on a pristine tree** (exit 1 on four
+gitignored third-party `node_modules` bytes).
+
+**Ground Keel confirmed is sound:** photograph verifies by hash · `git merge-tree` **conflict-free** ·
+first-party scan **exit 0** · `planWithDecisions` seam real. *"This is one round trip, not a re-plan."*
+
 ### ✅ VERA GATE — **PASS** on Lane D at `111c8cd`. Both conditions genuinely closed, **verified on the rendered screen.**
 
 **V-1 CLOSED, and Felix's harder fix survives contact with a browser.** At 375px the headline renders in
