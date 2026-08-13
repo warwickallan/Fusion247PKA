@@ -51,6 +51,12 @@ file_surface:
   - services/cockpit/asdair-list-check.mjs
   - services/cockpit/server.mjs
   - services/cockpit/provenance.mjs
+  # ── WIDENED BY AMENDMENT 1, 2026-08-13, on Keel M2. A notifier that is dead until someone
+  # remembers an env var is the exact shape of "lives only in Larry's head". You own the SCHEMA and
+  # the fail-loud; Mack owns the VALUES; both docs exist and were verified before this widening.
+  - services/asdair/cockpit-api/server.js          # CONFIG_SPEC / validateConfig - fail loud at startup
+  - services/asdair/cockpit-api/README.md          # the new route and the two new variables
+  - services/asdair/CONFIGURATION.md               # where an operator actually looks
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -87,9 +93,9 @@ contract_basis:
   - surface: services/cockpit/provenance.mjs
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
   - action: Prove the sense-check classifies against the real 109-regular catalogue
-    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Method item 6 — Prove it by running it — and § Method item 8, test and script execution are yours. RESOLVED BY LARRY, 2026-08-13: the generator keyword match finds no grant-bearing section for these phrasings; Method 6/8 is the grant, and the bound is the authority-defaults section: the disposable Postgres only, loopback only, and NEVER api.telegram.org."Critical rules\" scored higher (1) — read it must be read"
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Method item 6 — Prove it by running it — and § Method item 8, test and script execution are yours. RESOLVED BY LARRY, 2026-08-13: the generator keyword match finds no grant-bearing section for these phrasings; Method 6/8 is the grant, and the bound is the authority-defaults section: the disposable Postgres only, loopback only, and NEVER api.telegram.org."
   - action: Prove the ShopperBot notification fires on submission with an injected fetch
-    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Method item 6 — Prove it by running it — and § Method item 8, test and script execution are yours. RESOLVED BY LARRY, 2026-08-13: the generator keyword match finds no grant-bearing section for these phrasings; Method 6/8 is the grant, and the bound is the authority-defaults section: the disposable Postgres only, loopback only, and NEVER api.telegram.org."Critical rules\" scored higher (1) — read it must be read"
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Method item 6 — Prove it by running it — and § Method item 8, test and script execution are yours. RESOLVED BY LARRY, 2026-08-13: the generator keyword match finds no grant-bearing section for these phrasings; Method 6/8 is the grant, and the bound is the authority-defaults section: the disposable Postgres only, loopback only, and NEVER api.telegram.org."
 
 contract_conflicts: none
 
@@ -188,6 +194,93 @@ submission. A page that claims he was told when he was not is the same defect on
 **⛔ MUM IS NEVER ASKED A QUESTION.** Warwick, 2026-08-13: *"I will deal with any questions and such through
 my existing process."* No disambiguation, no candidate list, no "which did you mean" ever reaches her
 screen. Ambiguity and genuinely-new items go through and are answered downstream in Warwick's own flow.
+
+## THE CHECK-ITEM CONTRACT — **v1, 2026-08-13. FROZEN.** Byte-identical in the Felix and Keel orders.
+
+> **Keel was right that this was the urgent gap: it was never frozen, and Felix was already building against
+> it.** Two lanes inventing two shapes kills the feature with neither lane at fault. **Field names follow
+> Felix's build, which exists; the response follows Keel's proposal, which is better.** It is a SUPERSET of
+> what Felix was given, so nothing he has written needs changing.
+
+```
+Cockpit (tailnet)   POST /api/asdair/check-item
+   proxies to →     POST http://127.0.0.1:8710/asdair/check-item
+
+request  { "household": 1,
+           "text":   "<her exact words, untouched>",
+           "chosen": [ "<regulars.id_display>", ... ]   <- what is ALREADY on her list
+         }
+
+200      { "ok": true,
+           "status": "matched"|"possible_duplicate"|"needs_confirmation"|"unmatched_new_item"|"unreadable",
+           "matched_name":       "<the catalogue name>"|null,
+           "matched_regular_id": <n>|null,
+           "already_on_list":    true|false }
+
+4xx/5xx  { "ok": false, "error": "<machine_code>", "message": "<ONE plain sentence>" }
+```
+
+**⛔ `matched_name` and `matched_regular_id` are NON-NULL ONLY on `matched` and `possible_duplicate`.**
+On `needs_confirmation`, `unmatched_new_item` and `unreadable` they are `null` **and there is no other key**
+— **nothing she must decide.** No `alternatives`. No candidate array. Ever, under any status.
+
+**This makes AC2 STRUCTURAL rather than promised**, which is Keel's phrasing and the reason for the shape:
+the route cannot ask Mum a question because the response has nowhere to put one.
+
+**`chosen` is what makes `possible_duplicate` reachable at all.** A single `resolveReading()` call can never
+return it — `possible_duplicate` is set by `resolveAll()` across a batch, from a `seen` set. Without knowing
+what is already on her list, "you've already got that" is unanswerable.
+
+**The UI's obligations, so both lanes agree on what the statuses MEAN to her:**
+
+| `status` | What she is told |
+|---|---|
+| `matched` / `possible_duplicate` | Warmly, that she already has it — by name. **She may add it anyway.** |
+| `needs_confirmation` / `unmatched_new_item` | **Nothing.** It is accepted silently and answered downstream in Warwick's own flow. |
+| `unreadable` | **Nothing.** Accept it and let it travel; her words are evidence even when they are not a product. |
+| the route fails, times out, or returns `ok:false` | **Nothing. ACCEPT HER ITEM ANYWAY.** A sense-check that blocks her input when it cannot reach the server is worse than no sense-check. |
+
+## AMENDMENT 1 — Larry's rulings on Keel's read-back, 2026-08-13. **These bind; where they differ from the ACs below, these win.**
+
+**READ-BACK ACCEPTED. Every item below was raised by the worker.** Two of them are defects in what I wrote,
+and one of those would have silently eaten Mum's words.
+
+| # | Ruling |
+|---|---|
+| **M1** | **SETTLED — the check-item contract is frozen above and is byte-identical in Felix's order (`eb1de7d8d7c55d52`).** You were right that this was the urgent one. Field names follow Felix's build because it exists; the response follows YOUR proposal because it is better. It is a **superset** of what he was given, so he has no rework. **`already_on_list` and the `chosen` array are yours — they are what make `possible_duplicate` reachable at all**, which answers C4. |
+| **C1** | **UPHELD, and it is the most important thing in this read-back. APPROVED: `extras` enter the fingerprint canonically.** `listFingerprint()` hashes `id\|qty\|name` and nothing else, so folding extras into `rawText` alone would give a woman who adds *"some of those little cakes"* an identical `sourceId` → `recorded_new:false` → her page says **"nothing has changed"**, no notification fires, and her words are gone. **That is ruling A1's defect one layer along, and AC3 cannot hold without your fix.** It is in your surface. Do it. |
+| **C2** | **UPHELD. APPROVED: on `created:false, recorded_new:true` the ShopperBot message carries HER EXTRAS VERBATIM and the item lines.** You established that nothing else durably records what she typed — `raw_*` is excluded from `shopStore`'s UPDATE allowlist and the command payload is a hash, not her words. So the message is **the only surviving carrier**, and without it Felix's page promises *"I've told Warwick what you changed"* while telling him nothing of the sort. **On her shopping being private: it is NOT, and Warwick has ruled that three times. Put her words in the message.** |
+| **C3** | **APPROVED as designed. Await with a bounded budget of 5 seconds**, wrapped so it can never throw or reject into her path. `notified: true\|false` and `notify_error: "<machine_code>"` **are within contract v3's "additional keys MAY appear"** — confirmed, they are additive and UI-invisible. Plus the loud structured log. *Her send already carries a 15 s client timeout, so a 5 s notify budget cannot strand her.* |
+| **C4** | **Answered by M1** — `chosen` supplies the batch context `resolveAll` needs. |
+| **M2** | **GRANTED — surface widened to `server.js`, `cockpit-api/README.md` and `services/asdair/CONFIGURATION.md`** (both docs verified to exist before granting). **Your reasoning is adopted verbatim: a notifier that is dead until someone remembers an env var is the exact shape of "lives only in Larry's head."** You own the **schema and the fail-loud**; Mack owns the **values**. `SHOPPER_CHAT_ID` returning `null` happily is precisely the silent-failure this estate's rules forbid — make `validateConfig` refuse it at startup, not at send time. |
+| **M3** | **Correct, and hold that line.** Label the automatic half **BUILT-NOT-VERIFIED**. The real production event with real credentials is mine at integration, and I will not let a green suite read as a delivered notification. |
+| **A1** | Approved — `recorded_new := result.recorded && result.recorded.created === true`. |
+| **A2** | **Approved, and the reasoning is exactly right.** The notification fires in `httpApi.js`'s `/asdair/list` handler, **never inside the shared `receiveList` command** — putting it in the command would ping Warwick for every Telegram list too, which is not what "Mum submits" means. |
+| **A3** | Approved — `checkItem.js` stays pure, catalogue injected, no pool of its own. |
+| **A4** | **Approved, and this is the best line in the read-back: "never message Mum" becomes MECHANICAL rather than intentional.** Destination is `SHOPPER_CHAT_ID` only; **no field of her request may influence the chat id, and you assert that by test.** |
+| **A5** | **Approved — the name-only pass-through of `process.env` to `loadSenderConfig` is exactly the sanctioned pattern and is NOT what the prohibition means.** You may hand the environment to a mechanism that consumes it. You may never read, print, log, return or copy the value. Your reading was right and you were right to ask rather than guess. |
+
+### The two order defects you reported — both mine, both fixed
+
+**The garbled `contract_basis` tail** (`."Critical rules\" scored higher (1) — read it must be read"`) was an
+artefact of my own repair regex stopping at an escaped quote. **Repaired in this amendment.** The grant was
+never in doubt — Method 6/8 plus the authority defaults — but you were right to report a defect in the order
+rather than read past it. **`document_impact`'s format is noted, non-blocking, parked.**
+
+### Your clock design is ADOPTED as proposed, and it is better than my ruling
+
+`buildReceiveListSpec` gains the third return, exactly as you wrote it:
+
+```
+clock: { claimed: "<what her tablet asserted, or null>",
+         recorded: "<the server's date — unchanged as the source of shop_ref>",
+         agrees: true | false | null }     // null = she asserted nothing
+```
+
+**You are right that the comparison belongs in the adapter** — it is the only place both values exist
+together, and deriving the date twice is how two derivations drift. A malformed `list_date` is
+`agrees:false` with the raw claim reported, **never a reason to reject her submission**. She is told nothing.
+`shop_ref` still comes from the server's clock alone.
 
 ## Acceptance criteria
 

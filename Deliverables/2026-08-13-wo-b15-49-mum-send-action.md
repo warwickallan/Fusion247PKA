@@ -167,6 +167,51 @@ submission. A page that claims he was told when he was not is the same defect on
 my existing process."* No disambiguation, no candidate list, no "which did you mean" ever reaches her
 screen. Ambiguity and genuinely-new items go through and are answered downstream in Warwick's own flow.
 
+## THE CHECK-ITEM CONTRACT — **v1, 2026-08-13. FROZEN.** Byte-identical in the Felix and Keel orders.
+
+> **Keel was right that this was the urgent gap: it was never frozen, and Felix was already building against
+> it.** Two lanes inventing two shapes kills the feature with neither lane at fault. **Field names follow
+> Felix's build, which exists; the response follows Keel's proposal, which is better.** It is a SUPERSET of
+> what Felix was given, so nothing he has written needs changing.
+
+```
+Cockpit (tailnet)   POST /api/asdair/check-item
+   proxies to →     POST http://127.0.0.1:8710/asdair/check-item
+
+request  { "household": 1,
+           "text":   "<her exact words, untouched>",
+           "chosen": [ "<regulars.id_display>", ... ]   <- what is ALREADY on her list
+         }
+
+200      { "ok": true,
+           "status": "matched"|"possible_duplicate"|"needs_confirmation"|"unmatched_new_item"|"unreadable",
+           "matched_name":       "<the catalogue name>"|null,
+           "matched_regular_id": <n>|null,
+           "already_on_list":    true|false }
+
+4xx/5xx  { "ok": false, "error": "<machine_code>", "message": "<ONE plain sentence>" }
+```
+
+**⛔ `matched_name` and `matched_regular_id` are NON-NULL ONLY on `matched` and `possible_duplicate`.**
+On `needs_confirmation`, `unmatched_new_item` and `unreadable` they are `null` **and there is no other key**
+— **nothing she must decide.** No `alternatives`. No candidate array. Ever, under any status.
+
+**This makes AC2 STRUCTURAL rather than promised**, which is Keel's phrasing and the reason for the shape:
+the route cannot ask Mum a question because the response has nowhere to put one.
+
+**`chosen` is what makes `possible_duplicate` reachable at all.** A single `resolveReading()` call can never
+return it — `possible_duplicate` is set by `resolveAll()` across a batch, from a `seen` set. Without knowing
+what is already on her list, "you've already got that" is unanswerable.
+
+**The UI's obligations, so both lanes agree on what the statuses MEAN to her:**
+
+| `status` | What she is told |
+|---|---|
+| `matched` / `possible_duplicate` | Warmly, that she already has it — by name. **She may add it anyway.** |
+| `needs_confirmation` / `unmatched_new_item` | **Nothing.** It is accepted silently and answered downstream in Warwick's own flow. |
+| `unreadable` | **Nothing.** Accept it and let it travel; her words are evidence even when they are not a product. |
+| the route fails, times out, or returns `ok:false` | **Nothing. ACCEPT HER ITEM ANYWAY.** A sense-check that blocks her input when it cannot reach the server is worse than no sense-check. |
+
 ## Acceptance criteria
 
 **AC1 — `send()` performs a real POST, and the success state has exactly one cause.**
