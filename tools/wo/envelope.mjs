@@ -772,7 +772,14 @@ export function cite(root, rel, heading, body, label = 'CITED') {
   return `${label} — \`${rel}\` § ${heading}${at} (${chars} chars — read it there; not inlined, per the SSOT rule)`;
 }
 
-export function resolveEnvelope({ root, owner, governanceHead, worktree }) {
+// G-7 — the envelope TABLE must print the OPERATIVE authority value, not the standing default,
+// whenever the order deviates. It previously printed the template default unconditionally while
+// the frontmatter carried the deviation, so a generated order contradicted itself on its own face
+// for every deviating dispatch. That is not cosmetic: Keel's contract requires a worker to CLARIFY
+// on exactly that disagreement and never act on the wider value, so the defect cost a live round
+// trip on WO-2026-08-12-05 and would have cost another on -06 had it not been pre-answered in prose.
+// `deviations` is optional so that the two callers that legitimately have none keep working.
+export function resolveEnvelope({ root, owner, governanceHead, worktree, deviations = [] }) {
   const grant = toolGrant(root, owner);
   const annotation = notDeliveredAnnotation(root, grant.tools);
   const surf = surfaces(root, owner);
@@ -780,6 +787,7 @@ export function resolveEnvelope({ root, owner, governanceHead, worktree }) {
   const git = gitAuthority(root, owner);
   const tree = worktreeCheck(worktree, governanceHead);
   const evidence = producibleEvidence(grant.tools);
+  const deviationMap = new Map((deviations ?? []).map((d) => [d.field, d]));
 
   // git_authority keeps its three-state VALUE and loses only its page. R-31 — a push
   // instruction issued to a specialist whose contract is silent on git — was prevented by the
@@ -809,7 +817,18 @@ export function resolveEnvelope({ root, owner, governanceHead, worktree }) {
     { key: 'permitted_file_surface', value: cite(root, surf.source, surf.headings?.permitted, surf.permitted), source: surf.source },
     { key: 'prohibited_file_surface', value: cite(root, surf.source, surf.headings?.prohibited, surf.prohibited), source: surf.source },
     { key: 'critical_rules', value: cite(root, surf.source, surf.headings?.criticalRules, surf.criticalRules), source: surf.source },
-    ...STANDING_DEFAULT_FIELDS.map((f) => ({ key: f, value: defaults[f], source: defaults.source })),
+    // G-7 — operative value, never the bare default when the order deviates. The DEVIATED marker
+    // and the superseded default are both stated, so the table remains a truthful summary of what
+    // governs rather than a second, quieter answer that contradicts the frontmatter.
+    ...STANDING_DEFAULT_FIELDS.map((f) => {
+      const dev = deviationMap.get(f);
+      if (!dev) return { key: f, value: defaults[f], source: defaults.source };
+      return {
+        key: f,
+        value: `DEVIATED (operative) — ${dev.value}  ·  supersedes standing default \`${defaults[f]}\``,
+        source: `order frontmatter (deviation) — ESCALATION: ${dev.authority ?? 'AUTHOR REQUIRED — deviation_authority'}`,
+      };
+    }),
     { key: 'git_authority', value: gitValue, source: git.source ?? null },
     { key: 'worktree', value: tree.value, source: worktreeSource },
     { key: 'producible_evidence', value: evidence.value, source: 'worker tool grant (not product authority)' },
@@ -1003,7 +1022,7 @@ export function generateOrder({
   const found = contractFolder(root, owner);
   const folder = found.folder ?? null;
   const contractPath = folder ? SOURCES.contract(folder) : unresolved(`Team/<${owner}>/AGENTS.md`, found.error);
-  const envelope = resolveEnvelope({ root, owner, governanceHead, worktree });
+  const envelope = resolveEnvelope({ root, owner, governanceHead, worktree, deviations });
   const isMachineInstall = machineSurfaces.length > 0;
   // Repo surfaces still extract; machine surfaces use the dedicated basis (G-6).
   const repoBasis = surfaceEntries.length || actions.length
@@ -1316,7 +1335,15 @@ function main(argv) {
   const worktree = typeof args.worktree === 'string' ? args.worktree : null;
 
   if (args['envelope-only']) {
-    process.stdout.write(`${render(resolveEnvelope({ root, owner, governanceHead, worktree }))}\n`);
+    // G-7 — this path must show the SAME operative authority values as the full order, or
+    // `--envelope-only` becomes a second, quieter answer that contradicts the order it summarises.
+    process.stdout.write(`${render(resolveEnvelope({
+      root,
+      owner,
+      governanceHead,
+      worktree,
+      deviations: parseDeviations(args.deviate, args['deviation-authority']),
+    }))}\n`);
     return 0;
   }
 

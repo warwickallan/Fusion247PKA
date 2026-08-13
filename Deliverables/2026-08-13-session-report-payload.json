@@ -1,0 +1,161 @@
+{
+  "session_date": "2026-08-13",
+  "branch": "main",
+  "closing_head": "80b5cd3b70949fcdf2637ad24e94799ce0f2dbb8",
+  "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-13-session-report-overnight-asdair-list.md",
+
+  "host": "claude-code",
+  "host_version": null,
+  "elapsed_minutes": 834,
+
+  "total_subagent_tokens": 3818356,
+  "total_context_tokens_in": null,
+  "total_context_tokens_out": null,
+
+  "parent_channel_available": true,
+  "queued_messages": 0,
+
+  "wo_total": 10,
+  "wo_first_dispatch_success": 3,
+  "wo_amendments": 7,
+  "wo_refusals": 1,
+
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+
+  "allocation_product_pct": 80.5,
+  "allocation_evidence_pct": 10.2,
+  "allocation_admin_pct": 3.5,
+  "allocation_rework_pct": null,
+  "allocation_waiting_pct": null,
+
+  "git_stat_larry_measured": {
+    "session_start": "4e6508d7dea0a990b1ed1a97a2a31e5db0378443",
+    "closing_head": "80b5cd3b70949fcdf2637ad24e94799ce0f2dbb8",
+    "governance_head_ledger": "6723dfaf6b84ccc1c8175263cf5a29225e2cdcb7",
+    "origin_main_at_audit": "32c6ade23cafc8aee563ef2c3812ba81a3bbe71f",
+    "record_commits_main": 35,
+    "record_commits_main_in_declared_range": 34,
+    "abandoned_commits_main": 1,
+    "product_commits_total": 23,
+    "product_commits_b15_28_vision_lane_a": 18,
+    "product_commits_b15_25_cockpit_backend": 3,
+    "product_commits_b15_26_cockpit_ui": 2,
+    "record_to_product_ratio": 1.52,
+    "pushes_to_origin_main": 23,
+    "lines_changed": null,
+    "measured_by": "Pax, read directly from .git/logs/HEAD, .git/logs/refs/remotes/origin/main and the three branch reflogs",
+    "note": "Line/stat figures are UNESTABLISHED: this dispatch had no Bash or git binary, and .git/logs carries SHAs, messages and timestamps but no diff content."
+  },
+
+  "branch_heads": {
+    "main": "80b5cd3b70949fcdf2637ad24e94799ce0f2dbb8",
+    "build-015/b15-28-agentic-vision-prototype-v2": "df18e64c6a1f581892d912487e0c08c6a1d2d29b",
+    "build-015/b15-25-cockpit-backend": "fc1fe165ee75018a47e5a0569319a24d6a156765",
+    "build-015/b15-26-cockpit-ui": "8a2fabfa5bd05328d9297130f74dfdb4faee412a"
+  },
+
+  "specialists": [
+    { "specialist": "asdair", "dispatches": 1, "tokens": 79273, "notes": "21 tool uses" },
+    { "specialist": "general-purpose (recon)", "dispatches": 2, "tokens": 219148, "notes": "72 tool uses" },
+    { "specialist": "keel — WP-B15-29", "dispatches": 2, "tokens": 319334, "notes": "126 tool uses" },
+    { "specialist": "keel — WP-B15-30", "dispatches": 2, "tokens": 431674, "notes": "163 tool uses; largest peak footprint of the session" },
+    { "specialist": "nolan — contract amendment", "dispatches": 3, "tokens": 134093, "notes": "42 tool uses" },
+    { "specialist": "keel — WP-B15-31", "dispatches": 3, "tokens": 334733, "notes": "137 tool uses" },
+    { "specialist": "veritas — amendment review", "dispatches": 1, "tokens": 138980, "notes": "22 tool uses; verdict HOLD at f320b13" },
+    { "specialist": "veritas — F1 confirmation", "dispatches": 1, "tokens": 117682, "notes": "14 tool uses; DISCHARGED/PASS at ffcb702" },
+    { "specialist": "keel — WP-B15-32 variance", "dispatches": 2, "tokens": 190203, "notes": "64 tool uses" },
+    { "specialist": "keel — WP-B15-33", "dispatches": 2, "tokens": 312028, "notes": "118 tool uses" },
+    { "specialist": "keel — WP-B15-34 vision final", "dispatches": 1, "tokens": 333298, "notes": "192 tool uses; highest tool-use-per-dispatch" },
+    { "specialist": "keel — WP-B15-35 cockpit backend", "dispatches": 3, "tokens": 368544, "notes": "254 tool uses" },
+    { "specialist": "felix — WP-B15-36 cockpit UI", "dispatches": 2, "tokens": 407991, "notes": "237 tool uses" },
+    { "specialist": "vera — UI quality gate", "dispatches": 1, "tokens": 134190, "notes": "26 tool uses; CONDITIONAL PASS" },
+    { "specialist": "keel — WP-B15-37 Lane A", "dispatches": 1, "tokens": 297185, "notes": "120 tool uses; produced the final 39-line list" }
+  ],
+
+  "work_orders": [
+    { "id": "WO-2026-08-12-01", "package": "WP-B15-29", "envelope_generated": true, "verdict": "REFUSE then amended (v2)", "first_dispatch_substantive": false, "challenge": "Keel's REFUSE correct on all four counts", "evidence_ref": "657a943c75f3b88be63d569897a4a28adfe62c6f" },
+    { "id": "WO-2026-08-12-02", "package": "WP-B15-30", "envelope_generated": true, "verdict": "AMENDED after read-back", "first_dispatch_substantive": true, "challenge": "the photograph is ROTATED; horizontal bands would have made it worse", "evidence_ref": "fcde2e0549a68e1aea406dd114b5b53321f6fee0" },
+    { "id": "WO-2026-08-12-03", "package": "Keel contract redline", "envelope_generated": true, "verdict": "AMENDED after read-back", "first_dispatch_substantive": true, "challenge": "the order could not have reached its own stated outcome", "evidence_ref": "1d91f595ca085d2de92dcc2fb189170a1296ebba" },
+    { "id": "WO-2026-08-12-04", "package": "WP-B15-31", "envelope_generated": true, "verdict": "AMENDED after read-back", "first_dispatch_substantive": true, "challenge": "the Richmond discrepancy does not exist and never did", "evidence_ref": "6fbc82be6815dc983c27160a0f329dd3f14790be" },
+    { "id": "WO-2026-08-12-05", "package": "WP-B15-32", "envelope_generated": true, "verdict": "AMENDED after read-back", "first_dispatch_substantive": true, "challenge": "two premises false, one of them already reported to Warwick", "evidence_ref": "0e84894ad6d96e261b019e491331e95c48ae16f1" },
+    { "id": "WO-2026-08-12-06", "package": "WP-B15-33", "envelope_generated": true, "verdict": "AMENDED after read-back", "first_dispatch_substantive": true, "challenge": "two of three named defects already fixed or unfixable", "evidence_ref": "30384bc3c23408e20bb2a3d8873bbdeb62490db6" },
+    { "id": "WO-2026-08-13-01", "package": "WP-B15-34 vision final", "envelope_generated": true, "verdict": "CLEAN first dispatch", "first_dispatch_substantive": true, "challenge": null, "evidence_ref": "16db301c10b709ea191fa31bad9e05d9069a2ff2" },
+    { "id": "WO-2026-08-13-02", "package": "WP-B15-35 cockpit backend", "envelope_generated": true, "verdict": "AMENDED after read-back", "first_dispatch_substantive": true, "challenge": "AMENDMENT 1 to WP-B15-35", "evidence_ref": "ea12b3d9ecfc3b6e10788a472801641dd3753579" },
+    { "id": "WO-2026-08-13-03", "package": "WP-B15-36 cockpit UI", "envelope_generated": true, "verdict": "CLEAN first dispatch; Vera CONDITIONAL PASS", "first_dispatch_substantive": true, "challenge": null, "evidence_ref": "8a2fabfa5bd05328d9297130f74dfdb4faee412a" },
+    { "id": "WO-2026-08-13-04", "package": "WP-B15-37 Lane A", "envelope_generated": true, "verdict": "CLEAN first dispatch", "first_dispatch_substantive": true, "challenge": null, "evidence_ref": "4cccb3f1a5d26dc0026f00a1a17ebafb436733f7" }
+  ],
+
+  "findings": [
+    {
+      "family": "work-order-not-generated",
+      "exposure": "clean",
+      "summary": "Ten numbered Work Orders and seven amendments were all issued through the generated envelope route, with no exemption taken for amendment-shaped orders - the exact exemption this family names. Larry went past compliance twice: he ran the check on his own order pre-dispatch and caught a defect (6c14820), and he found a defect in the envelope generator's own output table (3f1a7fc, G-7). First clean exposure in five recorded occurrences; last session this family recurred on the first orders dispatched.",
+      "evidence_ref": "488b61fb759017971943438bd0f5c38959067bf1, 6c148208af0d2295c2c49088fe578dfa0635b152, 3f1a7fcf573ce9c8b432b8d6d0c8eb6aefd038ec"
+    },
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "recurrence",
+      "summary": "The fix for Warwick's permission complaint was a host-loaded configuration change committed at ea12b3d (2026-08-12T23:47:45Z). Host config loads once at session start, so it prevented zero permission prompts in the session that shipped it and Warwick had to repeat the instruction. The inertness mechanism was already recorded in this build's own map (line 3171: 'takes effect next session, not this one') and in estate memory before the fix was made. Counter-evidence, real but not exculpating: migration 020 is this family's exact raw shape and the prevention HELD there - Larry attempted activation, a safety classifier declined, he did not route around it, and he named it as the one item requiring Warwick with 'no acceptance is claimed' stated in terms. Split verdict: held on the high-consequence case, failed on the low-consequence one where a remedy was reported delivered while inert.",
+      "evidence_ref": "ea12b3d9ecfc3b6e10788a472801641dd3753579"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "clean",
+      "summary": "Four independent instances, all against Larry's own preferred conclusions. (a) 40ea646 retracted a whole published result table as stale-instrument output. (b) bdf8f30 re-scored every stored arm on the current instrument rather than fixing the one wrong number, retaining and labelling the stale figures. (c) 16db301 killed Larry's own authorised positional field by controlled comparison: -14.8% lines per band call at permutation p=0.0127, and its claimed anti-phantom benefit falsified in the opposite direction (5.7% invention in best-resolved bands vs 1.5% in the worst). (d) Vera corrected Larry's claim that a detector was broken and reporting success - the gate was loudly red and nobody had executed it, including under her own earlier PASS. Streak 3 to 4; one clean exposure from EFFECTIVE.",
+      "evidence_ref": "40ea646fa99dc60304b394330f9bd68bc97dfd52, bdf8f307931220217a4f4718be60ae9979046314, 16db301c10b709ea191fa31bad9e05d9069a2ff2"
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "recurrence",
+      "summary": "The closing commit is the confession in Larry's own contemporaneous words: 80b5cd3 'Re-cut the map to the real post-overnight state: it was five work packages stale'. The reflog gives the shape: last map commit 4cccb3f at 2026-08-13T00:34:07Z, next 8046962 at 06:17:23Z - a 5h43m16s window with no map commit, inside which three of four lanes reached their final heads (fc1fe16, 8a2fabf, df18e64) and WP-B15-34/35/36/37 all completed. Four phase boundaries passed unrecorded against the map's own rule to update at every PASS/PARTIAL/FAILED. Counter-evidence: where amendments were written the supersession discipline is close to exemplary (explicit SUPERSEDED/CORRECTED headers with forward pointers at ten separate locations). The failure is batching, not amendment-by-append - but the same prevention addresses both, which is the family test. This family stood at 4 clean, one exposure from EFFECTIVE; the streak resets. This is the one grading in the report that is a judgement rather than a measurement and Warwick could reasonably reverse it.",
+      "evidence_ref": "80b5cd3b70949fcdf2637ad24e94799ce0f2dbb8, 4cccb3f1a5d26dc0026f00a1a17ebafb436733f7, 80469625f3a4ee96ae9035131aeb19da026a4b95"
+    },
+
+    {
+      "proposed_family": "order-premise-not-verified",
+      "summary": "PROPOSED FAMILY - no slug emitted, so capae-sync skips this deliberately. Five premises Larry wrote into his own Work Orders were falsified by worker read-backs across four orders, and one had already been reported to Warwick as fact before the worker falsified it. First-dispatch clean rate fell from ~73% (prior session) to 30% (3 of 10). In every case the falsifying evidence was already in the repository when the order was written. Prevention: every numeric or state premise in an order is re-derived on the current instrument at the moment of writing, or is labelled unverified inside the order.",
+      "evidence_ref": "1d91f595ca085d2de92dcc2fb189170a1296ebba, 6fbc82be6815dc983c27160a0f329dd3f14790be, 0e84894ad6d96e261b019e491331e95c48ae16f1, 30384bc3c23408e20bb2a3d8873bbdeb62490db6"
+    },
+    {
+      "proposed_family": "review-gated-change-pushed-early",
+      "summary": "PROPOSED FAMILY - no slug emitted. Keel's AGENTS.md contract change (8d9b8c9, 21:08:42Z) had an unrelated commit stacked on it 3m05s later (6fbc82b) and was pushed to the public remote at 21:13:06Z; Veritas returned HOLD at 21:23:34Z - public for 10m28s before its independent review returned. CORRECTION TO LARRY'S OWN ACCOUNT: he reported the recurrence as happening 'an hour' later; the reflog says 17m02s (8d9b8c9 21:08:42Z to 9d672b3 21:25:44Z), too generous to himself by ~3.5x. Also, the recurrence was PARTIAL: the stacking repeated but the premature push did not - the second time the push (21:36:01Z) followed the verdict (21:35:29Z) by 32 seconds. The outward irreversible half was corrected within the session; the local habit was not. Proportionality: 10m28s of a governance document public on an already-public repo - no credential, no financial account, no household data. Reported, not escalated, no Work Order recommended.",
+      "evidence_ref": "8d9b8c95227caf1e1175c62378eea7e9d37aa02e, 6fbc82be6815dc983c27160a0f329dd3f14790be, f320b1353c3ca18e68b76516ebd92750d01fdc5f, ffcb702ca82709b0ff8589111fb9409687dd3977"
+    },
+    {
+      "proposed_family": "notification-transport-has-no-size-guard",
+      "summary": "PROPOSED FAMILY - no slug emitted. The morning report, carrying the session's only Warwick-blocking item (migration 020 unapplied), was rejected at 2026-08-13T06:16:30Z with http 400 'message is too long' at 5139 bytes; the successful retry 33s later was 2771 bytes, so 46% of the intended content did not reach the phone. What survived is UNESTABLISHED - the ding log records bytes, never bodies - and the migration-020 item is section 8 of 8, at the end of the document, which is the first thing a length-driven shortening removes. ding.mjs failed loudly (not silently) but has no pre-send length check and no chunking, so recovery depends on the sender noticing a non-zero exit. A Rule 4a-critical path with an unguarded hard limit. Recommend a length check plus chunk-or-refuse; no Work Order; does not meet the HOBBY BRAIN escalation bar.",
+      "evidence_ref": "~/.mypka/governor/ding-log.jsonl entries 199-200"
+    },
+    {
+      "summary": "NOTIFICATION DISCIPLINE IMPROVED SHARPLY, and it is the clearest process gain in the session. 18 send attempts in window, 16 delivered, 0 queued, mean delivered size ~2475 bytes - against 4 sends averaging 269 bytes last session, which this report's predecessor flagged as terse pings rather than substantive outcome reports. 4x the message count, ~9x the content per message. No owed-and-not-sent found; no send for routine narration found. The 7h19m silence from 22:57:06Z to 06:16:30Z is CORRECT, not a miss - Warwick was asleep, the overnight mission was authorised, the standing rule forbids status pings, and the blocker found in that window was not actionable at 03:00 and was delivered at 06:17.",
+      "evidence_ref": "~/.mypka/governor/ding-log.jsonl entries 183-200"
+    },
+    {
+      "summary": "ASSURANCE COVERAGE OF THIS SESSION'S PRODUCT OUTPUT IS ZERO, AND LARRY DECLARED IT. Two Veritas dispatches ran, both against the contract-amendment boundary (HOLD f320b13, then DISCHARGED/PASS ffcb702). No Veritas gate was sought on WP-B15-34/35/36/37; the map states this in terms and claims no completion. Vera's CONDITIONAL PASS covers the Cockpit UI alone. Correct handling of an omission, and the omission stands: 0 of 4 overnight work packages carry an assurance verdict. Worth noting against the opposite failure: assurance consumed 10.2% of subagent token traffic here, against the measured 4B incident of 57.7% of a working phase producing zero product change. This session is on the safer tail, but under-gated and honest about it is still under-gated.",
+      "evidence_ref": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md lines 2246-2249"
+    },
+    {
+      "summary": "MEASUREMENT BLIND SPOT, and it is the real finding in the economics section. The evidenced allocation (implementation 80.5%, assurance 10.2%, recon 5.7%, contract admin 3.5% - summing to 3,818,356 exactly) measures DELEGATED effort only. Work Order authorship, all map maintenance, all 35 record commits, every rework decision and all waiting ran inside Larry's own context, which no instrument in this estate reads. Rework is measurable on a different denominator and deliberately not blended: 12 of 27 dispatches (44.4%) were resume events, every one an amendment round-trip after a read-back found a defect in Larry's own order. Larry's own context occupancy remains UNESTABLISHED and is correctly excluded from total A.",
+      "evidence_ref": "Deliverables/2026-08-13-subagent-token-ledger-overnight-asdair-list.md"
+    },
+    {
+      "summary": "SESSION IDENTITY DRIFT, minor, recorded not escalated. At the time of this audit origin/main stood at 32c6ade, two commits beyond the declared closing head 80b5cd3 and one beyond the governance head 6723dfa. The commission asked for exactly one session identity; the record already carried three candidate heads before this report added to it. 80b5cd3 is used throughout as instructed.",
+      "evidence_ref": ".git/logs/refs/remotes/origin/main line 161"
+    }
+  ],
+
+  "unestablished": [
+    "Line counts, files-changed and --stat figures for every commit - no Bash or git binary in this dispatch's tool grant; .git/logs carries SHAs, messages and timestamps but no diff content.",
+    "Whether the migration-020 item survived the 2771-byte morning-report retry after the 5139-byte send was rejected - the ding log records bytes and outcomes, never bodies.",
+    "The literal content of all 16 delivered notifications.",
+    "Warwick's second, angry permission instruction - the inert-fix mechanism is well evidenced, but the two-orders sequence is Larry-reported and not verifiable from any artefact in this dispatch's grant (no transcript access).",
+    "Waiting time as a share of session effort - per-dispatch durations overlap across three parallel lanes and the ledger explicitly forbids summing them.",
+    "Larry's own context occupancy - not read from any instrument, correctly excluded from total A.",
+    "Whether the 7 upheld read-backs are a complete list of challenges - a read-back that finds nothing leaves no commit, so the denominator of clean read-backs is inferred from the 10-order count, not directly observed.",
+    "Independent verification of the ledger's per-agent token figures - Larry-transcribed; internal arithmetic verified (four category subtotals sum to 3,818,356 exactly) but no tool reproduced them."
+  ],
+
+  "notes": "Pax, independent session witness. Denominator warning for the allocation_* columns: they are shares of SUBAGENT TOKEN TRAFFIC (total A = 3,818,356), not of wall-clock or of total session effort. They do not sum to 100 because reconnaissance/audit (5.7%, 219,148 tokens) has no column, and allocation_rework_pct / allocation_waiting_pct are null ON PURPOSE: rework is measured on a different denominator (12 of 27 dispatches = 44.4%) and blending it into a token-share column would be the exact error the ledger warns against. Three ledger totals (A traffic, B peak footprint, C dispatch/tool counts) are never blended and Larry's own context is never added to A. Gateway spend (~$4.11) is separately measured and is not a token figure. Headline: 2 CAPAE families clean, 1 unchanged, 1 degraded - the family that moved backwards is the one that was one exposure from closing. First-dispatch order quality fell from ~73% to 30% with five falsified premises; notification substance rose ~9x. The most important correction is to Larry's own account: the review-gate stacking recurrence was 17m02s later, not 'an hour', and it was partial - the push discipline held the second time."
+}
