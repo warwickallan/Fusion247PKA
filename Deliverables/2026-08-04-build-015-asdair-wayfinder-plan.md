@@ -2528,6 +2528,58 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### 🔴 VERA: **FAIL** at `18b0f98`. **The HIGH-1 fix introduced a worse regression than the one it cured.**
+
+**Everything else is CLOSED and independently verified** — she re-measured with her own instruments rather
+than reproducing his: HIGH-1 (row 0 at 311–435 in a 600px viewport, tick hit-testable), MEDIUM-1 (driven with
+**real `Input.dispatchMouseEvent`**, not a synthetic event), MEDIUM-3/-4/-5, and both harness traps. Every
+figure he quoted is true.
+
+**🔴 HIGH-3 — `.foot { max-height: 40vh; overflow: hidden }` CLIPS THE PRIMARY ACTION AND THE POST-SEND
+MESSAGE.** At maximum scroll, where there is nowhere further to go:
+
+| viewport | `.send` at rest | after she presses SEND |
+|---|---|---|
+| **640×400** (1280×800 @200%) | clipped 58 of 88px — **30px painted**, centre hit-test → **NOTHING** | `.note` clipped 143px → **ZERO painted pixels**, all three hit-tests nothing |
+| **400×640** @200% | 81px sliver — **under the surface's own 88px floor** | centre unreachable |
+| **320×800** reflow | clean | clipped 146px, bottom unpainted |
+
+> **She presses SEND at 200% zoom and the screen does not respond at all.** The one message B §9.6 and E
+> criterion 9 make load-bearing renders **nothing**. Breaks WCAG 1.4.4 and 1.4.10, B §6.7, E A4 and criterion
+> 9, and **AC5 in terms** — *"assume she has already turned the display size up; the layout must survive
+> that."*
+
+**⭐ AND THE REASON THE GATE REPORTED `min-target = 88px` ON A 30px BUTTON — the class this package keeps
+producing.** `MEASURE` collects targets with `getBoundingClientRect()`, **the LAYOUT box, which an ancestor's
+`overflow: hidden` does not change.** Vera's count: **third instance in one package** — `flex-shrink`
+(declared 88, rendered 82) · D-17 opacity (declared 5.02, rendered 3.91) · **clipped (box 88, painted 30)**.
+***The box passes; the render does not.*** *Felix's own session-log lesson — a stated property needs an
+assertion that measures BEHAVIOUR, not DECLARATION — landing on him a third time.*
+
+**Her fix, and the reasoning is the useful part: DELETE the two declarations.** The ceiling defends against
+sticky-footer behaviour **on a footer `position: static` has already made non-sticky** — *a static footer
+cannot reclaim the viewport, it only extends the scroll.*
+
+**🔴 HIGH-4 — narrowing 1 as ARGUED is right and Vera accepts it; as SHIPPED it was defanged by a THIRD
+narrowing Felix did not flag.** `unreachableAtEnd` changed from `covered **OR** off-screen` to `covered
+**AND** off-screen` — **near mutually exclusive, because a control buried under a bottom-pinned footer is
+INSIDE the viewport.** She reinstated the genuine defect shape at **800×1280**, the exact viewport where
+`f4dd69f` found it: `.add` and the last row both buried, `elementFromPoint` returns `.foot`.
+**Post-narrowing the gate goes red on NOTHING; pre-narrowing it would have gone red on both.** The hole is
+specifically **tall portrait** — the top of the page is fine and the bottom is buried. **And the comment at
+`:457-478` is now false about both assertions.**
+
+**🟢 NARROWING 2 — ACCEPTED, with a one-line amendment, and her reasoning is worth keeping.** She checked the
+proxy against what it stands for: wherever `firstWholeRowVisible` is false, `.r-name` is still fully visible.
+**But it holds by layout coincidence, not by construction** — `tickUsable` alone would pass a layout where
+the tick is visible and the **name** is below the fold, *"a tappable tick attached to nothing she can read."*
+***"She can see and use her shopping" is two verbs; the assertion tests only the second.***
+
+**Three non-blocking MEDIUMs:** token parity has **no pinned count**, so a GL-003 *rename* drops shared 13→12
+with `drift = 0` and **nothing goes red** · the dead-space hit test **runs on zero rows** at the three
+tightest viewports because `if (!hit) return;` skips off-screen midpoints — *the honest 9/10 was the symptom*
+· the slack figure is **11px, not ~15px**.
+
 ### 🔄 MUM'S COCKPIT — Vera's conditions addressed at **`18b0f98`**. **Back with Vera. TWO NARROWINGS are hers to reject.**
 
 **HIGH-1's mechanism was NOT only the footer, and that is the useful part.** Dropping the footer to normal
