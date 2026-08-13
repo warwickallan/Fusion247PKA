@@ -37,6 +37,18 @@ export const ASDAIR_LIST_ROUTE = '/api/asdair/list';
 // The upstream that actually records the list.
 export const UPSTREAM_PATH = '/asdair/list';
 
+// ── WP-B15-50. THE SENSE-CHECK PROXY LIVES IN THIS MODULE, DELIBERATELY ────────────────────────
+// Not in a new file. `provenance.mjs` declares the cockpit's source closure module by module, so a
+// new `.mjs` inside server.mjs's import graph must be declared there as well. This route is the same
+// shape as the list route — POST JSON in, JSON out, every failure in the contract's error shape —
+// and shares this module's body reader and forwarder, so a sibling file would have duplicated all of
+// it to gain nothing but a second place for the two to drift.
+//
+// ⛔ IT IS READ-ONLY UPSTREAM AND MUST STAY THAT WAY. It asks whether she already has something; it
+// records nothing. If it ever needs to write, that needs its own review, not a quiet edit here.
+export const ASDAIR_CHECK_ITEM_ROUTE = '/api/asdair/check-item';
+export const CHECK_ITEM_UPSTREAM_PATH = '/asdair/check-item';
+
 // Same cap as the existing POST route in server.mjs (/api/decide, 1e5). A weekly shopping list is a
 // few hundred bytes; 100 kB is generous enough that no honest submission meets it, and small enough
 // that a malformed client cannot spend this process's memory.
@@ -114,12 +126,49 @@ export function readJsonBody(req, opts = {}) {
  * @param {{fetch?:Function, timeoutMs?:number, maxBytes?:number}} [deps]  injected only by the gate
  */
 export async function proxyAsdairList(req, res, origin, deps) {
+  return proxyJson(req, res, origin, deps, {
+    upstreamPath: UPSTREAM_PATH,
+    notPost: 'A list is sent with POST.',
+    unreachable: (why) => 'I could not reach AsdAIr to send that list — ' + why + '. Nothing was sent.',
+    unreadable: (why) => 'AsdAIr started to answer and then stopped — ' + why + '.',
+    notJson: (status) => 'AsdAIr answered in a form I could not read (HTTP ' + status + '). Nothing was sent.',
+  });
+}
+
+/**
+ * POST /api/asdair/check-item  ->  POST <origin>/asdair/check-item      (WP-B15-50 AC1)
+ *
+ * The sense-check, on its way to the resolver. Identical mechanics to the list proxy above and
+ * DIFFERENT WORDS on failure, on purpose: nothing was being sent here, so a message saying "nothing
+ * was sent" would be answering a question she did not ask.
+ *
+ * ⛔ WHAT THE PAGE MUST DO WITH A FAILURE FROM THIS ROUTE — and it is why every exit is still the
+ * contract's error shape rather than a bare 502: **accept her item anyway**. A sense-check that
+ * swallows what she typed because a service was down is worse than no sense-check at all. This
+ * module cannot enforce that, but it can make the failure legible enough that the page can.
+ */
+export async function proxyAsdairCheckItem(req, res, origin, deps) {
+  return proxyJson(req, res, origin, deps, {
+    upstreamPath: CHECK_ITEM_UPSTREAM_PATH,
+    notPost: 'A check is sent with POST.',
+    unreachable: (why) => 'I could not reach AsdAIr to check that — ' + why + '.',
+    unreadable: (why) => 'AsdAIr started to answer and then stopped — ' + why + '.',
+    notJson: (status) => 'AsdAIr answered in a form I could not read (HTTP ' + status + ').',
+  });
+}
+
+/**
+ * The shared body: read once, cap, forward, hand back JSON. Both routes above are this function with
+ * a different upstream path and different sentences — extracted rather than copied so a fix to the
+ * error handling cannot land on one route and miss the other.
+ */
+async function proxyJson(req, res, origin, deps, shape) {
   const d = deps || {};
   const doFetch = d.fetch || fetch;
   const timeoutMs = d.timeoutMs || 8000;
 
   if (String(req.method || '').toUpperCase() !== 'POST') {
-    return refuse(res, 405, 'method_not_allowed', 'A list is sent with POST.');
+    return refuse(res, 405, 'method_not_allowed', shape.notPost);
   }
 
   const read = await readJsonBody(req, { maxBytes: d.maxBytes || MAX_BODY_BYTES });
@@ -133,7 +182,7 @@ export async function proxyAsdairList(req, res, origin, deps) {
 
   let upstream;
   try {
-    upstream = await doFetch(origin + UPSTREAM_PATH, {
+    upstream = await doFetch(origin + shape.upstreamPath, {
       method: 'POST',
       signal: AbortSignal.timeout(timeoutMs),
       headers: { 'content-type': JSON_TYPE, accept: 'application/json' },
@@ -142,8 +191,7 @@ export async function proxyAsdairList(req, res, origin, deps) {
   } catch (e) {
     // NOT REACHED IS NOT THE SAME AS REFUSED, and the caller must be able to tell: nothing was
     // written, so this is always safe to retry.
-    return refuse(res, 502, 'upstream_unreachable',
-      'I could not reach AsdAIr to send that list — ' + whyDown(e) + '. Nothing was sent.');
+    return refuse(res, 502, 'upstream_unreachable', shape.unreachable(whyDown(e)));
   }
 
   // The upstream body is ALREADY the contract shape, so it is forwarded VERBATIM - including
@@ -153,8 +201,7 @@ export async function proxyAsdairList(req, res, origin, deps) {
   try {
     text = await upstream.text();
   } catch (e) {
-    return refuse(res, 502, 'upstream_unreadable',
-      'AsdAIr started to answer and then stopped — ' + whyDown(e) + '.');
+    return refuse(res, 502, 'upstream_unreadable', shape.unreadable(whyDown(e)));
   }
 
   let payload;
@@ -165,7 +212,7 @@ export async function proxyAsdairList(req, res, origin, deps) {
     // hand to the UI. It is converted into the contract's shape, and the upstream STATUS is kept so
     // a 500 does not read as a 200.
     return refuse(res, upstream.status >= 400 ? upstream.status : 502, 'upstream_not_json',
-      'AsdAIr answered in a form I could not read (HTTP ' + upstream.status + '). Nothing was sent.');
+      shape.notJson(upstream.status));
   }
 
   return send(res, upstream.status, payload);

@@ -39,7 +39,12 @@ import { ASDAIR_CHECKLIST_ROUTE, proxyAsdairChecklist } from './asdair-checklist
 // AsdAIr service that can actually record it as a durable shop. Its own module for exactly the
 // reason above; asdair-list-check.mjs runs the real handler over a real socket, which is the only
 // way a proxy's behaviour can be proven at all.
-import { ASDAIR_LIST_ROUTE, proxyAsdairList } from './asdair-list.mjs';
+// WP-B15-50 adds the SENSE-CHECK from the same module: "have I already got this?", asked while she
+// is typing. Read-only upstream, and its answer can never contain a question for her.
+import {
+  ASDAIR_LIST_ROUTE, proxyAsdairList,
+  ASDAIR_CHECK_ITEM_ROUTE, proxyAsdairCheckItem,
+} from './asdair-list.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -411,6 +416,11 @@ const server = http.createServer(async (req, res) => {
     // It reads its own capped body and answers in the JSON error shape on every path, so the UI can
     // always tell "did not send" from "sent" — which is why it is not `j(res, ...)` either.
     if (req.url.startsWith(ASDAIR_LIST_ROUTE)) return proxyAsdairList(req, res, ASDAIR_ORIGIN);
+    // THE SENSE-CHECK (WP-B15-50). Read-only upstream: it asks whether she already has the thing she
+    // is typing, and it never records anything. Same JSON error shape, for the same reason — the page
+    // has to be able to tell a real verdict from a failure, because on a failure it ACCEPTS HER ITEM
+    // ANYWAY rather than dropping what she typed.
+    if (req.url.startsWith(ASDAIR_CHECK_ITEM_ROUTE)) return proxyAsdairCheckItem(req, res, ASDAIR_ORIGIN);
     // Private-app same-origin bridge (opt-in via COCKPIT_PRIVATE_API). Must run before static.
     if (req.url.startsWith(PRIVATE_API_PREFIX)) return servePrivateApi(req, res, PRIVATE_API);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {

@@ -26,7 +26,10 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASDAIR_LIST_ROUTE, MAX_BODY_BYTES, UPSTREAM_PATH, proxyAsdairList } from './asdair-list.mjs';
+import {
+  ASDAIR_LIST_ROUTE, MAX_BODY_BYTES, UPSTREAM_PATH, proxyAsdairList,
+  ASDAIR_CHECK_ITEM_ROUTE, CHECK_ITEM_UPSTREAM_PATH, proxyAsdairCheckItem,
+} from './asdair-list.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(DIR, 'server.mjs');
@@ -62,9 +65,27 @@ export function serverDispatchesList(source) {
   });
 }
 
+// WP-B15-50. The same rule, for the sense-check route. An import line mentioning both names is not
+// a dispatch — that lesson is already paid for above and is not re-learned here.
+export function serverDispatchesCheckItem(source) {
+  return source.split(/\r?\n/).some((l) => {
+    const t = l.trim();
+    if (t.startsWith('import ')) return false;
+    return t.includes('ASDAIR_CHECK_ITEM_ROUTE') && /proxyAsdairCheckItem\s*\(/.test(t);
+  });
+}
+
 /** Start a one-request server around the real handler, pointed at `origin`. */
 function withHandler(origin, deps) {
   const server = http.createServer((req, res) => proxyAsdairList(req, res, origin, deps));
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+  });
+}
+
+/** The same, around the REAL sense-check handler. */
+function withCheckHandler(origin, deps) {
+  const server = http.createServer((req, res) => proxyAsdairCheckItem(req, res, origin, deps));
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
   });
@@ -86,11 +107,11 @@ function fakeUpstream(handler) {
   });
 }
 
-function post(port, body, headers = {}) {
+function post(port, body, headers = {}, route = ASDAIR_LIST_ROUTE) {
   return new Promise((resolve, reject) => {
     const payload = typeof body === 'string' ? body : JSON.stringify(body);
     const req = http.request(
-      { host: '127.0.0.1', port, path: ASDAIR_LIST_ROUTE, method: 'POST', headers: { 'content-type': 'application/json', ...headers } },
+      { host: '127.0.0.1', port, path: route, method: 'POST', headers: { 'content-type': 'application/json', ...headers } },
       (res) => {
         let raw = '';
         res.on('data', (c) => { raw += c; });
@@ -234,6 +255,54 @@ async function main() {
     ok('server.mjs DISPATCHES the route constant (not merely imports it)', serverDispatchesList(src));
     ok('the route constant is the one the UI posts to', ASDAIR_LIST_ROUTE === '/api/asdair/list', ASDAIR_LIST_ROUTE);
     ok('the cap matches the existing POST route in server.mjs', MAX_BODY_BYTES === 1e5, String(MAX_BODY_BYTES));
+    // WP-B15-50: the sense-check has to be joined up too, or the page calls a route that 404s.
+    ok('server.mjs DISPATCHES the sense-check route (not merely imports it)', serverDispatchesCheckItem(src));
+    ok('the sense-check route constant is the one the UI posts to',
+      ASDAIR_CHECK_ITEM_ROUTE === '/api/asdair/check-item', ASDAIR_CHECK_ITEM_ROUTE);
+  }
+
+  // ── 11. WP-B15-50: THE SENSE-CHECK PROXY, OVER A REAL SOCKET ──────────────────────────────────
+  {
+    const verdict = { ok: true, status: 'matched', matched_name: 'Semi skimmed milk 4 pints', matched_regular_id: 11, already_on_list: false };
+    const up = await fakeUpstream((req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(verdict));
+    });
+    const h = await withCheckHandler(up.origin);
+    const res = await post(h.port, { household: 1, text: 'milk', chosen: [] }, {}, ASDAIR_CHECK_ITEM_ROUTE);
+
+    ok('a typed term reaches the sense-check upstream over a real socket', up.seen.length === 1,
+      up.seen.length + ' request(s)');
+    ok('it is POSTed to ' + CHECK_ITEM_UPSTREAM_PATH,
+      up.seen[0] && up.seen[0].method === 'POST' && up.seen[0].url === CHECK_ITEM_UPSTREAM_PATH,
+      up.seen[0] ? up.seen[0].method + ' ' + up.seen[0].url : 'nothing');
+    ok('her words arrive unchanged', JSON.parse(up.seen[0].body).text === 'milk');
+    ok('the verdict is forwarded VERBATIM', JSON.stringify(parsed(res)) === JSON.stringify(verdict));
+  }
+  {
+    // ⛔ THE CASE THAT MATTERS MOST ON THIS ROUTE. When the sense-check cannot answer, the page must
+    // still accept what she typed — so the failure has to be legible JSON, not a bare 502 the browser
+    // cannot parse. This proves the shape; the page's own behaviour is Felix's lane.
+    const dead = await fakeUpstream(() => {});
+    const origin = dead.origin;
+    await new Promise((r) => dead.server.close(r));
+    const h = await withCheckHandler(origin, { timeoutMs: 1500 });
+    const res = await post(h.port, { household: 1, text: 'milk' }, {}, ASDAIR_CHECK_ITEM_ROUTE);
+    const body = parsed(res);
+    ok('an unreachable sense-check is 502 in the JSON error shape', res.status === 502 && body !== null,
+      String(res.status));
+    ok('with a named machine code the page can branch on', body && body.error === 'upstream_unreachable');
+    ok('and it does NOT claim nothing was sent - nothing was being sent',
+      body && !/nothing was sent/i.test(body.message || ''), body ? body.message : '');
+    h.server.close();
+  }
+  {
+    const up = await fakeUpstream((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"ok":true}'); });
+    const h = await withCheckHandler(up.origin);
+    const res = await post(h.port, '{not json', {}, ASDAIR_CHECK_ITEM_ROUTE);
+    ok('a malformed sense-check body is a JSON 400', res.status === 400 && parsed(res).error === 'bad_json');
+    ok('and nothing was forwarded upstream', up.seen.length === 0);
+    h.server.close(); up.server.close();
   }
 
   // ── 10. THE LIVE LEG - ONLY WHEN NAMED ────────────────────────────────────────────────────────
@@ -274,6 +343,20 @@ function selfTest() {
   ok('the assertion accepts the REAL server.mjs', serverDispatchesList(real));
   Object.keys(mutants).forEach((why) => {
     ok('the assertion REJECTS a mutant: ' + why, serverDispatchesList(mutants[why]) === false);
+  });
+
+  // WP-B15-50: the same mutation proof for the sense-check assertion. A source scan that cannot go
+  // red is decoration, and adding a second one without proving it would be adding decoration.
+  const checkMutants = {
+    'the sense-check dispatch line deleted': real.split(/\r?\n/)
+      .filter((l) => !(l.includes('ASDAIR_CHECK_ITEM_ROUTE') && /proxyAsdairCheckItem\s*\(/.test(l)))
+      .join('\n'),
+    'only the sense-check import left': "import { ASDAIR_CHECK_ITEM_ROUTE, proxyAsdairCheckItem } from './asdair-list.mjs';\n",
+    'the sense-check handler call removed but the constant kept': real.replace(/proxyAsdairCheckItem\s*\(/g, 'somethingElse('),
+  };
+  ok('the sense-check assertion accepts the REAL server.mjs', serverDispatchesCheckItem(real));
+  Object.keys(checkMutants).forEach((why) => {
+    ok('the sense-check assertion REJECTS a mutant: ' + why, serverDispatchesCheckItem(checkMutants[why]) === false);
   });
   console.log(failed
     ? 'SELF-TEST FAIL — ' + failed + ' of ' + ran + ' assertions failed.'
