@@ -36,6 +36,11 @@ const path = require('path');
 // and commandSurface.test.js fails the moment the two drift.
 // ---------------------------------------------------------------------
 const COMMAND_NAMES = Object.freeze([
+  // WP-B15-48. THE ONE CAPABILITY EXTENSION, and the door Mum's Cockpit sends
+  // through. It is INTAKE, not an operator action: no operator button may ever
+  // offer it, and cockpitUi.test.js asserts it is ABSENT from the operator UI's
+  // own list rather than merely permitted there.
+  'receiveList',            // the week's list arrives - from Telegram, or from Mum's Cockpit
   'confirmInterpretation',  // accept the catalogue-grounded reading of the list
   'correctLine',            // fix a line: different regular, different qty, new item
   'buildShop',              // plan the shop from the confirmed interpretation
@@ -156,10 +161,49 @@ function loadCommands(injected) {
   return assertCommandSurface(mod);
 }
 
-/** True when the canonical module is present on this checkout. */
+/**
+ * True when the canonical module is PRESENT ON DISK. Nothing more.
+ *
+ * ⚠️ THIS IS NOT "DISPATCH WOULD WORK", AND MUST NEVER BE USED AS IF IT WERE.
+ * `require.resolve` finds the file without evaluating it: a module that throws
+ * on import, or that has drifted so it no longer exposes this surface, resolves
+ * exactly as happily as a working one. That gap is what made /asdair/health
+ * report `command_surface_bound: true` for a surface no command could be
+ * dispatched through. Health now calls isDispatchable() instead.
+ *
+ * Kept because it is the right question in two places - the test that asks
+ * whether the pipeline is on this checkout at all, and the fast path that
+ * decides which contract to assert - and because deleting it would only push
+ * the same `require.resolve` back inline somewhere less obvious.
+ */
 function isBound() {
   try {
     require.resolve(PIPELINE_COMMANDS_PATH);
+    return true;
+  } catch (ignore) {
+    return false;
+  }
+}
+
+/**
+ * WP-B15-48 AC6. TRUE WHEN A COMMAND WOULD ACTUALLY DISPATCH.
+ *
+ * The honest form of the question health is really asking. It does the whole
+ * thing dispatch does before it calls a command: LOAD the module (evaluating
+ * it) and ASSERT it exposes this exact surface with nothing forbidden on it.
+ * Anything that would make `dispatch()` throw - a missing file, an import-time
+ * error, a drifted surface, a forbidden export - makes this false.
+ *
+ * It cannot throw. Health must be able to report ill health, and a check that
+ * explodes reports nothing at all.
+ *
+ * @param {object} [injected] the already-loaded module, when the host has one.
+ *        It is ASSERTED, never trusted: an injected surface that is missing a
+ *        command is exactly as unusable as an absent one.
+ */
+function isDispatchable(injected) {
+  try {
+    loadCommands(injected);
     return true;
   } catch (ignore) {
     return false;
@@ -218,5 +262,6 @@ module.exports = {
   assertCommandSurface: assertCommandSurface,
   loadCommands: loadCommands,
   isBound: isBound,
+  isDispatchable: isDispatchable,
   dispatch: dispatch
 };
