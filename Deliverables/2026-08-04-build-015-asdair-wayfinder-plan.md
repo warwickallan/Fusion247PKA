@@ -2333,6 +2333,51 @@ describes**, while `inventedFreeGeneration` absorbs three different mechanisms u
 unconstrained invention on a closed-enum run. Recorded as an observation. **No Work Order. Vision stays
 parked.** Band 7 flags itself via `lookAgainRegions: [5,7]` and **nothing downstream consumes that flag.**
 
+### ✅ LANE F COMPLETE — **`de8560b`** on `build-015/b15-39-browser-handoff`. 11 files, 0 outside surface. **NOT accepted.**
+
+**`14/14 mutants killed, ZERO SURVIVORS`** (baseline 9/9). The five new ones by name: `emissionGateIgnored` ·
+`sentinelTreatedAsBrand` · `packSizeBecomesQuantity` · `silentDrop` · `provenanceNotRequired`.
+**157 executed subtests, 157 pass, 0 skipped** (baseline 133) · **12/12 DB-gated against 17.4**, and **12
+cleanly SKIPPED with the variable unset** — so it degrades honestly on a box with no dependencies ·
+secret-scan **exit 0 over 24 files**.
+
+**AC4 is the one that protects the trolley:** Richmond 16 → **1**, Ariel Pods 33 → **1**, `total_units: 2`
+**not 49**. It asserts against `settleQuantity.js` rather than owning it — *"if AB moves them, my
+`PACK_SIZE_TREATED_AS_QUANTITY` assertions are what will notice."*
+
+**AC6 was proven the only way persistence can be:** two real OS processes, `SIGKILL` mid-flight, lease expiry
+on the **database** clock, and worker B resumed **the same `requestId`** with `lines_done: [1]` intact and
+exactly one live request. **Not inspection — kill and revive.**
+
+**AC1's stale artefact, reported and NOT touched** (it is Lane AB's surface): `browser-handoff.json` is
+**stale in shape, not in arithmetic** — its counts are internally consistent, but it **predates 020** and not
+one of its 31 lines carries `provenance`, though the reconciled list records `PHOTO: 39`. **The provenance
+was computed upstream and dropped at the handoff boundary.** Same for `pack_identity`. Lane F's new reader
+carries both. **And a correction worth having: the `ZZ` sentinel does NOT reach that artefact** — its `held[]`
+entries carry only line number, original text and reason, so the sentinel is confined upstream.
+
+#### 🔴 `human_state` HAS NO TRIGGER AND WILL DRIFT — cross-lane, and it lands on the human journey
+
+**Migration 020 adds the column with a default and backfills it ONCE. It installs ZERO triggers.** Lane F
+proved by execution that a row inserted with `status = 'READY_TO_SHOP'` comes back
+`human_state = 'ASDAIR_WORKING'`.
+
+**Consequence, stated in product terms: Cockpit can display a state the machine does not agree with, and do
+it confidently.** Anything writing `status` must write `human_state` in the same transaction or the two
+silently diverge. **Lane AB wired the pipeline's own transitions and proved every status by reading it back
+out of Postgres — so the pipeline path is covered.** The exposure is any *other* writer: direct SQL, another
+service, a future path that forgets.
+
+**Relayed to Lane C mid-build**, with the ruling: **keep reading the stored value — do not re-derive** (one
+canonical value is what 020 is *for*), **detect and surface the disagreement honestly**, and **report rather
+than fix the write side** — triggers are Silas's decision. *It also independently vindicates Lane F's own M3
+challenge: a gate resting on that column would have rested on someone's memory.*
+
+**Two smaller hazards, both now relayed:** `--surface` secret-scan enumerates from the **filesystem**, not
+`git ls-files`, so it sees `node_modules` once anything is installed inside a declared surface — **report
+both results, never narrow the surface**. And **line numbers are not a stable anchor**: the AC7 exclusions
+Larry pinned by line had already moved because Lane F inserted above them. **Verify exclusions by content.**
+
 ### ✅ LANE AB COMPLETE — **`58c86ef`** on `build-015/b15-28-…-v2`. 15 files, 0 outside surface. **NOT accepted.**
 
 | AC | Evidence |
