@@ -2344,7 +2344,71 @@ earlier route both were absent.
 **⚠️ `"cravendale"` typed alone returns `unmatched_new_item` even though she has it** — the brand is not one
 of that product's aliases. **Catalogue curation, not a defect**, and recorded rather than actioned.
 
-### 🔴 THE ONE THING BLOCKED ON WARWICK — `SHOPPER_CHAT_ID`. Asked at `message_id 531`.
+### ✅ SHOPPER_CHAT_ID — **DERIVED, VERIFIED AND SET.** Warwick authorised the derivation; Larry verified before any send.
+
+> **Warwick, 2026-08-13:** *"Derive the ShopperBot destination from the existing canonical .fusion
+> configuration / SHOPPER_ALLOWED_USER_IDS; that is the authorised chat destination. Verify it against the
+> existing ShopperBot configuration before the first live send and carry on."*
+
+**Verified READ-ONLY against the live Telegram API — `getMe` + `getChat`, nothing sent:**
+
+| Check | Result |
+|---|---|
+| the bot | **`@Fusion247shopperbot`** · id `8877654348` · *"Fusion 247 Shopper"* |
+| the destination | id `860…832` · **`type=private`** · **name "Warwick Allan"** |
+| ambiguity | **none — `SHOPPER_ALLOWED_USER_IDS` held exactly ONE id.** The script was written to REFUSE on more than one rather than pick |
+| the token | consumed by name · **length printed, value never printed**, and masked out of any error string |
+
+**⚠️ LARRY CORRUPTED `asdair.env` DOING THIS, AND REPAIRED IT. Recorded because the hazard is general.**
+The file **had no trailing newline**, so an `Add-Content` append concatenated onto the last line, producing
+`FUSION_MODEL_VISION=gpt-5.6-terraSHOPPER_CHAT_ID=…` — **silently destroying the Terra vision setting** that
+cost this build a whole diversion to establish. **A backup was taken first** (`asdair.env.bak-2026-08-13-chatid`),
+restored from, and the append redone with explicit newline handling. **Verified after: both variables declared
+separately, and `FUSION_MODEL_VISION` is exactly `gpt-5.6-terra`.** No live impact — the running process still
+held the pre-edit environment throughout. *The lesson is one line: never append to an env file without first
+asserting it ends in a newline.*
+
+**The service now starts clean** — no half-configured refusal, no *"Warwick is NOT told"* warning. **That
+absence is the positive evidence**, because the same `validateConfig` loudly refused to start twenty minutes
+earlier on the half-configuration.
+
+### ✅ MUM'S PAGE — Vera FAILED it, Felix fixed all four HIGH, gates re-verified BY LARRY at the merged state
+
+**Vera's FAIL was correct and it caught what no gate could.** Her four HIGH, and what happened:
+
+| # | Finding | State |
+|---|---|---|
+| **HIGH-1** | **Tapping SEND landed the confirm screen BELOW THE FOLD on 8 of 9 viewports — including her Fire HD 8 at NO ZOOM.** At 800×500, **10px of an 88px `YES, SEND IT` was painted**; at two sizes both controls were entirely off screen | **FIXED** |
+| **HIGH-2** | **Her typed words destroyed by one mis-tap, twice, with no undo** — and the undo on screen would have un-ticked something else | **FIXED** |
+| **HIGH-3** | The opposite-effect gap fell to **16px** at her tablet's landscape zoom where the safety rule says 24 — **and nothing measured that pair at any viewport** | **FIXED** |
+| **HIGH-4** | **9 of 46 rows render a retailer catalogue string** (*"Sample Brand 7 Yoghurts 450g"*) instead of a word she uses | **OPEN — needs a curated `display_name` COLUMN. Backend. No front-end work moves it, and Addendum E criterion 2 cannot pass until it exists** |
+
+**⭐ WHY THE GATE COULD NOT SEE HIGH-1, and it is the durable lesson of this session:** `outcomeVisible`
+measured at **maximum scroll**. She *is* at maximum scroll — **before the tap.** The tap grows the document,
+so max scroll moves and she does not; the gate then scrolled to the new maximum and measured **a place she is
+not standing.** *Right property, wrong moment — the third time that exact class has bitten this build.*
+
+**Verified BY LARRY at the merged state, not accepted from the builder:**
+
+| Gate | Result | Session baseline |
+|---|---|---|
+| `shopping-geometry-check.mjs` | **PASS — 104 viewports in a real browser, 0 violations** | 20 states |
+| `--self-test` | **PASS — 16/16 mutations caught, control clean, 104 combinations** | 12/12 across 10 of 20 |
+| `render-vm-check.mjs` | **PASS — 64 scenarios, 232 assertions, 0 failed** | 183 assertions |
+
+**The three viewports VERA measured at are now permanent in the gate — 800×500, 512×300, 300×512. Every HIGH
+she returned was at a size the gate had never rendered.**
+
+**⚖️ LARRY'S BANNER RULING, recorded because it was a product call and Vera is entitled to reject it.** At
+small sizes the pending banner is **split**: the load-bearing heading stays wholly in the initial viewport,
+the elaboration renders **after the list** — moved **in the DOM** via a reactive `matchMedia` breakpoint, not
+by CSS ordering, **so visual order and DOM order agree and WCAG 1.3.2 never arises.** Keyed to **either axis**,
+because the failing viewports were 300×512 *and* 512×300 and a width-only query would have left her actual
+device broken. *Reasoning: this is her shopping list; if she opens it and sees no shopping, it reads as broken.*
+**Larry nearly ruled the other way on "beyond realistic zoom", then checked Vera's own words — she calls
+512×300 her Fire HD 8 at 200%. That was Larry looking for a reason not to do the work.**
+
+### 🔴 FORMERLY BLOCKED ON WARWICK — `SHOPPER_CHAT_ID`. **DISCHARGED above.** Original ask at `message_id 531`.
 
 **`SHOPPER_BOT_TOKEN` is set; `SHOPPER_CHAT_ID` is set nowhere.** So the notification has **no destination**.
 
