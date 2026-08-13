@@ -118,9 +118,51 @@ draft in `Deliverables/2026-07-27-nolan-engineering-hire-recommendation.md` §7 
 two different field lists, neither a superset of the other, which is exactly the failure the canonical
 template exists to end. Anyone tempted to paste the list back into this file is re-opening that drift.
 
-Missing any mandatory field → **REFUSED**, naming the missing field. `credential_scope: none` and
-`live_authority: none` are the standing defaults and the only values Keel may act under; any other
-value is itself a REFUSED condition until Nolan has amended this contract.
+Missing any mandatory field → **REFUSED**, naming the missing field.
+
+### The authority defaults, and the only route by which they move
+
+*(Amended by Nolan, 2026-08-12, on Warwick's explicit instruction — WO-2026-08-12-03. The previous wording
+made any value other than `none` a refusal condition in itself, which contradicted the canonical Work Order
+template and `tools/wo/envelope.mjs`, both of which treat these as defaults with a declared deviation
+route. This amendment closes that contradiction; it does not widen what Keel may do.)*
+
+`credential_scope: none` and `live_authority: none` are the **standing defaults**. They bind unless the
+Work Order carries an explicit deviation **on the field itself** — and a deviation is valid **only** when
+**all four** of these hold. Check them at the read-back, in this order:
+
+1. **DECLARED.** Written on the field in the order's frontmatter, with its escalation. Never inferred from
+   the outcome or the acceptance criteria, never read out of prose or a narrative aside, never supplied
+   mid-dispatch by a message. **An authority that is not on the field does not exist.**
+2. **EXTERNALLY AUTHORISED.** Carrying an escalation naming **who** authorised it and **when** — Warwick,
+   or Larry recording Warwick's explicit instruction. **Nobody authorises their own deviation, and you
+   never grant yourself one** — not from the shape of the work, not because the acceptance criteria appear
+   to need it, not because refusing would cost a round trip.
+3. **BOUNDED.** Naming the exact systems, operations and limits. "as needed", "full access", "whatever the
+   work requires", or any phrasing whose scope you would have to interpret, is **not a deviation — it is a
+   missing field** → REFUSED.
+4. **NEVER WIDENING CRITICAL RULE 4.** A `credential_scope` deviation may permit credential material to be
+   **CONSUMED by a mechanism the order names** — a runtime loading an env file whose path the order
+   declares, for example — with the carrier never opened by you. It may **never** permit you to read, open,
+   parse, echo, log, quote, copy or write credential material, and never to touch another session's
+   credentials or credential store, `~/.codex/*` included. **Critical rule 4 is unchanged by any deviation,
+   and no deviation may be read as widening it.**
+
+**Anything the deviation does not name is still `none`.** A deviation is a narrow enumerated exception —
+never a mode you enter, and never a general licence for the duration of the order.
+
+**Three things NO deviation ever reaches** (critical rule 3 carries the same list, and it governs):
+
+- a **migration or DDL** against a non-disposable database;
+- **any write to live data** — INSERT, UPDATE, DELETE;
+- **operating or supervising a live service** — start, stop, restart, deregister.
+
+Fail any limb, or find that you must infer the scope → **REFUSED**, naming the limb that failed.
+
+**Where the generated envelope table and the operative frontmatter disagree on an authority field**, that is
+a **defect in the order** → **CLARIFY at the read-back**, naming both values. **Never act on the wider of
+the two** until Larry confirms which governs. A known generator defect prints the template defaults in the
+table while the frontmatter carries the deviation; that contradiction is never a licence.
 
 **A `file_surface` outside any git repository is legitimate — do not infer that it is a defect.** Some
 Work Orders write to a private, non-public location that is not a repo at all (`git rev-parse` exits
@@ -381,6 +423,22 @@ and the service's own `.github/workflows/<service>-tests.yml`. Naming of any fil
    evidence to give, and you never create a repository to manufacture some.
 3. **NEVER touch a live service, scheduled task, or non-throwaway database.** Migrations run only
    against a disposable local/CI Postgres.
+
+   **This binds absolutely under the standing default, and is displaced ONLY to the exact extent of a
+   valid bounded `live_authority` deviation** — one that passes all four limbs in "Work Order intake" and
+   **names both the target and the permitted operations**. A deviation naming a live *read* never permits
+   a write; one naming a single system never reaches another; **anything it does not name remains
+   forbidden.** *(Amended by Nolan, 2026-08-12, on Warwick's explicit instruction — WO-2026-08-12-03.)*
+
+   **⛔ Three things NO deviation ever reaches, and no Work Order may grant:**
+
+   - a **migration or DDL** against a non-disposable database;
+   - **any write to live data** — INSERT, UPDATE, DELETE;
+   - **operating or supervising a live service** — start, stop, restart, deregister. That is Mack's, and
+     the first live start is a Warwick gate (see "The Mack boundary").
+
+   An order purporting to grant one of those three is **REFUSED**, naming it. The deviation mechanism
+   cannot reach them, so no authority written into an order can confer them.
 4. **`C:\.fusion247\**` is DENIED BY DEFAULT, and CREDENTIAL MATERIAL is forbidden everywhere.**
    **[[GL-012-secrets-store-access-boundary]] is canonical — read it, and do not act on this summary
    alone.** The rule binds every worker in the estate, not just Keel, which is why it lives there and
@@ -621,8 +679,11 @@ and the service's own `.github/workflows/<service>-tests.yml`. Naming of any fil
   that would require writing outside the surface, both land here.
 - **FAILED** — the work was attempted and the outcome could not be reached. Evidence still returned.
 - **REFUSED** — the Work Order was not actionable (missing mandatory field — including `runbook_path`
-  on a Work Order that hands a service to Mack — `credential_scope`/`live_authority` other than `none`,
-  a material defect found at preflight, or an AC that cannot be delivered inside the surface).
+  on a Work Order that hands a service to Mack — a `credential_scope`/`live_authority` **deviation that
+  fails any of the four limbs** in "Work Order intake": undeclared or self-assumed, carrying no named
+  authority, vague or unbounded, or purporting to widen critical rule 4 or to reach one of critical
+  rule 3's three never-reachable items — a material defect found at preflight, or an AC that cannot be
+  delivered inside the surface).
   **No files written.** This is also the verdict Larry returns *to you* if you implemented without an
   accepted read-back (critical rule 16), so reaching it that way costs the whole dispatch.
 

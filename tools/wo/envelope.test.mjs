@@ -1003,3 +1003,57 @@ test('MUT-8 the incompleteness notice suppressed — an incomplete envelope read
     'MUT-8 an incomplete envelope must say so',
   );
 });
+
+// G-7 — the envelope TABLE and the operative frontmatter must never disagree about an authority
+// field. Before this, the table printed the template standing default unconditionally while the
+// frontmatter carried the deviation, so every deviating order contradicted itself on its own face.
+// That is not cosmetic: Keel's contract obliges a worker to CLARIFY on exactly that disagreement
+// and never act on the wider value, so the defect cost a live round trip on WO-2026-08-12-05 and
+// was only pre-answered in prose on -06. Both directions are pinned: it must fire when the order
+// deviates, and it must NOT fire when it does not.
+test('G-7 the envelope table prints the OPERATIVE authority value when the order deviates', () => {
+  const deviations = [{ field: 'live_authority', value: 'BOUNDED — one named photograph', authority: 'Warwick, 2026-08-13' }];
+  const env = E.resolveEnvelope({ root: REPO, owner: 'keel', governanceHead: null, worktree: null, deviations });
+  const table = E.render(env);
+
+  const live = table.split('\n').find((l) => l.includes('**live_authority**'));
+  assert.ok(live, 'live_authority row must exist');
+  assert.match(live, /DEVIATED \(operative\)/, 'a deviated field must be marked DEVIATED in the table');
+  assert.match(live, /BOUNDED — one named photograph/, 'the table must carry the operative value');
+  assert.match(live, /supersedes standing default/, 'the superseded default must still be stated, not hidden');
+  assert.match(live, /Warwick, 2026-08-13/, 'the escalation must travel with the deviated value');
+
+  // Per-field, never blanket: an undeviated field on the SAME order keeps its standing default.
+  const cred = table.split('\n').find((l) => l.includes('**credential_scope**'));
+  assert.ok(cred, 'credential_scope row must exist');
+  assert.doesNotMatch(cred, /DEVIATED/, 'an undeviated field must not be marked as deviated');
+});
+
+test('G-7 the envelope table still prints the standing default when the order does NOT deviate', () => {
+  const env = E.resolveEnvelope({ root: REPO, owner: 'keel', governanceHead: null, worktree: null });
+  const table = E.render(env);
+  const live = table.split('\n').find((l) => l.includes('**live_authority**'));
+  assert.ok(live, 'live_authority row must exist');
+  assert.doesNotMatch(live, /DEVIATED/, 'no deviation supplied means no DEVIATED marker');
+});
+
+test('MUT-G7 the deviation lookup neutered — a deviating order silently reads as `none`', async () => {
+  const mutant = await loadMutant(
+    '      const dev = deviationMap.get(f);',
+    '      const dev = undefined;',
+  );
+  const deviations = [{ field: 'live_authority', value: 'BOUNDED — one named photograph', authority: 'Warwick, 2026-08-13' }];
+  const mutantTable = mutant.render(
+    mutant.resolveEnvelope({ root: REPO, owner: 'keel', governanceHead: null, worktree: null, deviations }),
+  );
+  assert.doesNotMatch(mutantTable, /DEVIATED \(operative\)/, 'mutant should reintroduce the contradiction');
+
+  await assertMutantBreaks(
+    mutant,
+    (m) => {
+      const t = m.render(m.resolveEnvelope({ root: REPO, owner: 'keel', governanceHead: null, worktree: null, deviations }));
+      assert.match(t, /DEVIATED \(operative\)/);
+    },
+    'MUT-G7 a deviating order must never print the bare standing default in its table',
+  );
+});
