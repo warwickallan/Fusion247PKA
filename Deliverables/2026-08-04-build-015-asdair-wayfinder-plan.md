@@ -2389,6 +2389,26 @@ Larry's head". No completed-automation claim can arise from a disposable-target 
 **Three worker findings deleted or replaced an acceptance criterion — the read-back gate earning its keep:**
 Lane AB's stale-`needs human` defect **did not reproduce** (8 holds all genuine, zero shoppable-with-a-held-reason) and became an investigation that may correctly return nothing · Lane F's `READY_TO_SHOP` guard **already existed** in a directory the same order forbade it to touch, keyed on a `shop.status` value Larry had conflated with `human_state` · Lane C found Larry had asserted `node_modules/pg` existed in a worktree where it does not.
 
+### ⚠️ `asdair.execution_packet` IS READ BY COCKPIT AND EXISTS NOWHERE. **Drift in the opposite direction.**
+
+**`cockpit-api/readPacket.js` reads `asdair.execution_packet`. That table is not among the 31 live tables, no
+migration creates it, and NO PRODUCER EXISTS ANYWHERE IN THE ESTATE** — Lane C established this by
+execution across the whole repository, on this branch and every other. `readPacket` answers
+`packet_state: 'not_built'`, `packet: null`, and does so correctly.
+
+**Larry told Lane D that Lane C would publish `routed_question` on held lines to unblock its exception
+board. That promise would have returned `unknown` forever.** Retracted to Felix in the same round it was
+found, before it cost a night's work.
+
+**The join key Lane D actually needs already exists on a different endpoint: `question_key` on
+`/asdair/workspace`**, published today by `assembleWorkspace.buildQuestions`, matching the
+`routed_question` value carried on all 8 held lines in the finalise artefact. **Nothing is blocked; the
+route was simply not where Larry said it was.**
+
+*Larry's record-keeping, labelled Larry's: this is a second, opposite drift — three tables exist with no
+migration, and one table is consumed with no producer. Both are recorded, neither is fixed tonight, and
+both are Warwick's to decide.*
+
 ### ⚠️ SCHEMA DRIFT, RECORDED WHERE IT WILL BE FOUND
 
 **Three tables exist in the live database that NO repository migration creates:** `command_request`,
