@@ -14,6 +14,10 @@
 
 **§2b / §2b-bis / §2c amended:** 2026-07-29 by **Felix**, after closing D-1…D-16 in `styles.css`. ⚠️ **This file is Iris-only by the rule at the top, and Felix is not Iris.** The amendment is confined to what the fix *measured* — updated ratios, re-keyed line numbers, closed defects, two newly-found ones — and makes **no visual-language decision**. Three judgement calls are deliberately left open and flagged as Iris's: the `.act.accept` fill demotion (D-11), the `--ok-ink` / `--warn-ink` token gap (§2a), and how to resolve D-17/D-18 without losing the faded-state signal. **Iris should ratify or revise this amendment.** It is recorded here rather than done silently because an unattributed edit to an SSOT is how the SSOT stops being trusted.
 
+**§2a / §2b / §2b-bis / §2c amended:** 2026-08-13 by **Iris** (the owner), on two items raised at Vera's WP-B15-42 Cockpit gate and independently reported by Felix. Two shipping pairings — `--ink` on `--warn-w` and `--ink` on `--stop-w` — were **absent from §2b** and are now recorded; both were **re-derived here from the token hexes, not copied from the report**, after calibrating the arithmetic against this file's own pinned figures. **D-17 is DECIDED** (§2c), and the decision is expressed as a new normative rule in §2b-bis rather than as a patch at the call site. **No token was added and no token value changed**, so every pre-existing §2b figure still holds.
+
+Of the three judgement calls Felix left open for Iris, this pass settles **D-17 only**. The `.act.accept` fill demotion (D-11) and the `--ok-ink` / `--warn-ink` token gap (§2a) **remain open and remain Iris's** — they were not in scope here and are not silently ratified by this amendment.
+
 **Scope.** This design system documents the **Fusion247 Cockpit** — the surface at `services/cockpit/public/`. It is not yet a whole-estate brand. If a second surface is built, it either adopts these tokens or GL-003 is extended to carry two themes; it does not fork silently.
 
 **Direction of authority — important, and not yet what it should be.**
@@ -76,11 +80,11 @@ The intent column is the load-bearing part of this file. A token list without in
 | `--accent-ink` | `#0a5c64` | `#6fd8dc` | The accent as **text**: links, `.back`, `.crumb`, active nav label, and all text sitting on `--accent-w`. Comfortable in both schemes (6.64:1 worst case). | A fill behind white text. |
 | `--accent-w` | `#e2f1f2` | `#123138` | The accent **tint background** for pills, counts, active tabs. | Paired with anything but `--accent-ink`. |
 | `--ok` | `#1f9d57` | `#3ad07f` | Success as a **rail, dot or numeral** — the green `border-left`, the up dot, the large `.t-num`. | A fill behind white text (2.00:1 in dark — see D-11), and not small text on `--panel2` or on `--ok-w`. It is a tint-strength colour, not an ink. |
-| `--ok-w` | `#e4f4ea` | `#10331f` | Success **tint background** for pills and chips. | Paired with `--ok` as text (3.06:1 light). Pair with `--ink2` (6.55:1 / 6.30:1). |
+| `--ok-w` | `#e4f4ea` | `#10331f` | Success **tint background** for pills and chips. | Paired with `--ok` as text (3.06:1 light). Pair with `--ink2` (6.55:1 / 6.30:1) or `--ink` (14.39:1 / 11.77:1). |
 | `--warn` | `#b26a12` | `#e0a63a` | Attention as a **rail, dot or numeral** — "needs a decision", "service not answering". | A fill behind white text (4.23:1 light / 2.17:1 dark — both fail). Not small text on `--panel` in light (4.23:1). Not `--warn-w`-backed text. |
-| `--warn-w` | `#f8ecda` | `#3a2c12` | Attention **tint background**. | Paired with `--warn` as text (3.63:1 light). Pair with `--ink2`. |
+| `--warn-w` | `#f8ecda` | `#3a2c12` | Attention **tint background**. | Paired with `--warn` as text (3.63:1 light). Pair with `--ink2` (6.40:1 / 6.16:1), `--ink` (14.06:1 / 11.51:1) or `--accent-ink` (6.60:1 / 8.09:1). |
 | `--stop` | `#c1453c` | `#ee6a5f` | Blocked / error / destructive: the red rail, error text, `.act.decline`, `.nav-badge` and `.load-err` fills. The only status colour that is AA-safe as text on `--panel` in **both** schemes. | A white-text fill in **dark** (3.06:1). Not `--stop-w`-backed text in light (4.14:1). |
-| `--stop-w` | `#f8e5e3` | `#3a1c19` | Error **tint background**. | Paired with `--stop` as text in light (4.14:1). Pair with `--ink2` (6.16:1 / 7.02:1). |
+| `--stop-w` | `#f8e5e3` | `#3a1c19` | Error **tint background**. | Paired with `--stop` as text in light (4.14:1). Pair with `--ink2` (6.16:1 / 7.02:1), `--ink` (13.52:1 / 13.11:1) or `--accent-ink` (6.35:1 / 9.21:1). |
 
 **The rule the three status tints share, stated once:** `--ok`, `--warn`, `--stop` are *signal* colours sized for rails, dots and large numerals. Their `-w` partners are *surfaces*. **A signal colour on its own tint is not a text pairing** — that combination is 3.06:1, 3.63:1 and 4.14:1 in light. The tint carries the tone; `--ink2` carries the words. The cockpit already states this reasoning in a comment at `styles.css:55-57` for `.app-pill`; this row is that reasoning promoted from a comment into a rule.
 
@@ -107,7 +111,7 @@ All figures computed from the token hexes above using WCAG 2.x relative luminanc
 | `--ink3` | **3.80** | **3.72** | FAIL as text — **now used only as ornament** | `.chev`\* only |
 | `--accent-ink` | **7.70** | **9.67** | PASS | `.back`, `.crumb`, `.d-links a`, `.read a`, `.nav-btn.on`, `.i-eyebrow.suggestion` |
 | `--accent` | **4.95** | **7.57** | PASS (thin in light) | `.opp-body summary` |
-| `--stop` | **5.02** | **5.30** | PASS **as declared** — but see §2b-bis, `.i-eyebrow.blocked` renders at `opacity:.85` and lands at 3.91 / 4.17 (D-17) | `.err`, `.status-mini.red`, `.status-line.red`, `.i-eyebrow.blocked` |
+| `--stop` | **5.02** | **5.30** | PASS **as declared** — but see §2b-bis: `.i-eyebrow.blocked` still renders at `opacity:.85` and lands at 3.91 / 4.17 (**D-17, decided 2026-08-13; the `opacity` is removed, restoring 5.02 / 5.30**) | `.err`, `.status-mini.red`, `.status-line.red`, `.i-eyebrow.blocked` |
 | `--warn` | **4.23** | **7.47** | **FAIL light** — no longer used as text | (none since D-16; survives as the `.item.amber` rail, which is non-text) |
 | `--ok` | **3.49** | **8.11** | FAIL light as normal text; **PASS as large text** | only `.t-num` (32px/700) — passes on the large-text threshold, not the normal one |
 
@@ -139,12 +143,22 @@ All figures computed from the token hexes above using WCAG 2.x relative luminanc
 |---|---|---|---|---|
 | `--accent-ink` on `--accent-w` | **6.64** | **8.23** | PASS | `.count`, `.g-count`, `.chip.prog`, `.opp-disp`, `.app-nav-btn.on` |
 | `--ink` on `--ok-w` | **14.39** | **11.77** | PASS — the strongest text pairing in the system | `.act.accept` (since D-11) |
+| `--ink` on `--warn-w` | **14.06** | **11.51** | PASS | **`.home-attn.t-prominent .home-attn-h`, `.rr-chip.t-prominent b`** (added 2026-08-13) |
+| `--ink` on `--stop-w` | **13.52** | **13.11** | PASS | **`.home-attn.t-urgent .home-attn-h`, `.rr-chip.t-urgent b`** (added 2026-08-13) |
 | `--ink2` on `--ok-w` | **6.55** | **6.30** | PASS | `.app-pill.up`, **`.done-pill`, `.chip.ok`** (since D-14) |
-| `--ink2` on `--warn-w` | **6.40** | **6.16** | PASS | `.app-pill.down`, **`.opp-conflict`** (since D-13) |
-| `--ink2` on `--stop-w` | **6.16** | **7.02** | PASS | **`.chip.block`** (since D-15) |
+| `--ink2` on `--warn-w` | **6.40** | **6.16** | PASS | `.app-pill.down`, **`.opp-conflict`**, `.rr-chip.t-prominent`, `.cap-line.t-prominent`, `.home-attn-b` |
+| `--ink2` on `--stop-w` | **6.16** | **7.02** | PASS | **`.chip.block`**, `.rr-chip.t-urgent`, `.cap-line.t-urgent`, `.cap-alert.t-urgent`, `.home-attn-b` |
+| `--accent-ink` on `--warn-w` | **6.60** | **8.09** | PASS | `.home-attn.t-prominent .home-attn-go` (added 2026-08-13) |
+| `--accent-ink` on `--stop-w` | **6.35** | **9.21** | PASS | `.home-attn.t-urgent .home-attn-go` (added 2026-08-13) |
 | `--ok` on `--ok-w` | **3.06** | **6.93** | **FAIL light as text** — PASS as the non-text dot (3:1) | `.chip.ok .d` only |
 | `--warn` on `--warn-w` | **3.63** | **6.25** | **FAIL light as text** — PASS as a non-text ring (3:1) | `.opp-conflict` 1px inset ring |
 | `--stop` on `--stop-w` | **4.14** | **5.05** | **FAIL light as text** — PASS as the non-text dot (3:1) | `.chip.block .d` only |
+
+**Four rows added 2026-08-13 — a documentation gap, not a drift.** `--ink` on `--warn-w` and `--ink` on `--stop-w` were reported by Felix and confirmed by Vera at the WP-B15-42 gate; both were already shipping and neither was in this table. Reading the two call sites to fill the *Used by* column surfaced two more undocumented pairings in the same component (`--accent-ink` on both tints, via `.home-attn-go`), which are recorded here for the same reason. **No token was added and no value changed** — every other figure in §2 is unaffected, and this is not the product of an audit.
+
+All four were **re-derived from the token hexes by the §2d method**, not copied from the report. The derivation was calibrated first against this file's own anchors (`--ink` on `--panel` 16.404 → 16.40 and 13.759 → 13.76; `--accent-ink` on `--panel` 7.699 → 7.70) so that a plausible-looking wrong model could not enter the record. **`contrast-check.mjs` should reproduce all eight figures; if it does not, this block is wrong and not the script.**
+
+**The claim "`--ink` on `--ok-w` is the strongest text pairing in the system" survives** — 14.39 still leads 14.06 and 13.52 in light. It no longer leads in dark, where `--ink` on `--stop-w` (13.11) beats `--ink` on `--ok-w` (11.77). The row is left as written because it was always a light-mode observation; do not quote it as a both-scheme fact.
 
 #### White text on a colour fill
 
@@ -189,16 +203,59 @@ Model: `seen_text = α·declared + (1−α)·backdrop`, and where the element's 
 |---|---|---|---|---|---|
 | `.i-eyebrow.decision` (post-D-16) | `--ink2` on `--panel` | .85 | **5.08** | **5.71** | PASS both — the D-16 fix survives compositing |
 | `.i-eyebrow.suggestion` | `--accent-ink` on `--panel` | .85 | **5.38** | **7.39** | PASS both |
-| `.i-eyebrow.blocked` | `--stop` on `--panel` | .85 | **3.91** | **4.17** | **FAIL both — D-17.** Declared 5.02 / 5.30 passes; composited it does not. |
+| `.i-eyebrow.blocked` | `--stop` on `--panel` | .85 | **3.91** | **4.17** | **FAIL both — D-17. DECIDED 2026-08-13: the `opacity` goes.** Declared 5.02 / 5.30 passes; composited it does not. See the opacity rule below. |
 | `.item.deferred .i-title` | `--ink` on `--panel` | .7 | **6.25** | **7.40** | PASS both |
 | `.item.deferred .i-why` / `.fresh` (post-D-5/D-7) | `--ink2` on `--panel` | .7 | **3.63** | **4.30** | **FAIL both — D-18.** The `--ink3`→`--ink2` lift raised this from 2.41 / 2.49 but did **not** clear the floor. |
 | `.item.deferred .i-eyebrow.blocked` | `--stop` on `--panel` | .85 × .7 = .595 | **2.55** | **2.66** | **FAIL both — D-18 compounded.** The worst rendered text pairing in the cockpit. |
 
 **Rule this establishes: `opacity` is a contrast operation, not a styling flourish.** Any rule that fades text must be measured composited. "Muted" is already a token decision (`--ink2`); reaching for `opacity` *on top of* a muted token double-mutes it and is how a passing token becomes a failing pixel.
 
-### 2c. Defect register — sixteen closed, two newly opened
+#### The opacity rule — normative. Added 2026-08-13 by Iris as the resolution of D-17.
 
-**Status: D-1…D-16 are CLOSED in `services/cockpit/public/styles.css`. D-17 and D-18 are newly OPEN.** The register no longer describes shipping defects for D-1…D-16; it records what they were, what closed them, and the measured evidence. Every figure below comes from `services/cockpit/contrast-check.mjs` and was independently confirmed in a real browser by `services/cockpit/a11y-probe.mjs` (see §2d). **Line numbers are keyed to the post-fix file** — the previous edition's numbers referred to a pre-merge file and were stale.
+> **`opacity` on text expresses STATE. It never expresses HIERARCHY.**
+
+- **Hierarchy** — *"this is the eyebrow, not the title"* — is expressed by **token, size, weight, case and tracking**. Those four are measurable in §2b, they compose predictably, and a reader can reason about them from the declaration. `opacity` is not among them and must not be added to them.
+- **State** — *"this item is deferred"* — **may** use `opacity`, because there the fade *is* the signal and removing it would remove information. A state fade is still governed by this section: measure it composited, and never let it be the only cue.
+
+**The test, applied before any `opacity` on text ships: remove the declaration and ask what information is lost.**
+
+- *"Nothing — it just looks a little heavier"* → it was hierarchy. **It does not belong.** Reach for a lighter token, a smaller size, or a lower weight, all of which §2b can price.
+- *"The user can no longer tell this item is deferred"* → it is state. **It stays**, and its composited figure goes in the table above.
+
+**Why this is the rule and not a per-selector exception.** A fade applied for hierarchy charges an invisible, *unequal* contrast tax across every variant of the faded element — it takes the same 15% from a pairing with 3 points of headroom and from one with none, and only the second one shows up as a defect. That is not a rule anyone can design against. Hierarchy expressed in tokens and type is legible in the declaration and priced in §2b; hierarchy expressed in `opacity` is legible nowhere until someone renders it.
+
+#### D-17 — the decision
+
+**Resolved as: `opacity:.85` is removed from `.i-eyebrow` (`styles.css:328`).** No new token, no scoped override, no change to any token value.
+
+The text carrying the defect is the **"HELD OUT OF THE BASKET"** label — the eyebrow that tells the operator a line is blocked from the basket. Since the Cockpit's three exception areas were consolidated into one primary Exceptions board, that label renders on the surface the operator uses to resolve *every* held line. It is legible today; it is below AA; the fix costs one deleted declaration.
+
+**By the test above, the eyebrow fade is hierarchy, not state.** Removing it loses no information — the eyebrow's de-emphasis is already over-determined by 9.5px, `--mono`, `text-transform:uppercase`, `letter-spacing:.08em`, `font-weight:700` in a small size, and — for `.decision` — the muted token `--ink2` on top of all of that. The 15% fade is the sixth muting mechanism on an element that already had five.
+
+**What the fade actually costs, across all three variants — this is the argument:**
+
+| Variant | Declared | Composited at .85 | Cost |
+|---|---|---|---|
+| `.i-eyebrow.decision` (`--ink2`) | 7.47 / 7.37 | 5.08 / 5.71 | −2.39 / −1.66 — passes on headroom alone |
+| `.i-eyebrow.suggestion` (`--accent-ink`) | 7.70 / 9.67 | 5.38 / 7.39 | −2.32 / −2.28 — passes on headroom alone |
+| `.i-eyebrow.blocked` (`--stop`) | 5.02 / 5.30 | **3.91 / 4.17** | −1.11 / −1.13 — **fails, because `--stop` had no headroom to spend** |
+
+Only one variant fails, and it fails for a reason that has nothing to do with it: `--stop` is the correct token for a blocked state and is simply the darkest-constrained of the three. Two variants survive by luck. **Removing the fade returns all three to their declared, already-documented figures — 5.02 / 5.30, 7.47 / 7.37 and 7.70 / 9.67 — every one of which is in §2b above and every one of which passes.**
+
+**Two alternatives were considered and rejected, recorded so they are not re-proposed:**
+
+1. **A `--stop-ink` token**, on the `--accent` / `--accent-ink` pattern. Rejected. It would add a fourth ink to a palette that already carries **two unfilled ink gaps** (`--ok-ink`, `--warn-ink` — §2a), inventing a new colour decision to preserve a fade that carries no meaning. It would also fix only `.blocked` and leave `.decision` and `.suggestion` paying the same invisible tax. A token earns its place by removing a class of defect; this one would paper over one instance of it.
+2. **A scoped `.i-eyebrow.blocked { opacity:1 }`.** Rejected. It is precisely the per-site special case this Guideline exists to prevent (*"when a violation surfaces a missing token, extend GL-003 rather than special-casing the deliverable"*), and it would leave the eyebrow row internally inconsistent — two variants faded, one not, for a reason visible only in a contrast table.
+
+**Effect on D-18 — a partial mitigation, explicitly NOT a closure.** `.i-eyebrow` and `.item.deferred` nest, so a blocked eyebrow inside a deferred item currently composites at α = .85 × .7 = .595 → **2.55 / 2.66**, the worst rendered text pairing in the cockpit. With the eyebrow fade gone it composites at α = .7 → **3.06 / 3.21** (Iris-derived; to be confirmed by the §2d tools on implementation). Better by half a point, **still below the 4.5 floor. D-18 remains OPEN.**
+
+And the rule above says why D-18 cannot be closed the same way: **`.item.deferred`'s fade is state.** Deferring *is* signalled by the fade, so removing it would remove information — the legitimate case. D-18's resolution therefore has to come from somewhere else (a non-fade deferred treatment, or a per-state ink), and it remains an open decision for Iris. **Do not "fix" D-18 by deleting `opacity:.7`.**
+
+**Implementation is not Iris's.** This decision changes `services/cockpit/public/styles.css`; Iris authors the system and does not edit the surface. The change is a single deletion of `opacity:.85` from the `.i-eyebrow` rule, and it must be re-measured in **both** schemes by both §2d tools before D-17 is marked closed. Until that lands, D-17 is **DECIDED, implementation outstanding** — not closed.
+
+### 2c. Defect register — sixteen closed, one decided, one open
+
+**Status: D-1…D-16 are CLOSED in `services/cockpit/public/styles.css`. D-17 is DECIDED (2026-08-13) with its implementation outstanding. D-18 is OPEN.** The register no longer describes shipping defects for D-1…D-16; it records what they were, what closed them, and the measured evidence. Every figure below comes from `services/cockpit/contrast-check.mjs` and was independently confirmed in a real browser by `services/cockpit/a11y-probe.mjs` (see §2d). **Line numbers are keyed to the post-fix file** — the previous edition's numbers referred to a pre-merge file and were stale.
 
 Severity per [[SOP-007-audit-content-for-design-system-compliance]] §Step 4, weighted by whether the text is on a primary reading path.
 
@@ -238,16 +295,18 @@ These did **not** share one fix. Three moved to a tint, one needed a per-scheme 
 
 **`.app-blurb` (L54) was NOT touched.** It was listed for deletion as a redundant scoped override; it is not one. No other rule sets `.app-blurb`'s colour, so removing `color:var(--ink2)` would drop it to inherited `--ink` — a visual change, not a no-op. Its 6.59 / 8.34 already passes.
 
-#### Open: D-17, D-18 — opacity compositing
+#### D-17 (decided, unimplemented) and D-18 (open) — opacity compositing
 
-**These are new. They are not fixed, and they were not visible to a token-level audit** — both are cases where the *declared* pairing passes or nearly passes and the *rendered* pairing does not. Evidence and the compositing model are in §2b-bis.
+**Neither is fixed in shipping CSS, and neither was visible to a token-level audit** — both are cases where the *declared* pairing passes or nearly passes and the *rendered* pairing does not. Evidence and the compositing model are in §2b-bis; **the D-17 decision and its full reasoning are in §2b-bis §"D-17 — the decision" and are not restated here.**
 
 | ID | Rule (`styles.css`) | Declared | Composited Light | Composited Dark | Sev | Note |
 |---|---|---|---|---|---|---|
-| **D-17** | `.i-eyebrow` `opacity:.85` (L139) applied to `.i-eyebrow.blocked` (L145) | `--stop` on `--panel` — 5.02 / 5.30, **passes** | **3.91** | **4.17** | MEDIUM | The `opacity:.85` on `.i-eyebrow` pushes an otherwise-compliant pairing under the floor. `.decision` (post-D-16) and `.suggestion` both survive compositing; only `.blocked` fails. Cheapest honest fix is dropping `opacity` from `.i-eyebrow` — but that is a visual-weight decision, so it is **Iris's call, not a passing change**. |
-| **D-18** | `.item.deferred` `opacity:.7` (L137) | `--ink2` on `--panel` — 7.47 / 7.37, **passes** | **3.63** (`.i-why`, `.fresh`) · **2.55** (`.i-eyebrow.blocked`, α=.595) | **4.30** · **2.66** | MEDIUM | `opacity:.7` on the whole card fades text *and* card together. The D-5/D-7 lift improved this from 2.41 / 2.49 to 3.63 / 4.30 but **did not clear the floor** — so D-5 and D-7 are closed for normal items and **remain open for deferred ones**. `.i-title` (`--ink`) survives at 6.25 / 7.40. Deferring is a *state*, and fading is how it is signalled; making it accessible without losing that signal is a design decision for Iris. |
+| **D-17** | `.i-eyebrow` `opacity:.85` (L328) applied to `.i-eyebrow.blocked` (L334) | `--stop` on `--panel` — 5.02 / 5.30, **passes** | **3.91** | **4.17** | MEDIUM ↑ **HIGH** | **DECIDED 2026-08-13 — remove `opacity:.85` from `.i-eyebrow`.** Reasoning and rejected alternatives in §2b-bis. Priority raised from MEDIUM: the text is the **"HELD OUT OF THE BASKET"** label, and the consolidation of three exception areas into one primary Exceptions board (WP-B15-42) moved it onto the surface the operator uses to resolve every held line. **Not a regression** — the new markup reuses a class that already carried the defect; no `opacity` was introduced by that work. **Implementation is outstanding in `styles.css` and is not Iris's to make.** |
+| **D-18** | `.item.deferred` `opacity:.7` (L326) | `--ink2` on `--panel` — 7.47 / 7.37, **passes** | **3.63** (`.i-why`, `.fresh`) · **2.55** (`.i-eyebrow.blocked`, α=.595) | **4.30** · **2.66** | MEDIUM | **OPEN.** `opacity:.7` on the whole card fades text *and* card together. The D-5/D-7 lift improved this from 2.41 / 2.49 to 3.63 / 4.30 but **did not clear the floor** — so D-5 and D-7 are closed for normal items and **remain open for deferred ones**. `.i-title` (`--ink`) survives at 6.25 / 7.40. **Implementing D-17 lifts the compounded eyebrow row from 2.55 / 2.66 to 3.06 / 3.21 — a mitigation, not a closure.** Deferring is a *state* and the fade **is** the signal, so §2b-bis's opacity rule explicitly protects it: **do not close D-18 by deleting `opacity:.7`.** Its resolution needs a non-fade deferred treatment or a per-state ink, and remains a design decision for Iris. |
 
-**Count: 16 closed, 2 open.** The sixteen closed cleanly with no new colour token. The two open ones are a *different class of defect* — not "wrong token chosen" but "correct token, then faded" — which is why the original audit could not see them: it read declarations, and `opacity` does not appear in a declaration's colour.
+**Count: 16 closed, 1 decided-not-yet-implemented, 1 open.** The sixteen closed cleanly with no new colour token; D-17 will close the same way, with no new colour token. The last two are a *different class of defect* — not "wrong token chosen" but "correct token, then faded" — which is why the original audit could not see them: it read declarations, and `opacity` does not appear in a declaration's colour.
+
+**Recorded 2026-08-13, because it is evidence the exclusion list earns its keep.** Vera's WP-B15-42 browser probe raised `.crumb-sep` (3.36) and `.chev` (3.80) as contrast failures. **Both were correctly overruled by the "Legitimate `--ink3` uses" list below** — they are ornament governed by the 3:1 non-text floor, not text. Two false positives stopped before they became work. Anyone tempted to trim that list should read this line first: an exclusion list with a stated *reason* per entry is what lets a machine-generated failure be dismissed on evidence rather than on someone's memory.
 
 **The lesson worth keeping:** the first audit found the token misuse; only measuring the *rendered* result found the compositing. A design-system audit that stops at declared token pairings is incomplete by construction.
 
@@ -376,7 +435,8 @@ Until then, any agent writing copy for a cockpit-adjacent deliverable works in *
 - **At session start, every creative agent reads this Guideline.** Charta and Pixel always; Iris on every authoring or audit task.
 - **Read the §Status fill table first.** Sections marked `<unset>` are not pinned. Do not improvise them — either route to Iris via [[SOP-006-author-a-design-system]], or work in flagged fallback mode and note "GL-003 §X not populated" in the deliverable.
 - **Before shipping any text-on-colour pairing, check §2b.** If the pairing is not in the table, compute it with §2d and bring the number — do not estimate, and do not infer one scheme's figure from the other.
-- **§2c is an open register, not history.** The cockpit currently ships 16 measured sub-AA pairings. Do not describe the system as compliant, and do not copy a defective pairing into a new deliverable on the grounds that it is already in use.
+- **§2c is an open register, not history.** As of 2026-08-13 the cockpit ships **two** measured sub-AA rendered pairings (D-17, decided but not yet implemented; D-18, open) — the original sixteen are closed. Do not describe the system as compliant, and do not copy a defective pairing into a new deliverable on the grounds that it is already in use.
+- **`opacity` on text is governed, not free.** §2b-bis is normative: `opacity` expresses **state**, never **hierarchy**. Before shipping any faded text, apply the removal test in that section and measure the composited result — a declared pairing in §2b tells you nothing about a faded one.
 - **When a violation surfaces a missing token, extend GL-003** rather than special-casing the deliverable. `--ink3`-as-body-text is the canonical example: the answer is a token-role rule, not a per-component patch.
 - **When this Guideline evolves,** in-flight deliverables that referenced the changed section are flagged for re-render. Older deliverables become stale candidates and get re-rendered next time they are touched (boy-scout rule), not bulk-rebuilt on the spot.
 - **Audit cadence.** Iris runs [[SOP-007-audit-content-for-design-system-compliance]] on request, when a token is added, or when drift is suspected. The audit names violations; the user decides which to fix.

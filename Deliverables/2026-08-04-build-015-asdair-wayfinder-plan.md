@@ -2333,6 +2333,67 @@ describes**, while `inventedFreeGeneration` absorbs three different mechanisms u
 unconstrained invention on a closed-enum run. Recorded as an observation. **No Work Order. Vision stays
 parked.** Band 7 flags itself via `lookAgainRegions: [5,7]` and **nothing downstream consumes that flag.**
 
+### 🟡 VERA GATE ON LANE D — **CONDITIONAL PASS** at `152e4a0`. Two conditions, both back with Felix.
+
+**She re-ran Larry's whole quoted evidence list herself and all of it reproduced** — 48/136/0, 10/10,
+template, nav, sw-version, clone-portability, asdair-checklist, secret-scan 43 files — **except one stale
+literal, which was Larry's pass-through, not Felix's error** (V-6: the cache version had moved because
+Felix's own next commit touched `app.js`, which is in `SHELL`; `sw-version-check` mutation-proves the
+invalidation property, so **no product defect**).
+
+**V-1 — HIGH. Two contradictory "needs you" counts, 49px apart, above the fold.** Measured at 375px on the
+Exceptions board: `"1 decision still needs you."` at 332px, and `"2 need you"` at 381–407px. `app.js:2921`
+counts open API questions; `:2944-2953` counts questions **plus held lines with no routed question**. **Two
+populations, one screen — on the very board built to stop Warwick inferring from several counters.** It also
+falsifies the code's own comment at `:656-657` claiming the two are *"unable to contradict each other"*;
+that guarantee holds for the Shop screen, not across this pair. **No wrong shop results — the rows are
+correct and complete — but Warwick reads a screen, not a data model.**
+
+**V-2 — MEDIUM. Brand-list rows are disclosures with no visible affordance.** `SUMMARY_COUNT=4,
+WITH_VISIBLE_MARKER=0` at all three breakpoints. Not a WCAG failure (focus ring measured real at 4.95:1,
+native `<details>` exposes state to AT) — **design-system drift**: `.chev` is this cockpit's affordance glyph
+and is already used on six other row types, **including elsewhere on the same screen**. AC5's
+provenance-on-expansion currently sits behind an unmarked control.
+
+**V-3 — routed to IRIS, explicitly NOT Felix's.** `.i-eyebrow.blocked` at `opacity:.85` composites to
+**3.91 light / 4.17 dark**, below AA — and the text carrying it is **"HELD OUT OF THE BASKET"**. This is
+GL-003's open **D-17**; Felix's new CSS introduces no `opacity` and the new markup reuses a class that
+already carried the defect. **Not a regression. Its priority rose because three exception areas became one
+primary board**, so it now renders where Warwick resolves every held line.
+
+**⭐ VERA VERIFIED THE THINGS LARRY MOST NEEDED VERIFIED, by running them rather than reading them:**
+across all **37 AsdAIr scenarios** — zero `ZZ`, zero `undefined`, zero `NaN`, zero `[object Object]`, zero
+bare `null`; `product: null` renders `list_item_name`, never a null. The vocabulary detector **was made to
+fail**: `--self-test` catches **10/10 mutations plus 2 negative controls**, including both the ZZ and the
+VERIFIED injections, and exactly **one** verify-word line survives estate-wide — the sanctioned caveat,
+matched by identity. And `39/53/31/30` appear **only inside comments**; zero in executable code.
+
+**Honesty note she volunteered rather than papered over:** she reproduced the **light** scheme only. She
+closed the gap by proving both `prefers-color-scheme: dark` blocks contain **zero layout properties** — so
+the layout, tap-target, overflow and semantics evidence governs both — and evidenced dark *colour*
+arithmetically against six independently-pinned GL-003 figures. **But she did not render dark in a browser,
+and says Felix's claim that he did is not something she can corroborate.**
+
+**On `.as-remember`, she and Felix agree and Larry concurs:** the **disabled** state is **ACCEPTED** — it
+renders the offer, disables the control, and explains why. The **enabled** state is **CAPABILITY ONLY** and
+cannot be accepted until a real production command exists. *Felix labelled it that way before anyone asked.*
+
+**Vera's process note, owned rather than hidden — and Larry's ruling: ACCEPTED.** She did not return a
+read-back before inspecting, judging the round-trip cost to exceed the risk on a **read-only re-inspection**
+against a named head, surface and breakpoint set. **That is a sound judgement for this round** and she
+flagged it for overruling rather than hoping it passed. Had it been a first dispatch, or had she needed to
+write anything, the hold would have been required.
+
+**⚠️ AND THE RECORD-KEEPING DEFECT IS CONFIRMED AS LARRY'S:** she could not verify the previous round's
+conditions were discharged, *"because there is no durable record of what they were."* Her CONDITIONAL PASS
+was returned inline and never written to a receipt. **The fix is a written receipt, not another review.**
+
+**Two methodology facts worth carrying estate-wide:** `nav-check.mjs` binds **port 8099** and exits 1 with
+`EADDRINUSE` if another gate's probe holds it — **a concurrency artefact, not a product failure**. And
+GL-003 §2c's *"do not fix these"* list **correctly overruled two of her own probe's contrast readings**
+(`.crumb-sep` 3.36, `.chev` 3.80, both ornaments under the 3:1 floor) — evidence that the exclusion list
+earns its place.
+
 ### ✅ LANE F COMPLETE — **`de8560b`** on `build-015/b15-39-browser-handoff`. 11 files, 0 outside surface. **NOT accepted.**
 
 **`14/14 mutants killed, ZERO SURVIVORS`** (baseline 9/9). The five new ones by name: `emissionGateIgnored` ·
