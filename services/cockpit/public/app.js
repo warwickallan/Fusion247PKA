@@ -962,18 +962,23 @@ createApp({
       return null;
     }
 
-    // ---- The FINAL LIST seam — TWO recognised shapes, both declared -----------------------------
-    // ⚠️ ASSUMPTION, REPORTED, AND STATED ON SCREEN. Lane C (WP-B15-41) had not started when this was
-    // built, so there is no published endpoint for the reconciled list. Two shapes are recognised,
-    // in this order, and the one that answered is named in Diagnostics and on the list screen:
+    // ---- The FINAL LIST seam — TWO recognised shapes, and which one is the DESIGN ---------------
+    // ⛔ CORRECTED 2026-08-13 AFTER LANE C ESTABLISHED THIS BY EXECUTION, and the correction matters
+    // because the obvious reading of the code is now the wrong one.
     //
-    //   'packet'  services/asdair/cockpit-api/readPacket.js — the DOCUMENTED contract. Already
-    //             publishes brand_display / has_brand / required_quantity_display / held[] and
-    //             asserts its own Brand A-Z sort. Primary.
-    //   'final'   the shape the REAL reconciled artefact actually has today
+    //   'final'   ⭐ THE LIVE ROUTE AND THE DESIGN. The shape the REAL reconciled artefact has
     //             (services/asdair/pipeline/finalise/out/final-shopping-list.json, WP-B15-37):
     //             lines[] with brand / product / quantity / provenance_detail / held_reason /
-    //             routed_question, plus totals and a skipped[] carrying human reasons.
+    //             routed_question, plus totals and a skipped[] carrying human reasons. Carried on
+    //             the workspace payload, which is served today.
+    //
+    //   'packet'  services/asdair/cockpit-api/readPacket.js. Read FIRST only because it is strictly
+    //             richer where it exists — but it DOES NOT EXIST AND IS NOT ARRIVING. Lane C
+    //             established that `asdair.execution_packet` is not among the database's 31 tables,
+    //             NO migration creates it, and NO producer exists in the estate on any branch. So
+    //             readPacket correctly and permanently answers packet_state:'not_built', packet:null,
+    //             and this branch never fires. It is kept as a correct-if-it-ever-lands path, NOT as
+    //             the primary route, and nothing on this screen may wait on it.
     //
     // ⛔ NEITHER route may invent a line. With both absent the screen renders an honest gap naming
     // what is missing. A plausible-looking shopping list that did not come from real reconciliation
@@ -1058,7 +1063,13 @@ createApp({
         exception: o.shoppable === false,
         heldReason: reason ? (asdairSaid(o.reason_meaning, null) || ASDAIR_HELD_REASON[reason] || reason) : null,
         heldDetail: asdairSaid(o.held_detail, null),
-        questionKey: asdairSaid(o.routed_question, null),
+        // ⭐ THE JOIN KEY, AND IT IS LIVE TODAY. This is a `shop_question.question_key` — the same
+        // value `assembleWorkspace.buildQuestions` already publishes as `question_key` on every
+        // question item. The reconciled artefact spells it `routed_question`; Lane C is additionally
+        // carrying it as `question_key` on held and blocked workspace lines. BOTH spellings are
+        // accepted because they are the same identifier under two names, and accepting only one
+        // would make the board's join depend on which producer happened to write the row.
+        questionKey: asdairSaid(o.routed_question, asdairSaid(o.question_key, null)),
         incomplete: false,
       };
     }
@@ -1197,10 +1208,17 @@ createApp({
     // should not have to ask Larry. This is ONE board, and the Shop screen now points AT it rather
     // than rendering a second copy of it.
     //
-    // Held lines join to their question by `routed_question` -> `question_key`. ⚠️ ASSUMPTION,
-    // REPORTED: readPacket.js's held[] does NOT publish that key today (Lane C is adding it). The
-    // board therefore works WITHOUT the join — an unjoined held line becomes its own entry that says
-    // plainly no question was routed for it — and improves the moment the key arrives.
+    // ⭐ THE JOIN IS LIVE, NOT PENDING. Held lines join to their question by `routed_question` (or
+    // `question_key`) -> the workspace question's own `question_key`, which
+    // `assembleWorkspace.buildQuestions` publishes on every item today. This needs nothing from any
+    // other lane.
+    //
+    // ⛔ AND THE UNJOINED PATH IS THE DESIGN, NOT A WORKAROUND — corrected after Lane C established
+    // that the packet route this was originally hedged against is never arriving. A held line can
+    // legitimately carry no question: the planner held it without routing a decision. That entry
+    // becomes its own board row saying plainly there is nothing to answer yet, because the
+    // alternative is either hiding the line or offering a control that does nothing. Both are worse
+    // than saying so. Treat this branch as permanent.
     const asdairHeldByQuestion = computed(() => {
       const m = new Map();
       for (const r of asdairListExceptionRows.value) if (r.questionKey) m.set(r.questionKey, r);

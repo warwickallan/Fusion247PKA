@@ -37,10 +37,29 @@ Larry. The board is now the Questions screen (relabelled **Exceptions**); Shop a
 **route** to it and render no controls of their own. The deleted "Held back" block has a comment
 where it stood saying why, because the next person will otherwise "restore" it.
 
-**Held lines join their question by `routed_question` → `question_key`.** `readPacket.js` does not
-publish that key yet (Lane C is adding it), so the board works **without** the join — an unjoined
-held line becomes its own entry that says plainly no question was routed for it — and improves when
-the key lands. Built to degrade, not to wait.
+**Held lines join their question by `routed_question` → `question_key`, and that join is LIVE.**
+
+⛔ **Corrected mid-build, and the correction is the durable part.** I was told the key would arrive
+from Lane C on `/asdair/packet`. Lane C established by execution that it never will:
+`asdair.execution_packet` **is not among the database's 31 tables, no migration creates it, and no
+producer exists on any branch**, so `readPacket` correctly and permanently answers
+`packet_state: 'not_built'`. **The key I was promised does not arrive.**
+
+The key I actually need was already live on a different endpoint: **`question_key` on
+`/asdair/workspace`**, published by `assembleWorkspace.buildQuestions` on every item, matching the
+`routed_question` the finalise artefact carries on all held lines. So the workspace route is the
+**design**, not a fallback, and the packet branch is kept only as a correct-if-it-ever-lands path
+that never fires.
+
+**The generalisable bit: "build to degrade" and "build to wait" look identical in the code and are
+opposite in intent.** My unjoined-held branch was written as a temporary accommodation and is in
+fact permanent — a planner can legitimately hold a line without routing a decision. Once I knew
+that, the comment had to change even though not one line of logic did. **A branch whose comment
+says "until X arrives" is a bug when X is not coming**, because the next reader deletes it.
+
+Both spellings of the identifier are accepted (`routed_question` and `question_key`) — they are the
+same `shop_question.question_key` under two names, and accepting only one would make the join depend
+on which producer happened to write the row.
 
 ## The detector, and why it is not a sweep
 
@@ -75,6 +94,16 @@ sentence.
 **Both are the same failure: a control that reports success without having done anything.** The tell
 in each case was a value that should have been impossible — `has-corroborated = no` on a screen whose
 whole job is corroboration, and a guard whose message never appeared.
+
+**A third, from the same family, in an assertion rather than a control.** The join scenario's second
+assertion took three attempts, and both failures are ways of passing for the wrong reason:
+`"HELD OUT OF THE BASKET" is present` stayed **green under a broken join**, because a failed join
+produces an unjoined entry carrying the same eyebrow; then `the unjoined sentence is ABSENT` went
+**red on correct code**, because the fixture also holds a second, legitimately unjoined line and a
+whole-screen text check cannot see *which row* carried the sentence. What discriminates is the
+**count** — 2 entries when the join collapses line into question, 3 when it does not. **An assertion
+over whole-screen text cannot distinguish two rows of the same shape; when it must, assert the
+number the mechanism actually moves.**
 
 ## The backtick trap, twice in one WP
 

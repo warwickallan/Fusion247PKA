@@ -602,6 +602,16 @@ const WS_STALE = ws({ human_state: 'ASDAIR_WORKING' }, {
       ? { ...l, routed_question: 'q_placeholder_2' } : l)) },
   questions: { ...WS.questions, open_count_display: '0', items: [] },
 });
+// ⭐ THE SAME JOIN, SPELLED THE OTHER WAY. The reconciled artefact writes `routed_question`; Lane C
+// additionally carries the identifier as `question_key` on held workspace lines. They are the same
+// `shop_question.question_key` under two names, so the board must join on either — accepting only
+// one would make the join depend on which producer happened to write the row.
+const WS_BOARD_QKEY = ws({ human_state: 'NEEDS_WARWICK' }, {
+  final_list: { ...FINAL_LIST,
+    lines: FINAL_LIST.lines.map((l) => (l.routed_question === 'q_placeholder_1'
+      ? { ...l, routed_question: null, question_key: 'q_placeholder_1' } : l)) },
+  questions: { ...WS.questions, open_count_display: '1', items: [WS.questions.items[0]] },
+});
 // The API publishing a remember command — the only thing that may enable the durable-knowledge
 // offer. Without it the control is rendered DISABLED and says why; it is never hidden, because
 // Warwick is owed the knowledge that the choice exists.
@@ -790,6 +800,23 @@ const ASDAIR_PLAN = [
           (p) => hasText(p, 'hasn’t routed a question for it')],
         ['⛔ the ZZ sort sentinel never reaches the board either',
           (p) => !p.some((s) => /ZZ/.test(s))],
+      ]],
+    ['EXCEPTIONS · the join spelled question_key instead of routed_question', 'questions',
+      { asdairWs: WS_BOARD_QKEY, asdairWsErr: null }, {}, [
+        ['the SAME identifier under the other name still joins line to question',
+          (p) => hasText(p, 'Read from the list as “1 BAG SYNTHETIC SWEETS”.')],
+        // ⛔ THIS ASSERTION TOOK THREE ATTEMPTS AND BOTH FAILURES ARE WORTH RECORDING, because each
+        // is a way of passing for the wrong reason:
+        //   1. "HELD OUT OF THE BASKET is present" stayed GREEN under a broken join — a failed join
+        //      makes an unjoined held entry carrying the same eyebrow. Vacuous.
+        //   2. "the unjoined sentence is ABSENT" went RED on correct code — this fixture also has a
+        //      second, legitimately unjoined held line, so that sentence is on screen either way.
+        //      A whole-screen text check cannot see WHICH row carried it.
+        // What discriminates is the COUNT. Joined: one question entry (carrying its line) plus one
+        // unjoined held = 2. Broken: one question entry plus TWO unjoined held = 3. The join is the
+        // only thing that moves that number.
+        ['⛔ and the join COLLAPSES line into question — 2 entries need him, not 3',
+          (p) => valueAfter(p, 'Needs you') === '2'],
       ]],
     // AC2 — the durable-knowledge offer. Both halves: no command, and a published command.
     ['EXCEPTIONS · remember-this offer with NO command published', 'questions',
