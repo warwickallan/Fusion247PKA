@@ -2386,6 +2386,72 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### ✅ MUM'S COCKPIT EXISTS — **`f4dd69f`** on `build-015/b15-45-mum-cockpit-view`. **With Vera. ONE integration step is Larry's.**
+
+**⚠️ THE ROUTE WARWICK ASKED FOR, and the honest caveat:**
+`https://<the existing cockpit ts.net host>:8443/shopping.html` — same tailnet host and port the Cockpit
+already uses; locally `http://127.0.0.1:8090/shopping.html`.
+**It returns 404 today.** Felix established this rather than assuming it: the live Cockpit serves from
+`C:\Fusion247PKA`, and her files are in the worktree. **Her three files are static under `public/`, so once
+the branch reaches the live checkout they are live on save with no restart.** *His own rule: a correct edit
+that never reaches the user is indistinguishable from no edit.*
+
+**Separate by construction, not by care.** Her page loads **no operator bundle**, so there is no control to
+switch out of her view. **And he deliberately did NOT link Warwick's manifest** — its `name` is "Fusion247
+Cockpit", so adding her page to a home screen would have put **the banned word under her finger via the
+launcher.** *That is the kind of leak a checklist never catches.*
+
+| Gate | Result |
+|---|---|
+| `render-vm-check` | **58 scenarios / 180 assertions / 0 failed** (baseline 48/140/0) |
+| `--self-test` | **18/18 caught** (baseline 11/11) — all 7 household-vocabulary rules made to fail |
+| `shopping-geometry-check` (NEW) | **7 viewports, real browser, 0 violations**; self-test **6/6** |
+| secret-scan | exit 0, 47 files |
+
+Measured in a real browser at 1280×800, 1024×600, 800×1280, 600×1024, **both at 200% zoom**, and 320px
+reflow: **min tap target 88px · gutter 24–48px · min text 22px · worst rendered contrast 7.08:1**, zero faded
+text, no horizontal overflow.
+
+**⭐ TWO DEFECTS ONLY THE BROWSER COULD SEE, and both are the class that keeps recurring here.**
+`.q-btn { width: 88px }` **rendered at 82×88** — flex items default to `flex-shrink: 1`, so **a declared
+width is a preference, and a floor that compresses is not a floor.** And a sticky footer **buried "Add
+something else" at 800×1280**, because the padding was correct arithmetic for a one-line footer and portrait
+produces two. **Neither was a typo. Both were correct-looking declarations whose RESULT was wrong** — the
+same class as GL-003's opacity compositing. *He promoted the measurement from a throwaway into a committed
+gate rather than reporting "I measured it once."*
+
+**⭐ AND HIS SELF-TEST CAUGHT HIM TWICE MORE.** Two of his first mutations **could never fire** (`::after`
+content is not in `innerText`; zero padding makes the page *shorter*), and an IIFE-less `const` at CDP top
+level silently broke all seven — **two assertions would have been vacuous while reporting a clean catch
+rate.** The footer-overlap assertion ships with **no mutation, recorded as such**, because every synthetic
+one either pushed the control below the fold or tripped a different assertion first: *"a catch for the wrong
+reason is worse than none."*
+
+**The naming derivation, loud as instructed:** `aka[0]` capitalised → else `name_display` → else **the row is
+omitted and counted — never blank, never invented.** The third fixture renders **"Placeholder Orange Juice
+1L"** exactly where her word for it should be. **Addendum E criterion 2 CANNOT PASS** until a curated
+`display_name` column exists. *That is backend work, and the screen asks the question better than Larry
+could have.*
+
+**⛔ ADDENDUM E — ALL FOURTEEN MUM ROWS ARE `HOLD` BY CONSTRUCTION, NOT BY OMISSION.** They need her hands,
+her eyes, her words, on her tablet, **across three sessions on three different days** (§0.2). Row 10 is
+untestable in a single sitting *by definition*. Row 9 fails on DEV grounds — **no durable record to read
+back, because there is no write path.** Row 11 is partial: Felix has **not** handed over the failure-mode
+enumeration E requires, and **an un-enumerated surface is itself a FAIL of that row** — he said so rather
+than letting it pass quietly.
+
+**Not built, named rather than implied:** S2–S5 as screens · offline behaviour · **any write path** · a
+manifest of her own. **The send action renders to spec and states plainly that sending is not finished and
+nothing was lost. It never shows success.**
+
+**⚠️ ALL GEOMETRY IS CHROMIUM — NOT SILK, NOT HER TABLET.** Addendum A's five device checks are unrun,
+including the **Tailscale power-cycle test with the kill-switch OFF**, which Felix names as **the only
+finding with product-failure potential.**
+
+**Owed and parked:** his session log (`Team Knowledge/session-logs/` is outside this order's surface — his
+contract requires it, the order forbade it; **Larry to release**) · `provenance-check` **fails identically at
+untouched `111c8cd`**, proven pre-existing by stash-rerun-restore.
+
 ### 🔴 LANE J REFUSED — correctly, on six findings. **Three are Larry repeating himself.**
 
 **🥇 M1 — THE FINDING THAT WOULD HAVE WRECKED THE RESULT, and it is the one Larry asked for and did not
