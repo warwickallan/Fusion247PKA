@@ -2322,7 +2322,56 @@ got that on your list"* — and **NOT an interrogation.** `needs_confirmation` a
 **go through**, and Warwick answers downstream exactly as he does for his own lists. *A check that stops an
 84-year-old to adjudicate a catalogue match would be a defect, not diligence.*
 
-### 🔴 MERGE HOLD ON FELIX'S UI — **built, green, committed, and DELIBERATELY NOT MERGED.** Established by execution.
+### ✅ MERGE HOLD LIFTED AND BOTH LANES INTEGRATED — **the write/action path is COMPLETE and LIVE.** *(Block superseded in place, not appended to.)*
+
+**All three Work Packages are merged into local `main`.** WP-B15-48 (the write door) · WP-B15-50 (the
+sense-check + notification) · WP-B15-49 (Mum's SEND). **The hold was satisfied the moment WP-B15-50 landed,
+which is exactly what it was for** — her page reads `recorded_new` and sends `extras`, and against the
+earlier route both were absent.
+
+**Proven live over the tailnet, through the path her browser takes, after restarting BOTH services:**
+
+| Probe | Result |
+|---|---|
+| `http://warwick-yoga/shopping.html` | **200** |
+| her page carries the confirm + `notified` logic | **52 matches in the served bytes** |
+| the retired *"that part isn't finished"* copy | **0 occurrences — gone from the live surface** |
+| `POST /api/asdair/list` `{"items":[]}` | **400 `list_empty`**, contract's JSON error shape, nothing written |
+| `POST /api/asdair/check-item` `"milk"` | **`matched` → "Cravendale Arla Filtered Fresh Semi Skimmed Milk 2L"** |
+| `"richmond"` · `"lenor"` · `"bread"` | **matched** · `"bananas"` → **`unmatched_new_item`** |
+| `"ariel pods"` (genuinely ambiguous) | **`needs_confirmation`, and 0 responses carry a candidate list** |
+
+**⚠️ `"cravendale"` typed alone returns `unmatched_new_item` even though she has it** — the brand is not one
+of that product's aliases. **Catalogue curation, not a defect**, and recorded rather than actioned.
+
+### 🔴 THE ONE THING BLOCKED ON WARWICK — `SHOPPER_CHAT_ID`. Asked at `message_id 531`.
+
+**`SHOPPER_BOT_TOKEN` is set; `SHOPPER_CHAT_ID` is set nowhere.** So the notification has **no destination**.
+
+**Keel's `validateConfig` REFUSED TO START the service on that half-configuration** — deliberately, so it
+could not accept Mum's list and discover at send time that Warwick could not be told. **The control worked
+on its first live boot.** Larry restarted with notifications explicitly disabled so her Cockpit was not left
+down; the service now warns loudly and every submission reports `notify_not_configured`.
+
+> **Larry could derive it from `SHOPPER_ALLOWED_USER_IDS` and it is almost certainly the same number. He has
+> NOT.** Sending a Telegram message to a guessed destination is an outward action, and a wrong guess sends
+> Warwick's shopping to a stranger. **One line from Warwick settles it either way.**
+
+### ⚠️ WHAT IS NOT PROVEN, STATED AS PLAINLY AS THE BUILDERS STATED IT
+
+- **The real Telegram send has NEVER been exercised. `BUILT-NOT-VERIFIED`.** Every proof used an injected
+  `fetch`; nothing contacted `api.telegram.org` and nothing read the token. **What is proven is wiring,
+  trigger conditions, message content, failure handling and counts — not that a message reached a phone.**
+- **No real submission has been made.** The end-to-end proof needs **one real action from Mum on the tablet**,
+  which is the single exact action Warwick pre-authorised asking for. **No shop has been fabricated in live
+  data to tick a box.**
+- **Everything measured is Chromium, NOT Silk, NOT her tablet** — the geometry gate says so in its own output.
+- **Neither Vera nor Veritas has gated any of this.** Both builders' returns are explicitly labelled
+  *builder self-test evidence — NOT independent review*, and that labelling is respected here.
+- **`render-check.mjs` still carries the false-green hole** — it loads whatever answers the URL, which is how
+  it silently measured the live Cockpit for Felix. Outside both surfaces; reported, not fixed.
+
+### 🔴 SUPERSEDED CONTEXT — the hold that was lifted, retained because it explains WHY the sequencing existed
 
 **WP-B15-49 is DONE at `42bdfcc` on `build-015/b15-49-mum-send-action`** — all four gates green together
 (geometry **70 states / 0 violations**, self-test **15/15 across 70**, send-cases **10/10**, render-vm-check
