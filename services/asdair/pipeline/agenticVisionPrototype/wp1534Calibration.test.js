@@ -17,6 +17,7 @@ import {
   PROVENANCE, MIN_POSITIONED_FOR_DEGENERACY, POSITION_TOLERANCE_PITCH_FRACTION,
 } from './visualEvidenceGate.js';
 import { clearResolvedNeedsHuman, buildBandPrompt } from './bandInspection.js';
+import { scoreMetricFamilies } from './twoLayerScore.js';
 import { buildLineSchema, ASK_FOR_BAND_POSITION } from './lineSchema.js';
 import { NEEDS_HUMAN } from './groundLines.js';
 
@@ -386,6 +387,78 @@ test('AC3 INVARIANT MUTATION: the "never adds" assertion actually fires', () => 
   // reasons is precisely the stale bare-boolean shape WP-B15-33 replaced.
   const out = clearResolvedNeedsHuman([line({ needs_human: true, needs_human_reasons: [] })]);
   assert.equal(out.lines[0].needs_human, false, 'needs_human is DERIVED from the reasons, never an independent flag');
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// AC5 - A MERGE IS ONLY "INCORRECT" IF A PURCHASE ACTUALLY WENT MISSING
+// ═══════════════════════════════════════════════════════════════════════
+
+const FIXTURE = {
+  lines: [
+    { page_order: 2, source_text: '1 x 6pts ASDA SEMI Skimmed MiLk', expected_quantity: 1, identity_established: true, product_id: '2' },
+    { page_order: 5, source_text: '1 MASHED POTATO', expected_quantity: 1, identity_established: true, product_id: '5' },
+  ],
+};
+const answer = (over = {}) => ({
+  as_written: '', product_id: '5', identified: true, quantity: 1, source_region: 2,
+  needs_human: false, needs_human_reasons: [], ...over,
+});
+
+const dupes = (merges, accepted) => scoreMetricFamilies({
+  accepted, merges, duplicateGroups: [], rawObservationCount: accepted.length,
+  fixture: FIXTURE, gateCounts: null, enumClosed: true,
+}).families.duplicates;
+
+test('AC5 PROOF: the ASDA POTATO shape is a MISREADING, not a destroyed purchase', () => {
+  // "ASDA POTATO." is a misreading of page 5 that text-matches page 2 on the
+  // single shared token "ASDA". Page 2 is detected anyway, so nothing was lost.
+  const d = dupes(
+    [{ kept_as_written: '1 MASHED POTATO', merged_as_written: 'ASDA POTATO.', kept_product_id: null, merged_product_id: null }],
+    [answer({ as_written: '1 MASHED POTATO' }), answer({ as_written: '1 x 6pts ASDA SEMI Skimmed MiLk', product_id: '2' })],
+  );
+  assert.equal(d.incorrectCrossLineMerges, 0, 'no page line went missing, so no purchase was destroyed');
+  assert.equal(d.mergesTextAmbiguous, 1, 'the misreading is still REPORTED, never hidden');
+  assert.equal(d.mergesTextAmbiguousDetail[0].exonerated_by, 'attributed-page-line-was-detected-anyway');
+});
+
+test('AC5 PROOF MUTATION: when the attributed page line really IS missing, it counts as INCORRECT', () => {
+  // Same merge, but page 2 is now nowhere in the answer. That is the shape of
+  // a merge that genuinely destroyed a purchase, and it must still be caught.
+  const d = dupes(
+    [{ kept_as_written: '1 MASHED POTATO', merged_as_written: 'ASDA POTATO.', kept_product_id: null, merged_product_id: null }],
+    [answer({ as_written: '1 MASHED POTATO' })],
+  );
+  assert.equal(
+    d.incorrectCrossLineMerges, 1,
+    'MUTATION DID NOT BITE - a merge that really did lose a page line was exonerated, so the metric has been '
+    + 'switched off rather than narrowed and a destroyed purchase would go unreported',
+  );
+  assert.equal(d.mergesTextAmbiguous, 0);
+});
+
+test('AC5 PROOF: agreeing identity exonerates a merge even when the page line IS missing', () => {
+  // The STRAWBERRY CAKE shape. The application merged on identity; a text
+  // disagreement about which page line it was cannot overturn that.
+  const d = dupes(
+    [{ kept_as_written: '1 MASHED POTATO', merged_as_written: 'ASDA POTATO.', kept_product_id: '5', merged_product_id: '5' }],
+    [answer({ as_written: '1 MASHED POTATO' })],
+  );
+  assert.equal(d.incorrectCrossLineMerges, 0);
+  assert.equal(d.mergesTextAmbiguousDetail[0].exonerated_by, 'same-resolved-identity');
+});
+
+test('AC5: quantity correctness is published over ALL 39 page lines, so an omission cannot inflate it', () => {
+  // One of two page lines detected and correct. Graded over DETECTED lines
+  // that is 100%; graded over the page it is 50%, and only the second figure
+  // answers "did Warwick end up with the right shopping list?".
+  const q = scoreMetricFamilies({
+    accepted: [answer({ as_written: '1 MASHED POTATO' })],
+    merges: [], duplicateGroups: [], rawObservationCount: 1,
+    fixture: FIXTURE, gateCounts: null, enumClosed: true,
+  }).families.quantity;
+  assert.equal(q.expectedPageLines, 2);
+  assert.equal(q.correct.pct, 100);
+  assert.equal(q.correctOfAllExpected.pct, 50, 'the undetected line counts as not-correct');
 });
 
 // ═══════════════════════════════════════════════════════════════════════

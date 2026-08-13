@@ -398,11 +398,33 @@ export function scoreMetricFamilies({
       const mergedId = m.merged_product_id ?? null;
       const sameResolvedIdentity = keptId !== null && mergedId !== null && keptId === mergedId;
 
+      // ── THE DECISIVE TEST, AND IT WAS ALREADY IN THIS FUNCTION ──────────
+      //
+      // The identity guard above closed the STRAWBERRY CAKE shape but not the
+      // ASDA POTATO one, measured on the final runs: "ASDA POTATO." is a
+      // misreading of page 5 "1 MASHED POTATO" that text-matches page 2
+      // "1 x 6pts ASDA SEMI Skimmed MiLk" on the single shared token "ASDA".
+      // Neither side carried a resolved identity, so the guard did not apply
+      // and a correct merge was again reported as a destroyed purchase.
+      //
+      // ⛔ A MERGE CAN ONLY HAVE DESTROYED A PURCHASE IF A PAGE LINE ACTUALLY
+      //    WENT MISSING. That is not a matter of textual opinion, and this
+      //    scorer already knows the answer: `fixtureForAnswer` records which
+      //    page lines the run detected. If the page line the merged reading is
+      //    ATTRIBUTED to was detected anyway - by this or any other
+      //    observation - then nothing was lost and the attribution was simply
+      //    wrong.
+      //
+      //    This subsumes the identity guard rather than replacing it: both are
+      //    kept, because they fail in different directions and a merge needs
+      //    only one of them to be exonerated.
+      const attributedPageLineSurvives = b !== null && [...fixtureForAnswer.values()].includes(b);
+
       if (a === null || b === null) {
         duplicates.mergesUngradable += 1;
       } else if (a === b) {
         duplicates.reconciledSameLine += 1;
-      } else if (sameResolvedIdentity) {
+      } else if (sameResolvedIdentity || attributedPageLineSurvives) {
         duplicates.mergesTextAmbiguous += 1;
         duplicates.mergesTextAmbiguousDetail.push({
           kept_as_written: m.kept_as_written,
@@ -411,9 +433,13 @@ export function scoreMetricFamilies({
           text_matched_page_line: expected[b].page_order,
           product_id: keptId,
           regions: m.regions ?? null,
-          note: 'Both observations resolved to the SAME product identity, which is what the application '
-            + 'merged on. The merged reading text-matches a different page line, which makes it a MISREADING '
-            + 'to report - NOT a merge that destroyed a purchase.',
+          exonerated_by: sameResolvedIdentity
+            ? 'same-resolved-identity'
+            : 'attributed-page-line-was-detected-anyway',
+          note: 'The merged reading text-matches a DIFFERENT page line, but nothing was destroyed: either both '
+            + 'observations resolved to the same product identity (which is what the application merged on), or '
+            + 'the page line the text was attributed to was detected anyway. A MISREADING to report - NOT a '
+            + 'merge that destroyed a purchase.',
         });
       } else {
         duplicates.incorrectCrossLineMerges += 1;
