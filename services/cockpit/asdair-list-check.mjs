@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ASDAIR_LIST_ROUTE, MAX_BODY_BYTES, UPSTREAM_PATH, proxyAsdairList,
   ASDAIR_CHECK_ITEM_ROUTE, CHECK_ITEM_UPSTREAM_PATH, proxyAsdairCheckItem,
+  ASDAIR_DISPLAY_NAME_ROUTE, DISPLAY_NAME_UPSTREAM_PATH, proxyAsdairDisplayName,
 } from './asdair-list.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -75,6 +76,15 @@ export function serverDispatchesCheckItem(source) {
   });
 }
 
+// WP-B15-51. The same rule again, for Warwick's display-name route.
+export function serverDispatchesDisplayName(source) {
+  return source.split(/\r?\n/).some((l) => {
+    const t = l.trim();
+    if (t.startsWith('import ')) return false;
+    return t.includes('ASDAIR_DISPLAY_NAME_ROUTE') && /proxyAsdairDisplayName\s*\(/.test(t);
+  });
+}
+
 /** Start a one-request server around the real handler, pointed at `origin`. */
 function withHandler(origin, deps) {
   const server = http.createServer((req, res) => proxyAsdairList(req, res, origin, deps));
@@ -86,6 +96,14 @@ function withHandler(origin, deps) {
 /** The same, around the REAL sense-check handler. */
 function withCheckHandler(origin, deps) {
   const server = http.createServer((req, res) => proxyAsdairCheckItem(req, res, origin, deps));
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+  });
+}
+
+/** The same, around the REAL display-name handler. */
+function withDisplayNameHandler(origin, deps) {
+  const server = http.createServer((req, res) => proxyAsdairDisplayName(req, res, origin, deps));
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
   });
@@ -259,6 +277,44 @@ async function main() {
     ok('server.mjs DISPATCHES the sense-check route (not merely imports it)', serverDispatchesCheckItem(src));
     ok('the sense-check route constant is the one the UI posts to',
       ASDAIR_CHECK_ITEM_ROUTE === '/api/asdair/check-item', ASDAIR_CHECK_ITEM_ROUTE);
+    // WP-B15-51: and Warwick's display-name write, for the same reason — an editor page that posts
+    // to a route nobody dispatches just 404s.
+    ok('server.mjs DISPATCHES the display-name route (not merely imports it)', serverDispatchesDisplayName(src));
+    ok('the display-name route constant is the one the editor posts to',
+      ASDAIR_DISPLAY_NAME_ROUTE === '/api/asdair/display-name', ASDAIR_DISPLAY_NAME_ROUTE);
+  }
+
+  // ── 12. WP-B15-51: WARWICK'S DISPLAY-NAME WRITE, OVER A REAL SOCKET ───────────────────────────
+  {
+    const saved = { ok: true, id: 4, display_name: 'Milk' };
+    const up = await fakeUpstream((req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(saved));
+    });
+    const h = await withDisplayNameHandler(up.origin);
+    const res = await post(h.port, { id: 4, display_name: 'Milk' }, {}, ASDAIR_DISPLAY_NAME_ROUTE);
+
+    ok('a display name reaches the upstream over a real socket', up.seen.length === 1,
+      up.seen.length + ' request(s)');
+    ok('it is POSTed to ' + DISPLAY_NAME_UPSTREAM_PATH,
+      up.seen[0] && up.seen[0].method === 'POST' && up.seen[0].url === DISPLAY_NAME_UPSTREAM_PATH,
+      up.seen[0] ? up.seen[0].method + ' ' + up.seen[0].url : 'nothing');
+    ok('his words arrive unchanged', JSON.parse(up.seen[0].body).display_name === 'Milk');
+    ok('the saved row is forwarded VERBATIM', JSON.stringify(parsed(res)) === JSON.stringify(saved));
+    h.server.close(); up.server.close();
+  }
+  {
+    const dead = await fakeUpstream(() => {});
+    const origin = dead.origin;
+    await new Promise((r) => dead.server.close(r));
+    const h = await withDisplayNameHandler(origin, { timeoutMs: 1500 });
+    const res = await post(h.port, { id: 4, display_name: 'Milk' }, {}, ASDAIR_DISPLAY_NAME_ROUTE);
+    const body = parsed(res);
+    ok('an unreachable display-name write is 502 in the JSON error shape', res.status === 502 && body !== null,
+      String(res.status));
+    ok('and it says plainly that nothing was changed',
+      body && /nothing was changed/i.test(body.message || ''), body ? body.message : '');
+    h.server.close();
   }
 
   // ── 11. WP-B15-50: THE SENSE-CHECK PROXY, OVER A REAL SOCKET ──────────────────────────────────
@@ -357,6 +413,20 @@ function selfTest() {
   ok('the sense-check assertion accepts the REAL server.mjs', serverDispatchesCheckItem(real));
   Object.keys(checkMutants).forEach((why) => {
     ok('the sense-check assertion REJECTS a mutant: ' + why, serverDispatchesCheckItem(checkMutants[why]) === false);
+  });
+
+  // WP-B15-51: and again for the display-name assertion. A third source scan added without proving
+  // it can go red would be a third piece of decoration.
+  const displayMutants = {
+    'the display-name dispatch line deleted': real.split(/\r?\n/)
+      .filter((l) => !(l.includes('ASDAIR_DISPLAY_NAME_ROUTE') && /proxyAsdairDisplayName\s*\(/.test(l)))
+      .join('\n'),
+    'only the display-name import left': "import { ASDAIR_DISPLAY_NAME_ROUTE, proxyAsdairDisplayName } from './asdair-list.mjs';\n",
+    'the display-name handler call removed but the constant kept': real.replace(/proxyAsdairDisplayName\s*\(/g, 'somethingElse('),
+  };
+  ok('the display-name assertion accepts the REAL server.mjs', serverDispatchesDisplayName(real));
+  Object.keys(displayMutants).forEach((why) => {
+    ok('the display-name assertion REJECTS a mutant: ' + why, serverDispatchesDisplayName(displayMutants[why]) === false);
   });
   console.log(failed
     ? 'SELF-TEST FAIL — ' + failed + ' of ' + ran + ' assertions failed.'

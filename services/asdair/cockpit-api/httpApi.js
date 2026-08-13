@@ -5,10 +5,13 @@
 // handleRequest() takes a plain {method, path, query, body} and returns a
 // plain {status, body}. server.js binds it to node:http and does nothing else.
 //
-// TWELVE ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
-// the count was stale, the list was not. Keep this count honest - ROUTES below
-// is the machine-readable answer and httpApi.test.js asserts the two agree.)
+// THIRTEEN ROUTES, AND NO MORE. (The header once said "THREE" while listing
+// four; the count was stale, the list was not. Keep this count honest - ROUTES
+// below is the machine-readable answer and httpApi.test.js asserts the two
+// agree.)
 //
+// WP-B15-51 moved this from TWELVE to THIRTEEN: POST /asdair/display-name -
+// WARWICK'S route, writing exactly one column of one catalogue row.
 // WP-B15-50 moved this from ELEVEN to TWELVE: POST /asdair/check-item, the
 // sense-check. SELECT-only, and its response is SEALED so a candidate list can
 // never reach Mum's screen - see checkItem.js.
@@ -39,6 +42,9 @@
 //                             shop already existed and nothing durable changed.
 //   POST /asdair/check-item - THE SENSE-CHECK. "Have I already got this?"
 //                             SELECT-only. Answers; never asks.
+//   POST /asdair/display-name - WARWICK sets what MUM READS for one product.
+//                             One column, one row. `name` and `aka` are not
+//                             reachable from it - see displayName.js.
 //
 // WHY /asdair/rules IS A SEPARATE ROUTE rather than another key on the
 // workspace: the workspace is scoped to one shop and is already the largest
@@ -79,6 +85,9 @@ const checkItem = require('./checkItem');
 // step. It is hermetic (no `pg`, no credential read at import) so this transport
 // still imports clean.
 const notifyShopper = require('./notifyShopper');
+// WP-B15-51. Warwick's display-name write. PURE at import (no `pg`, no env), so
+// this transport still imports clean on a box with nothing installed.
+const displayName = require('./displayName');
 
 const ROUTES = Object.freeze([
   'GET /asdair/health',
@@ -94,6 +103,8 @@ const ROUTES = Object.freeze([
   // WP-B15-50 AC1. THE SENSE-CHECK. Read-only, and the ONLY route here whose
   // response shape is sealed by its module rather than assembled inline.
   'POST /asdair/check-item',
+  // WP-B15-51 AC4. WARWICK sets what MUM READS. One column of one row.
+  'POST /asdair/display-name',
   // WP-B15-41 AC3. THREE ROUTES OVER ONE UNCHANGED COMMAND. See ANSWER_ROUTES.
   'POST /asdair/answer',
   'POST /asdair/answer/choose',
@@ -667,6 +678,61 @@ async function handleRequest(req, deps) {
         return json(400, { ok: false, error: err.code || 'check_invalid', message: err.message });
       }
       return json(500, { ok: false, error: 'check_failed', message: safeMessage(err) });
+    }
+  }
+
+  // ── WP-B15-51 AC4: WHAT MUM READS. POST /asdair/display-name ─────────────
+  //
+  // Warwick's route, and his only. He sets or clears the household-English name
+  // shown on Mum's tile for ONE product; the ASDA listing stays beneath it and
+  // the matcher carries on reading `name` and `aka` exactly as before.
+  //
+  // ⛔ EXACTLY TWO KEYS ARE READ OFF THE BODY, and they are read by name. A body
+  // carrying `name` or `aka` is not filtered or rejected - those keys are simply
+  // never looked at, so there is nothing for them to reach. displayName.js
+  // issues one fixed single-column UPDATE and is handed two validated
+  // primitives, never this object.
+  //
+  // For `name` the database refuses it regardless: asdair_rw holds no UPDATE
+  // privilege on that column. `aka` IS writable by that role - the weekly
+  // learning write-back needs it - so `aka` is safe here because of how this
+  // route is written, not because of the grant. Both statements are true and
+  // they are not the same statement.
+  if (route === '/asdair/display-name') {
+    if (method !== 'POST') {
+      return json(405, { ok: false, error: 'method_not_allowed', message: 'POST only.' });
+    }
+    const body = readBody(req && req.body);
+    if (body === null) {
+      return json(400, { ok: false, error: 'bad_json', message: 'Request body is not valid JSON.' });
+    }
+
+    let write = d.writeQuery;
+    if (typeof write !== 'function') {
+      try {
+        // eslint-disable-next-line global-require
+        write = require('./commandDeps')._internal.writeQuery;
+      } catch (err) {
+        return json(503, { ok: false, error: 'not_configured', message: safeMessage(err) });
+      }
+    }
+
+    try {
+      const saved = await displayName.setDisplayName(
+        { id: body.id, display_name: body.display_name },
+        { writeQuery: write }
+      );
+      return json(200, { ok: true, id: saved.id, display_name: saved.display_name });
+    } catch (err) {
+      // `expose` marks the errors that are about WHAT HE TYPED - safe to show,
+      // and useful. A missing connection string is configuration, not input.
+      if (err && err.expose === true) {
+        return json(400, { ok: false, error: err.code || 'display_name_invalid', message: err.message });
+      }
+      if (err && err.code === 'ASDAIR_CONFIG_MISSING') {
+        return json(503, { ok: false, error: 'not_configured', message: safeMessage(err) });
+      }
+      return json(500, { ok: false, error: 'display_name_failed', message: safeMessage(err) });
     }
   }
 

@@ -41,9 +41,12 @@ import { ASDAIR_CHECKLIST_ROUTE, proxyAsdairChecklist } from './asdair-checklist
 // way a proxy's behaviour can be proven at all.
 // WP-B15-50 adds the SENSE-CHECK from the same module: "have I already got this?", asked while she
 // is typing. Read-only upstream, and its answer can never contain a question for her.
+// WP-B15-51 adds WARWICK'S display-name write from the same module: the household-English name Mum
+// actually reads on her tile, which he sets here and nowhere else.
 import {
   ASDAIR_LIST_ROUTE, proxyAsdairList,
   ASDAIR_CHECK_ITEM_ROUTE, proxyAsdairCheckItem,
+  ASDAIR_DISPLAY_NAME_ROUTE, proxyAsdairDisplayName,
 } from './asdair-list.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -421,6 +424,9 @@ const server = http.createServer(async (req, res) => {
     // has to be able to tell a real verdict from a failure, because on a failure it ACCEPTS HER ITEM
     // ANYWAY rather than dropping what she typed.
     if (req.url.startsWith(ASDAIR_CHECK_ITEM_ROUTE)) return proxyAsdairCheckItem(req, res, ASDAIR_ORIGIN);
+    // WARWICK'S DISPLAY NAME (WP-B15-51). He sets what Mum reads for one product. It writes exactly
+    // one column of one catalogue row; `name` and `aka` are not reachable from it.
+    if (req.url.startsWith(ASDAIR_DISPLAY_NAME_ROUTE)) return proxyAsdairDisplayName(req, res, ASDAIR_ORIGIN);
     // Private-app same-origin bridge (opt-in via COCKPIT_PRIVATE_API). Must run before static.
     if (req.url.startsWith(PRIVATE_API_PREFIX)) return servePrivateApi(req, res, PRIVATE_API);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {

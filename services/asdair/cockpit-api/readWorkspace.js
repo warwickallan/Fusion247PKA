@@ -92,6 +92,9 @@ const ALTERNATIVES_SQL =
   'SELECT id, list_item_id, alternative_name, price, chosen FROM asdair.product_alternatives ' +
   'WHERE list_item_id = ANY($1::bigint[]) ORDER BY id ASC';
 
+// The catalogue read, in its BASE form - the columns that have existed since
+// migration 004. `display_name` (migration 021) is appended only when the
+// database actually has it; see CATALOGUE_OPTIONAL_COLUMNS below.
 const CATALOGUE_SQL =
   'SELECT id, name, brand, category, high_level_category, asda_product_id, asda_url, typical_qty, ' +
   'aka, substitutes_allowed, active, created_at, updated_at FROM asdair.regulars ' +
@@ -162,6 +165,16 @@ const ITEM_OPTIONAL_COLUMNS = Object.freeze([
   'line_no', 'raw_reading', 'matched_regular_id', 'interpretation_status',
   'match_basis', 'match_confidence', 'applied_rule_id', 'applied_rule'
 ]);
+
+// WP-B15-51. asdair.regulars columns that may not be there yet.
+//
+// ⚠️ THIS IS NOT DEFENSIVENESS ABOUT AN EDGE CASE - IT IS ABOUT LIVE. Migration
+// 021 is applied to the live database BY HAND, after this code merges, so
+// between those two moments the live schema genuinely has no `display_name`. A
+// blind column list would take Warwick's whole workspace read down in that
+// window. Same whitelist-then-intersect shape as ITEM_OPTIONAL_COLUMNS above,
+// for the same reason and with the same identifier check.
+const CATALOGUE_OPTIONAL_COLUMNS = Object.freeze(['display_name']);
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 
@@ -308,6 +321,31 @@ function buildItemSelect(presentColumns) {
   });
   return 'SELECT ' + all.join(', ') + ' FROM asdair.shopping_list_items WHERE list_id = $1 ORDER BY ' +
     (extra.indexOf('line_no') === -1 ? 'id ASC' : 'line_no ASC, id ASC');
+}
+
+/**
+ * PURE. The catalogue SELECT, with `display_name` appended only when the
+ * database reports it. Same construction and the same identifier check as
+ * buildItemSelect above; an unknown column can never reach the statement.
+ */
+function buildCatalogueSelect(presentColumns) {
+  const have = new Set((presentColumns || []).map(function (c) { return String(c); }));
+  const extra = CATALOGUE_OPTIONAL_COLUMNS.filter(function (c) { return have.has(c); });
+  if (extra.length === 0) return CATALOGUE_SQL;
+  extra.forEach(function (c) {
+    if (!IDENTIFIER.test(c)) throw new Error('readWorkspace: refusing unsafe column name "' + c + '".');
+  });
+  return CATALOGUE_SQL.replace(' FROM asdair.regulars', ', ' + extra.join(', ') + ' FROM asdair.regulars');
+}
+
+async function probeRegularsColumns(client) {
+  try {
+    const res = await client.query(COLUMN_PROBE_SQL, ['regulars']);
+    return rows(res).map(function (r) { return r.column_name; });
+  } catch (ignore) {
+    // A database that will not answer the probe still gets the base columns.
+    return [];
+  }
 }
 
 async function probeItemColumns(client) {
@@ -474,8 +512,14 @@ async function gather(client, opts) {
     if (ids.length) alternatives = rows(await client.query(ALTERNATIVES_SQL, [ids]));
   }
 
-  // 5. The catalogue - the thing that DETERMINES identity.
-  const catalogue = rows(await client.query(CATALOGUE_SQL, [status.household_id]));
+  // 5. The catalogue - the thing that DETERMINES identity, and now also the
+  // thing that carries what MUM READS. `display_name` arrives ALONGSIDE `name`,
+  // never instead of it: Warwick's tile shows her name large and the ASDA
+  // listing small underneath, so the payload has to hold both.
+  const catalogue = rows(await client.query(
+    buildCatalogueSelect(await probeRegularsColumns(client)),
+    [status.household_id]
+  ));
 
   // 6. The confirmation and its lines.
   const confirmation = first(await client.query(CONFIRMATION_SQL, [status.shop_id]));
@@ -534,6 +578,7 @@ module.exports = {
   ALL_SQL: ALL_SQL,
   ITEM_BASE_COLUMNS: ITEM_BASE_COLUMNS,
   ITEM_OPTIONAL_COLUMNS: ITEM_OPTIONAL_COLUMNS,
+  CATALOGUE_OPTIONAL_COLUMNS: CATALOGUE_OPTIONAL_COLUMNS,
   _internal: {
     // Exported so readPacket.js shares the SAME lazy pool, the same lazy
     // require('pg') and the same env var. A sibling reader that opened its own
@@ -542,7 +587,9 @@ module.exports = {
     getPool: getPool,
     gather: gather,
     buildItemSelect: buildItemSelect,
+    buildCatalogueSelect: buildCatalogueSelect,
     probeItemColumns: probeItemColumns,
+    probeRegularsColumns: probeRegularsColumns,
     probeProvenanceLedger: probeProvenanceLedger,
     PROVENANCE_LEDGER_PROBE_SQL: PROVENANCE_LEDGER_PROBE_SQL,
     readDecisions: readDecisions,

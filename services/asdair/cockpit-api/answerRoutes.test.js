@@ -77,13 +77,16 @@ test('AC3: the surface grew by three ROUTES and by zero COMMANDS', () => {
   // moves while COMMAND_NAMES below deliberately does not, which is exactly the
   // point this test exists to make.
   //
-  // ⚠️ THIS IS THE SECOND ROUTE-COUNT PIN AND IT HAS NOW BLOCKED TWO WORK
-  // PACKAGES IN A ROW (B15-48, B15-50), because the other one lives in
-  // httpApi.test.js and the declared surface only ever named that one. ADDING A
-  // ROUTE MOVES BOTH. Larry edited this line by hand under a stated Rule 4
-  // exception, after Keel correctly REFUSED to write outside its declared
-  // surface to reach a green - which is the behaviour that surfaced it.
-  assert.equal(ROUTES.length, 12);
+  // WP-B15-51: the THIRTEENTH route is POST /asdair/display-name - Warwick
+  // setting what Mum reads. It also adds NO command: it is a single-column
+  // UPDATE through its own module, not a dispatch.
+  //
+  // ⚠️ THIS IS THE SECOND ROUTE-COUNT PIN AND IT HAS NOW BLOCKED OR BEEN TOUCHED
+  // BY THREE WORK PACKAGES IN A ROW (B15-48, B15-50, B15-51), because the other
+  // one lives in httpApi.test.js and the declared surface only ever named that
+  // one. ADDING A ROUTE MOVES BOTH. B15-51's Work Order declared both files, so
+  // this edit needed no exception - which is the fix working.
+  assert.equal(ROUTES.length, 13);
   assert.deepEqual(Object.keys(ANSWER_ROUTES).sort(),
     ['/asdair/answer', '/asdair/answer/choose', '/asdair/answer/skip']);
   // THE POINT OF AC3. All three land on one existing command.

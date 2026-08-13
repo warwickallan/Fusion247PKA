@@ -49,6 +49,18 @@ export const UPSTREAM_PATH = '/asdair/list';
 export const ASDAIR_CHECK_ITEM_ROUTE = '/api/asdair/check-item';
 export const CHECK_ITEM_UPSTREAM_PATH = '/asdair/check-item';
 
+// ── WP-B15-51. WARWICK'S DISPLAY-NAME WRITE, in this module for the same reason
+// the sense-check is: `provenance.mjs` declares the cockpit's source closure
+// module by module, so a new `.mjs` inside server.mjs's import graph has to be
+// declared there too. This route is the same shape as the two above — POST JSON
+// in, JSON out, every failure in the contract's error shape — and shares this
+// module's body reader and forwarder.
+//
+// ⛔ IT WRITES, but only ever ONE column of ONE catalogue row, and only WARWICK
+// reaches it. Mum's page never calls it.
+export const ASDAIR_DISPLAY_NAME_ROUTE = '/api/asdair/display-name';
+export const DISPLAY_NAME_UPSTREAM_PATH = '/asdair/display-name';
+
 // Same cap as the existing POST route in server.mjs (/api/decide, 1e5). A weekly shopping list is a
 // few hundred bytes; 100 kB is generous enough that no honest submission meets it, and small enough
 // that a malformed client cannot spend this process's memory.
@@ -158,9 +170,26 @@ export async function proxyAsdairCheckItem(req, res, origin, deps) {
 }
 
 /**
- * The shared body: read once, cap, forward, hand back JSON. Both routes above are this function with
- * a different upstream path and different sentences — extracted rather than copied so a fix to the
- * error handling cannot land on one route and miss the other.
+ * POST /api/asdair/display-name  ->  POST <origin>/asdair/display-name      (WP-B15-51 AC4)
+ *
+ * Warwick renaming a product to what Mum should actually read. Identical mechanics to the two
+ * proxies above; different words on failure because this one is HIS surface, not hers — it can say
+ * "saved" and "not saved" plainly rather than in the careful sentences her page needs.
+ */
+export async function proxyAsdairDisplayName(req, res, origin, deps) {
+  return proxyJson(req, res, origin, deps, {
+    upstreamPath: DISPLAY_NAME_UPSTREAM_PATH,
+    notPost: 'A display name is saved with POST.',
+    unreachable: (why) => 'I could not reach AsdAIr to save that name — ' + why + '. Nothing was changed.',
+    unreadable: (why) => 'AsdAIr started to answer and then stopped — ' + why + '.',
+    notJson: (status) => 'AsdAIr answered in a form I could not read (HTTP ' + status + '). Nothing was changed.',
+  });
+}
+
+/**
+ * The shared body: read once, cap, forward, hand back JSON. All three routes above are this function
+ * with a different upstream path and different sentences — extracted rather than copied so a fix to
+ * the error handling cannot land on one route and miss the others.
  */
 async function proxyJson(req, res, origin, deps, shape) {
   const d = deps || {};

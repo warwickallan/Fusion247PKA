@@ -23,10 +23,11 @@ command against the same row** — not because two implementations were kept in 
 | `readWorkspace.js` | The reader for ONE SHOP. ONE `BEGIN TRANSACTION READ ONLY`; reuses `getShopStatus()` on the same client rather than reimplementing the projection. |
 | `readRules.js` | The reader for the **durable rulebook** — `asdair.rules`, `asdair.rule_qa_log`, `asdair.regulars` (with their `aka` aliases). Same construction as `readWorkspace.js`: SELECT-only, one read-only snapshot, presentation via `present.js`. Shop-independent, so it is a separate route rather than another key on the workspace. |
 | `commandSurface.js` | Names the 10 shared commands, binds to `../pipeline/commands.js`, and refuses anything on the deny list. **No local fallback, deliberately.** |
-| `httpApi.js` | PURE-ish router. **Twelve routes**; `httpApi.test.js` pins the count to a literal so the surface cannot grow by accident, and it has now caught five additions in a row. *(This row previously said "Five routes" and listed five while `ROUTES` held eleven — the pin caught every addition; this prose did not.)* |
+| `httpApi.js` | PURE-ish router. **Thirteen routes**; `httpApi.test.js` pins the count to a literal so the surface cannot grow by accident, and it has now caught six additions in a row. *(This row previously said "Five routes" and listed five while `ROUTES` held eleven — the pin caught every addition; this prose did not.)* |
 | `cockpitIntake.js` | PURE. The Cockpit's **translator**, not a second intake service: one submitted list → the `receiveList` spec the shared command already accepts. Owns the evidence text, the content fingerprint behind `sourceId`, and the `list_date` comparison. |
 | `checkItem.js` | **WP-B15-50.** The sense-check behind `POST /asdair/check-item`. Calls `resolveReading` from `../interpret/` — it is not a second matcher — and **seals** its response to four keys so a candidate list can never reach Mum's screen. |
 | `notifyShopper.js` | **WP-B15-50.** Tells Warwick, on ShopperBot, when Mum's submission recorded something. Fired by `POST /asdair/list` itself. Never throws, never messages Mum, never polls. |
+| `displayName.js` | **WP-B15-51.** The third field. Holds **both halves of one decision**: the write behind `POST /asdair/display-name` (Warwick sets it) and `displayNameFor()`, the single rule for **what Mum reads** wherever a product name reaches her. PURE at import. |
 | `server.js` | The node:http binder. Started by `node server.js` and nothing else. Owns `CONFIG_SPEC` / `validateConfig()` — the startup contract. |
 
 ## The rules this module exists to keep
@@ -97,9 +98,15 @@ submission answers `notify_error: notify_not_configured`. Full table in
 request   { "household": 1, "text": "<her exact words>", "chosen": ["<regulars.id_display>", ...] }
 200       { "ok": true, "status": "matched"|"possible_duplicate"|"needs_confirmation"
                                  |"unmatched_new_item"|"unreadable",
-            "matched_name": "<catalogue name>"|null, "matched_regular_id": <n>|null,
+            "matched_name": "<what MUM should read>"|null, "matched_regular_id": <n>|null,
             "already_on_list": true|false }
 ```
+
+**`matched_name` is her name for it, not the catalogue's (WP-B15-51 AC3a).** It is
+`display_name` when Warwick has set one, and the catalogue name otherwise. This route read the raw
+retailer string out to her until 2026-08-13, when Warwick typed "milk" on the live Cockpit and was told
+*"you've already got cravendale arla filtered fresh semi skimmed milk"*. The **identity** still comes
+from the resolver and is unchanged; only the words are hers.
 
 SELECT-only: it opens no write pool and dispatches no command, so nothing posted to it can change a
 row. `chosen` is what makes `possible_duplicate` reachable at all — a single `resolveReading()` call
@@ -110,6 +117,50 @@ cannot produce it, because that status comes from a batch's `seen` set.
 `sealed()`, which **throws** on any key outside the frozen four. The route has nowhere to put a
 question, which is why this is a control rather than a promise. `matched_name` and
 `matched_regular_id` are non-null **only** on `matched` and `possible_duplicate`.
+
+## WP-B15-51 — `display_name`, the third field
+
+**The three fields, and the boundary between them.** Migration `db/021_regulars_display_name.sql`.
+
+| field | what it is | editable | who reads it |
+|---|---|---|---|
+| `name` | the official ASDA listing — the truth about what the product is | **no** | the matcher, and Warwick |
+| `aka` | what Mum writes on her lists — **a matching term**, not a label | **no** | the matcher **only** |
+| `display_name` | **what Mum reads** | **yes — Warwick** | Mum's surfaces **only** |
+
+**⛔ The matcher never reads `display_name`, and that is the whole safety property.** The obvious fix
+for "Mum's tile shows a catalogue string" was to let Warwick edit `aka` — but `aka` is what
+`resolveByCatalogue.js` matches on, so improving what she *reads* would have changed what *matches*.
+Setting a `display_name` that names a **different** product changes nothing about resolution;
+`displayName.test.js` proves that by execution against the real resolver, with the column injected
+directly into the rows it is handed.
+
+**The read rule is `displayNameFor(regular, fallback)`, and it is a rule rather than a patch:**
+`display_name` when Warwick has set one, otherwise whatever would have been shown. Anywhere a product
+name reaches **Mum**, it goes through that function. `name` and `aka` are unchanged everywhere else.
+
+**`POST /asdair/display-name`** — Warwick's route, and his only.
+
+```
+request   { "id": <regulars.id>, "display_name": "<text>"|null }
+200       { "ok": true, "id": <n>, "display_name": "<text>"|null }
+4xx/5xx   { "ok": false, "error": "<machine_code>", "message": "<one plain sentence>" }
+```
+
+- **`null` or empty clears it** — he can undo a bad name, not only overwrite it.
+- **Trimmed, otherwise untouched.** His words are his; over 60 characters is a `400`, never a truncation.
+- **One column.** The route reads exactly `id` and `display_name` off the body and passes two validated
+  primitives to `displayName.js`, which issues one fixed single-column `UPDATE`. A body carrying `name`
+  or `aka` leaves both untouched — proven end to end against a real database, not only with a stub.
+- **`name` is refused by PostgreSQL regardless**: `asdair_rw` holds no `UPDATE` on it (migration 005's
+  column-scoped grant). `aka` **is** granted to that role — the weekly learning write-back needs it — so
+  `aka` is safe here because of how the route is written, not because of the grant. Both are true; they
+  are not the same statement.
+
+**Reading it back is column-probed, deliberately.** `readWorkspace.js` and `checkItem.js` add
+`display_name` to their `SELECT` **only when the database reports the column**. That is not defensiveness
+about an edge case: migration 021 reaches the live database by hand *after* this code ships, and a blind
+column list would take the workspace read and the sense-check down in that window.
 
 **The ShopperBot notification** fires from `POST /asdair/list` — the real submission event, no script
 and no manual step — when `created` **or** `recorded_new` is true, and **not at all** when neither is.
