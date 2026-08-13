@@ -5,10 +5,13 @@
 // handleRequest() takes a plain {method, path, query, body} and returns a
 // plain {status, body}. server.js binds it to node:http and does nothing else.
 //
-// ELEVEN ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
+// TWELVE ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
 // the count was stale, the list was not. Keep this count honest - ROUTES below
 // is the machine-readable answer and httpApi.test.js asserts the two agree.)
 //
+// WP-B15-50 moved this from ELEVEN to TWELVE: POST /asdair/check-item, the
+// sense-check. SELECT-only, and its response is SEALED so a candidate list can
+// never reach Mum's screen - see checkItem.js.
 // WP-B15-48 moved this from TEN to ELEVEN: POST /asdair/list, the write door.
 // WP-B15-41 moved this from SEVEN to TEN: the three resolution routes below.
 // The pinned literal in httpApi.test.js is edited in the same commit, on
@@ -34,6 +37,8 @@
 //                             SHARED receiveList command. `created` in the
 //                             response is load-bearing: false means the day's
 //                             shop already existed and nothing durable changed.
+//   POST /asdair/check-item - THE SENSE-CHECK. "Have I already got this?"
+//                             SELECT-only. Answers; never asks.
 //
 // WHY /asdair/rules IS A SEPARATE ROUTE rather than another key on the
 // workspace: the workspace is scoped to one shop and is already the largest
@@ -64,6 +69,16 @@ const commandSurface = require('./commandSurface');
 // The Cockpit's translator. PURE - no `pg`, no environment - so importing this
 // transport still needs neither, exactly as before.
 const cockpitIntake = require('./cockpitIntake');
+// The sense-check. `classifyItem` is PURE; only `loadRegulars` touches the
+// SELECT-only pool, and it is required lazily below for the same reason
+// commandDeps is - importing this transport must need neither `pg` nor an
+// environment variable.
+const checkItem = require('./checkItem');
+// WP-B15-50 AC5. The ShopperBot notification. Required at the top because THE
+// REAL SUBMISSION EVENT MUST FIRE IT - there is no other caller and no manual
+// step. It is hermetic (no `pg`, no credential read at import) so this transport
+// still imports clean.
+const notifyShopper = require('./notifyShopper');
 
 const ROUTES = Object.freeze([
   'GET /asdair/health',
@@ -76,6 +91,9 @@ const ROUTES = Object.freeze([
   // WP-B15-48 AC3. THE WRITE DOOR: the one route on this service that creates
   // something. Mum's Cockpit proxies to it; it holds no logic of its own.
   'POST /asdair/list',
+  // WP-B15-50 AC1. THE SENSE-CHECK. Read-only, and the ONLY route here whose
+  // response shape is sealed by its module rather than assembled inline.
+  'POST /asdair/check-item',
   // WP-B15-41 AC3. THREE ROUTES OVER ONE UNCHANGED COMMAND. See ANSWER_ROUTES.
   'POST /asdair/answer',
   'POST /asdair/answer/choose',
@@ -492,6 +510,31 @@ async function handleRequest(req, deps) {
     try {
       const result = await dispatchList('receiveList', built.spec, { commands: d.commands, deps: listDeps });
       const r = result && typeof result === 'object' ? result : {};
+      const createdNow = r.created === true;
+      const recordedNew = !!(r.recorded && r.recorded.created === true);
+
+      // ── WP-B15-50 AC5/AC6. THE NOTIFICATION, FIRED BY THIS EVENT ─────────
+      //
+      // ⛔ ORDER MATTERS AND IS DELIBERATE. `receiveList` has already returned,
+      // so HER LIST IS DURABLE BEFORE THIS LINE RUNS. Nothing below can undo it,
+      // and nothing below can fail her submission: notifySubmission never throws
+      // and never rejects, and it is bounded so a dead Telegram cannot hold her
+      // SEND button open.
+      //
+      // It is awaited rather than fired and forgotten because the response has
+      // to be able to say whether Warwick was actually told - a promise the page
+      // makes on her behalf. A detached send could not be reported, and
+      // "recorded but not silent" would quietly become "recorded and silent".
+      const notice = await notifyShopper.notifySubmission({
+        created: createdNow,
+        recorded_new: recordedNew,
+        shop_ref: r.shop_ref === undefined ? null : r.shop_ref,
+        items: built.items.length,
+        extras: built.extras.length,
+        rawText: built.rawText,
+        clock: built.clock
+      }, d.notify);
+
       return json(200, {
         ok: true,
         shop_ref: r.shop_ref === undefined ? null : r.shop_ref,
@@ -501,7 +544,31 @@ async function handleRequest(req, deps) {
         // shop already existed and this submission changed nothing durable -
         // the UI must render that differently and must NOT say the list was
         // sent. It is taken from the store's own report, never inferred here.
-        created: r.created === true,
+        created: createdNow,
+        // ── `recorded_new` IS THE THIRD OUTCOME (route contract v3, AC4) ───
+        //
+        // TRUE when THIS submission left a durable ledger row of its own. It is
+        // the store's own report - `recorded.created` from the pipeline receipt,
+        // which is the INSERT ... ON CONFLICT DO NOTHING result on
+        // (shop_ref, sourceId) - never anything inferred here.
+        //
+        // WHY THE THREE CASES ARE NOT TWO. `created` alone could not tell
+        // "today's shop already existed and I recorded what you changed" apart
+        // from "today's shop already existed and this was identical, so nothing
+        // was written at all". Both were `ok:true, created:false`, and Felix's
+        // page rendered one sentence for two different truths - one of which was
+        // a promise that Warwick had been told.
+        //
+        //   created  recorded_new
+        //   true     true           a shop was created from her list
+        //   false    true           recorded, but it does NOT alter today's shop
+        //   false    false          identical resubmission - nothing happened
+        //
+        // Defensive on shape rather than trusting it: a receipt without
+        // `recorded` reads as "nothing new was recorded", which is the safe
+        // direction - it under-claims instead of promising a durable row that
+        // may not exist.
+        recorded_new: recordedNew,
         // THE STORE'S OWN VOCABULARY, PASSED THROUGH VERBATIM. No translation
         // layer: a renamed enum is a place for the two sides to drift.
         // `superseded_terminal_ref` is reported as the match when the store had
@@ -512,10 +579,94 @@ async function handleRequest(req, deps) {
         // is the store saying this exact intent was already recorded.
         duplicate: r.duplicate === true,
         source_id: r.source_id || null,
-        items: built.items.length
+        items: built.items.length,
+        // WP-B15-50 AC3. How many of the lines she sent were TYPED rather than
+        // tapped - so the count in the notification and the count on the page
+        // come from the same place.
+        extras: built.extras.length,
+        // ── HER TABLET'S DATE CLAIM, CHECKED AND REPORTED ─────────────────
+        // `list_date` is the date THE SERVER recorded and the only one that
+        // decided the shop_ref. The other two are the assertion her tablet made
+        // and whether it agreed. FOR WARWICK, NEVER FOR HER: no UI copy is
+        // derived from these, and a disagreement never fails a submission.
+        list_date: built.clock.recorded,
+        list_date_claimed: built.clock.claimed,
+        list_date_agrees: built.clock.agrees,
+        // ── WAS WARWICK ACTUALLY TOLD? (AC5) ─────────────────────────────
+        // `notified` is TRUE only when a send genuinely succeeded. On the
+        // no-op row nothing was attempted, so it is false with no error - the
+        // correct reading is "nobody needed telling", and `recorded_new:false`
+        // beside it says so. `notify_error` carries the machine code on a real
+        // failure, so a page or an operator can tell a Telegram outage from a
+        // missing configuration without reading a log.
+        //
+        // ⛔ HER SUBMISSION IS STILL ok:true HERE. The list is saved; only the
+        // telling failed. Turning a saved shop into an error on her screen
+        // because a bot was unreachable would be the worse defect by far.
+        notified: notice.notified === true,
+        notify_error: notice.error || null
       });
     } catch (err) {
       return json(listErrorStatus(err), listErrorBody(err));
+    }
+  }
+
+  // ── WP-B15-50 AC1/AC2: THE SENSE-CHECK. POST /asdair/check-item ──────────
+  //
+  // "Have I already got this?" - asked by the page while she is typing, before
+  // anything travels. SELECT-only: it opens no write pool and dispatches no
+  // command, so it cannot change a single row no matter what is posted to it.
+  //
+  // ⛔ THE RESPONSE IS SEALED BY checkItem.js, NOT ASSEMBLED HERE. That is
+  // deliberate: the resolver's `needs_confirmation` verdict carries a candidate
+  // array, and a body built inline by spreading it is one keystroke away. The
+  // seal throws on any key outside the frozen four, so the failure is a red test
+  // rather than a question on an 84-year-old's screen.
+  //
+  // ⛔ AND IT NEVER BLOCKS HER. Every failure exit is the contract's error
+  // shape; the page's own obligation on ok:false is to ACCEPT HER ITEM ANYWAY.
+  // A sense-check that swallows her words when the database is down would be
+  // worse than no sense-check at all.
+  if (route === '/asdair/check-item') {
+    if (method !== 'POST') {
+      return json(405, { ok: false, error: 'method_not_allowed', message: 'POST only.' });
+    }
+    const body = readBody(req && req.body);
+    if (body === null) {
+      return json(400, { ok: false, error: 'bad_json', message: 'Request body is not valid JSON.' });
+    }
+
+    const load = d.loadRegulars || checkItem.loadRegulars;
+    let regulars;
+    try {
+      regulars = await load({ household_id: body.household === undefined ? null : body.household });
+    } catch (err) {
+      // A missing connection string is CONFIGURATION, not a bad request - the
+      // same mapping every other route here uses.
+      const code = err && err.code === 'ASDAIR_CONFIG_MISSING' ? 'not_configured' : 'check_failed';
+      const status = /ASDAIR_DB_URL is not set/.test((err && err.message) || '') ? 503
+        : (code === 'not_configured' ? 503 : 500);
+      return json(status, {
+        ok: false,
+        error: status === 503 ? 'not_configured' : code,
+        message: safeMessage(err)
+      });
+    }
+
+    try {
+      const verdict = checkItem.classifyItem({
+        text: body.text,
+        regulars: regulars,
+        chosen: body.chosen
+      });
+      // `ok` plus the sealed four. Nothing else is added here, and nothing else
+      // can be: `verdict` came out of the seal with exactly those keys.
+      return json(200, Object.assign({ ok: true }, verdict));
+    } catch (err) {
+      if (err && err.expose === true) {
+        return json(400, { ok: false, error: err.code || 'check_invalid', message: err.message });
+      }
+      return json(500, { ok: false, error: 'check_failed', message: safeMessage(err) });
     }
   }
 

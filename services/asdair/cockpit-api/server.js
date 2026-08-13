@@ -31,6 +31,15 @@
 //                                    accident. There is no "*" default.
 //   ASDAIR_MEDIA_ROOT                directory the retained list photos live
 //                                    under. Unset = /asdair/media is disabled.
+//   SHOPPER_BOT_TOKEN                SECRET. The @Fusion247shopperbot token,
+//                                    used to tell Warwick when Mum sends her
+//                                    list. Consumed BY NAME; never read, parsed
+//                                    or printed by this service.
+//   SHOPPER_CHAT_ID                  the chat that notification goes to. Not a
+//                                    secret, and the ONLY source of the
+//                                    destination.
+//                                    ⛔ SET BOTH OR NEITHER. Half-configured is
+//                                    REFUSED at startup - see validateConfig().
 //
 // This file never reads, prints or logs a credential. The connection string is
 // consumed by pg inside readWorkspace.js and is scrubbed from any error text
@@ -253,6 +262,35 @@ const CONFIG_SPEC = Object.freeze([
     required: false,
     describe: 'directory the retained list photos live under. Unset = /asdair/media is disabled.',
     check: function () { return null; }
+  },
+  // ── WP-B15-50. THE SHOPPERBOT NOTIFICATION ────────────────────────────────
+  //
+  // Neither is `required`, for the reason ASDAIR_WRITE_DB_URL already gives
+  // above: refusing to boot a working READER because an optional capability is
+  // unconfigured is the worse failure. What IS refused is the HALF-configured
+  // state - see the paired check in validateConfig().
+  {
+    name: 'SHOPPER_BOT_TOKEN',
+    required: false,
+    describe: 'the @Fusion247shopperbot token, used to tell Warwick when Mum sends her list. '
+      + 'Absent, together with SHOPPER_CHAT_ID, means notifications are OFF and every submission '
+      + 'reports notify_error: notify_not_configured.',
+    // ⛔ PRESENCE ONLY, DELIBERATELY. This is credential material. This file does
+    // not read, parse, print or shape-check its value, and a "helpful" format
+    // check here would be exactly the inspection that boundary forbids.
+    // Telegram is the authority on whether its own token is good, and it says so
+    // on the first send - which is reported loudly rather than swallowed.
+    check: function () { return null; }
+  },
+  {
+    name: 'SHOPPER_CHAT_ID',
+    required: false,
+    describe: 'the chat the ShopperBot notification is sent to. NOT a secret. It is the ONLY '
+      + 'source of that destination - nothing in an HTTP request can influence it.',
+    check: function (v) {
+      // Telegram chat ids are integers, negative for groups.
+      return /^-?\d+$/.test(v) ? null : 'must be a Telegram chat id (an integer, negative for a group)';
+    }
   }
 ]);
 
@@ -297,6 +335,42 @@ function validateConfig(env) {
     warnings.push('ASDAIR_MEDIA_ROOT is not set, so GET /asdair/media is disabled.');
   }
 
+  // ── ⛔ WP-B15-50. THE HALF-CONFIGURED NOTIFIER IS REFUSED AT STARTUP ──────
+  //
+  // THE SILENT FAILURE THIS CLOSES. `loadSenderConfig` throws on a missing
+  // token but returns a NULL chatId perfectly happily. So a service started
+  // with a token and no chat id LOOKS configured, boots clean, accepts Mum's
+  // list - and discovers it has nowhere to send at the exact moment it needs
+  // one, on a path nobody is watching. A notifier that only finds out it is
+  // broken when it is needed is the shape this estate's rules forbid.
+  //
+  // The three states, and only one of them stops the service:
+  //
+  //   BOTH SET      notifications are on.
+  //   NEITHER SET   notifications are explicitly OFF. Loud warning, service
+  //                 boots, and every submission reports
+  //                 notify_error: notify_not_configured. This is a legitimate
+  //                 configuration - it is how the service runs before Mack has
+  //                 placed the values - and taking the read surface down over
+  //                 it would be the worse failure.
+  //   ONE SET       REFUSED. There is no honest reading of half a destination.
+  const hasToken = !!(e.SHOPPER_BOT_TOKEN && String(e.SHOPPER_BOT_TOKEN).trim() !== '');
+  const hasChat = !!(e.SHOPPER_CHAT_ID && String(e.SHOPPER_CHAT_ID).trim() !== '');
+  if (hasToken !== hasChat) {
+    errors.push(
+      (hasToken ? 'SHOPPER_CHAT_ID is not set but SHOPPER_BOT_TOKEN is'
+        : 'SHOPPER_BOT_TOKEN is not set but SHOPPER_CHAT_ID is')
+      + ' - the ShopperBot notification is half-configured. Refusing to start rather than '
+      + 'accepting Mum\'s list and discovering at send time that Warwick cannot be told. '
+      + 'Set both, or neither.'
+    );
+  }
+  if (!hasToken && !hasChat) {
+    warnings.push('SHOPPER_BOT_TOKEN and SHOPPER_CHAT_ID are not set, so Warwick is NOT told when '
+      + 'Mum sends her list. Her submissions still save; each one reports notify_error: '
+      + 'notify_not_configured. Mum\'s page may say Warwick was told when he was not.');
+  }
+
   return {
     ok: errors.length === 0,
     errors: errors,
@@ -308,7 +382,11 @@ function validateConfig(env) {
       read: !!e.ASDAIR_DB_URL,
       apply_answers: !!e.ASDAIR_WRITE_DB_URL,
       media: !!e.ASDAIR_MEDIA_ROOT,
-      browser_access: !!e.ASDAIR_COCKPIT_ALLOWED_ORIGIN
+      browser_access: !!e.ASDAIR_COCKPIT_ALLOWED_ORIGIN,
+      // WP-B15-50. Whether Warwick actually gets told. Reported at startup so an
+      // operator READS what the service can do rather than inferring it from
+      // which warnings did not appear.
+      notify_shopper: hasToken && hasChat
     }
   };
 }

@@ -249,11 +249,13 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   // a silent side effect. It has already done that job FOUR times: adding
   // GET /asdair/rules failed this line before anything else noticed, then
   // GET /asdair/packet, then GET /asdair/checklist, and then WP-B15-41's three
-  // resolution routes (7 -> 10), and then WP-B15-48's write door (10 -> 11).
+  // resolution routes (7 -> 10), then WP-B15-48's write door (10 -> 11), and
+  // then WP-B15-50's sense-check (11 -> 12).
   // Each time the number was changed on purpose, in the same commit as the
   // route, which is exactly what the pin is for.
-  assert.equal(ROUTES.length, 11);
+  assert.equal(ROUTES.length, 12);
   assert.ok(ROUTES.includes('POST /asdair/list'));
+  assert.ok(ROUTES.includes('POST /asdair/check-item'));
   assert.ok(ROUTES.includes('GET /asdair/rules'));
   assert.ok(ROUTES.includes('GET /asdair/packet'));
   assert.ok(ROUTES.includes('GET /asdair/checklist'));
@@ -263,7 +265,7 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   // The header comment above ROUTES states a count in prose. Prose rots; this
   // asserts the two agree, which is why the header's stale "THREE" cannot recur.
   const header = require('node:fs').readFileSync(require('node:path').join(__dirname, 'httpApi.js'), 'utf8');
-  assert.ok(/ELEVEN ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
+  assert.ok(/TWELVE ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
 });
 
 // =====================================================================
@@ -593,4 +595,129 @@ test('a read failure on the checklist route is a scrubbed 500, never a stack', a
   assert.equal(res.status, 500);
   assert.equal(res.body.error, 'read_failed');
   assert.ok(!/postgres:\/\/u:p/.test(JSON.stringify(res.body)), 'a connection string must never reach a browser');
+});
+
+// =====================================================================
+// WP-B15-50 AC1/AC2 - POST /asdair/check-item, THE SENSE-CHECK
+//
+// The route-level half of the proof. checkItem.test.js proves the
+// classification and the seal; these prove the TRANSPORT cannot widen either,
+// and that a failure on this route never blocks her.
+// =====================================================================
+
+const CHECK_REGULARS = [
+  { id: 11, name: 'Semi skimmed milk 4 pints', aka: ['milk'] },
+  { id: 21, name: 'Yazoo chocolate milkshake', aka: ['shake'] },
+  { id: 22, name: 'Yazoo strawberry milkshake', aka: ['shake'] }
+];
+
+function checkDeps(overrides) {
+  return Object.assign({ loadRegulars: async () => CHECK_REGULARS }, overrides || {});
+}
+
+test('AC1: POST /asdair/check-item names what she already has', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: 'milk', chosen: [] } },
+    checkDeps()
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.status, 'matched');
+  assert.equal(res.body.matched_name, 'Semi skimmed milk 4 pints');
+  assert.equal(res.body.matched_regular_id, 11);
+  assert.equal(res.body.already_on_list, false);
+});
+
+test('AC1: `chosen` is what makes possible_duplicate reachable through the route', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: 'milk', chosen: ['11'] } },
+    checkDeps()
+  );
+  assert.equal(res.body.status, 'possible_duplicate');
+  assert.equal(res.body.already_on_list, true);
+});
+
+test('AC2: an ambiguous term returns a status and NOTHING she must decide', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: 'shake', chosen: [] } },
+    checkDeps()
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.body.status, 'needs_confirmation');
+  assert.equal(res.body.matched_name, null);
+  assert.equal(res.body.matched_regular_id, null);
+  // ⛔ THE WHOLE RESPONSE, KEY BY KEY. The contract's five and nothing else -
+  // so a candidate list cannot ride along under any name.
+  assert.deepEqual(Object.keys(res.body).sort(),
+    ['already_on_list', 'matched_name', 'matched_regular_id', 'ok', 'status']);
+  assert.ok(!/alternat/i.test(JSON.stringify(res.body)));
+});
+
+test('AC2: EVERY status is exercised through the route and none carries a list', async () => {
+  const cases = [
+    { text: 'milk', chosen: [], expect: 'matched' },
+    { text: 'milk', chosen: ['11'], expect: 'possible_duplicate' },
+    { text: 'shake', chosen: [], expect: 'needs_confirmation' },
+    { text: 'some of those little cakes', chosen: [], expect: 'unmatched_new_item' },
+    { text: '...', chosen: [], expect: 'unreadable' }
+  ];
+  let exercised = 0;
+  for (const c of cases) {
+    const res = await handleRequest(
+      { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: c.text, chosen: c.chosen } },
+      checkDeps()
+    );
+    assert.equal(res.status, 200);
+    assert.equal(res.body.status, c.expect);
+    for (const k of Object.keys(res.body)) {
+      const v = res.body[k];
+      assert.ok(v === null || ['string', 'number', 'boolean'].includes(typeof v),
+        'a non-leaf value escaped on ' + c.expect + ' under key ' + k);
+    }
+    exercised += 1;
+  }
+  // A sweep that silently covered zero cases is a failing sweep.
+  assert.equal(exercised, 5);
+});
+
+test('AC1: the sense-check route dispatches NO command - it cannot write', async () => {
+  let dispatched = 0;
+  await handleRequest(
+    { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: 'milk' } },
+    checkDeps({ dispatch: async () => { dispatched += 1; return {}; } })
+  );
+  assert.equal(dispatched, 0, 'the sense-check must never reach the command surface');
+});
+
+test('AC1: an empty term is a plain 400 about HER input, never a 500', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: '   ' } },
+    checkDeps()
+  );
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error, 'no_text');
+});
+
+test('AC1: an unconfigured reader answers 503 not_configured, in words', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: 'milk' } },
+    checkDeps({ loadRegulars: async () => { throw new Error('ASDAIR_DB_URL is not set. Export the asdair READ connection string'); } })
+  );
+  assert.equal(res.status, 503);
+  assert.equal(res.body.error, 'not_configured');
+});
+
+test('AC1: a database failure is a scrubbed 500 - the connection string never reaches her', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/check-item', body: { household: 1, text: 'milk' } },
+    checkDeps({ loadRegulars: async () => { throw new Error('connect ECONNREFUSED postgresql://asdair_ro:test@127.0.0.1:55432/asdair_test'); } })
+  );
+  assert.equal(res.status, 500);
+  assert.equal(res.body.error, 'check_failed');
+  assert.ok(!/asdair_ro:test/.test(JSON.stringify(res.body)));
+});
+
+test('AC1: GET on the sense-check route is 405, not a silent read', async () => {
+  const res = await handleRequest({ method: 'GET', path: '/asdair/check-item' }, checkDeps());
+  assert.equal(res.status, 405);
 });

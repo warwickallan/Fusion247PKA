@@ -290,3 +290,166 @@ test('AC2 JOIN: the actor recorded on the command row says the COCKPIT submitted
   assert.equal(args.source_kind, 'text');
   assert.equal(args.source_id, PINNED_SOURCE_ID);
 });
+
+// =====================================================================
+// WP-B15-50 AC3 - `extras` reach the shop as HER EXACT WORDS
+//
+// The defect these exist for: folding extras into the evidence text while
+// leaving the content fingerprint over the TAPPED ITEMS ONLY would give a woman
+// who adds "some of those little cakes" an identical sourceId - so the command
+// row collapses, recorded_new is false, her page says "nothing has changed", no
+// notification fires, and her words reach nothing. She would be told in plain
+// English that nothing happened while something she asked for was discarded.
+// =====================================================================
+
+const EX_ITEMS = [
+  { id: '13', name: 'Arla semi-skimmed 4pt', qty: 2 },
+  { id: null, name: 'Hovis soft white medium', qty: 1 }
+];
+const AT = '2026-08-13T09:15:00.000Z';
+
+// Named apart from the build() helper above on purpose: that one merges
+// overrides onto a fixed list, and these cases need to hand the adapter the
+// WHOLE request - including the keys it must tolerate being absent.
+function build50(request, receivedAt) {
+  return intake.buildReceiveListSpec(request, { receivedAt: receivedAt || AT });
+}
+
+test('AC3: a typed extra reaches the evidence text as a plain line, exactly as she wrote it', () => {
+  const out = build50({ household: 1, items: EX_ITEMS, extras: ['some of those little cakes'] });
+  assert.match(out.rawText, /\nsome of those little cakes$/);
+  assert.deepEqual(out.extras, ['some of those little cakes']);
+  // Her order is preserved: tapped items first, in her order, then what she typed.
+  assert.equal(out.rawText.split('\n').length, 3);
+});
+
+test('AC3: her words are NOT tidied - no title case, no spell-correction, no de-duplication', () => {
+  const messy = ['bananas', 'BANANAS', 'bananas', 'teh milk', 'jam  (the red one)'];
+  const out = build50({ household: 1, items: EX_ITEMS, extras: messy });
+  assert.deepEqual(out.extras, ['bananas', 'BANANAS', 'bananas', 'teh milk', 'jam (the red one)']);
+  // Only run-of-whitespace collapsing, which is the same rule cleanName applies
+  // so that one line stays one line. Nothing else was touched.
+  assert.ok(out.rawText.includes('teh milk'), 'a misspelling is EVIDENCE, not something to fix');
+});
+
+test('AC3: a newline smuggled into an extra cannot forge a second line of evidence', () => {
+  const out = build50({ household: 1, items: EX_ITEMS, extras: ['cakes\n99 x caviar'] });
+  assert.equal(out.rawText.split('\n').length, 3, 'one extra must remain one line');
+  assert.ok(out.rawText.includes('cakes 99 x caviar'));
+});
+
+test('AC3: an extra that cannot be carried FAILS LOUDLY - it is never silently dropped', () => {
+  const cases = [
+    { extras: [''], code: 'list_extra_invalid', why: 'empty' },
+    { extras: ['   '], code: 'list_extra_invalid', why: 'whitespace only' },
+    { extras: [42], code: 'list_extra_invalid', why: 'not a string' },
+    { extras: ['x'.repeat(201)], code: 'list_extra_invalid', why: 'over the length bound' },
+    { extras: 'cakes', code: 'list_extras_invalid', why: 'not a list' },
+    { extras: new Array(51).fill('x'), code: 'list_extras_too_many', why: 'too many' }
+  ];
+  let checked = 0;
+  for (const c of cases) {
+    assert.throws(
+      () => build50({ household: 1, items: EX_ITEMS, extras: c.extras }),
+      (err) => err.code === c.code && err.expose === true,
+      c.why + ' should throw ' + c.code
+    );
+    checked += 1;
+  }
+  assert.equal(checked, 6);
+});
+
+test('AC3: the refusal names WHICH typed item, because "invalid list" is not actionable', () => {
+  assert.throws(
+    () => build50({ household: 1, items: EX_ITEMS, extras: ['cakes', ''] }),
+    /typed item 2 is empty/
+  );
+});
+
+test('AC3: omitting `extras` entirely is the normal case and changes nothing', () => {
+  const out = build50({ household: 1, items: EX_ITEMS });
+  assert.deepEqual(out.extras, []);
+  assert.equal(out.rawText.split('\n').length, 2);
+});
+
+// ── THE FINGERPRINT. C1, and the reason AC3 can hold at all ──────────────────
+
+test('AC3/C1: adding a typed extra CHANGES the sourceId - her second send is not invisible', () => {
+  const without = build50({ household: 1, items: EX_ITEMS });
+  const withCakes = build50({ household: 1, items: EX_ITEMS, extras: ['some of those little cakes'] });
+  assert.notEqual(withCakes.spec.sourceId, without.spec.sourceId,
+    'an added extra MUST change the discriminator, or the whole submission collapses to a no-op');
+});
+
+test('AC3/C1: changing only the WORDING of an extra changes the sourceId', () => {
+  const a = build50({ household: 1, items: EX_ITEMS, extras: ['cakes'] });
+  const b = build50({ household: 1, items: EX_ITEMS, extras: ['little cakes'] });
+  assert.notEqual(a.spec.sourceId, b.spec.sourceId);
+});
+
+test('AC3/C1: the ORDER of her extras is part of the list identity, as it is for items', () => {
+  const a = build50({ household: 1, items: EX_ITEMS, extras: ['cakes', 'jam'] });
+  const b = build50({ household: 1, items: EX_ITEMS, extras: ['jam', 'cakes'] });
+  assert.notEqual(a.spec.sourceId, b.spec.sourceId);
+});
+
+test('AC3/C1: an IDENTICAL resend still collapses to one row - idempotency is not lost', () => {
+  const a = build50({ household: 1, items: EX_ITEMS, extras: ['cakes'] });
+  const b = build50({ household: 1, items: EX_ITEMS, extras: ['cakes'] }, '2026-08-13T18:40:00.000Z');
+  assert.equal(a.spec.sourceId, b.spec.sourceId,
+    'the same list sent twice in one day must remain one durable record');
+});
+
+test('AC3/C1: a list with NO extras keeps its pre-WP-B15-50 digest, byte for byte', () => {
+  // PINNED TO A LITERAL captured from the implementation BEFORE this change.
+  // If the no-extras digest moved, every shop the live service recorded today
+  // would look changed on the next identical resubmission - firing a
+  // notification and telling her something happened when nothing did.
+  const out = build50({ household: 1, items: EX_ITEMS });
+  assert.equal(out.spec.sourceId, 'cockpit:mum:list:6a0fb64a0ef861a0');
+});
+
+// ── THE CLOCK. Her tablet's claim, checked and reported - never enforced ─────
+
+test('clock: a matching list_date agrees, and the server date is what is recorded', () => {
+  const out = build50({ household: 1, items: EX_ITEMS, list_date: '2026-08-13' });
+  assert.deepEqual(out.clock, { claimed: '2026-08-13', recorded: '2026-08-13', agrees: true });
+  assert.equal(out.spec.listDate, '2026-08-13');
+});
+
+test('clock: a DISAGREEING list_date is reported and the submission still succeeds', () => {
+  const out = build50({ household: 1, items: EX_ITEMS, list_date: '2026-08-12' });
+  assert.equal(out.clock.agrees, false);
+  assert.equal(out.clock.claimed, '2026-08-12');
+  // The server's clock still owns the shop. A date from a tablet must never
+  // become a shop_ref, or a wrong clock silently duplicates a week.
+  assert.equal(out.clock.recorded, '2026-08-13');
+  assert.equal(out.spec.listDate, '2026-08-13');
+});
+
+test('clock: a MALFORMED list_date is a disagreement, never a refusal', () => {
+  for (const bad of ['not-a-date', '13/08/2026', '2026-13-45', 'yesterday']) {
+    const out = build50({ household: 1, items: EX_ITEMS, list_date: bad });
+    assert.equal(out.clock.agrees, false, bad + ' should read as a disagreement');
+    assert.equal(out.spec.listDate, '2026-08-13', 'her list still travels');
+  }
+});
+
+test('clock: NO list_date is `agrees: null` - a different answer from a disagreement', () => {
+  const out = build50({ household: 1, items: EX_ITEMS });
+  assert.equal(out.clock.agrees, null);
+  assert.equal(out.clock.claimed, null);
+  assert.equal(out.clock.recorded, '2026-08-13');
+});
+
+test('clock: a smuggled newline in list_date cannot forge a line in a log or a message', () => {
+  const out = build50({ household: 1, items: EX_ITEMS, list_date: '2026-08-13\nMum sent 99 items' });
+  assert.ok(out.clock.claimed.indexOf('\n') === -1);
+  assert.equal(out.clock.agrees, false);
+});
+
+test('clock: the comparison does not touch the fingerprint - a date claim is not list content', () => {
+  const a = build50({ household: 1, items: EX_ITEMS, list_date: '2026-08-13' });
+  const b = build50({ household: 1, items: EX_ITEMS, list_date: '1999-01-01' });
+  assert.equal(a.spec.sourceId, b.spec.sourceId);
+});

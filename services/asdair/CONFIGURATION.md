@@ -112,6 +112,34 @@ downloaded list photos are household personal data.
 | `ASDAIR_COCKPIT_ALLOWED_ORIGIN` | recommended | exact origin, e.g. `https://cockpit.example` | none | not checked | Cross-origin requests from the cockpit shell are refused |
 | `ASDAIR_DB_URL` | yes | as above | none | not checked *here* | The read service has nothing to read |
 | `ASDAIR_MEDIA_ROOT` | recommended | as above | unset = disabled | not checked *here* | `/asdair/media` returns `media_root_not_configured` |
+| `SHOPPER_BOT_TOKEN` | for notifications | `<digits>:<url-safe token>` | none | **presence only** — `cockpit-api` never reads, parses or prints the value | Warwick is not told when Mum sends her list |
+| `SHOPPER_CHAT_ID` | for notifications | integer (negative for a group) | none | **BLOCKING when malformed**, at startup | The notification has no destination |
+
+### ⛔ The two notification variables: set BOTH, or NEITHER
+
+`cockpit-api` **refuses to start** when exactly one of `SHOPPER_BOT_TOKEN` / `SHOPPER_CHAT_ID` is
+present. This is deliberate, and it is the one configuration state that used to fail silently.
+
+`loadSenderConfig` throws on a missing token but returns a **null chat id perfectly happily**. So a
+process started with a token and no chat id *looks* configured, boots clean, accepts Mum's list — and
+discovers it has nowhere to send at the exact moment it needs one, on a path nobody is watching.
+
+The three states:
+
+| `SHOPPER_BOT_TOKEN` | `SHOPPER_CHAT_ID` | What happens |
+|---|---|---|
+| set | set | Notifications on. `enabled.notify_shopper: true` at startup. |
+| absent | absent | **Starts.** Loud startup warning; every submission answers `notify_error: notify_not_configured`. Legitimate — it is how the service runs before the values are placed. |
+| one of them | the other absent | **REFUSES TO START**, naming which one is missing. |
+
+⚠️ **While notifications are off, Mum's page can still say "I've told Warwick what you changed" when
+he was not told.** The response carries `notified: false` and `notify_error`, so the page *can* tell —
+but the two halves are configured independently, and this is the gap between them.
+
+The same `SHOPPER_BOT_TOKEN` as the intake process (one bot account, one credential). The chat id is
+**not** a secret. `cockpit-api` consumes the token **by name only** — `notifyShopper.js` hands the
+environment to the bot module's own loader and never touches the value, so the token appears in no
+log, no error, no response and no diagnostic on this service.
 
 ---
 

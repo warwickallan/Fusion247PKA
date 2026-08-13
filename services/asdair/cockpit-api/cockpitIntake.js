@@ -51,6 +51,19 @@
 // "changes the display but not the durable record" defect. What it buys is that
 // the second send is not invisible.
 //
+// ── WP-B15-50: WHAT SHE TYPED, AND WHAT HER TABLET CLAIMED THE DATE WAS ────
+//
+// TWO ADDITIONS, both of which keep the promises the page makes to her:
+//
+//   `extras`  the things she typed rather than tapped. They travel VERBATIM
+//             into the evidence text AND into the content fingerprint. The
+//             fingerprint half is the load-bearing one - see listFingerprint().
+//
+//   `clock`   her tablet's `list_date`, compared against the server's own date.
+//             An ASSERTION to be checked, never a source: shop_ref still comes
+//             from the server's clock. Reported to Warwick, never to her, and
+//             never a reason to refuse her list.
+//
 // PURE. No `pg`, no env, no I/O. Every test in cockpitIntake.test.js runs on a
 // box with nothing installed.
 // =====================================================================
@@ -71,6 +84,12 @@ const MAX_ITEMS = 200;
 const MAX_NAME_LENGTH = 120;
 const MIN_QTY = 1;
 const MAX_QTY = 20;
+// WP-B15-50 AC3. The things she TYPES rather than taps. Same kind of bound, same
+// reason: a shape limit on a malformed client, never an opinion about her shop.
+const MAX_EXTRAS = 50;
+// Longer than an item name on purpose - a tapped item is a catalogue name, an
+// extra is a sentence ("some of those little cakes from the bakery bit").
+const MAX_EXTRA_LENGTH = 200;
 
 const ACTOR = 'cockpit:mum';
 const SOURCE_KIND = 'text';
@@ -152,6 +171,54 @@ function normaliseItems(items) {
   });
 }
 
+/**
+ * ── WP-B15-50 AC3. WHAT SHE TYPED, AND IT IS NOT TIDIED ───────────────────
+ *
+ * ⛔ HER EXACT WORDS. No title-casing, no spell-correction, no de-duplication,
+ * no sorting, no "helpful" singularisation. The pipeline resolves identity
+ * downstream against the real catalogue; her raw words are EVIDENCE, and an
+ * evidence record that has been improved is not evidence.
+ *
+ * The ONE transformation applied is the same one `cleanName` applies and for
+ * the same reason: control characters and newlines become a space, because the
+ * evidence text is line-per-item and a smuggled newline would forge a line she
+ * never wrote. That is keeping one line one line, not editing her language.
+ *
+ * ⛔ AND NOTHING IS SILENTLY DROPPED. An extra that cannot be carried - not a
+ * string, empty, or longer than the bound - throws a coded, exposable error and
+ * the whole submission fails loudly. Succeeding with less than she asked for,
+ * while telling her it went, is the exact class of defect this Work Package
+ * exists to close.
+ */
+function normaliseExtras(extras) {
+  if (extras === undefined || extras === null) return [];
+  if (!Array.isArray(extras)) {
+    throw invalid('list_extras_invalid', 'the extra items did not arrive as a list');
+  }
+  if (extras.length > MAX_EXTRAS) {
+    throw invalid('list_extras_too_many',
+      'there are ' + extras.length + ' typed extras, and the limit is ' + MAX_EXTRAS);
+  }
+  return extras.map(function (raw, i) {
+    if (typeof raw !== 'string') {
+      throw invalid('list_extra_invalid', 'typed item ' + (i + 1) + ' is not something I can read');
+    }
+    const flat = raw.replace(CONTROL_CHARS, ' ').replace(/\s+/g, ' ').trim();
+    if (flat === '') {
+      // Loud, not dropped. The route contract tells the page to omit `extras`
+      // entirely when there is nothing in it, so a blank arriving here means the
+      // page sent something it should not have - and answering that with a plain
+      // sentence is recoverable, where silently discarding it is not.
+      throw invalid('list_extra_invalid', 'typed item ' + (i + 1) + ' is empty');
+    }
+    if (flat.length > MAX_EXTRA_LENGTH) {
+      throw invalid('list_extra_invalid',
+        'typed item ' + (i + 1) + ' is longer than ' + MAX_EXTRA_LENGTH + ' characters');
+    }
+    return flat;
+  });
+}
+
 /** The household. Never defaulted: a list written to the wrong household is a silent disaster. */
 function normaliseHousehold(value) {
   if (value === undefined || value === null || value === '') {
@@ -180,8 +247,23 @@ function normaliseHousehold(value) {
  * deliberately absent - this line is the name SHE WAS SHOWN, and a machine id in
  * the evidence text would make it harder to read, not easier to trust.
  */
-function renderList(items) {
-  return items.map(function (it) { return it.qty + ' x ' + it.name; }).join('\n');
+/**
+ * WP-B15-50 AC3. Typed extras are appended AS PLAIN LINES, after the tapped ones.
+ *
+ * No "1 x" prefix, because she did not say one of anything - inventing a
+ * quantity would be this file having a shopping opinion. No marker, no bullet,
+ * no bracketed "(typed)": a bare line is EXACTLY what a typed Telegram list
+ * looks like to the interpreter downstream, so her extras travel through the
+ * same unchanged path as everything else rather than needing a special case.
+ *
+ *     2 x Semi skimmed milk 4 pints
+ *     1 x Hovis soft white medium
+ *     some of those little cakes
+ */
+function renderList(items, extras) {
+  const lines = items.map(function (it) { return it.qty + ' x ' + it.name; });
+  const typed = Array.isArray(extras) ? extras : [];
+  return lines.concat(typed).join('\n');
 }
 
 /**
@@ -197,12 +279,42 @@ function renderList(items) {
  * The household is included so two households cannot collide; the DATE is NOT,
  * because the shop_ref already carries the week and the key is scoped to it.
  */
-function listFingerprint(householdId, items) {
+function listFingerprint(householdId, items, extras) {
   const canonical = items
     .map(function (it) { return (it.id === null ? '' : it.id) + '|' + it.qty + '|' + it.name; })
     .join('\n');
+  const typed = Array.isArray(extras) ? extras : [];
+  // ── ⛔ WP-B15-50. THE EXTRAS ARE PART OF THE IDENTITY OF A LIST ──────────
+  //
+  // THE DEFECT THIS CLOSES, EXACTLY. Before this line existed the digest was
+  // taken over the TAPPED ITEMS ONLY. So a woman who taps her usual items, adds
+  // "some of those little cakes" and sends produced a byte-identical `sourceId`
+  // to her earlier submission - which means:
+  //
+  //   * the command row collapsed on ON CONFLICT DO NOTHING     -> recorded_new: false
+  //   * her page therefore said "Today's list has already gone. Nothing has
+  //     changed."                                                <- A LIE
+  //   * no notification fired, so Warwick was never told
+  //   * and `raw_*` is excluded from shopStore's UPDATE allowlist, so the words
+  //     she typed reached nothing at all.
+  //
+  // She would have been told, in plain English, that nothing happened, WHILE
+  // something she asked for was discarded. That is ruling A1's defect one layer
+  // along, and AC3 cannot hold without this.
+  //
+  // ── WHY THE SECTION IS APPENDED ONLY WHEN NON-EMPTY ─────────────────────
+  // A list with no typed extras must hash EXACTLY as it did before this Work
+  // Package - shops recorded by the live service today already carry v1 digests,
+  // and changing them would make the next identical resubmission look like a
+  // change, fire a notification and tell her something happened when nothing
+  // did. Pinned by a literal in cockpitIntake.test.js so it cannot drift.
+  //
+  // ORDER IS PART OF THE IDENTITY, as it is for items: the evidence text
+  // preserves her order, and a fingerprint that disagreed with the evidence
+  // beside it would be worse than no fingerprint.
+  const extrasSection = typed.length === 0 ? '' : '\n#extras\n' + typed.join('\n');
   return crypto.createHash('sha256')
-    .update('asdair:cockpit:list:v1\n' + householdId + '\n' + canonical, 'utf8')
+    .update('asdair:cockpit:list:v1\n' + householdId + '\n' + canonical + extrasSection, 'utf8')
     .digest('hex')
     .slice(0, 16);
 }
@@ -214,8 +326,8 @@ function listFingerprint(householdId, items) {
  * as siblings in the ledger: channel first, then whatever that channel uses to
  * identify a delivery. Telegram has a message id; the Cockpit has the content.
  */
-function sourceIdFor(householdId, items) {
-  return 'cockpit:mum:list:' + listFingerprint(householdId, items);
+function sourceIdFor(householdId, items, extras) {
+  return 'cockpit:mum:list:' + listFingerprint(householdId, items, extras);
 }
 
 /**
@@ -240,11 +352,53 @@ function listDateFrom(receivedAt) {
 }
 
 /**
+ * ── WP-B15-50. THE DATE SHE CONFIRMED IS AN ASSERTION, NOT A SOURCE ───────
+ *
+ * Her tablet sends `list_date` - the date she confirmed on screen. It does NOT
+ * become the shop's date: `shop_ref` still derives from the SERVER's clock
+ * alone, exactly as it did, because a shop_ref taken from a client is a
+ * duplicated week waiting to happen.
+ *
+ * What it IS good for is catching the case where the tablet's idea of today and
+ * the server's have drifted apart - which nobody would otherwise notice until a
+ * shop landed on the wrong day.
+ *
+ * ⛔ IT NEVER BLOCKS HER, AND SHE IS NEVER TOLD. A disagreement, a malformed
+ * date, a date from 1970 - all of it travels, the submission succeeds, and the
+ * mismatch is reported to WARWICK on the response and in the ShopperBot
+ * message. She did nothing wrong and there is nothing for her to fix.
+ *
+ * THE COMPARISON LIVES HERE, IN THE ADAPTER, because this is the only place
+ * both values exist together. Deriving the server's date a second time at the
+ * transport to compare it against this one is how two derivations of one date
+ * drift apart.
+ *
+ * `agrees: null` means she asserted nothing - a genuinely different answer from
+ * `false`, and never rendered as a disagreement.
+ */
+function compareClock(claimedRaw, recorded) {
+  if (claimedRaw === undefined || claimedRaw === null || claimedRaw === '') {
+    return { claimed: null, recorded: recorded, agrees: null };
+  }
+  // Flattened and capped for the same reason every other free string here is:
+  // this value is reported onward into a log line and a Telegram message, and a
+  // smuggled newline in either is a forged line.
+  const claimed = String(claimedRaw)
+    .replace(CONTROL_CHARS, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40);
+  return { claimed: claimed, recorded: recorded, agrees: claimed === recorded };
+}
+
+/**
  * TRANSLATE ONE COCKPIT SUBMISSION INTO A receiveList SPEC.
  *
- * @param {{household:*, items:Array<{id?:*,name:*,qty?:*}>}} request  what the Cockpit POSTed
+ * @param {{household:*, items:Array<{id?:*,name:*,qty?:*}>, extras?:Array<string>,
+ *          list_date?:string}} request  what the Cockpit POSTed
  * @param {{receivedAt:(string|Date)}} options  the receiver's own stamp
- * @returns {{spec:object, items:Array, rawText:string}}
+ * @returns {{spec:object, items:Array, extras:Array<string>, rawText:string,
+ *            clock:{claimed:string|null, recorded:string, agrees:boolean|null}}}
  *
  * The spec is handed to the SHARED command unchanged. Every field below exists
  * in receiveList's own documented spec; nothing here is invented for this
@@ -257,11 +411,14 @@ function buildReceiveListSpec(request, options) {
 
   const householdId = normaliseHousehold(req.household);
   const items = normaliseItems(req.items);
-  const rawText = renderList(items);
+  const extras = normaliseExtras(req.extras);
+  const rawText = renderList(items, extras);
+  const listDate = listDateFrom(opts.receivedAt);
+  const clock = compareClock(req.list_date, listDate);
 
   const spec = {
     householdId: householdId,
-    listDate: listDateFrom(opts.receivedAt),
+    listDate: listDate,
     sourceKind: SOURCE_KIND,
     rawText: rawText,
     rawMediaPath: null,
@@ -272,8 +429,9 @@ function buildReceiveListSpec(request, options) {
     // WHO SENT IT. Recorded on the command row so "who sent this week's list?"
     // is answerable from the row alone a month later.
     actor: ACTOR,
-    // Ruling A1. The discriminator that makes a CHANGED re-send visible.
-    sourceId: sourceIdFor(householdId, items),
+    // Ruling A1, extended by WP-B15-50 to cover what she TYPED as well as what
+    // she tapped. The discriminator that makes a CHANGED re-send visible.
+    sourceId: sourceIdFor(householdId, items, extras),
     // A tapped list was never read from a photograph, so it needs no review
     // gate. Photo shops set this; a typed or tapped one must not, or every
     // Cockpit shop would be held for a human check that has nothing to check.
@@ -281,7 +439,7 @@ function buildReceiveListSpec(request, options) {
     receivedAt: opts.receivedAt instanceof Date ? opts.receivedAt.toISOString() : (opts.receivedAt || null),
   };
 
-  return { spec: spec, items: items, rawText: rawText };
+  return { spec: spec, items: items, extras: extras, rawText: rawText, clock: clock };
 }
 
 module.exports = {
@@ -292,12 +450,16 @@ module.exports = {
   MAX_NAME_LENGTH: MAX_NAME_LENGTH,
   MIN_QTY: MIN_QTY,
   MAX_QTY: MAX_QTY,
+  MAX_EXTRAS: MAX_EXTRAS,
+  MAX_EXTRA_LENGTH: MAX_EXTRA_LENGTH,
   _internal: {
     normaliseItems: normaliseItems,
+    normaliseExtras: normaliseExtras,
     normaliseHousehold: normaliseHousehold,
     renderList: renderList,
     listFingerprint: listFingerprint,
     sourceIdFor: sourceIdFor,
     listDateFrom: listDateFrom,
+    compareClock: compareClock,
   },
 };
