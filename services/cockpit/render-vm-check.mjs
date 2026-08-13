@@ -124,6 +124,32 @@ function setRefs(refs) {
 }
 
 function scenario(name, viewKey, render, overrides = {}) {
+  // ⛔ THE RECURRENCE GUARD. Vera, WP-B15-36 gate, LOW 3 — and it is here because the failure it
+  // prevents already happened once, cost the AsdAIr screens every scrap of render coverage from
+  // f7bf71a onward, and made three mutation "catches" vacuous.
+  //
+  // A scenario names its view by STRING against a registry that lives in another file. Rename a key
+  // in apps.js and `find` silently returns undefined, `currentView.label` throws in the breadcrumb
+  // BEFORE the mutation or the template can be reached, and `--self-test` scores that throw as a
+  // catch. The run stays green and means nothing.
+  //
+  // So this fails LOUDLY and NAMES THE CAUSE, instead of leaving the next reader to work it back
+  // from "Cannot read properties of undefined (reading 'label')". Deliberately a hard throw, not a
+  // recorded error: a mis-keyed scenario is a broken harness, and a broken harness must never be
+  // able to present itself as a passing one.
+  //
+  // NO_APP_VIEW is the honest way to say "this scenario does not render an app view at all" — the
+  // Home and System plans override `area`, so the app workspace never renders and the view key is
+  // irrelevant to them. They previously carried the string 'overview', which was ALSO a dead key;
+  // that is a coincidence worth removing rather than preserving, because a real key sitting there
+  // unused is indistinguishable from a real key that has silently gone stale.
+  const resolvedView = viewKey === NO_APP_VIEW ? null : app.views.find((v) => v.key === viewKey);
+  if (viewKey !== NO_APP_VIEW && !resolvedView) {
+    throw new Error('render-vm-check: scenario "' + name + '" names view key "' + viewKey
+      + '", which the app registry does not carry. Known keys: ' + app.views.map((v) => v.key).join(', ')
+      + '. A view was almost certainly renamed in apps.js without this file being updated — fix the '
+      + 'key here rather than letting the breadcrumb throw and be scored as a passing mutation.');
+  }
   const base = {};
   for (const k of Object.keys(bindings)) {
     Object.defineProperty(base, k, {
@@ -136,7 +162,7 @@ function scenario(name, viewKey, render, overrides = {}) {
   // assignment is swallowed and the scenario silently tests the wrong data.
   const fixed = Object.assign({
     area: 'apps', appKey: 'asdair', currentApp: app,
-    currentView: app.views.find((v) => v.key === viewKey),
+    currentView: resolvedView,
     statusOf: () => ({ state: 'up', detail: 'answering' }),
     appStatusLine: () => 'running',
     detail: null, busy: false,
@@ -223,6 +249,11 @@ function valueAfter(parts, label) {
 // Whole sentences are their own text nodes, so match within a node rather than across a join —
 // joining first would let two unrelated fragments satisfy a phrase that is nowhere on screen.
 const hasText = (parts, s) => parts.some((p) => p.includes(s));
+
+/** Sentinel for a scenario that renders no app view (Home, System — they override `area`). A named
+ * value, not a bare null, so the intent is legible at every call site and the guard in scenario()
+ * can tell "deliberately no view" apart from "view key has gone stale". */
+const NO_APP_VIEW = Symbol('no app view rendered by this scenario');
 
 // Run one scenario's assertions and push each result into `sink`. `sink` is supplied by the caller
 // because the two callers want opposite things from a failure: the gate REPORTS it, while the
@@ -666,7 +697,7 @@ const CAP_QUIET = {
 };
 
 const HOME_PLAN = [
-  ['HOME (a prevention is in doubt)', 'overview', CAP_ATTN, { area: 'home' }, [
+  ['HOME (a prevention is in doubt)', NO_APP_VIEW, CAP_ATTN, { area: 'home' }, [
     ['the attention card names the count in plain language',
       (p) => hasText(p, '1 prevention needs attention')],
     ['it names the actual family, not a slug',
@@ -678,7 +709,7 @@ const HOME_PLAN = [
     ['Recent activity carries the CAPAE event, not just ingestion',
       (p) => hasText(p, 'Recent activity') && hasText(p, 'Prevention challenged')],
   ]],
-  ['HOME (nothing in doubt — the card must stay quiet)', 'overview', CAP_QUIET, { area: 'home' }, [
+  ['HOME (nothing in doubt — the card must stay quiet)', NO_APP_VIEW, CAP_QUIET, { area: 'home' }, [
     ['⭐ no attention card at all when nothing needs attention',
       (p) => !hasText(p, 'needs attention') && !hasText(p, 'System →')],
     ['but the pane still renders',
@@ -689,7 +720,7 @@ const HOME_PLAN = [
 const SYSTEM_PLAN = [
   // AC1 ① — two reports, most recent first. The ordering holds, so the ORDER WRONG branch must NOT
   // fire; a banner that appears on correct data is as bad as one that never appears on wrong data.
-  ['SYSTEM (two rotation reports, most recent first)', 'overview',
+  ['SYSTEM (two rotation reports, most recent first)', NO_APP_VIEW,
     rrRefs([RR_RECENT, RR_OLDER]), SYS, [
       ['the group count is the number of reports read', (p) => valueAfter(p, 'Session / Rotation Reports') === '2'],
       ['the plural sentence states they were read and are shown in the supplied order',
@@ -709,7 +740,7 @@ const SYSTEM_PLAN = [
   // AC1 ② — the SAME two reports supplied in the wrong order. The cockpit never re-sorts; a declared
   // order that is not the actual order is a PRODUCER defect and is surfaced, and this branch was
   // rendered by no scenario at all before now.
-  ['SYSTEM (reports supplied OUT of order)', 'overview',
+  ['SYSTEM (reports supplied OUT of order)', NO_APP_VIEW,
     rrRefs([RR_OLDER, RR_RECENT]), SYS, [
       ['the order break is surfaced rather than silently re-sorted', (p) => hasText(p, 'ORDER WRONG')],
       ['the banner names the exact position the order first breaks',
@@ -720,7 +751,7 @@ const SYSTEM_PLAN = [
 
   // AC1 ③ + ④ + AC2 — THE DECIDING SCENARIO. Each assertion binds to ONE field, and the unknown and
   // the zero it is paired against sit in the same block.
-  ['SYSTEM (an unknown field beside a genuine measured zero)', 'overview',
+  ['SYSTEM (an unknown field beside a genuine measured zero)', NO_APP_VIEW,
     rrRefs([RR_UNKNOWN_AND_ZERO]), SYS, [
       ['an unestablished elapsed time renders as words, NOT as 0',
         (p) => valueAfter(p, 'Elapsed') === 'not established'],
@@ -761,7 +792,7 @@ const SYSTEM_PLAN = [
 
   // Every container null. The degenerate card must stay honest field by field, and — the part that
   // was once actually wrong — must NOT print a total over nothing.
-  ['SYSTEM (a report whose every field and container is null)', 'overview',
+  ['SYSTEM (a report whose every field and container is null)', NO_APP_VIEW,
     rrRefs([RR_ALL_NULL]), SYS, [
       ['the singular sentence is used for a single report',
         (p) => hasText(p, 'rotation report was') && !hasText(p, 'rotation reports were')],
@@ -793,7 +824,7 @@ const SYSTEM_PLAN = [
 
   // AC1 ⑤ — read, and there are none. A MEASURED ZERO at the list level, and the one rung most
   // easily confused with the two either side of it.
-  ['SYSTEM (reports read and there are none — a measured zero)', 'overview',
+  ['SYSTEM (reports read and there are none — a measured zero)', NO_APP_VIEW,
     rrRefs([]), SYS, [
       ['the empty state says they were READ and there are none',
         (p) => hasText(p, 'The reports were read and there are none recorded yet.')],
@@ -804,7 +835,7 @@ const SYSTEM_PLAN = [
 
   // Not asked yet. "We have not looked" is not "there are none", and this rung exists to keep those
   // two sentences apart.
-  ['SYSTEM (the reports have not been asked for yet)', 'overview',
+  ['SYSTEM (the reports have not been asked for yet)', NO_APP_VIEW,
     rrRefs(null, { requested: false }), SYS, [
       ['the surface says it has not asked yet',
         (p) => hasText(p, 'The rotation reports have not been read yet.')],
@@ -814,7 +845,7 @@ const SYSTEM_PLAN = [
 
   // In flight. Leads the chain on rrLoading alone so a RE-read announces too, and the already-read
   // cards stay on screen under it rather than blanking.
-  ['SYSTEM (a read is in flight over already-read reports)', 'overview',
+  ['SYSTEM (a read is in flight over already-read reports)', NO_APP_VIEW,
     rrRefs([RR_RECENT], { loading: true }), SYS, [
       ['the in-flight state is announced', (p) => hasText(p, 'Reading the rotation reports…')],
       ['the already-read card is NOT blanked while the re-read runs', (p) => hasText(p, 'aaaaaaa')],
@@ -823,7 +854,7 @@ const SYSTEM_PLAN = [
 
   // AC1 ⑥ — the database read failed. Two separate properties: the failure is stated truthfully, AND
   // it is CONTAINED — "failure to load historical reports must not break the rest of the System tab".
-  ['SYSTEM (the database read FAILED)', 'overview',
+  ['SYSTEM (the database read FAILED)', NO_APP_VIEW,
     rrRefs(null, { err: 'the database is not answering' }), SYS, [
       ['the failure is stated as a failure', (p) => hasText(p, 'COULD NOT BE READ')],
       ['and it is explicitly NOT reported as an absence of reports',

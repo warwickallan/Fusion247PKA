@@ -51,6 +51,33 @@ and `.as-compact-why`; getComputedStyle says the real backdrops are `--bg` and `
 PASS, but a figure quoted against a surface the element does not sit on is the wrong-number class
 GL-003 §2d warns about. The comment now records the MEASURED surfaces.
 
+## ⛔ CORRECTION to my own evidence markers — Vera, gate HOLD 2, and she is right
+
+**I labelled AC5's crop RENDER-VERIFIED. It is CODE-VERIFIED ONLY, and this correction is the record.**
+
+I did measure the crop in a browser probe and the geometry I quoted is real — but **the executed
+suite has ZERO coverage of the crop's positive path.** All 40 VM scenarios render the *absence*
+branch, **including the fixture that carries all four pixel bounds**, because `asdairMediaSize` is
+populated only by `img.onload`, which cannot fire in a Node `vm`, and no fixture sets `region.url`.
+`asdairCropBoxStyle`, `asdairCropImgStyle` and the percentage arithmetic are therefore never executed
+there.
+
+The measurement was real; the label was not. One hand-driven probe against a scratch fixture server
+is not the same claim as "the suite renders this", and I let the two blur into a single word.
+**The rest of the markers survived her audit** — everything I called code-verified-only was genuinely
+unexecuted, and nothing I called render-verified rested on a synthesised node. That is precisely why
+this one is worth writing down instead of quietly amending.
+
+**No code fix is owed.** On the current backend contract neither `region.bounded` nor
+`region_image_url` is published, so the crop is unreachable today; what Warwick actually meets is the
+honest fallback, and that IS covered. **Re-gate it when the backend lands regions** — the assertion
+to add then renders a crop with `asdairMediaSize` primed, so the arithmetic is executed rather than
+measured by hand.
+
+**Generalisable: "I measured it" and "the suite executes it" are different claims, and a measurement
+performed once by hand is the weaker of the two.** A probe proves the code CAN work; a suite proves
+it keeps working. When one word has to carry both, it will quietly carry the stronger one.
+
 ## Design decisions worth preserving
 
 - **The backend seam is a declared, ordered list, not a guess.** `ASDAIR_STATE_FIELDS =
@@ -92,3 +119,41 @@ GL-003 §2d warns about. The comment now records the MEASURED surfaces.
 `provenance-check.mjs` FAILs 1/30 — `provenance.mjs`'s `SOURCE_MODULES` omits `asdair-checklist.mjs`,
 which `server.mjs` imports. **Pre-existing on `86cfc08`, both files are backend, and this order
 forbids touching them.**
+
+## After Vera's CONDITIONAL PASS — what changed
+
+**MEDIUM 1 — the same `unknown` defect survived on the Rules screen.** I fixed the pattern on the
+Shop screen and wrote an assertion banning it *there*, and the identical leak sat two screens away
+rendering `#2 · unknown`. **A one-site fix for a wording rule is how the rule fails to travel** —
+so the fix is now a named helper, `asdairSaid(value, absent)`, which the next site can reach for
+instead of re-deriving. Rules renders `no category recorded`, matching the `no target recorded`
+vocabulary already four lines below it. **I then swept all four primary tabs in a browser rather
+than fixing only the two instances Vera named: zero bare `unknown` remain on Shop, Questions,
+Basket or Rules.**
+
+**LOW 3 — the recurrence guard, and it is the most valuable line in this WP.** `scenario()` now
+throws when a view key does not resolve, naming the key, the scenario and the registry's real keys.
+**Mutation-proved rather than asserted**: re-pointing one scenario at `'overview'` produces that
+message and exit 1; restored afterwards. The Home/System plans, which override `area` and render no
+app view, now carry a named `NO_APP_VIEW` sentinel instead of the same dead `'overview'` string —
+a real key sitting unused is indistinguishable from a real key that has gone stale, which is the
+whole failure being prevented.
+
+## Parked — Vera's three LOW focus sub-findings, backlog by her verdict, not acted on
+
+Recorded here so they are not rediscovered. My recommendation is in each.
+
+1. **`.as-trap` carries `tabindex="0"` and `aria-hidden="true"`** — the axe `aria-hidden-focus`
+   condition. Near-zero real impact (the sentinels are empty and instantly redirect focus), but an
+   automated scan WILL flag it. *Recommendation: drop `aria-hidden`; empty spans announce nothing,
+   so it buys nothing and costs a permanent scan finding.* One attribute.
+2. **`asdairTrapFocus()` does not add `.kb-focus`** — so the sheet-edge wrap still leans on the very
+   `:focus-visible` heuristic residual 3 was written to remove. *Recommendation: route it through
+   `focusSel()`'s ring, so there is one focus-indicator mechanism rather than two.*
+3. **`focusSel()` is called from mouse-driven `openApp()`**, giving a mouse user a keyboard ring.
+   Cosmetic. *Recommendation: only add `.kb-focus` when the last input was a key — or accept it, as
+   an over-visible focus ring harms nobody and a missing one harms a keyboard user.*
+
+These are deliberately NOT bundled into this commit: they touch code Vera has already reviewed and
+passed, and re-opening reviewed surface after a CONDITIONAL PASS to carry three cosmetic changes is
+a worse trade than logging them plainly.

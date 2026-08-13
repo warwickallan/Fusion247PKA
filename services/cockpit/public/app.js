@@ -845,6 +845,12 @@ createApp({
       if (asdairKnown(l.raw_reading_display)) return l.raw_reading_display;
       return 'AsdAIr couldn’t read this line';
     }
+    /** The GENERAL form of the same rule, for a slot that must still read as English when the API
+     * holds no value. "unknown" is the API's own word for absence and must never reach a screen.
+     * Added after Vera's gate found the identical defect surviving on the Rules screen while the
+     * Shop screen was fixed in the same commit — a one-site fix for a wording rule invites exactly
+     * that, so the rule now has a name that the next site can reach for. */
+    const asdairSaid = (v, absent) => (asdairKnown(v) ? String(v) : absent);
 
     // ---- The photo, and the PER-LINE CROP (AC5) -----------------------------------------------
     // "Show the relevant crop rather than making Warwick hunt around the page."
@@ -1477,7 +1483,7 @@ createApp({
       asdairBlockingSentence, asdairSentenceSource, asdairStateDisagreement,
       asdairProvenance, asdairLineOrigin,
       asdairAttentionLines, asdairChangeLines, asdairResolvedLines,
-      asdairRegionOf, asdairCropBoxStyle, asdairCropImgStyle, asdairCanCrop, asdairMediaSize, asdairLineTitle,
+      asdairRegionOf, asdairCropBoxStyle, asdairCropImgStyle, asdairCanCrop, asdairMediaSize, asdairLineTitle, asdairSaid,
       asdairHasCommand, asdairSkipCommand, asdairSkipLine, asdairFlash, asdairOpenReanswer, asdairTrapFocus,
       asdairMediaUrl, asdairSheet, asdairSheetBusy, asdairSheetErr, asdairChangeName, asdairChangeQty, asdairAnswerText,
       asdairOpenSheet, asdairCloseSheet, asdairOpenPhoto, asdairOpenQuestion, asdairOpenChange,
@@ -2045,7 +2051,12 @@ createApp({
                     <div v-for="r in g.items" :key="r.id_display" class="item as-stack"
                       :class="r.active ? (r.directive==='exclude' ? 'red' : r.directive==='needs_decision' ? 'amber' : 'green') : 'grey'">
                       <div class="i-main">
-                        <div class="i-eyebrow">#{{ r.id_display }} · {{ r.category_display }}<span v-if="r.scope_is_global"> · applies to every household</span></div>
+                        <!-- Vera, WP-B15-36 gate, MEDIUM 1. This slot printed the API's own word
+                             "unknown" for a rule with no category — the SAME defect asdairLineTitle()
+                             closes on the Shop screen, in the same commit, with an assertion banning
+                             it there. The vocabulary is not invented: "no target recorded" is two
+                             lines below, and "No detail recorded against this rule." is four. -->
+                        <div class="i-eyebrow">#{{ r.id_display }} · {{ asdairSaid(r.category_display, 'no category recorded') }}<span v-if="r.scope_is_global"> · applies to every household</span></div>
                         <div class="as-raw">{{ r.rule_text_display }}</div>
                         <div class="as-sub strong" v-if="r.has_matched_product">→ always: {{ r.matched_product_display }}</div>
                         <div class="as-chips">
