@@ -526,7 +526,16 @@ const SEND_MODES = {
   created: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: true, matched_by: 'insert' })); },
   // created:false, recorded_new:true — today's shop is unchanged, but a durable record of what
   // she changed WAS written and Warwick is told. Contract v3.
-  noted: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, matched_by: 'shop_ref' })); },
+  noted: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, notified: true, matched_by: 'shop_ref' })); },
+  // ⛔ AC7 — RECORDED, AND WARWICK NEVER HEARD. The route deliberately still answers ok:true:
+  // her list is durable the moment it is recorded, and a messaging outage must not turn a saved
+  // shop into an error on her screen. That correct decision is what makes this state reachable.
+  saved: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, notified: false, notify_error: 'notify_failed', matched_by: 'shop_ref' })); },
+  // The other real failure: no Telegram configured at all.
+  notconfigured: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, notified: false, notify_error: 'notify_not_configured', matched_by: 'shop_ref' })); },
+  // Contract violation: recorded, and `notified` absent entirely. Must claim LESS — she is told
+  // he has not heard, because the two errors are not symmetric.
+  nonotified: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, matched_by: 'shop_ref' })); },
   // created:false, recorded_new:false — an identical re-send. Nothing was written at all.
   unchanged: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: false, matched_by: 'shop_ref' })); },
   // ⛔ THE CONTRACT VIOLATION CASES. Both fields absent, then `created:false` with `recorded_new`
@@ -960,6 +969,7 @@ const STATES = [
   { label: 'adding something in her own words', kind: 'add', want: 'idle' },
   { label: 'after SEND -> sent', kind: 'send', mode: 'created', want: 'sent' },
   { label: 'after SEND -> already gone, Warwick told', kind: 'send', mode: 'noted', want: 'already-sent-noted' },
+  { label: 'after SEND -> already gone, saved but Warwick NOT told', kind: 'send', mode: 'saved', want: 'already-sent-saved' },
   { label: 'after SEND -> already gone, nothing changed', kind: 'send', mode: 'unchanged', want: 'already-sent-unchanged' },
   { label: 'after SEND -> not sent', kind: 'send', mode: 'refused', want: 'failed' },
 ];
@@ -1164,7 +1174,10 @@ if (process.argv.includes('--send-cases')) {
     // The two that MAY succeed, included in the same transcript because a claim that five things
     // cannot reach a state is worthless without showing what does.
     { mode: 'created', expect: 'sent', why: 'ok:true AND created:true — a row was written' },
-    { mode: 'noted', expect: 'already-sent-noted', why: 'created:false, recorded_new:true — her change WAS recorded and Warwick told' },
+    { mode: 'noted', expect: 'already-sent-noted', why: 'recorded_new:true AND notified:true — recorded, and Warwick actually heard' },
+    { mode: 'saved', expect: 'already-sent-saved', why: 'AC7: recorded_new:true, notified:false — saved, and the message did NOT get through' },
+    { mode: 'notconfigured', expect: 'already-sent-saved', why: 'AC7: notified:false for the other real reason — no messaging configured' },
+    { mode: 'nonotified', expect: 'already-sent-saved', why: 'AC7: recorded_new:true with notified ABSENT — never promise he was told' },
     { mode: 'unchanged', expect: 'already-sent-unchanged', why: 'created:false, recorded_new:false — an identical re-send, nothing written' },
     { mode: 'nocreated', expect: 'already-sent-unchanged', why: 'ok:true with created ABSENT — claim less, never more' },
     { mode: 'norecorded', expect: 'already-sent-unchanged', why: 'created:false with recorded_new ABSENT — never promise Warwick was told' },
@@ -1311,6 +1324,53 @@ if (process.argv.includes('--send-cases')) {
   console.log('        ' + (confirmOk ? 'ok    nothing is sent until she says so, and the date she saw is the date that went'
     : 'FAIL  the confirm step or the date did not behave as specified') + '\n');
   if (!confirmOk) bad++;
+  releaseHungSockets();
+
+  // ══ THE TWO CROSS-LANE FACTS FROM WP-B15-50, ESTABLISHED BY EXECUTION ══════════════════════════
+  // Both are claims about what LEAVES this page, so both are read off the CAPTURED REQUEST BODY.
+  // Reading the source and reasoning about it is how a confident wrong answer gets given.
+  console.log('CROSS-LANE — what this page actually puts on the wire:');
+  // 1. An empty input box must never produce `extras: ['']`. Keel's route answers 400 to that, and
+  //    it would fail her ENTIRE submission over a nicety she did not even use.
+  const emptyBody = listBodies[0] || {};
+  const hasExtrasKey = Object.prototype.hasOwnProperty.call(emptyBody, 'extras');
+  console.log('        with nothing typed, `extras` key present : ' + hasExtrasKey + '   (contract: omit it entirely)');
+  await gotoPage();
+  checkMode = 'matched';
+  checkRequests = 0; checkBodies.length = 0;
+  listRequests = 0; listBodies.length = 0;
+  // The exact gesture that could produce an empty string: open the box, add nothing, press Add it.
+  await evalIn('(() => { document.querySelector(".add").click(); })()');
+  await wait(150);
+  await evalIn('(() => { const g = document.querySelector(".a-add"); if (g) g.click(); })()');
+  await wait(300);
+  const blankMadeAnExtra = await evalIn('(() => document.querySelectorAll(".extra").length)()');
+  const blankHitTheCheck = checkRequests;
+  // ⛔ THE BLANK ATTEMPT CORRECTLY LEAVES HER INPUT OPEN — addExtra() returns before closing it, so
+  // a mis-tap on "Add it" does not throw away a box she is still using. That is right for her and
+  // it broke this test: `.add` is `v-if="!addOpen"`, so driveAdd() found no entry control and
+  // returned immediately, and the run reported a product failure that was mine. Close it as she
+  // would, with the worded control, then drive the real journey.
+  await evalIn('(() => { const c = document.querySelector(".a-cancel"); if (c) c.click(); })()');
+  await wait(200);
+  await driveAdd();
+  const checkBody = checkBodies[checkBodies.length - 1] || {};
+  sendMode = 'created';
+  await driveSend();
+  const withExtras = listBodies[0] || {};
+  const extrasSent = Array.isArray(withExtras.extras) ? withExtras.extras : null;
+  const noEmptyString = !!extrasSent && extrasSent.every((x) => typeof x === 'string' && x.trim() !== '');
+  const chosenSent = Array.isArray(checkBody.chosen);
+  const crossOk = hasExtrasKey === false && blankMadeAnExtra === 0 && blankHitTheCheck === 0
+    && noEmptyString && chosenSent;
+  console.log('        a blank box produced N extras            : ' + blankMadeAnExtra + '   (must be 0)');
+  console.log('        ...and reached the check route N times   : ' + blankHitTheCheck + '   (must be 0)');
+  console.log('        `extras` as sent                         : ' + JSON.stringify(extrasSent));
+  console.log('        ...contains no empty string              : ' + noEmptyString + '   (an empty string is a 400 that fails her whole send)');
+  console.log('        `chosen` sent to the check route         : ' + JSON.stringify(checkBody.chosen) + '   (without it possible_duplicate is unreachable)');
+  console.log('        ' + (crossOk ? 'ok    a blank box emits nothing, and the check gets what it needs to spot a duplicate'
+    : 'FAIL  this page would trip the 400, or cannot reach possible_duplicate') + '\n');
+  if (!crossOk) bad++;
   releaseHungSockets();
 
   // ══ ADD SOMETHING ELSE — AND THE RULE THAT SHE IS NEVER ASKED A QUESTION ═══════════════════════

@@ -1469,6 +1469,27 @@ const NO_SUCCESS_LANGUAGE = (p) => !p.some((s) =>
 // the page would pass while the BUTTON was missing.
 const actionNotTappable = (p) => !p.some((x) => x.trim() === 'SEND MY SHOPPING LIST');
 
+// ⛔⛔ THE PROMISE PREDICATE — AC7. SAME SHAPE AS `NO_SUCCESS_LANGUAGE`, AND FOR THE SAME REASON.
+//
+// "I've told Warwick" is not a description of a screen state. It is a claim about something that
+// happened in the world, to a person, outside this browser — and it can be false while everything
+// else about the submission is true. The route records her change and notifies Warwick as two
+// SEPARATE acts, and it deliberately still answers `ok:true, recorded_new:true` when the second one
+// fails, because her list IS durable at that point and a messaging outage must never present itself
+// to her as a lost shop. That correct decision is precisely what makes `notified:false` reachable.
+//
+// So this predicate travels with EVERY state except the one where the server confirmed `notified`.
+// If those words ever appear anywhere else, the page has told an 84-year-old that the person who
+// can fix her shopping already knows — and she would then have no reason to mention it to him,
+// which is the single action that would actually have fixed it.
+//
+// ⚠️ IT MATCHES THE CLAIM, NEVER THE MENTION. "Warwick will sort this one out for you" (the pending
+// banner) and "Warwick hasn't heard about it yet" (the saved state) both name him without asserting
+// he has been told, and both must stay legal — a predicate that simply banned his name would force
+// the honest sentence out of the one state that most needs to say it.
+const NO_TOLD_WARWICK_PROMISE = (p) => !p.some((s) =>
+  /told warwick|warwick has been told|warwick knows|warwick has heard/i.test(s));
+
 // Every quantity that reaches the screen is a bare integer text node; a product name never is, and
 // a count renders as a whole sentence. So this is the rendered-side half of the Addendum B §6.4
 // guarantee — the state-side half is executed directly in the clamp scenario below.
@@ -1553,6 +1574,7 @@ const MUM_PLAN = [
       ['the date she is being asked to confirm is on screen', (p) => hasText(p, 'Thursday 13 August')],
       ['it says plainly that nothing has gone yet', (p) => hasText(p, 'Nothing has been sent yet')],
       ['⛔ NO success or thank-you language — nothing has been written', NO_SUCCESS_LANGUAGE],
+      ['⛔ NO promise that Warwick was told — nothing has been submitted at all', NO_TOLD_WARWICK_PROMISE],
       ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
       ['the commit control is present and is named in words', (p) => hasText(p, 'YES, SEND IT')],
       ['⛔ her way OUT is present — she is never cornered by a confirmation', (p) => hasText(p, 'No, not yet')],
@@ -1567,6 +1589,7 @@ const MUM_PLAN = [
         (p) => hasText(p, 'thank you') && hasText(p, 'getting your shopping ready')],
       ['it says how much went', (p) => p.some((s) => /sent 1 thing/i.test(s))],
       ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
+      ['⛔ it makes NO claim that Warwick was told — this state does not mention him today, and an edit that began to would need its own notified evidence', NO_TOLD_WARWICK_PROMISE],
       ['the way back to editing is offered at full size (B §9.5)', (p) => hasText(p, 'I want to change something')],
       ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],
     ]],
@@ -1584,6 +1607,27 @@ const MUM_PLAN = [
       ['she is not stranded — there is a worded route back (B §9.5)', (p) => hasText(p, 'Back to my shopping')],
     ]],
 
+  // 3b. AC7 — recorded_new:true, notified:FALSE. Her change is saved and Warwick never heard.
+  //     ⛔ THIS IS THE STATE THE OLD SINGLE SENTENCE GOT WRONG. Under the previous split, `noted`
+  //     covered both, so a Telegram outage produced "I've told Warwick what you changed" while
+  //     nobody had been told anything. She would then have had no reason to mention it to him —
+  //     and mentioning it to him is the ONLY thing that recovers it.
+  ['MUM S4 (already gone today — saved, but Warwick has NOT been told)',
+    M({ selected: { 11: true }, sendState: 'already-sent-saved' }), [
+      ['it says what actually happened to today-s list', (p) => hasText(p, 'already gone')],
+      ['⛔ IT DOES NOT PROMISE WARWICK WAS TOLD — the notification did not get through',
+        NO_TOLD_WARWICK_PROMISE],
+      ['it says her change IS saved — the reassuring half comes first', (p) => hasText(p, 'saved what you changed')],
+      ['...and it says plainly that he has not heard yet', (p) => hasText(p, 'heard about it yet')],
+      ['it gives her the one action that actually fixes it', (p) => hasText(p, 'mention it to him')],
+      ['nothing she chose has been lost', (p) => hasText(p, 'has been lost')],
+      ['⛔ NO machine code reaches her — notify_failed / notify_not_configured are for the console',
+        (p) => !p.some((s) => /notify|not_configured|telegram|notification/i.test(s))],
+      ['⛔ NO success or thank-you language — today-s shop is untouched', NO_SUCCESS_LANGUAGE],
+      ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
+      ['she is not stranded — there is a worded route back (B §9.5)', (p) => hasText(p, 'Back to my shopping')],
+    ]],
+
   // 4. created:false, recorded_new:false — an identical re-send. NOTHING happened anywhere.
   //    ⛔ THIS SCENARIO IS THE ONE THAT PROVES ROUTE CONTRACT v3 WAS WORTH HAVING. Under v2 this
   //    case and case 3 were indistinguishable, so both would have received the same sentence — and
@@ -1594,7 +1638,7 @@ const MUM_PLAN = [
       ['it says plainly that nothing changed', (p) => hasText(p, 'Nothing has changed')],
       ['⛔ NO success or thank-you language — nothing was written', NO_SUCCESS_LANGUAGE],
       ['⛔⛔ IT DOES NOT PROMISE WARWICK WAS TOLD — no record was written, so no promise is earned',
-        (p) => !hasText(p, 'told Warwick')],
+        NO_TOLD_WARWICK_PROMISE],
       ['nothing she chose has been lost', (p) => hasText(p, 'has been lost')],
       ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
       ['she is not stranded — there is a worded route back (B §9.5)', (p) => hasText(p, 'Back to my shopping')],
@@ -1608,6 +1652,7 @@ const MUM_PLAN = [
       ['⛔ NO success or thank-you language — it did not arrive', NO_SUCCESS_LANGUAGE],
       ['⛔ NO machine detail reaches her: no status code, no error code, no stack text',
         (p) => !p.some((s) => /\b(unknown|error|exception|failed|500|404|timeout|econn|json)\b/i.test(s))],
+      ['⛔ NO promise that Warwick was told — it never arrived, so nobody was notified', NO_TOLD_WARWICK_PROMISE],
       ['a full-size way to try again is offered (B §9.6)', (p) => hasText(p, 'Try again')],
       ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
       ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],

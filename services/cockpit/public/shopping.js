@@ -221,14 +221,17 @@
 
   // The complete state set. Exported so a gate can assert against the real list rather than against
   // a string it hopes is still spelled the same way.
-  // 'confirm'      — she has pressed SEND and is being shown the date, before anything is posted.
-  // The two 'already-sent-*' states are NOT flavours of 'sent' and are not flavours of each other:
-  // one says a durable record of her change was written and Warwick has been told, the other says
-  // nothing at all happened. Route contract v3 exists precisely because v2 conflated them.
-  // ⛔ THREE SETTLED OUTCOMES, NOT TWO — ROUTE CONTRACT v3. `already-sent-noted` and
-  // `already-sent-unchanged` are NOT flavours of `sent` and are not flavours of each other.
+  // 'confirm' — she has pressed SEND and is being shown the date, before anything is posted.
+  //
+  // ⛔ FOUR SETTLED OUTCOMES. None of the three 'already-sent-*' states is a flavour of 'sent', and
+  // none of them is a flavour of another. Each names a DIFFERENT thing that happened in the world:
+  //   already-sent-noted     her change was recorded AND Warwick was actually notified
+  //   already-sent-saved     her change was recorded and the notification DID NOT GET THROUGH
+  //   already-sent-unchanged nothing was recorded, because nothing about her list had changed
+  // Route contract v3 split the first from the third; AC7 split the first from the second, and that
+  // split exists because the notification can fail while the submission still succeeds.
   var SEND_STATES = ['idle', 'confirm', 'sending', 'sent',
-    'already-sent-noted', 'already-sent-unchanged', 'failed'];
+    'already-sent-noted', 'already-sent-saved', 'already-sent-unchanged', 'failed'];
 
   // ⛔ HER DATE, BUILT FROM LOCAL FIELDS — NEVER toISOString(). `new Date().toISOString()` is UTC,
   // so from 00:00 to 01:00 British Summer Time it names YESTERDAY. This value becomes the shop's
@@ -392,6 +395,7 @@
         // Both settled outcomes return to editable the moment she changes anything, so no outcome
         // strip is ever left sitting over a list it no longer describes.
         if (sendState.value === 'sent' || sendState.value === 'already-sent-noted'
+          || sendState.value === 'already-sent-saved'
           || sendState.value === 'already-sent-unchanged') sendState.value = 'idle';
         // ...but only a REAL write (created:true) can make "you've changed it since you sent it"
         // a true sentence. After either 'already-sent-*' today's shop is unchanged, so there is
@@ -532,6 +536,9 @@
             console.info('[shopping] server accepted', {
               shop_ref: body.shop_ref, shop_id: body.shop_id,
               created: body.created, recorded_new: body.recorded_new, matched_by: body.matched_by,
+              // The machine detail about the notification goes HERE and only here. `notify_error`
+              // is a machine code and never reaches her screen.
+              notified: body.notified, notify_error: body.notify_error,
               list_date: confirmDate.value, items: items.length, extras: extraTexts.length,
             });
             // ⛔ STRICT `=== true` THROUGHOUT. A missing, null or non-boolean field is a contract
@@ -543,11 +550,25 @@
             // same sentence — and one of those sentences would have been wrong. `recorded_new`
             // splits them, so she is told which of the three things actually happened.
             if (body.created !== true) {
-              // ⛔ "I've told Warwick" IS A PROMISE, AND IT IS ONLY MADE WHEN THE SERVER SAYS A ROW
-              // WAS WRITTEN. If `recorded_new` is absent, false, or anything other than exactly
-              // true, she is told nothing changed — which is the claim that risks least if the
-              // contract is being violated.
-              sendState.value = (body.recorded_new === true) ? 'already-sent-noted' : 'already-sent-unchanged';
+              // ⛔ "I've told Warwick" IS A PROMISE ABOUT THE REAL WORLD, AND IT IS MADE ONLY WHEN
+              // THE SERVER CONFIRMS BOTH HALVES OF IT.
+              //
+              // AC7, and it is the last honesty gap in the whole chain. A durable record being
+              // written and Warwick actually HEARING about it are two different events, and the
+              // second one can fail on its own — the route deliberately still answers ok:true when
+              // it does, because her list is safe the moment it is recorded and a messaging outage
+              // must never turn a saved shop into an error on her screen. That correct decision is
+              // exactly what makes `recorded_new:true, notified:false` reachable, and it is the
+              // state in which the old single sentence was a lie.
+              if (body.recorded_new !== true) {
+                sendState.value = 'already-sent-unchanged';
+                return;
+              }
+              // ⛔ STRICT `=== true` AGAIN. A missing or non-boolean `notified` means she is told he
+              // has NOT heard yet. The two errors are not symmetric: telling her to mention it when
+              // he already knows costs one redundant sentence between them, and telling her he
+              // knows when he does not means nobody ever finds out.
+              sendState.value = (body.notified === true) ? 'already-sent-noted' : 'already-sent-saved';
               return;
             }
             sentCount.value = total;
@@ -580,12 +601,15 @@
           // `list_date` is the date SHE CONFIRMED, not a date derived again here: receiveList takes
           // it as a first-class input and builds the shop reference from it, so what she agreed to
           // on screen is what the shop is dated.
-          body: JSON.stringify({
-            household: HOUSEHOLD,
-            list_date: confirmDate.value,
-            items: items,
-            extras: extraTexts,
-          }),
+          // ⛔ `extras` IS OMITTED ENTIRELY WHEN SHE HAS TYPED NOTHING, not sent as an empty array.
+          // The frozen contract says omit the key when empty, and Keel's route answers 400 to an
+          // empty-STRING entry — which would fail her whole submission over a nicety. Establishing
+          // it by execution rather than by reading: addExtra() trims and returns early on falsy, so
+          // a blank box cannot create an entry and `extras` can never contain ''. Omitting the key
+          // as well means the empty case matches the contract exactly rather than merely closely.
+          body: JSON.stringify(extraTexts.length
+            ? { household: HOUSEHOLD, list_date: confirmDate.value, items: items, extras: extraTexts }
+            : { household: HOUSEHOLD, list_date: confirmDate.value, items: items }),
         };
         if (ctrl) opts.signal = ctrl.signal;
 
@@ -999,6 +1023,24 @@
       '      <div class="note" role="alert">',
       '        <strong class="n-say">Today’s list has already gone.</strong>',
       '        <span class="n-sub">I’ve told Warwick what you changed, and he’ll sort it out for you. Nothing you’ve chosen has been lost.</span>',
+      '      </div>',
+      '      <button type="button" class="again" @click="reopen()">Back to my shopping</button>',
+      '    </div>',
+
+      // ⛔ AC7 — HER CHANGE IS SAVED AND WARWICK HAS NOT HEARD. BOTH FACTS, IN THAT ORDER.
+      // The reassuring one comes first because it is the one she cares about: her words are safe.
+      // The second is stated plainly and without alarm, and it ends in the one small thing she can
+      // actually do about it — which is what stops this being a worry with no exit (B §9.5, "she is
+      // never stranded"). She is an 84-year-old who lives near him; "mention it when you see him"
+      // is an action she can take, unlike anything involving a screen.
+      // ⛔ NO MACHINE CODE. `notify_error` is 'notify_failed' or 'notify_not_configured' and neither
+      // is a thing she should ever read; both are in the console for Larry.
+      // ⛔ AND IT MUST NOT CONTAIN THE WORDS "told Warwick" — render-vm-check asserts that no state
+      // but the notified one makes that promise, and this is the state most likely to break it.
+      '    <div v-else-if="sendState === \'already-sent-saved\'" class="f-state">',
+      '      <div class="note" role="alert">',
+      '        <strong class="n-say">Today’s list has already gone.</strong>',
+      '        <span class="n-sub">I’ve saved what you changed and nothing you’ve chosen has been lost. Warwick hasn’t heard about it yet, so do mention it to him when you see him.</span>',
       '      </div>',
       '      <button type="button" class="again" @click="reopen()">Back to my shopping</button>',
       '    </div>',
