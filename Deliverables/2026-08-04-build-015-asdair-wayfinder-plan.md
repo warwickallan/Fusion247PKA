@@ -2528,6 +2528,47 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### 🔄 BOTH FAIL CONDITIONS ADDRESSED — **`490c7b7`**, back with Vera. **⭐ AND TWO MORE INSTRUMENTS THAT LIED.**
+
+**Felix accepted every point and says both HIGHs were his.** His account of HIGH-3 matches Vera's diagnosis
+exactly: he added the ceiling as a *"defensive ceiling"* **and never measured it**, and its own comment
+claimed it stopped a future third line reclaiming the screen — **while `position: static` three lines above
+had already made that impossible.** *A static footer is in flow: extra height extends the scroll; it cannot
+overlay anything.* **Deleted, with no `overflow-y: auto` either**, on Vera's reasoning that a nested scroll
+region inside a scrolling page is worse for her.
+
+**Now asserted: `foot.scrollHeight <= foot.clientHeight`, and every on-screen control must hit-test to itself
+at maximum scroll — IN THE POST-SEND STATE TOO, which the gate had never rendered.** Each viewport measured
+twice, driven by a real click on a row and a real click on the action.
+
+**HIGH-4 — he confirms he announced two narrowings and shipped three.** `unreachableAtEnd` restored as
+hit-testing; `:457-478` re-cut because it was false about **both** halves. **His durable line: *"changing a
+boolean inside an edit about something else is a separate change and needs saying out loud — both narrowings
+I announced were accepted; the one I didn't broke the check."***
+
+#### ⭐⭐ TWO INSTRUMENTS THAT LIED, found while fixing the above and **disclosed rather than quietly fixed**
+
+1. **The backtick guard COULD NEVER FIRE.** A stray backtick is a **parse** error — the module never loads,
+   so **no runtime check inside it ever runs.** *"A control that looked like a control."* Fixed structurally:
+   `MEASURE` is now a real function via `toString()`, **so the trap no longer exists to be guarded.**
+2. **That conversion then broke the backdrop walk.** A regex escaped for a template literal is wrong as
+   source, so it stopped matching `rgba(0, 0, 0, 0)` and returned **transparent as a real background — 804
+   contrast violations on a surface that had not changed.** Loud, but aimed at the wrong thing. **A
+   transparent backdrop now reports as THE INSTRUMENT being broken, not the page.**
+
+> ### 🏆 THE PACKAGE'S REAL OUTPUT, in Felix's words:
+> **"A control that cannot fire is not a control — whether it is a mutation that cannot fire, a boolean whose
+> limbs exclude one another, or a guard that runs after the error it guards."**
+
+**Evidence:** geometry **20 viewport-states** (10 × resting + post-send), 0 violations · self-test **12/12** ·
+token parity now **pins the expected 13-token list**, so a GL-003 *rename* can no longer shrink the
+intersection with `drift = 0` · the dead-space test **scrolls rows in first and treats a zero count as a
+failure** — mutation now fires **10/10**, where *the honest 9/10 was the symptom* · slack corrected to 11px ·
+render-vm 58/183/0 · secret-scan exit 0.
+
+**Two new mutations reinstate Vera's exact defects.** The footer-clip mutation **fires at 6 of 10 viewports —
+only where content exceeds the ceiling — and he reports that honestly rather than rounding it to "caught."**
+
 ### 🔴 VERA: **FAIL** at `18b0f98`. **The HIGH-1 fix introduced a worse regression than the one it cured.**
 
 **Everything else is CLOSED and independently verified** — she re-measured with her own instruments rather
