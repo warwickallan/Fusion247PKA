@@ -43,3 +43,28 @@ be re-litigated.**
 30 shoppable · 9 held. Support from 2-of-3 frozen readings selected all 39 real lines and excluded all three
 measured inventions. **2-of-3 agreement is CORROBORATION, never VERIFICATION** — three readings by one model
 of one photograph are correlated, and a phantom has been measured reaching 3-of-3 in another run family.
+
+---
+
+## The two capture artefacts, and why one is poisoned
+
+**`vision-run-2026-08-13T13-07-12-670Z.json` — USE THIS ONE.**
+`interpreter_model: gpt-5.6-terra` · 3 vision calls · $0.187308 · `photo_sha256` and
+`region_plan_sha256` both verified. This is the real production interpreter's real output on the real
+photograph, on the model Warwick settled.
+
+**`SUPERSEDED-gpt-5-mini-vision-run-2026-08-13T12-41-13-420Z.json` — NEVER USE AS INPUT.**
+`interpreter_model: gpt-5-mini` · 5 vision calls · $0.418977. **It is retained because it is the evidence
+that found a real defect**, not because it is useful.
+
+**What it found.** The production interpreter was configured for `gpt-5-mini` while every measurement this
+build rests on — the 39/39 coverage, the 2-of-3 reconciliation, the phantom mechanism — was made on
+`gpt-5.6-terra`. `C:\.fusion247\asdair.env` line 16 read `FUSION_MODEL_VISION=gpt-5-mini`. **Corrected
+2026-08-13 to `gpt-5.6-terra`**, verified to resolve and to be registered on the gateway — unlike the
+`fusion.vision` fallback, which the gateway does not register and which `models.mjs:41` already records as
+having "failed live".
+
+**Why it could hide:** the frozen prototype runs **do not record which model produced them**. A
+configuration divergence could therefore sit underneath a settled ruling without anything in the record
+contradicting itself. *Terra needed 3 calls where mini needed 5 — fewer follow-up re-inspections, which is
+consistent with the better model, though one run of each is not a measurement.*
