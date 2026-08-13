@@ -336,11 +336,37 @@ createApp({
     // Going IN lands on the workspace heading (announces the new context); coming OUT lands back on
     // the tile you came from (returns you where you were). Switching views inside an app is left
     // alone deliberately: that button survives, so moving focus would be the rude thing to do.
+    //
+    // WP-B15-36, AC7 residual 3 — SCRIPTED FOCUS AND THE :focus-visible HEURISTIC. Vera recorded
+    // that Chromium does not reliably apply `:focus-visible` to focus WE moved, so a keyboard user
+    // could be left with no visible indicator after a level transition. Two things happen here, and
+    // between them the indicator stops depending on a browser heuristic we do not control:
+    //   1. `focus({ preventScroll:false, focusVisible:true })` — honoured where implemented,
+    //      harmlessly ignored where it is not.
+    //   2. a `.kb-focus` class we add ourselves and clear on blur, which the stylesheet renders with
+    //      the SAME 2px --accent ring `:focus-visible` already draws. No new token, no second ring.
     async function focusSel(sel) {
       await nextTick();
       const el = document.querySelector(sel);
-      if (el) el.focus();
-      return !!el;
+      if (!el) return false;
+      try { el.focus({ focusVisible: true }); } catch (e) { el.focus(); }
+      el.classList.add('kb-focus');
+      const drop = () => { el.classList.remove('kb-focus'); el.removeEventListener('blur', drop); };
+      el.addEventListener('blur', drop);
+      return true;
+    }
+    // The focusable set inside the AsdAIr sheet, in DOM order, disabled controls excluded — which is
+    // what makes the two trap sentinels correct even when the last button is greyed out.
+    function asdairTrapFocus(edge) {
+      const card = document.querySelector('.asdair-sheet');
+      if (!card) return;
+      const els = Array.prototype.filter.call(
+        card.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+        (el) => !el.disabled && el.getAttribute('aria-hidden') !== 'true' && el.offsetParent !== null,
+      );
+      if (!els.length) return;
+      const el = edge === 'last' ? els[els.length - 1] : els[0];
+      try { el.focus({ focusVisible: true }); } catch (e) { el.focus(); }
     }
     // ---- AsdAIr — the first app with real Overview/Details views (not the shared placeholder). ----
     // Pattern for the NEXT app to imitate: one `<key>Ws` ref holding the raw workspace JSON as-is
@@ -361,6 +387,9 @@ createApp({
         const d = await r.json();
         if (!r.ok || !d || d.ok === false) throw new Error((d && d.error) || ('http ' + r.status));
         asdairWs.value = d;
+        // Measure the photograph as soon as we know which shop it belongs to. The per-line crops
+        // (AC5) need its natural pixel size, and this is the one place a shop id becomes known.
+        if (d.evidence && d.evidence.has_media) asdairMeasureMedia();
       } catch (e) {
         asdairWsErr.value = e.message || 'failed'; asdairWs.value = null;
       } finally {
@@ -375,27 +404,16 @@ createApp({
       const curId = asdairShop.value && asdairShop.value.shop_id;
       return list.filter((s) => String(s.id) !== String(curId));
     });
-    // "What's waiting on you" is derived ONLY from fields the API actually reports (failure,
-    // is_terminal, needs_review_display, stage, and — where NEEDS_DECISION — the real open-question
-    // count) — never a guessed sentence for a stage we don't have grounds for. Anything not covered
-    // here falls back to the raw stage_label_display, which the Overview always shows anyway, per the
-    // brief: unsure → show the raw label, don't invent English. `openCount` is the API's own
-    // questions.open_count_display, passed in rather than re-derived — a string, or "unknown".
-    function asdairWaitingOn(shop, openCount) {
-      if (!shop) return '';
-      if (shop.failure) return 'Something went wrong — check Telegram.' + (typeof shop.failure === 'string' ? ' ' + shop.failure : '');
-      if (shop.is_terminal) return `This shop has reached its end (${shop.stage_label_display}) — nothing needed from you.`;
-      if (shop.stage === 'RECEIVED' && shop.needs_review_display === 'yes') return 'Waiting for you to tell AsdAIr to build this shop — reply in Telegram.';
-      if (shop.stage === 'NEEDS_DECISION') {
-        const n = Number(openCount);
-        if (Number.isFinite(n) && n > 0) {
-          return `Waiting on ${n} ${n === 1 ? 'answer' : 'answers'} in Telegram before this shop can go ahead.`;
-        }
-        return 'Waiting for you — there’s a decision to make in Telegram.';
-      }
-      if (shop.needs_review_display === 'yes') return 'Waiting on you — check Telegram for what AsdAIr needs.';
-      return 'AsdAIr is working on it — nothing needed from you right now.';
-    }
+    // ⛔ REMOVED IN WP-B15-36 — `asdairWaitingOn(shop, openCount)`, deliberately, and this note is
+    // here so nobody restores it. It derived a SECOND status sentence from raw stage /
+    // needs_review / open-count, alongside the canonical-state chip. AC2 is explicit: "No second
+    // status indicator may contradict it." Two independently-derived sentences on one screen is
+    // exactly the contradiction the design doc records Warwick hitting — "Waiting on you — check
+    // Telegram" beside "0 still waiting on you". Its job is now done ONCE, by
+    // `asdairBlockingSentence`, from the canonical state. Every sentence it used to produce
+    // (failure, terminal, needs-decision, working) has a counterpart there.
+    // The raw stage and needs_review it read are still shown — under the cog, in Diagnostics, where
+    // internal state names belong.
     // SHAPE NOW CONFIRMED against the live payload: history.previous_order.basket_total is a
     // present.js money object — { known, amount, currency, basis, is_asda_quoted, display } — and
     // `display` already carries its basis ("124.25 GBP (inferred - not an ASDA price)"). Printing
@@ -514,20 +532,35 @@ createApp({
     });
 
     // =====================================================================================
-    // BUILD-015 B15-26 — Cockpit UI: canonical state, exception-first Shop, Questions board,
-    // and the AsdAIr write path. See WO-2026-08-11-B15-COCKPIT-UI-01 and its accepted read-back.
+    // BUILD-015 · WP-B15-36 (WO-2026-08-13-03) — COCKPIT UI CONVERGENCE.
+    // Supersedes the B15-26 block that stood here. Warwick's test is the whole specification:
+    //   "The normal Cockpit experience must be HUMAN-READABLE, RELEVANT, INFORMATIVE, NOT A
+    //    DATABASE VIEW." and "Do not make Warwick reconcile contradictory counts or labels himself."
     // =====================================================================================
 
-    // ---- ONE canonical state, ONE derivation site (AC2) --------------------------------------
-    // This reads a single named field and NEVER recomputes a status from raw counts — that is the
-    // rule AC2 exists to hold. No other function in this file may derive a Shop-status sentence.
+    // ---- THE BACKEND SEAM, DECLARED IN ONE PLACE ----------------------------------------------
+    // The Cockpit BACKEND is being converged on `build-015/b15-25-cockpit-backend` AT THE SAME TIME
+    // as this UI (WO-2026-08-13-02). Guessing one field name and silently rendering "Status unknown"
+    // when it is wrong is exactly the silent seam disagreement that order exists to prevent — so
+    // this reads a DECLARED, ORDERED candidate list and RECORDS which one answered (`asdairSeam`,
+    // surfaced in Diagnostics). The seam is visible, not assumed.
     //
-    // ⚠️ PLACEHOLDER FIELD NAME — flagged at read-back (2026-08-11) and accepted by Larry the same
-    // session. `shop.cockpit_state` does not exist in the backend yet: WO-2026-08-11-B15-COCKPIT-BE-01
-    // (Keel) was amended to additive-only scope this round (AMENDMENT 1), so the real field may land
-    // under a different name later. When it does, this is the ONE line to change. Until then, an
-    // absent or unrecognised value renders as an honest "Status unknown" rail — never a guess, and
-    // never a value computed from asdairShop/asdairWs counts.
+    //   'human_state'     asdair.shop.human_state — the REAL durable column, migration 020
+    //                     (`020_shop_line_provenance_and_human_state.sql` §5). This is what
+    //                     WO-2026-08-13-02 AC1 converges canonicalState.js onto. Tried FIRST.
+    //   'canonical_state' what assembleWorkspace.js emits TODAY on the backend branch head
+    //                     (`shop.canonical_state`, computed by cockpit-api/canonicalState.js).
+    //   'cockpit_state'   the B15-26 placeholder this UI shipped with. Kept LAST so an older
+    //                     backend still renders rather than regressing to "unknown".
+    //
+    // ⚠️ Only the PAYLOAD FIELD NAME is uncertain. The six VALUES are NOT a guess — they are the
+    // closed vocabulary migration 020's own CHECK constraint enforces.
+    const ASDAIR_STATE_FIELDS = Object.freeze(['human_state', 'canonical_state', 'cockpit_state']);
+
+    // ---- ONE canonical state, ONE derivation site (AC2) --------------------------------------
+    // Reads a single named field and NEVER recomputes a status from raw counts. No other function
+    // in this file may derive a Shop-status label or sentence; both come from `asdairStatus` and
+    // `asdairBlockingSentence`, and both read THIS value.
     const ASDAIR_STATE_PRESENTATION = Object.freeze({
       NEEDS_WARWICK: Object.freeze({ label: 'Needs you', tone: 'amber' }),
       ASDAIR_WORKING: Object.freeze({ label: 'AsdAIr is working', tone: 'blue' }),
@@ -542,25 +575,360 @@ createApp({
       const key = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
       return ASDAIR_STATE_PRESENTATION[key] || { label: 'Status unknown', tone: 'grey' };
     }
-    const asdairCanonicalState = computed(() => (asdairShop.value && asdairShop.value.cockpit_state) || null);
+    /** PURE. The seam resolver: the first declared field carrying a real value wins. Returns BOTH
+     * the value and the field it came from, so an answer and its provenance never separate. */
+    function asdairResolveState(shop) {
+      const s = shop && typeof shop === 'object' ? shop : null;
+      if (!s) return { field: null, value: null };
+      for (const f of ASDAIR_STATE_FIELDS) {
+        const v = s[f];
+        if (typeof v === 'string' && v.trim() !== '' && v.trim().toLowerCase() !== 'unknown') {
+          return { field: f, value: v.trim().toUpperCase() };
+        }
+      }
+      return { field: null, value: null };
+    }
+    const asdairSeam = computed(() => asdairResolveState(asdairShop.value));
+    const asdairCanonicalState = computed(() => asdairSeam.value.value);
+    const asdairStateField = computed(() => asdairSeam.value.field);
     const asdairStatus = computed(() => asdairStatePresentation(asdairCanonicalState.value));
 
-    // ---- Exception-first line list — Shop screen defaults to "needs attention" + "changed" only;
-    // "All" is one tap away, never the default (design doc, "List screen"). ---------------------
+    // ---- Reading the API's OWN counts, once each ----------------------------------------------
+    // "unknown" is the API's word for a fact it does not hold; it is NEVER rewritten to 0. Each
+    // number below has exactly ONE reader, and the SAME reader feeds both the counter on screen and
+    // the sentence — which is why a counter and the sentence structurally cannot disagree (AC1).
+    function asdairCount(v) {
+      if (v === null || v === undefined || v === '' || v === 'unknown') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    const asdairOpenQuestions = computed(() =>
+      asdairCount(asdairWs.value && asdairWs.value.questions && asdairWs.value.questions.open_count_display));
+    const asdairAnsweredQuestions = computed(() =>
+      asdairCount(asdairWs.value && asdairWs.value.questions && asdairWs.value.questions.resolved_count_display));
+    const asdairOpenLines = computed(() =>
+      asdairCount(asdairShop.value && asdairShop.value.lines_summary && asdairShop.value.lines_summary.open_display));
+    const asdairTotalLines = computed(() =>
+      asdairCount(asdairShop.value && asdairShop.value.lines_summary && asdairShop.value.lines_summary.total_display));
+    const asdairResolvedLineCount = computed(() =>
+      asdairCount(asdairShop.value && asdairShop.value.lines_summary && asdairShop.value.lines_summary.resolved_display));
+    const plural = (n, one, many) => (n === 1 ? one : many);
+
+    // ---- AC1: "WHY ISN'T MY BASKET READY?" — ONE prominent sentence ---------------------------
+    // Warwick's own examples ARE the specification and are reproduced verbatim in the derivation:
+    //   "2 decisions still need you."
+    //   "Nothing needs you. AsdAIr is reconciling 3 products."
+    //   "Everything is resolved. Ready to build the ASDA basket."
+    //   "Basket build failed. Nothing was ordered."
+    // ⛔ "Never require Warwick to infer this from several counters."
+    //
+    // A BACKEND-SUPPLIED sentence always wins, because the backend WP (AC3) builds one from the same
+    // data as its counts. Only when none is supplied does this derive one — and the derivation takes
+    // its SHAPE from the canonical state (the same value the status chip renders) and its NUMBERS
+    // from the same fields the on-screen counters read. Neither half is independently computed,
+    // which is what makes the sentence and the counters unable to contradict each other.
+    //
+    // ⚠️ ASSUMPTION, REPORTED: the backend sentence field name is not yet published. These are the
+    // names probed for, in order; if the real one differs it is a ONE-LINE change here.
+    const ASDAIR_SENTENCE_FIELDS = Object.freeze([
+      'blocking_reason_display', 'why_not_ready_display', 'human_state_reason_display', 'blocking_sentence_display',
+    ]);
+    function asdairBackendSentence(shop) {
+      const s = shop && typeof shop === 'object' ? shop : null;
+      if (!s) return null;
+      for (const f of ASDAIR_SENTENCE_FIELDS) {
+        const v = s[f];
+        if (typeof v === 'string' && v.trim() !== '' && v.trim().toLowerCase() !== 'unknown') return v.trim();
+      }
+      return null;
+    }
+    /** PURE. state + the API's own counts -> the one sentence. Independently testable. */
+    function asdairDeriveSentence(state, openQuestions, openLines, failure) {
+      switch (state) {
+        case 'NEEDS_WARWICK':
+          if (openQuestions !== null && openQuestions > 0) {
+            return openQuestions + ' ' + plural(openQuestions, 'decision', 'decisions') + ' still '
+              + plural(openQuestions, 'needs', 'need') + ' you.';
+          }
+          return 'AsdAIr needs a decision from you before this shop can go ahead.';
+        case 'ASDAIR_WORKING':
+          if (openLines !== null && openLines > 0) {
+            return 'Nothing needs you. AsdAIr is reconciling ' + openLines + ' ' + plural(openLines, 'product', 'products') + '.';
+          }
+          return 'Nothing needs you. AsdAIr is still working on this shop.';
+        case 'READY_FOR_WARWICK':
+          return 'Everything is resolved. Ready to build the ASDA basket.';
+        case 'BROWSER_WORKING':
+          return 'Nothing needs you. Your ASDA basket is being built right now.';
+        case 'COMPLETE':
+          return 'This shop is finished. Nothing needs you.';
+        case 'FAILED': {
+          // Warwick's example names the basket build specifically. Say that ONLY when the recorded
+          // failure actually came from the basket half — never as a blanket claim.
+          const from = failure && typeof failure.failed_from_display === 'string' ? failure.failed_from_display : '';
+          return (/BROWSER|SHOPPING|BASKET/i.test(from) ? 'Basket build failed.' : 'Something went wrong.')
+            + ' Nothing was ordered.';
+        }
+        default:
+          return null;
+      }
+    }
+    const asdairBlockingSentence = computed(() => asdairBackendSentence(asdairShop.value)
+      || asdairDeriveSentence(asdairCanonicalState.value, asdairOpenQuestions.value, asdairOpenLines.value,
+        asdairShop.value && asdairShop.value.failure));
+    const asdairSentenceSource = computed(() => (asdairBackendSentence(asdairShop.value)
+      ? 'supplied by AsdAIr' : (asdairCanonicalState.value ? 'derived from the one canonical state' : 'none')));
+
+    // ---- The one thing Warwick must NEVER be asked to reconcile himself -----------------------
+    // If the canonical state and the open-question count genuinely disagree, that is a FAULT in the
+    // data, not a puzzle for him. It is surfaced as a fault, in words, once — never by showing two
+    // numbers and leaving him to work it out.
+    const asdairStateDisagreement = computed(() => {
+      const st = asdairCanonicalState.value;
+      const q = asdairOpenQuestions.value;
+      if (!st || q === null) return null;
+      if (st === 'NEEDS_WARWICK' && q === 0) {
+        return 'AsdAIr says it needs a decision from you, but records no open questions. That is a fault in AsdAIr, not something for you to resolve.';
+      }
+      if (st !== 'NEEDS_WARWICK' && st !== 'FAILED' && q > 0) {
+        return 'AsdAIr says nothing needs you, but still has ' + q + ' open ' + plural(q, 'question', 'questions')
+          + '. That is a fault in AsdAIr, not something for you to resolve.';
+      }
+      return null;
+    });
+
+    // ---- AC3: THIS WEEK'S SHOP, IN HUMAN TERMS ------------------------------------------------
+    // The FOUR provenance origins stay visibly distinct — PHOTO / REGULARS / HOUSEHOLD RULES /
+    // WARWICK — plus SKIPPED. ⛔ "Never an undifferentiated database-derived blob."
+    // Warwick's summary shape: "39 from photograph + N Regulars − N skipped = N final products /
+    // N items."
+    //
+    // The origin names are NOT invented: 'PHOTO' | 'REGULARS' | 'RULE' | 'WARWICK' is the closed
+    // vocabulary of `asdair.shop_line_provenance.provenance`, enforced by that table's own CHECK
+    // constraint in migration 020 §2.
+    //
+    // THREE ROUTES, in order, and the route used is always shown on screen:
+    //   'api'    the backend published a `provenance` summary block (WO-2026-08-13-02 AC4).
+    //   'lines'  no summary block, but the lines carry their own `provenance`: counted here.
+    //   'none'   neither. Rendered as an HONEST GAP naming what is missing. Never fabricated.
+    const ASDAIR_ORIGINS = Object.freeze([
+      { key: 'PHOTO', label: 'From the photograph', blurb: 'Read straight off the list you sent.' },
+      { key: 'REGULARS', label: 'Added from your Regulars', blurb: 'Not on the list — added because you normally buy it.' },
+      { key: 'RULE', label: 'From household rules', blurb: 'Added by a standing rule you set.' },
+      { key: 'WARWICK', label: 'You decided this week', blurb: 'Your own decision for this shop.' },
+      { key: 'SKIPPED', label: 'Skipped this week', blurb: 'Deliberately left out. Nothing was substituted.' },
+    ]);
+    const ASDAIR_ORIGIN_ALIASES = Object.freeze({
+      PHOTO: 'PHOTO', PHOTOGRAPH: 'PHOTO', LIST: 'PHOTO',
+      REGULARS: 'REGULARS', REGULAR: 'REGULARS',
+      RULE: 'RULE', RULES: 'RULE', HOUSEHOLD_RULE: 'RULE',
+      WARWICK: 'WARWICK', HUMAN: 'WARWICK',
+      SKIPPED: 'SKIPPED', SKIP: 'SKIPPED',
+    });
+    /** PURE. Normalise whatever origin token a line carries into one of the five, or null. */
+    function asdairOrigin(raw) {
+      const k = typeof raw === 'string' ? raw.trim().toUpperCase().replace(/[\s-]+/g, '_') : '';
+      return ASDAIR_ORIGIN_ALIASES[k] || null;
+    }
+    /** A line's origin, from the line's OWN provenance field. A line with no provenance field is
+     * NOT guessed at — it returns null and is counted as unattributed. */
+    const asdairLineOrigin = (ln) => (ln ? asdairOrigin(ln.provenance || ln.provenance_display || ln.origin) : null);
+
+    // ---- AC4: EXCEPTION-FIRST BY DEFAULT ------------------------------------------------------
+    // "Warwick is NOT going to proofread 39 lines every week." Default emphasis: needs attention ·
+    // changes and additions · unresolved exceptions. Resolved lines stay available, compact and
+    // collapsed. The full photograph is available WHEN WANTED, never by default.
     const asdairLineFilter = ref('exceptions'); // 'exceptions' | 'all'
     const asdairAllLines = computed(() => (asdairWs.value && asdairWs.value.interpretation && asdairWs.value.interpretation.lines) || []);
-    const asdairExceptionLines = computed(() => asdairAllLines.value.filter((ln) => ln.status !== 'matched'));
-    const asdairShopLines = computed(() => (asdairLineFilter.value === 'all' ? asdairAllLines.value : asdairExceptionLines.value));
-    // Plain-English provenance only (AC3) — never the raw status key.
-    const ASDAIR_LINE_PROVENANCE = Object.freeze({
-      matched: 'from the list', needs_confirmation: 'from the list — needs confirming',
-      possible_duplicate: 'from the list — looks like a duplicate', unmatched_new_item: 'from the list — new item',
-      unreadable: 'from the list — could not be read',
+    /** NEEDS ATTENTION — a line AsdAIr could not settle on its own. */
+    const ASDAIR_ATTENTION_STATUSES = Object.freeze(['needs_confirmation', 'possible_duplicate', 'unreadable']);
+    const asdairAttentionLines = computed(() => asdairAllLines.value.filter((ln) => ASDAIR_ATTENTION_STATUSES.indexOf(ln.status) !== -1));
+    /** CHANGES AND ADDITIONS — settled, but NOT simply read off the photograph. Decided by the
+     * line's own provenance where it has one; where it has none, a new item is the honest proxy. */
+    const asdairChangeLines = computed(() => asdairAllLines.value.filter((ln) => {
+      if (ASDAIR_ATTENTION_STATUSES.indexOf(ln.status) !== -1) return false;
+      const o = asdairLineOrigin(ln);
+      if (o) return o !== 'PHOTO';
+      return ln.status === 'unmatched_new_item';
+    }));
+    /** RESOLVED — everything else. Collapsed by default, one compact row each. */
+    const asdairResolvedLines = computed(() => {
+      const flagged = new Set([].concat(asdairAttentionLines.value, asdairChangeLines.value));
+      return asdairAllLines.value.filter((ln) => !flagged.has(ln));
     });
-    const asdairLineProvenance = (s) => ASDAIR_LINE_PROVENANCE[s] || 'from the list';
+    const asdairExceptionLines = computed(() => [].concat(asdairAttentionLines.value, asdairChangeLines.value));
+    const asdairShopLines = computed(() => (asdairLineFilter.value === 'all' ? asdairAllLines.value : asdairExceptionLines.value));
 
-    // ---- The photo: auto-rotated, shown small, never dominating by default (AC5) ---------------
+    const asdairProvenance = computed(() => {
+      const ws = asdairWs.value;
+      const api = ws && ws.provenance && typeof ws.provenance === 'object' ? ws.provenance : null;
+      const lines = asdairAllLines.value;
+      const counts = { PHOTO: null, REGULARS: null, RULE: null, WARWICK: null, SKIPPED: null };
+      let route = 'none';
+      let unattributed = null;
+
+      if (api) {
+        route = 'api';
+        counts.PHOTO = asdairCount(api.photo_display);
+        counts.REGULARS = asdairCount(api.regulars_display);
+        counts.RULE = asdairCount(api.rules_display !== undefined ? api.rules_display : api.rule_display);
+        counts.WARWICK = asdairCount(api.warwick_display);
+        counts.SKIPPED = asdairCount(api.skipped_display);
+      } else if (lines.some((ln) => asdairLineOrigin(ln) !== null)) {
+        route = 'lines';
+        Object.keys(counts).forEach((k) => { counts[k] = 0; });
+        unattributed = 0;
+        lines.forEach((ln) => {
+          const o = asdairLineOrigin(ln);
+          if (o) counts[o] += 1; else unattributed += 1;
+        });
+      }
+
+      const finalProducts = api ? asdairCount(api.final_products_display) : null;
+      const finalItems = api ? asdairCount(api.final_items_display) : null;
+
+      // Warwick's equation, assembled ONLY from terms that are actually known. A missing term is
+      // never filled with a zero — the equation simply is not claimed, and the gap is named on screen.
+      let equation = null;
+      if (counts.PHOTO !== null && counts.REGULARS !== null && counts.SKIPPED !== null && finalProducts !== null) {
+        equation = counts.PHOTO + ' from the photograph + ' + counts.REGULARS + ' from Regulars − '
+          + counts.SKIPPED + ' skipped = ' + finalProducts + ' products'
+          + (finalItems !== null ? ' / ' + finalItems + ' items' : '');
+      }
+
+      return {
+        route: route,
+        origins: ASDAIR_ORIGINS.map((o) => ({ key: o.key, label: o.label, blurb: o.blurb, n: counts[o.key] })),
+        unattributed: unattributed,
+        source_lines: api ? asdairCount(api.source_lines_display) : asdairTotalLines.value,
+        source_read: api && api.source_read_status_display ? String(api.source_read_status_display) : null,
+        reconciled_products: api ? asdairCount(api.reconciled_products_display) : null,
+        final_products: finalProducts,
+        final_items: finalItems,
+        equation: equation,
+        summary: api && typeof api.summary_display === 'string' && api.summary_display.trim() ? api.summary_display.trim() : null,
+      };
+    });
+
+    // Plain-English provenance for one line — never a raw status key, never a confidence decimal.
+    // Where the line carries a real four-way origin it is used; otherwise the interpretation status
+    // is translated. Both routes end in a sentence a person reads, never an enum.
+    const ASDAIR_ORIGIN_PHRASE = Object.freeze({
+      PHOTO: 'from the photograph', REGULARS: 'added from your Regulars',
+      RULE: 'added by a household rule', WARWICK: 'you decided this', SKIPPED: 'skipped this week',
+    });
+    const ASDAIR_STATUS_PHRASE = Object.freeze({
+      matched: 'from the photograph', needs_confirmation: 'from the photograph — needs confirming',
+      possible_duplicate: 'from the photograph — looks like a duplicate',
+      unmatched_new_item: 'from the photograph — new item',
+      unreadable: 'from the photograph — could not be read',
+    });
+    /** Tolerant of BOTH call shapes — a line object, or a bare status string — so there is exactly
+     * one place this wording lives. */
+    function asdairLineProvenance(lineOrStatus) {
+      if (lineOrStatus && typeof lineOrStatus === 'object') {
+        const o = asdairLineOrigin(lineOrStatus);
+        if (o && o !== 'PHOTO') return ASDAIR_ORIGIN_PHRASE[o];
+        return ASDAIR_STATUS_PHRASE[lineOrStatus.status] || ASDAIR_ORIGIN_PHRASE.PHOTO;
+      }
+      return ASDAIR_STATUS_PHRASE[lineOrStatus] || ASDAIR_ORIGIN_PHRASE.PHOTO;
+    }
+    /** What a line is CALLED on a human screen.
+     * CAUGHT BY READING THE RENDERED OUTPUT, not by reading the diff (AC8, and the reason AC8 is an
+     * acceptance criterion): an unreadable line carries the API's own word "unknown" in BOTH
+     * `canonical_product_name_display` and `raw_reading_display`, and the previous expression
+     * printed that word as the product's title. The word "unknown" sitting where a product name
+     * belongs is a database view, which is the single thing Warwick said this screen must not be. */
+    function asdairLineTitle(ln) {
+      const l = ln || {};
+      if (asdairKnown(l.canonical_product_name_display)) return l.canonical_product_name_display;
+      if (asdairKnown(l.raw_reading_display)) return l.raw_reading_display;
+      return 'AsdAIr couldn’t read this line';
+    }
+
+    // ---- The photo, and the PER-LINE CROP (AC5) -----------------------------------------------
+    // "Show the relevant crop rather than making Warwick hunt around the page."
+    //
+    // The crop is rendered CLIENT-SIDE from the one full photograph the media route already serves,
+    // using the four pixel bounds migration 020 stores per region
+    // (`asdair.shop_image_region.pixel_top/left/bottom/right` — those exact column names, not
+    // invented ones). That deliberately needs NO new backend endpoint: the seam is four integers.
+    // If the backend later publishes a ready-made crop URL, that wins — see asdairRegionOf().
     const asdairMediaUrl = computed(() => (asdairShop.value ? '/api/asdair/media?shop=' + asdairShop.value.shop_id : null));
+    // The photograph's natural pixel size, measured from the image itself. Needed to place a crop,
+    // and free from one preload of a URL the page fetches anyway.
+    const asdairMediaSize = ref({ w: 0, h: 0 });
+    function asdairMeasureMedia() {
+      asdairMediaSize.value = { w: 0, h: 0 };
+      const url = asdairMediaUrl.value;
+      if (!url || typeof Image === 'undefined') return;
+      const img = new Image();
+      img.onload = () => { asdairMediaSize.value = { w: img.naturalWidth || 0, h: img.naturalHeight || 0 }; };
+      img.onerror = () => { asdairMediaErr.value = true; };
+      img.src = url;
+    }
+    /** PURE. The region a question or line is evidence for, or null. Accepts the region on the
+     * question, on its line, or a backend-rendered crop URL — and never fabricates one. */
+    function asdairRegionOf(o) {
+      if (!o || typeof o !== 'object') return null;
+      const r = o.region || o.source_region || null;
+      const url = o.region_image_url || (r && r.image_url) || null;
+      if (!r && !url) return null;
+      const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+      const top = r ? n(r.pixel_top) : null;
+      const left = r ? n(r.pixel_left) : null;
+      const bottom = r ? n(r.pixel_bottom) : null;
+      const right = r ? n(r.pixel_right) : null;
+      const bounded = top !== null && left !== null && bottom !== null && right !== null && bottom > top && right > left;
+      if (!bounded && !url) return null;
+      return { url: url, top: top, left: left, bottom: bottom, right: right, bounded: bounded };
+    }
+    /** The crop frame takes the SHAPE of the region, not of the page. */
+    function asdairCropBoxStyle(region) {
+      if (!region || !region.bounded) return null;
+      return { aspectRatio: (region.right - region.left) + ' / ' + (region.bottom - region.top) };
+    }
+    /** Position the FULL photograph inside that frame so only the region shows. Percentages only:
+     * width/left resolve against the frame's width, height/top against its height — which is exactly
+     * the arithmetic below, and why no pixel value appears in the style. */
+    function asdairCropImgStyle(region) {
+      const nat = asdairMediaSize.value;
+      if (!region || !region.bounded || !nat.w || !nat.h) return null;
+      const rw = region.right - region.left;
+      const rh = region.bottom - region.top;
+      return {
+        width: (nat.w / rw * 100) + '%',
+        height: (nat.h / rh * 100) + '%',
+        left: (-region.left / rw * 100) + '%',
+        top: (-region.top / rh * 100) + '%',
+      };
+    }
+    /** Can this region actually be drawn yet? A region we cannot draw is SAID, never faked. */
+    const asdairCanCrop = (region) => !!(region && (region.url || (region.bounded && asdairMediaSize.value.w && asdairMediaSize.value.h)));
+
+    // ---- The command surface, as the API itself publishes it ----------------------------------
+    // "The UI may only offer an action that has a command behind it" — the payload's own rule, and
+    // the only honest way to build a UI against a backend that is moving underneath it. A control
+    // whose command is absent is NOT rendered as if it worked: it is disabled and says why.
+    const asdairCommands = computed(() => new Set((asdairWs.value && asdairWs.value.command_names) || []));
+    const asdairHasCommand = (n) => asdairCommands.value.has(n);
+    // ⚠️ ASSUMPTION, REPORTED: "mark an already-resolved line 'not this week'" is a command the
+    // backend WP (WO-2026-08-13-02 AC6) is building RIGHT NOW, and its name is not yet published.
+    // These are the names probed for. Nothing is invented — with none present the control renders
+    // disabled with an honest explanation rather than pretending to work.
+    const ASDAIR_SKIP_COMMANDS = Object.freeze(['skipThisWeek', 'skipItem', 'markNotThisWeek', 'skipLine']);
+    const asdairSkipCommand = computed(() => ASDAIR_SKIP_COMMANDS.find((n) => asdairCommands.value.has(n)) || null);
+
+    // ---- "See immediately that the answer landed, and what remains" (AC5) ---------------------
+    // One transient line, set only by a write that actually succeeded, cleared by the next write.
+    const asdairFlash = ref(null);
+    function asdairSetFlash(what) {
+      const remain = asdairOpenQuestions.value;
+      asdairFlash.value = what + (remain === null ? '' : (remain > 0
+        ? ' ' + remain + ' ' + plural(remain, 'question', 'questions') + ' still '
+          + plural(remain, 'needs', 'need') + ' you.'
+        : ' Nothing else needs you.'));
+    }
 
     // ---- The AsdAIr action sheet — one small, self-contained modal for every write action AND the
     // full-photo view, kept separate from the generic `detail` sheet (whose header is shared by
@@ -579,9 +947,21 @@ createApp({
     async function asdairCloseSheet() { asdairSheet.value = null; asdairSheetErr.value = null; await focusSel('#app-workspace-h'); }
     function asdairOpenPhoto() { asdairOpenSheet({ kind: 'photo' }); }
     function asdairOpenQuestion(q) { asdairAnswerText.value = ''; asdairOpenSheet({ kind: 'question', question: q }); }
+    // AC5, "correct an already-resolved item". A RESOLVED question reopens the SAME sheet and the
+    // SAME answerQuestion command — deliberately not a second, parallel "edit" path. His previous
+    // answer is prefilled so changing it is an edit, not a retype from nothing.
+    // ⚠️ ASSUMPTION, REPORTED: that answerQuestion accepts a re-answer on an already-resolved
+    // question. If the backend refuses, the sheet shows that refusal verbatim — never a silent no-op.
+    function asdairOpenReanswer(q) {
+      asdairAnswerText.value = asdairKnown(q && q.answer_text_display) ? String(q.answer_text_display) : '';
+      asdairOpenSheet({ kind: 'question', question: q, reanswer: true });
+    }
     function asdairOpenChange(line) {
       const l = line || {};
-      asdairChangeName.value = (asdairKnown(l.canonical_product_name_display) ? l.canonical_product_name_display : l.raw_reading_display) || '';
+      // Prefill from what is actually KNOWN — never the API's word "unknown". Typing over the string
+      // "unknown" is not an edit, it is a trap.
+      asdairChangeName.value = asdairKnown(l.canonical_product_name_display) ? String(l.canonical_product_name_display)
+        : (asdairKnown(l.raw_reading_display) ? String(l.raw_reading_display) : '');
       asdairChangeQty.value = '';
       asdairOpenSheet({ kind: 'change', line: l });
     }
@@ -623,23 +1003,29 @@ createApp({
      */
     async function asdairAnswerQuestion(q, replyKey, opts) {
       const o = opts || {};
-      q._busy = true; q._error = null;
+      q._busy = true; q._error = null; asdairFlash.value = null;
       try {
         const args = { questionKey: q.question_key };
+        let landed = 'Saved.';
         if (replyKey === 'skip') {
           args.skip = true;
+          landed = 'Marked “not this week”.';
         } else if (replyKey === 'choose' && o.candidate) {
           args.answerText = o.candidate.label_display; args.answerSource = 'button';
+          landed = 'Saved: ' + o.candidate.label_display + '.';
         } else if (replyKey === 'typed' || replyKey === 'search') {
           const text = (o.text || '').trim();
           if (!text) { q._error = 'Type an answer first.'; q._busy = false; return; }
           args.answerText = text; args.answerSource = 'typed';
+          landed = 'Saved: ' + text + '.';
         } else {
           q._error = 'Unrecognised reply.'; q._busy = false; return;
         }
         await asdairCommand('answerQuestion', args);
         if (asdairSheet.value && asdairSheet.value.kind === 'question' && asdairSheet.value.question === q) await asdairCloseSheet();
+        // Re-read FIRST, then say what remains — so "what remains" is the new truth, not the old one.
         await loadAsdairWorkspace();
+        asdairSetFlash(landed);
       } catch (e) {
         q._error = e.message || 'failed';
       } finally {
@@ -656,11 +1042,37 @@ createApp({
       if (qty !== null && (!Number.isInteger(qty) || qty < 1 || qty > 99)) {
         asdairSheetErr.value = 'Quantity must be a whole number from 1 to 99, or left blank.'; return;
       }
-      asdairSheetBusy.value = true; asdairSheetErr.value = null;
+      asdairSheetBusy.value = true; asdairSheetErr.value = null; asdairFlash.value = null;
       try {
         await asdairCommand('correctLine', { itemName: itemName, requestedQty: qty });
         await asdairCloseSheet();
         await loadAsdairWorkspace();
+        asdairSetFlash('Saved: ' + itemName + '.');
+      } catch (e) {
+        asdairSheetErr.value = e.message || 'failed';
+      } finally {
+        asdairSheetBusy.value = false;
+      }
+    }
+
+    /**
+     * AC5, "mark something 'not this week'" on an ALREADY-RESOLVED line — not a question, a line.
+     * Routed through whichever command the API actually publishes (asdairSkipCommand). If none is
+     * published this is never called: the control renders disabled and says so.
+     */
+    async function asdairSkipLine(line) {
+      const cmd = asdairSkipCommand.value;
+      const l = line || {};
+      if (!cmd) { asdairSheetErr.value = 'AsdAIr has no command for this yet.'; return; }
+      asdairSheetBusy.value = true; asdairSheetErr.value = null; asdairFlash.value = null;
+      try {
+        await asdairCommand(cmd, {
+          listItemId: l.list_item_id === undefined ? null : l.list_item_id,
+          lineNo: l.line_no === undefined ? null : l.line_no,
+        });
+        await asdairCloseSheet();
+        await loadAsdairWorkspace();
+        asdairSetFlash('Marked “not this week”.');
       } catch (e) {
         asdairSheetErr.value = e.message || 'failed';
       } finally {
@@ -1054,12 +1466,19 @@ createApp({
 
     return {
       AREAS, APPS, appKey, appViewKey, currentApp, currentView, statusOf, appTone, appStatusLine, probeApp, openApp, closeApp, goView,
-      asdairWs, asdairWsErr, asdairWsLoading, asdairMediaErr, loadAsdairWorkspace, asdairShop, asdairOtherShops, asdairWaitingOn, asdairPrevOrderTotal,
+      asdairWs, asdairWsErr, asdairWsLoading, asdairMediaErr, loadAsdairWorkspace, asdairShop, asdairOtherShops, asdairPrevOrderTotal,
       asdairMoney, asdairLineTone, asdairLineChip, asdairTally, asdairKnown,
       asdairRules, asdairRulesErr, asdairRulesLoading, loadAsdairRules, asdairRuleGroups,
       asdairPacket, asdairPacketErr, asdairPacketLoading, loadAsdairPacket,
       asdairPacketDoc, asdairRecon, asdairPacketState, asdairReconState,
-      asdairStatus, asdairCanonicalState, asdairLineFilter, asdairAllLines, asdairExceptionLines, asdairShopLines, asdairLineProvenance,
+      asdairStatus, asdairCanonicalState, asdairStateField, asdairLineFilter, asdairAllLines, asdairExceptionLines, asdairShopLines, asdairLineProvenance,
+      // WP-B15-36 — one sentence, the human summary, exception-first groups, and the crop.
+      asdairOpenQuestions, asdairAnsweredQuestions, asdairOpenLines, asdairTotalLines, asdairResolvedLineCount,
+      asdairBlockingSentence, asdairSentenceSource, asdairStateDisagreement,
+      asdairProvenance, asdairLineOrigin,
+      asdairAttentionLines, asdairChangeLines, asdairResolvedLines,
+      asdairRegionOf, asdairCropBoxStyle, asdairCropImgStyle, asdairCanCrop, asdairMediaSize, asdairLineTitle,
+      asdairHasCommand, asdairSkipCommand, asdairSkipLine, asdairFlash, asdairOpenReanswer, asdairTrapFocus,
       asdairMediaUrl, asdairSheet, asdairSheetBusy, asdairSheetErr, asdairChangeName, asdairChangeQty, asdairAnswerText,
       asdairOpenSheet, asdairCloseSheet, asdairOpenPhoto, asdairOpenQuestion, asdairOpenChange,
       asdairAnswerQuestion, asdairSubmitChange,
@@ -1206,8 +1625,19 @@ createApp({
               :class="{on: currentView.primary === false}" @click="goView(currentApp.views.find(v => v.primary === false).key)">⚙</button>
           </header>
 
-          <!-- Availability, measured. Never assumed, never dressed up. -->
-          <div class="app-status" :class="statusOf(currentApp).state" role="status" aria-live="polite">
+          <!-- Availability, measured. Never assumed, never dressed up.
+
+               WP-B15-36, AC2 — "No second status indicator may contradict it." This band and the
+               AsdAIr Shop band below were BOTH .app-status: same dot, same bold lead, one saying
+               "AsdAIr's read service is answering" and one saying "Needs you". Two status bands in
+               one visual language on one screen is precisely the thing Warwick said must not happen.
+               So when AsdAIr's own canonical band is on screen (its service is up, so the shop state
+               is real), THIS band stands down. It is never lost: it renders the moment the service is
+               anything other than up — the only case where it carries information the shop band
+               cannot — and it is always readable under the cog, in Diagnostics.
+               Every other app is untouched. -->
+          <div v-if="!(currentApp.key==='asdair' && statusOf(currentApp).state==='up')"
+            class="app-status" :class="statusOf(currentApp).state" role="status" aria-live="polite">
             <span class="as-dot" aria-hidden="true"></span>
             <div class="as-body"><b>{{ appStatusLine(currentApp) }}</b><span v-if="statusOf(currentApp).detail"> — {{ statusOf(currentApp).detail }}</span></div>
             <button v-if="currentApp.probe" class="act" @click="probeApp(currentApp)">Check again</button>
@@ -1270,10 +1700,20 @@ createApp({
                   </div>
                 </div>
 
-                <div class="grp" v-if="asdairCanonicalState">
+                <!-- THE SEAM, VISIBLE. WP-B15-36: the Cockpit backend was converging at the same
+                     time as this UI, so which field answered, which sentence was rendered and where
+                     the provenance figures came from are all shown here rather than being something
+                     an integrator has to infer from a blank chip. Diagnostics, behind the cog —
+                     never on a primary screen. -->
+                <div class="grp">
                   <h2>Technical status</h2>
                   <dl class="as-kv">
-                    <div><dt>Canonical state</dt><dd>{{ asdairCanonicalState }}</dd></div>
+                    <div><dt>Canonical state</dt><dd>{{ asdairCanonicalState || 'not reported' }}</dd></div>
+                    <div><dt>Read from field</dt><dd>{{ asdairStateField ? 'shop.' + asdairStateField : 'none of shop.human_state / shop.canonical_state / shop.cockpit_state' }}</dd></div>
+                    <div><dt>Blocking sentence</dt><dd>{{ asdairSentenceSource }}</dd></div>
+                    <div><dt>Provenance figures</dt><dd>{{ asdairProvenance.route === 'api' ? 'workspace.provenance' : (asdairProvenance.route === 'lines' ? 'counted from interpretation.lines[].provenance' : 'not reported') }}</dd></div>
+                    <div><dt>“Not this week” command</dt><dd>{{ asdairSkipCommand || 'not published by the API' }}</dd></div>
+                    <div><dt>Service availability</dt><dd>{{ appStatusLine(currentApp) }}</dd></div>
                   </dl>
                 </div>
 
@@ -1584,7 +2024,12 @@ createApp({
                   <div class="as-body"><b>{{ asdairRules.rules.active_display }} active rules</b><span> · {{ asdairRules.decisions.total_display }} recorded decisions · {{ asdairRules.regulars.active_display }} active regulars</span></div>
                   <button class="act" :disabled="asdairRulesLoading" @click="loadAsdairRules()">{{ asdairRulesLoading ? '…' : 'Refresh' }}</button>
                 </div>
-                <p class="app-blurb">Read-only. Nothing on this screen is edited from the cockpit — rules change through the same command surface the Telegram bot uses.</p>
+                <!-- AC6 — "do NOT imply CRUD that does not exist." The published command surface
+                     (workspace.command_names) carries NO rule create/edit/forget command, so this
+                     screen offers none and says so in one plain sentence, rather than growing an
+                     Edit button that would fail. When such a command is published, the control can
+                     be gated on asdairHasCommand() exactly as "Not this week" already is. -->
+                <p class="app-blurb">These are the standing rules AsdAIr plans against. <b>You can’t change them from here yet</b> — there is no command for editing or forgetting a rule, so this screen shows you what AsdAIr believes rather than pretending to let you rewrite it. Tell it in Telegram and the rule changes here too.</p>
 
                 <!-- STANDING RULES, grouped by what they DO. A directive name without its
                      consequence is just a label, so every group prints its meaning. -->
@@ -1683,70 +2128,161 @@ createApp({
               <div v-if="asdairWsLoading && !asdairWs" class="empty big">Loading AsdAIr’s workspace…</div>
               <div v-else-if="asdairWsErr || !asdairShop" class="empty big">{{ currentApp.offline }}</div>
 
-              <!-- SHOP — the one canonical state (AC2), then exceptions first (design doc's List
-                   screen folded in here, since AC1 caps AsdAIr at four primary tabs), then the rest
-                   resolved and compact. Nothing here is independently recomputed from raw counts —
-                   the status line traces to ONE field (asdairCanonicalState) or an honest fallback
-                   sentence, never a client-computed status string. -->
+              <!-- SHOP — WP-B15-36. The reading order IS the specification, top to bottom:
+                     1. ONE status label      (AC2)  — one field, one derivation site
+                     2. ONE blocking sentence (AC1)  — "why isn't my basket ready?", answered
+                     3. This week's shop in human terms, four origins distinct (AC3)
+                     4. Exception-first lines, resolved collapsed (AC4)
+                     5. The photograph, small, on demand (AC5)
+                   ⛔ Nothing here recomputes a status from raw counts, and no number on this screen
+                   is read from a different field than the sentence above it reads. -->
               <div v-else-if="currentView.key==='shop'" class="asdair-view">
                 <div class="app-status" :class="asdairStatus.tone" role="status" aria-live="polite">
                   <span class="as-dot" aria-hidden="true"></span>
                   <div class="as-body">
                     <b>{{ asdairStatus.label }}</b>
-                    <span v-if="!asdairCanonicalState"> — {{ asdairWaitingOn(asdairShop, asdairWs.questions && asdairWs.questions.open_count_display) }}</span>
                   </div>
                   <button class="act" :disabled="asdairWsLoading" @click="loadAsdairWorkspace()">{{ asdairWsLoading ? '…' : 'Refresh' }}</button>
                 </div>
-                <p v-if="!asdairCanonicalState" class="as-note">AsdAIr hasn’t reported one overall status yet — the line above falls back to what’s known. It becomes a single glance the moment that lands.</p>
 
-                <div class="grp">
-                  <h2>This week</h2>
-                  <div class="item grey">
-                    <div class="i-main"><div class="i-eyebrow">Photo understood</div><div class="i-title">{{ asdairShop.lines_summary.resolved_display }} of {{ asdairShop.lines_summary.total_display }} lines sorted<span v-if="asdairShop.lines_summary.open_display !== '0'"> · {{ asdairShop.lines_summary.open_display }} still open</span></div></div>
-                  </div>
-                  <div class="item" :class="(asdairWs.questions && Number(asdairWs.questions.open_count_display) > 0) ? 'amber' : 'grey'" role="button" tabindex="0" @click="goView('questions')" @keydown.enter="goView('questions')" @keydown.space.prevent="goView('questions')">
-                    <div class="i-main"><div class="i-eyebrow">Needs you</div><div class="i-title">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || 'unknown' }} question{{ asdairWs.questions && asdairWs.questions.open_count_display === '1' ? '' : 's' }} waiting<span v-if="asdairWs.questions && asdairWs.questions.resolved_count_display !== '0'"> · {{ asdairWs.questions.resolved_count_display }} already answered</span></div></div>
-                    <span class="chev" aria-hidden="true">›</span>
-                  </div>
-                </div>
+                <!-- AC1 — THE ONE SENTENCE. Warwick: "Never require Warwick to infer this from
+                     several counters." It is the largest text on the screen, immediately under the
+                     one status label, and it is never accompanied by a second competing sentence. -->
+                <p v-if="asdairBlockingSentence" class="as-answer">{{ asdairBlockingSentence }}</p>
+                <p v-else class="as-answer as-answer-unknown">AsdAIr hasn’t reported one overall status for this shop yet, so there is no single answer to show. Nothing below is a guess at one.</p>
 
-                <!-- The photo — auto-rotated (the browser's own EXIF handling; no pipeline-computed
-                     rotation exists yet where the source carries no EXIF, e.g. most Telegram photos —
-                     flagged in the read-back), shown small, never dominating (AC5). No per-line
-                     region crop exists anywhere upstream yet — that is Part 1/vision-pipeline scope,
-                     still fog per the design doc — so the honest interim is one small thumbnail with
-                     a "view original" control, never a fabricated crop. -->
-                <div class="grp" v-if="asdairWs.evidence && asdairWs.evidence.has_media">
-                  <h2>The list</h2>
-                  <button class="asdair-photo-thumb" type="button" @click="asdairOpenPhoto()" :disabled="asdairMediaErr" aria-label="View the original photo of the list, full size">
-                    <img v-if="!asdairMediaErr" class="asdair-photo-sm" :src="asdairMediaUrl" alt="" aria-hidden="true" @error="asdairMediaErr = true" />
-                    <span class="as-note">{{ asdairMediaErr ? 'The photo could not be loaded.' : 'View original photo' }}</span>
-                  </button>
-                </div>
+                <!-- A real disagreement in AsdAIr's own data is named as a FAULT, once — never left
+                     as two numbers for Warwick to reconcile himself. -->
+                <p v-if="asdairStateDisagreement" class="as-fault">{{ asdairStateDisagreement }}</p>
 
-                <!-- EXCEPTION-FIRST. Default: needs-attention + changed only. "All" is one tap away,
-                     never the default (design doc, "List screen"). Every line — resolved or not — is
-                     tappable with a plain "Change" action (design doc's "something looks wrong"
-                     escape hatch), routed through correctLine (AC4). -->
-                <div class="grp">
-                  <h2>Lines<span class="g-count">{{ asdairShopLines.length }}</span></h2>
-                  <div class="as-seg" role="group" aria-label="Filter lines">
-                    <button class="act" :class="{on: asdairLineFilter==='exceptions'}" :aria-pressed="asdairLineFilter==='exceptions'" @click="asdairLineFilter='exceptions'">Needs attention</button>
-                    <button class="act" :class="{on: asdairLineFilter==='all'}" :aria-pressed="asdairLineFilter==='all'" @click="asdairLineFilter='all'">All ({{ asdairAllLines.length }})</button>
-                  </div>
-                  <p class="empty" v-if="!asdairAllLines.length">Not interpreted yet — no lines have been read off the list.</p>
-                  <p class="empty" v-else-if="!asdairShopLines.length">Nothing needs attention — every line matched cleanly. Tap “All” to see the full list.</p>
-                  <div v-else v-for="(ln,i) in asdairShopLines" :key="ln.line_no != null ? ln.line_no : i" class="item as-stack" :class="asdairLineTone(ln.status)"
-                    role="button" tabindex="0" @click="asdairOpenChange(ln)" @keydown.enter="asdairOpenChange(ln)" @keydown.space.prevent="asdairOpenChange(ln)">
+                <!-- Confirmation that the last write landed, and what is left after it (AC5). -->
+                <p v-if="asdairFlash" class="as-flash" role="status" aria-live="polite">{{ asdairFlash }}</p>
+
+                <div class="grp" v-if="asdairOpenQuestions === null || asdairOpenQuestions > 0">
+                  <div class="item amber" role="button" tabindex="0" @click="goView('questions')" @keydown.enter="goView('questions')" @keydown.space.prevent="goView('questions')">
                     <div class="i-main">
-                      <!-- Plain English only (AC3): no raw status key, no confidence decimal, no
-                           match-basis text, no catalogue id, no ASDA product id on this primary
-                           screen — those move to Diagnostics, behind the cog. -->
-                      <div class="i-title">{{ asdairKnown(ln.canonical_product_name_display) ? ln.canonical_product_name_display : ln.raw_reading_display }}<span v-if="asdairKnown(ln.quantity_display)"> ×{{ ln.quantity_display }}</span></div>
-                      <div class="i-why">{{ asdairLineProvenance(ln.status) }}<span v-if="asdairKnown(ln.canonical_product_name_display) && ln.raw_reading_display !== ln.canonical_product_name_display"> · written as “{{ ln.raw_reading_display }}”</span></div>
+                      <!-- Deliberately carries NO count. The sentence above already answered "how
+                           many"; repeating it here would be the second counter AC1 exists to remove. -->
+                      <div class="i-title">Answer what’s waiting</div>
+                      <div class="i-why">Everything AsdAIr needs from you, on one screen.</div>
                     </div>
                     <span class="chev" aria-hidden="true">›</span>
                   </div>
+                </div>
+
+                <!-- AC3 — THIS WEEK'S SHOP, IN HUMAN TERMS. The four origins stay VISIBLY DISTINCT.
+                     ⛔ "Never an undifferentiated database-derived blob." Where a figure is not
+                     reported, the row says so — a gap is named, never filled with a zero. -->
+                <div class="grp">
+                  <h2>This week’s shop</h2>
+                  <p v-if="asdairProvenance.summary" class="as-answer as-answer-sm">{{ asdairProvenance.summary }}</p>
+                  <p v-else-if="asdairProvenance.equation" class="as-answer as-answer-sm">{{ asdairProvenance.equation }}</p>
+
+                  <div class="item grey as-stack">
+                    <div class="i-main">
+                      <div class="i-eyebrow">Your list</div>
+                      <div class="i-title">
+                        <template v-if="asdairResolvedLineCount !== null && asdairTotalLines !== null">{{ asdairResolvedLineCount }} of {{ asdairTotalLines }} lines sorted</template>
+                        <template v-else>AsdAIr hasn’t reported how many lines it sorted</template>
+                      </div>
+                      <div class="as-sub" v-if="asdairOpenLines !== null && asdairOpenLines > 0">{{ asdairOpenLines }} still being worked through.</div>
+                      <div class="as-sub" v-if="asdairProvenance.source_read">Source: {{ asdairProvenance.source_read }}</div>
+                    </div>
+                  </div>
+
+                  <!-- The five origins, one row each, always all five — so a zero is visibly a
+                       measured zero and an unreported one visibly unreported. -->
+                  <div v-for="o in asdairProvenance.origins" :key="o.key" class="item as-stack"
+                    :class="o.key==='SKIPPED' ? 'amber' : (o.n ? 'green' : 'grey')">
+                    <div class="i-main">
+                      <div class="i-title">{{ o.label }}<span v-if="o.n !== null"> — {{ o.n }}</span></div>
+                      <div class="as-sub">{{ o.blurb }}</div>
+                      <div class="as-note" v-if="o.n === null">AsdAIr isn’t reporting this count yet, so nothing is claimed for it.</div>
+                    </div>
+                  </div>
+
+                  <div class="item grey as-stack" v-if="asdairProvenance.final_products !== null || asdairProvenance.final_items !== null">
+                    <div class="i-main">
+                      <div class="i-eyebrow">Final shop</div>
+                      <div class="i-title">
+                        <template v-if="asdairProvenance.final_products !== null">{{ asdairProvenance.final_products }} products</template><template v-if="asdairProvenance.final_products !== null && asdairProvenance.final_items !== null"> · </template><template v-if="asdairProvenance.final_items !== null">{{ asdairProvenance.final_items }} items</template>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="as-note" v-if="asdairProvenance.route === 'none'">
+                    AsdAIr isn’t yet reporting where each product came from, so the five rows above are
+                    blank rather than filled in with numbers nobody measured. The lines themselves are
+                    below and are real.
+                  </p>
+                  <p class="as-note" v-else-if="asdairProvenance.route === 'lines'">
+                    Counted from the lines themselves — AsdAIr hasn’t published its own summary yet.<span v-if="asdairProvenance.unattributed"> {{ asdairProvenance.unattributed }} {{ asdairProvenance.unattributed === 1 ? 'line carries' : 'lines carry' }} no origin at all and {{ asdairProvenance.unattributed === 1 ? 'is' : 'are' }} counted in none of the five.</span>
+                  </p>
+                </div>
+
+                <!-- AC4 — EXCEPTION-FIRST BY DEFAULT. "Warwick is NOT going to proofread 39 lines
+                     every week." Needs attention, then changes and additions, then everything else
+                     COLLAPSED. Every line — resolved or not — stays tappable with a plain "Change"
+                     action (the design doc's "something looks wrong" escape hatch) via correctLine. -->
+                <div class="grp">
+                  <h2>Needs your attention<span class="g-count">{{ asdairAttentionLines.length }}</span></h2>
+                  <p class="empty" v-if="!asdairAllLines.length">Not interpreted yet — no lines have been read off the list.</p>
+                  <p class="empty" v-else-if="!asdairAttentionLines.length">Nothing on the list needs a second look.</p>
+                  <div v-else v-for="(ln,i) in asdairAttentionLines" :key="'att'+(ln.line_no != null ? ln.line_no : i)" class="item as-stack" :class="asdairLineTone(ln.status)"
+                    role="button" tabindex="0" @click="asdairOpenChange(ln)" @keydown.enter="asdairOpenChange(ln)" @keydown.space.prevent="asdairOpenChange(ln)">
+                    <div class="i-main">
+                      <!-- Plain English only: no raw status key, no confidence decimal, no
+                           match-basis text, no catalogue id, no ASDA product id on this primary
+                           screen — every one of those lives in Diagnostics, behind the cog. -->
+                      <div class="i-title">{{ asdairLineTitle(ln) }}<span v-if="asdairKnown(ln.quantity_display)"> ×{{ ln.quantity_display }}</span></div>
+                      <div class="as-sub">{{ asdairLineProvenance(ln) }}<span v-if="asdairKnown(ln.canonical_product_name_display) && ln.raw_reading_display !== ln.canonical_product_name_display"> · written as “{{ ln.raw_reading_display }}”</span></div>
+                      <!-- The relevant crop, beside the line it is evidence for. -->
+                      <div v-if="asdairCanCrop(asdairRegionOf(ln))" class="as-crop" :style="asdairCropBoxStyle(asdairRegionOf(ln))">
+                        <img v-if="asdairRegionOf(ln).url" :src="asdairRegionOf(ln).url" class="as-crop-whole" alt="" aria-hidden="true" />
+                        <img v-else :src="asdairMediaUrl" :style="asdairCropImgStyle(asdairRegionOf(ln))" alt="" aria-hidden="true" />
+                      </div>
+                    </div>
+                    <span class="chev" aria-hidden="true">›</span>
+                  </div>
+                </div>
+
+                <div class="grp" v-if="asdairChangeLines.length">
+                  <h2>Changes and additions<span class="g-count">{{ asdairChangeLines.length }}</span></h2>
+                  <p class="as-meaning">Not simply read off the photograph — added, changed, or decided.</p>
+                  <div v-for="(ln,i) in asdairChangeLines" :key="'chg'+(ln.line_no != null ? ln.line_no : i)" class="item as-stack" :class="asdairLineTone(ln.status)"
+                    role="button" tabindex="0" @click="asdairOpenChange(ln)" @keydown.enter="asdairOpenChange(ln)" @keydown.space.prevent="asdairOpenChange(ln)">
+                    <div class="i-main">
+                      <div class="i-title">{{ asdairLineTitle(ln) }}<span v-if="asdairKnown(ln.quantity_display)"> ×{{ ln.quantity_display }}</span></div>
+                      <div class="as-sub">{{ asdairLineProvenance(ln) }}</div>
+                    </div>
+                    <span class="chev" aria-hidden="true">›</span>
+                  </div>
+                </div>
+
+                <!-- RESOLVED — available, compact, and COLLAPSED. Warwick opens it when he wants it;
+                     it never competes for the screen with the things that actually need him. -->
+                <div class="grp" v-if="asdairResolvedLines.length">
+                  <h2>Already sorted<span class="g-count">{{ asdairResolvedLines.length }}</span></h2>
+                  <details class="tech">
+                    <summary>Show the {{ asdairResolvedLines.length }} {{ asdairResolvedLines.length === 1 ? 'line' : 'lines' }} that are already settled</summary>
+                    <div class="tech-body">
+                      <button v-for="(ln,i) in asdairResolvedLines" :key="'res'+(ln.line_no != null ? ln.line_no : i)" type="button" class="as-compact" @click="asdairOpenChange(ln)">
+                        <span class="as-compact-name">{{ asdairLineTitle(ln) }}<span v-if="asdairKnown(ln.quantity_display)"> ×{{ ln.quantity_display }}</span></span>
+                        <span class="as-compact-why">{{ asdairLineProvenance(ln) }}</span>
+                      </button>
+                    </div>
+                  </details>
+                </div>
+
+                <!-- AC5 — the full photograph WHEN WANTED, never by default. Auto-rotated by the
+                     browser's own EXIF handling; no pipeline-computed rotation exists yet where the
+                     source carries no EXIF (most Telegram photos), which is stated, not papered over. -->
+                <div class="grp" v-if="asdairWs.evidence && asdairWs.evidence.has_media">
+                  <h2>The photograph</h2>
+                  <button class="asdair-photo-thumb" type="button" @click="asdairOpenPhoto()" :disabled="asdairMediaErr" aria-label="View the original photo of the list, full size">
+                    <img v-if="!asdairMediaErr" class="asdair-photo-sm" :src="asdairMediaUrl" alt="" aria-hidden="true" @error="asdairMediaErr = true" />
+                    <span class="as-note">{{ asdairMediaErr ? 'The photo could not be loaded.' : 'View the original photo' }}</span>
+                  </button>
                 </div>
               </div>
 
@@ -1756,12 +2292,31 @@ createApp({
                    by the question's own allowed_replies rather than a client-invented action.
                    Answered items do not vanish: collapsed but openable, newest first. -->
               <div v-else-if="currentView.key==='questions'" class="asdair-view">
+                <!-- The same one sentence that leads the Shop screen, so the two screens can never
+                     tell Warwick two different stories about the same shop. ONE source, rendered twice. -->
+                <p v-if="asdairBlockingSentence" class="as-answer">{{ asdairBlockingSentence }}</p>
+                <p v-if="asdairFlash" class="as-flash" role="status" aria-live="polite">{{ asdairFlash }}</p>
+
                 <div class="grp">
                   <h2>Still waiting on you<span class="g-count">{{ (asdairWs.questions && asdairWs.questions.open_count_display) || '0' }}</span></h2>
                   <p class="empty" v-if="!asdairWs.questions || !asdairWs.questions.items || !asdairWs.questions.items.length">Nothing open — AsdAIr is not waiting on an answer.</p>
                   <div v-else v-for="(q,i) in asdairWs.questions.items" :key="q.id != null ? q.id : ('q'+i)" class="item as-stack amber">
                     <div class="i-main">
                       <div class="as-raw">{{ q.question_text_display }}</div>
+
+                      <!-- AC5 — THE RELEVANT CROP, right here. "Show the relevant crop rather than
+                           making Warwick hunt around the page." Drawn from the one photograph using
+                           the region's own pixel bounds; when no region is recorded we SAY so and
+                           offer the whole photograph rather than inventing a crop. -->
+                      <div v-if="asdairCanCrop(asdairRegionOf(q))" class="as-crop" :style="asdairCropBoxStyle(asdairRegionOf(q))">
+                        <img v-if="asdairRegionOf(q).url" :src="asdairRegionOf(q).url" class="as-crop-whole" alt="" aria-hidden="true" />
+                        <img v-else :src="asdairMediaUrl" :style="asdairCropImgStyle(asdairRegionOf(q))" alt="" aria-hidden="true" />
+                      </div>
+                      <p v-else-if="asdairWs.evidence && asdairWs.evidence.has_media" class="as-note">
+                        AsdAIr hasn’t recorded which part of the photograph this line came from, so there is
+                        no crop to show. <button class="as-link" type="button" @click="asdairOpenPhoto()">View the whole photograph</button>
+                      </p>
+
                       <div class="as-tags" v-if="q.candidates && q.candidates.length">
                         <button v-for="c in q.candidates" :key="c.index" class="as-choice" type="button" :disabled="q._busy"
                           @click="asdairAnswerQuestion(q, 'choose', {candidate: c})">✓ {{ c.label_display }}</button>
@@ -1775,14 +2330,26 @@ createApp({
                   </div>
                 </div>
 
+                <!-- ANSWERED — they do not vanish. Collapsed but openable, newest first, each one
+                     showing what was asked, what Warwick said, what it was taken to mean, and
+                     WHETHER IT WAS REMEMBERED for future shops or applied only to this one. Every
+                     one can be CHANGED, through the same command that answered it (AC5). -->
                 <div class="grp" v-if="asdairWs.questions && asdairWs.questions.resolved && asdairWs.questions.resolved.length">
-                  <h2>Answered<span class="g-count">{{ asdairWs.questions.resolved_count_display }}</span></h2>
+                  <h2>Already answered<span class="g-count">{{ asdairWs.questions.resolved_count_display }}</span></h2>
                   <details v-for="(q,i) in asdairWs.questions.resolved" :key="'r'+i" class="tech">
-                    <summary>{{ q.status_display === 'skipped' ? 'Skipped' : 'Answered' }}<span v-if="asdairKnown(q.answered_at_display)"> · {{ q.answered_at_display }}</span></summary>
+                    <summary>{{ q.status_display === 'skipped' ? 'Skipped' : 'Answered' }}<span v-if="asdairKnown(q.answer_text_display)"> · {{ q.answer_text_display }}</span><span v-if="asdairKnown(q.answered_at_display)"> · {{ q.answered_at_display }}</span></summary>
                     <div class="tech-body">
                       <div class="as-raw">{{ q.question_text_display }}</div>
                       <div class="as-sub" v-if="asdairKnown(q.answer_text_display)">You said: “{{ q.answer_text_display }}”</div>
                       <div class="as-sub strong" v-if="q.resolution_display">→ {{ q.resolution_display }}</div>
+                      <!-- "applied to this shop" vs "remembered for future shops" — from the
+                           decision's own recorded forward intent, never inferred. -->
+                      <div class="as-sub" v-if="q.decision && asdairKnown(q.decision.forward_intent_display)">Remembered for future shops: {{ q.decision.forward_intent_display }}</div>
+                      <div class="as-note" v-else>Applied to this shop. Nothing says it was remembered for future shops.</div>
+                      <div class="i-act">
+                        <button class="act" :disabled="q._busy" @click="asdairOpenReanswer(q)">Change this answer</button>
+                      </div>
+                      <p class="err" v-if="q._error">{{ q._error }}</p>
                     </div>
                   </details>
                 </div>
@@ -2587,20 +3154,34 @@ createApp({
        modal (BUILD-015 B15-26, AC4/AC5). Kept separate from the generic detail sheet below, whose
        header is shared by idea/opp/output/doc and would need a fifth branch for no benefit. -->
   <div v-if="asdairSheet" class="sheet" @click.self="asdairCloseSheet()">
+    <!-- WP-B15-36, AC7 residual 2 — the focus-trap "body bounce". The inert attribute on .nav and
+         .shell-main removes every other control from the tab order, but Tab from the LAST control in the
+         sheet still walks out into the browser's own chrome before coming back. These two sentinels
+         close that: they are in the tab order, in front of and behind the card, and each bounces
+         focus to the opposite end of the dialog. Two focus handlers, no hand-rolled key cycle, and
+         no Shift+Tab-from-first-element special case. -->
+    <span tabindex="0" aria-hidden="true" class="as-trap" @focus="asdairTrapFocus('last')"></span>
     <div class="sheet-card asdair-sheet" role="dialog" aria-modal="true"
       :aria-label="asdairSheet.kind==='photo' ? 'Original photo' : asdairSheet.kind==='question' ? 'Answer this question' : 'Change this line'"
       @keydown.esc="asdairCloseSheet()">
       <button class="back" @click="asdairCloseSheet()">‹ Back</button>
 
       <template v-if="asdairSheet.kind==='photo'">
-        <h1>Original photo</h1>
+        <h1>The original photograph</h1>
         <p class="as-sub">Shown exactly as uploaded — the browser applies the photo's own rotation if it carries one.</p>
         <img class="asdair-photo" :src="asdairMediaUrl" alt="The full, original photo of this week's list." />
       </template>
 
       <template v-else-if="asdairSheet.kind==='question'">
-        <h1>Answer this question</h1>
+        <h1>{{ asdairSheet.reanswer ? 'Change your answer' : 'Answer this question' }}</h1>
         <div class="as-raw">{{ asdairSheet.question.question_text_display }}</div>
+        <p class="as-sub" v-if="asdairSheet.reanswer && asdairKnown(asdairSheet.question.answer_text_display)">You said “{{ asdairSheet.question.answer_text_display }}”. Change it below and save.</p>
+        <!-- The crop, in the sheet too — the same region, drawn the same way, so answering from the
+             sheet never means losing sight of the evidence. -->
+        <div v-if="asdairCanCrop(asdairRegionOf(asdairSheet.question))" class="as-crop" :style="asdairCropBoxStyle(asdairRegionOf(asdairSheet.question))">
+          <img v-if="asdairRegionOf(asdairSheet.question).url" :src="asdairRegionOf(asdairSheet.question).url" class="as-crop-whole" alt="" aria-hidden="true" />
+          <img v-else :src="asdairMediaUrl" :style="asdairCropImgStyle(asdairRegionOf(asdairSheet.question))" alt="" aria-hidden="true" />
+        </div>
         <div class="as-tags" v-if="asdairSheet.question.candidates && asdairSheet.question.candidates.length">
           <button v-for="c in asdairSheet.question.candidates" :key="c.index" class="as-choice" type="button" :disabled="asdairSheet.question._busy"
             @click="asdairAnswerQuestion(asdairSheet.question, 'choose', {candidate: c})">✓ {{ c.label_display }}</button>
@@ -2626,10 +3207,17 @@ createApp({
         <input id="asdair-change-qty" class="asdair-input" type="number" min="1" max="99" v-model="asdairChangeQty" placeholder="leave blank if unchanged" />
         <div class="i-act">
           <button class="act accept" :disabled="asdairSheetBusy" @click="asdairSubmitChange()">{{ asdairSheetBusy ? '…' : 'Save correction' }}</button>
+          <!-- AC5 — "mark something 'not this week'" on an ALREADY-RESOLVED line. Offered only when
+               the API publishes a command for it; otherwise disabled and SAID, never faked. -->
+          <button class="act decline" :disabled="asdairSheetBusy || !asdairSkipCommand"
+            :title="asdairSkipCommand ? 'Leave this out of this week’s shop' : 'AsdAIr has no command for this yet'"
+            @click="asdairSkipLine(asdairSheet.line)">Not this week</button>
         </div>
+        <p class="as-note" v-if="!asdairSkipCommand">“Not this week” is greyed out because AsdAIr does not yet publish a command for skipping an already-sorted line. It becomes live the moment one exists — nothing here pretends to work in the meantime.</p>
         <p class="err" v-if="asdairSheetErr">{{ asdairSheetErr }}</p>
       </template>
     </div>
+    <span tabindex="0" aria-hidden="true" class="as-trap" @focus="asdairTrapFocus('first')"></span>
   </div>
 
   <!-- DETAIL SHEET (L3 + L4) -->

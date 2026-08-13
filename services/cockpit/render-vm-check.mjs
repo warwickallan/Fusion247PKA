@@ -251,13 +251,35 @@ function runChecks(r, sink) {
 // The discriminator is position, not size: a sanctioned blob is immediately preceded by its own
 // drawer label. An unsanctioned one is not. That still catches the original bug (34 blobs, none
 // behind a drawer label) and stops flagging the feature. `--self-test` proves both halves.
-const DRAWER_LABEL = 'Raw payload (debugging only)';
+//
+// ⛔ REPAIRED IN WP-B15-36, and the defect is worth recording because it is the failure mode this
+// whole harness exists to prevent, committed by the harness itself. The heading in app.js reads
+// "Raw payloadS (debugging only)" — plural, because the drawer holds three. This constant was the
+// SINGULAR string, so `.includes()` never matched, the sanctioned drawer was reported as a stray
+// blob on every run, and the ABOUT scenario has been red since. A permanently-red scenario is a
+// gate nobody reads. The match is now on the STABLE STEM, which is what the discriminator actually
+// depends on; the full label survives for the message. Confirmed pre-existing by executing this
+// file on untouched HEAD 86cfc08.
+const DRAWER_LABEL = 'Raw payloads (debugging only)';
+const DRAWER_STEM = 'debugging only';
 function strayJsonBlobs(textParts) {
   const out = [];
+  // SECOND HALF OF THE SAME REPAIR. The three-part lookbehind assumed ONE drawer. Diagnostics
+  // renders up to THREE (Workspace · Rulebook · Packet), and once the first drawer's own blob —
+  // which is thousands of characters — sits between the heading and the second drawer, the window
+  // can never reach back to it. So the second and third drawers were flagged as stray on every run.
+  // The heading INTRODUCES A GROUP, so once it has appeared in this view, the raw-payload area has
+  // begun. The trade is stated rather than hidden: a genuinely stray blob placed AFTER that heading
+  // in the same view would now be missed. It is accepted because the heading is the last block on
+  // the only screen that carries it, and because the alternative — a permanently red scenario — is
+  // a gate nobody reads. The self-test's stray-blob mutation injects at `<div class="app-view">`,
+  // BEFORE the heading, so it still fires; that is what keeps this non-vacuous.
+  let drawerOpen = false;
   for (let i = 0; i < textParts.length; i++) {
     const s = textParts[i];
+    if (s.includes(DRAWER_STEM)) drawerOpen = true;
     if (!s.startsWith('{') || s.length <= 200) continue;
-    const behindDrawer = textParts.slice(Math.max(0, i - 3), i).some((p) => p.includes(DRAWER_LABEL));
+    const behindDrawer = drawerOpen || textParts.slice(Math.max(0, i - 3), i).some((p) => p.includes(DRAWER_STEM));
     if (!behindDrawer) out.push(s.slice(0, 80));
   }
   return out;
@@ -302,14 +324,173 @@ const PACKET_BAD_SORT = {
   packet: { ...PACKET.packet, sort_verified: false, sort_first_break_display: '2' },
 };
 
+// ── WP-B15-36 FIXTURES — the converged Cockpit UI ───────────────────────────────────────────────
+//
+// ⛔ FIRST, THE DEFECT THESE REPAIR, because it is the reason every assertion below is new rather
+// than adjusted. Until this WP, the two AsdAIr scenarios named their views 'overview' and 'details'.
+// B15-26 RENAMED those keys to 'shop' and 'questions' (apps.js) and did not update this file. So
+// `app.views.find(v => v.key === viewKey)` returned `undefined`, `currentView.label` threw in the
+// breadcrumb, and EVERY AsdAIr scenario died before rendering a single node — carrying four
+// assertions down with it. Established by execution, not inference: the identical four failures
+// reproduce on untouched HEAD 86cfc08 with this WP's changes stashed.
+// The consequence is worth stating plainly: the AsdAIr Shop and Questions screens have had NO
+// executed render coverage since f7bf71a, and a green run of this harness did not mean what it
+// looked like it meant.
+//
+// SECOND, WHAT THE FIXTURES BELOW ARE FOR. `WS` (the committed sample) carries NO canonical state
+// field, NO provenance block and NO regions — which is exactly the "backend has not landed it yet"
+// case, and it stays as its own scenario because rendering an HONEST GAP is a requirement, not a
+// degraded mode. The fixtures here add the cases the converged backend will produce.
+//
+// Every value is synthetic. Field names are taken from the real contract, never invented:
+// `human_state` from migration 020 §5, the PHOTO/REGULARS/RULE/WARWICK vocabulary from that same
+// migration's shop_line_provenance CHECK, and the four pixel bounds from shop_image_region.
+const ws = (shopPatch, patch = {}) => ({
+  ...WS, ...patch, shop: { ...WS.shop, ...shopPatch },
+});
+const PROVENANCE = {
+  source_read_status_display: 'photograph read', source_lines_display: '39',
+  reconciled_products_display: '41',
+  photo_display: '39', regulars_display: '4', rules_display: '1', warwick_display: '2', skipped_display: '3',
+  final_products_display: '43', final_items_display: '61',
+};
+// NEEDS_WARWICK with two open questions: the exact case Warwick's first example names.
+const WS_NEEDS = ws({ human_state: 'NEEDS_WARWICK' }, {
+  provenance: PROVENANCE,
+  questions: { ...WS.questions, open_count_display: '2',
+    items: [
+      { ...WS.questions.items[0],
+        // The four pixel bounds, per shop_image_region. This is the whole crop seam.
+        region: { pixel_top: 100, pixel_left: 20, pixel_bottom: 160, pixel_right: 400 } },
+      { ...WS.questions.items[0], id: 9, question_key: 'q_placeholder_9',
+        question_text_display: 'A second placeholder question with no recorded region.', region: null },
+    ] },
+});
+// ASDAIR_WORKING with open lines: Warwick's second example, verbatim in shape.
+const WS_WORKING = ws({ human_state: 'ASDAIR_WORKING',
+  lines_summary: { total_display: '5', resolved_display: '2', open_display: '3' } },
+  { questions: { ...WS.questions, open_count_display: '0', items: [] } });
+// READY_FOR_WARWICK: Warwick's third example.
+const WS_READY = ws({ human_state: 'READY_FOR_WARWICK' },
+  { questions: { ...WS.questions, open_count_display: '0', items: [] } });
+// FAILED, from the basket half: Warwick's fourth example.
+const WS_FAILED = ws({ human_state: 'FAILED',
+  failure: { ...(WS.shop.failure || {}), failed_from_display: 'WAITING_FOR_BROWSER' } },
+  { questions: { ...WS.questions, open_count_display: '0', items: [] } });
+// THE CONTRADICTION. State says nothing needs him; two questions are still open. A naive UI shows
+// "Nothing needs you" beside a 2 and lets Warwick work it out. This must be named as a FAULT.
+const WS_CONTRADICT = ws({ human_state: 'ASDAIR_WORKING' },
+  { questions: { ...WS.questions, open_count_display: '2' } });
+// THE SEAM, both older shapes. Neither may regress to "Status unknown".
+const WS_SEAM_CANONICAL = ws({ canonical_state: 'READY_FOR_WARWICK' });
+const WS_SEAM_COCKPIT = ws({ cockpit_state: 'READY_FOR_WARWICK' });
+// Per-line provenance with NO summary block — the 'lines' counting route.
+const WS_LINE_PROV = ws({}, {
+  interpretation: { ...WS.interpretation,
+    lines: WS.interpretation.lines.map((l, i) => ({ ...l, provenance: ['PHOTO', 'REGULARS', 'RULE', 'WARWICK', 'PHOTO'][i % 5] })) },
+});
+// The API publishing a skip command — the only thing that may un-grey "Not this week" on a line.
+const WS_SKIP_CMD = ws({ human_state: 'NEEDS_WARWICK' },
+  { command_names: [...(WS.command_names || []), 'skipThisWeek'] });
+
 const ASDAIR_PLAN = [
-    ['OVERVIEW (live shop)', 'overview', { asdairWs: WS, asdairWsErr: null }],
+    // ── AC1 · AC2 — the one sentence and the one status, one scenario per state Warwick named ────
+    ['SHOP · NEEDS_WARWICK (2 open questions)', 'shop', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s own sentence, verbatim in shape', (p) => hasText(p, '2 decisions still need you.')],
+      ['AC2 — the one canonical status label is rendered', (p) => hasText(p, 'Needs you')],
+      ['AC2 — the SERVICE availability band stands down, so there is no second status indicator',
+        (p) => !hasText(p, 'running')],
+      ['AC3 — Warwick\'s summary equation, assembled from real terms',
+        (p) => hasText(p, '39 from the photograph + 4 from Regulars − 3 skipped = 43 products / 61 items')],
+      ['AC3 — all four origins plus SKIPPED stay VISIBLY DISTINCT, never one blob',
+        (p) => hasText(p, 'From the photograph') && hasText(p, 'Added from your Regulars')
+          && hasText(p, 'From household rules') && hasText(p, 'You decided this week')
+          && hasText(p, 'Skipped this week')],
+      ['no raw canonical state token leaks onto the primary screen', (p) => !hasText(p, 'NEEDS_WARWICK')],
+      ['no internal pipeline stage name leaks onto the primary screen', (p) => !hasText(p, 'PROCESSING')],
+      ['no shop reference leaks onto the primary screen', (p) => !hasText(p, 'SHOP-2026-01-01')],
+      ['no match-basis internal leaks onto the primary screen', (p) => !hasText(p, 'exact alias match')],
+      // REGRESSION — found by READING the rendered text, not the diff. An unreadable line carries
+      // the API's word "unknown" in both name fields, and the title expression printed it as the
+      // product's name. "unknown" where a product belongs IS the database view Warwick prohibited.
+      ['⛔ the word "unknown" is never a product title',
+        (p) => !p.some((s) => s.trim() === 'unknown')],
+      ['an unreadable line says so in English instead',
+        (p) => hasText(p, 'AsdAIr couldn’t read this line')],
+    ]],
+    ['SHOP · ASDAIR_WORKING (3 products reconciling)', 'shop', { asdairWs: WS_WORKING, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s second example, verbatim in shape',
+        (p) => hasText(p, 'Nothing needs you. AsdAIr is reconciling 3 products.')],
+      ['AC2 — one status label', (p) => hasText(p, 'AsdAIr is working')],
+    ]],
+    ['SHOP · READY_FOR_WARWICK', 'shop', { asdairWs: WS_READY, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s third example, verbatim',
+        (p) => hasText(p, 'Everything is resolved. Ready to build the ASDA basket.')],
+      ['AC2 — one status label', (p) => hasText(p, 'Ready for you')],
+    ]],
+    ['SHOP · FAILED (from the basket half)', 'shop', { asdairWs: WS_FAILED, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s fourth example, verbatim',
+        (p) => hasText(p, 'Basket build failed. Nothing was ordered.')],
+    ]],
+    // ── The thing Warwick must NEVER be asked to do himself ───────────────────────────────────────
+    ['SHOP · state and counts CONTRADICT each other', 'shop', { asdairWs: WS_CONTRADICT, asdairWsErr: null }, {}, [
+      ['the disagreement is named as a FAULT, in words',
+        (p) => hasText(p, 'That is a fault in AsdAIr, not something for you to resolve.')],
+      ['and Warwick is never left holding two bare numbers to reconcile',
+        (p) => hasText(p, 'AsdAIr says nothing needs you, but still has 2 open questions')],
+    ]],
+    // ── The seam. Both older field names must still render, or integration silently blanks. ───────
+    ['SHOP · seam: only shop.canonical_state present', 'shop', { asdairWs: WS_SEAM_CANONICAL, asdairWsErr: null }, {}, [
+      ['reads the backend branch\'s CURRENT field name', (p) => hasText(p, 'Ready for you')],
+      ['and answers the question from it', (p) => hasText(p, 'Everything is resolved. Ready to build the ASDA basket.')],
+    ]],
+    ['SHOP · seam: only shop.cockpit_state present (the B15-26 placeholder)', 'shop', { asdairWs: WS_SEAM_COCKPIT, asdairWsErr: null }, {}, [
+      ['an older backend still renders rather than regressing to unknown', (p) => hasText(p, 'Ready for you')],
+    ]],
+    // ── AC3 fallback routes. A gap is NAMED; it is never filled with a zero. ──────────────────────
+    ['SHOP · provenance counted from the lines themselves', 'shop', { asdairWs: WS_LINE_PROV, asdairWsErr: null }, {}, [
+      ['the route is stated on screen, not silently assumed',
+        (p) => hasText(p, 'Counted from the lines themselves')],
+      ['origins are still shown one by one', (p) => hasText(p, 'Added from your Regulars')],
+    ]],
+    ['SHOP · no canonical state and no provenance at all (the honest gap)', 'shop', { asdairWs: WS, asdairWsErr: null }, {}, [
+      ['⛔ nothing is invented — the missing answer is said, not guessed',
+        (p) => hasText(p, 'AsdAIr hasn’t reported one overall status for this shop yet')],
+      ['⛔ the five origin rows are BLANK, not filled with zeros',
+        (p) => hasText(p, 'AsdAIr isn’t yet reporting where each product came from')],
+      ['a per-origin row says so for itself too',
+        (p) => hasText(p, 'AsdAIr isn’t reporting this count yet, so nothing is claimed for it.')],
+    ]],
+    // ── AC4 — exception-first. ───────────────────────────────────────────────────────────────────
+    ['SHOP · exception-first grouping', 'shop', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      ['"needs your attention" leads the list', (p) => hasText(p, 'Needs your attention')],
+      ['resolved lines are COLLAPSED behind a control, never proofread by default',
+        (p) => p.some((s) => /Show the \d+ lines? that are already settled/.test(s))],
+    ]],
+    // ── AC5 — the question board. ────────────────────────────────────────────────────────────────
+    ['QUESTIONS · crop, and the honest absence of one', 'questions', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      ['a question with no recorded region SAYS so rather than showing a fabricated crop',
+        (p) => hasText(p, 'AsdAIr hasn’t recorded which part of the photograph this line came from')],
+      ['the same one sentence leads this screen too, so two screens cannot tell two stories',
+        (p) => hasText(p, '2 decisions still need you.')],
+      ['an answered question can be CHANGED', (p) => hasText(p, 'Change this answer')],
+      ['applied-to-this-shop vs remembered-for-future is stated, never inferred',
+        (p) => hasText(p, 'Applied to this shop.') || hasText(p, 'Remembered for future shops')],
+    ]],
+    // ── The command surface gate: a control with no command behind it is never dressed as working ─
+    ['QUESTIONS · no skip command published', 'questions', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      ['the API publishes no skip-a-line command in this fixture',
+        (p) => !hasText(p, 'AsdAIr has no command for this yet')],
+    ]],
+    ['SHOP · the API publishes a skip command', 'shop', { asdairWs: WS_SKIP_CMD, asdairWsErr: null }],
+    // ── The original coverage, with the view keys REPAIRED. ──────────────────────────────────────
+    ['SHOP (live shop, committed sample)', 'shop', { asdairWs: WS, asdairWsErr: null }],
     // The two questions checks below are the regression this scenario exists to catch: the fixture
     // used to carry field names (question_display, answered_display...) that DO NOT EXIST on the
     // real assembleWorkspace.js payload, so a real drift in the template's field names would have
     // rendered "unknown" everywhere and passed silently — the harness could not see it because the
     // fixture was already wrong in the same way. It is now keyed field-for-field to the real payload.
-    ['DETAILS (live shop)', 'details', { asdairWs: WS, asdairWsErr: null }, {}, [
+    ['QUESTIONS (live shop)', 'questions', { asdairWs: WS, asdairWsErr: null }, {}, [
       ['still-open question renders its real text, not a raw id',
         (p) => hasText(p, 'Is "placeholder juice" the Placeholder Orange Juice 1L you usually get?')],
       ['a RESOLVED question shows Warwick\'s own answer verbatim',
@@ -322,11 +503,12 @@ const ASDAIR_PLAN = [
       // toISOString() instant right beside "You said: ..." / "-> Resolved to ...". The checked-in
       // fixture is now honest about the real formatter's output (see assembleWorkspace.js's
       // humanWhen()), so this assertion is a genuine render-layer guard, not one the fixture masks.
-      ['no raw ISO timestamp anywhere in the Details view (a machine instant is never primary content)',
+      ['no raw ISO timestamp anywhere in the Questions view (a machine instant is never primary content)',
         (p) => !p.some((s) => /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s))],
     ]],
-    ['DETAILS (shop present, every section empty)', 'details', { asdairWs: BARE_WS, asdairWsErr: null }],
-    ['DETAILS (service down)', 'details', { asdairWs: null, asdairWsErr: 'service down' }],
+    ['QUESTIONS (shop present, every section empty)', 'questions', { asdairWs: BARE_WS, asdairWsErr: null }],
+    ['SHOP (shop present, every section empty)', 'shop', { asdairWs: BARE_WS, asdairWsErr: null }],
+    ['QUESTIONS (service down)', 'questions', { asdairWs: null, asdairWsErr: 'service down' }],
     ['RULES (live rulebook)', 'rules', { asdairRules: RULES, asdairRulesErr: null }],
     ['RULES (read failed)', 'rules', { asdairRules: null, asdairRulesErr: 'not answering' }],
     ['RULES (empty rulebook)', 'rules', { asdairRules: EMPTY_RULES, asdairRulesErr: null }],
@@ -694,7 +876,13 @@ if (SELF_TEST) {
   const missed = [];
   for (const [name, mutate] of Object.entries(cases)) {
     setRefs({ asdairWs: WS, asdairWsErr: null });
-    const r = scenario('mutant', 'details', Vue.compile(mutate(opts.template)));
+    // ⛔ 'shop', NOT the stale 'details'. WP-B15-36: with a view key the registry no longer carries,
+    // `currentView` was undefined and the BREADCRUMB threw before any mutation could be reached — so
+    // all three of these reported "caught -> threw: Cannot read properties of undefined (reading
+    // 'label')" on untouched HEAD. Every one was VACUOUS: the has-trap detector this block exists to
+    // prove was never exercised. A mutation test that passes for the wrong reason is worse than
+    // none, because it gets quoted as evidence.
+    const r = scenario('mutant', 'shop', Vue.compile(mutate(opts.template)));
     const hit = r.err || r.missing.length;
     if (hit) { caught++; console.log('  caught  ' + name.padEnd(42) + ' -> ' + (r.err ? 'threw: ' + r.err.message.slice(0, 60) : 'missing: ' + r.missing.join(', '))); }
     else { missed.push(name); console.log('  MISSED  ' + name); }
@@ -705,7 +893,9 @@ if (SELF_TEST) {
   {
     setRefs({ asdairWs: WS, asdairWsErr: null });
     const mutated = opts.template.replace(anchor, anchor + '<p>{{ JSON.stringify(asdairWs) }}</p>');
-    const r = scenario('mutant', 'details', Vue.compile(mutated));
+    // 'shop' for the same reason as above: on HEAD this scenario THREW, `strays` was forced to [],
+    // and the mutation was reported MISSED every run. Fixing the key is what makes it a real test.
+    const r = scenario('mutant', 'shop', Vue.compile(mutated));
     const strays = r.err ? [] : strayJsonBlobs(text(r.vnode));
     if (strays.length) { caught++; console.log('  caught  ' + 'stray raw JSON outside a drawer'.padEnd(42) + ' -> ' + strays[0].slice(0, 60)); }
     else { missed.push('stray raw JSON outside a drawer'); console.log('  MISSED  stray raw JSON outside a drawer'); }
@@ -714,7 +904,9 @@ if (SELF_TEST) {
   // gets ignored. A detector that fires on the feature is as useless as one that misses the bug.
   {
     setRefs({ asdairWs: WS, asdairWsErr: null });
-    const r = scenario('control', 'details', Vue.compile(opts.template));
+    // 'about' — the drawer lives in Diagnostics, so that is the only view where this control is
+    // testing anything at all. ('details' threw; before that it named a view without the drawer.)
+    const r = scenario('control', 'about', Vue.compile(opts.template));
     const strays = strayJsonBlobs(text(r.vnode));
     console.log(strays.length
       ? '  CONTROL FAILED — the sanctioned "' + DRAWER_LABEL + '" drawer is being flagged as stray'
