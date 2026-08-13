@@ -1102,24 +1102,32 @@
       // ⛔ "Take it off" IS NOW PRESENTATIONAL — a span, not a button. A real button inside a
       // role=button row is a control inside a control; `.tick` is presentational for the same reason.
       // Removal is recoverable: removeExtra() records a worded undo that puts it back where it was.
-      '    <div',
-      '      v-for="e in extras"',
-      '      :key="e.id"',
-      '      class="row extra on"',
-      '      role="button"',
-      '      :aria-label="\'Take \' + e.text + \' off your list\'"',
-      '      tabindex="0"',
-      '      @click="removeExtra(e)"',
-      '      @keydown.enter.prevent="removeExtra(e)"',
-      '      @keydown.space.prevent="removeExtra(e)"',
-      '    >',
-      '      <div class="r-body">',
-      '        <span class="tick" aria-hidden="true">✓</span>',
-      '        <span class="r-name">{{ e.text }}</span>',
+      // ⛔ MEDIUM-A, VERA — THE NUDGE IS A SIBLING OF THE ROW AND NEVER A CHILD OF IT.
+      // It used to sit INSIDE this row, and that made two things true at once, both bad. The row is
+      // a `role="button"` whose action is REMOVE, so touching the sentence "You've already got
+      // Cravendale on your list. I've kept this too." DELETED HER ITEM. And because `role="button"`
+      // renders its descendants presentational, that sentence and its `role="status"` live region
+      // were not exposed to assistive technology at all — the one message the sense-check exists to
+      // deliver was both a trap and inaudible. Moving it out of the row closes both halves at once.
+      // The `template` carries the v-for so the row and its note are SIBLINGS rather than nested.
+      '    <template v-for="e in extras" :key="e.id">',
+      '      <div',
+      '        class="row extra on"',
+      '        role="button"',
+      '        :aria-label="\'Take \' + e.text + \' off your list\'"',
+      '        tabindex="0"',
+      '        @click="removeExtra(e)"',
+      '        @keydown.enter.prevent="removeExtra(e)"',
+      '        @keydown.space.prevent="removeExtra(e)"',
+      '      >',
+      '        <div class="r-body">',
+      '          <span class="tick" aria-hidden="true">✓</span>',
+      '          <span class="r-name">{{ e.text }}</span>',
+      '        </div>',
+      '        <span class="take-off" aria-hidden="true">Take it off</span>',
       '      </div>',
-      '      <span class="take-off" aria-hidden="true">Take it off</span>',
       '      <p v-if="e.note" class="e-note" role="status">{{ e.note }}</p>',
-      '    </div>',
+      '    </template>',
       '  </div>',
 
       // B §8.1: the entry control, always the last thing before the footer. A single unmistakable
@@ -1169,9 +1177,16 @@
       '    <div v-if="sendState === \'confirm\'" class="f-state" tabindex="-1">',
       '      <div class="note" role="status">',
       '        <strong class="n-say">Send your shopping list for {{ confirmShown }}?</strong>',
-      '        <span class="n-sub">{{ confirmCountLabel }} Nothing has been sent yet.</span>',
+      // ⛔ MEDIUM-D, VERA — THE ZERO CASE IS REACHABLE AND USED TO BE SILENT.
+      // She can open the confirm, scroll up, untick everything and tap YES. confirmSend() returns
+      // early on an empty list, which is correct — but the control said nothing, showed nothing and
+      // did nothing, which for a technology-phobic user is indistinguishable from a broken page.
+      // `.send` has carried both halves since B §6.7 (visibly disabled, with the reason beside it);
+      // this simply gives the commit control the same two, rather than inventing a third pattern.
+      '        <span v-if="totalCount === 0" class="n-sub">You haven’t chosen anything. Tap some things first, then press SEND MY SHOPPING LIST again.</span>',
+      '        <span v-else class="n-sub">{{ confirmCountLabel }} Nothing has been sent yet.</span>',
       '      </div>',
-      '      <button type="button" class="confirm" @click="confirmSend()">YES, SEND IT</button>',
+      '      <button type="button" class="confirm" :aria-disabled="totalCount > 0 ? \'false\' : \'true\'" @click="confirmSend()">YES, SEND IT</button>',
       '      <button type="button" class="again" @click="cancelConfirm()">No, not yet</button>',
       '    </div>',
 
