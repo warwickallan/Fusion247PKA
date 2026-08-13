@@ -2282,6 +2282,103 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+### ⭐ LANE E DELIVERED — WHY TERRA INVENTS. The answer is a switch, not an argument.
+
+**`Deliverables/2026-08-13-terra-in-enum-false-positive-mechanism.md`, branch `b15-38-terra-invention-analysis` @ `9798648`.**
+
+**The mechanism in one line: Terra fills a gap with the most plausible thing Warwick already buys.** Bands
+overlap by 20px, so every strip is **cut through real handwriting at its edges**. When the clipped line
+reads cleanly, nothing goes wrong. When it degrades, Terra reaches into the supplied candidate list and
+writes down the nearest neighbour **by category** — it does not leave the slot empty.
+
+**The proof is a controlled switch, not a plausible story.** Band 2 carries `1 LENOR OUTDOOR` (Lenor
+**fabric conditioner**). Across six runs: **Lenor read → no phantom. Lenor not read → phantom `TRESemme`**,
+the only other **conditioner** in the catalogue. **6/6, no exceptions, never both, never neither.** The
+bridge is **semantic through the candidate list, not visual** — different aisle, no resemblance, shared
+category word.
+
+| Class | Frozen set | Full estate |
+|---|---|---|
+| A — systematic/repeated bias | 0 | **8** (`17` TRESemme ×4, `102` Wall's ×4) |
+| B — neighbour/region confusion | 1 | 1 |
+| C — catalogue over-selection | 1 (`47`) | 2 (`47`, `103`) |
+| D — genuinely stochastic | 1 (low confidence) | 1 |
+
+**A and C are one mechanism at two frequencies**, split by evidence of recurrence.
+
+### 🔴 TWO PREMISES FALSIFIED, AND ONE OF THEM IS IN WARWICK'S OWN BRIEF
+
+> **1. RECONCILIATION DOES NOT REJECT THE PHANTOMS.** Warwick's brief says *"reconciliation currently
+> rejects the measured phantoms"* and Larry repeated it into three Work Orders. **All three residuals
+> reached `finalLines` with `photo_evidence.supported: true` and `needs_human: false`.** Reconciliation
+> rejected only crossed-out lines and empty strings. **What actually stopped them is cross-run 3-of-3
+> consensus in `finalise`** — a different control, in a different place. *Larry's record-keeping, labelled
+> Larry's: this identifies the load-bearing control, and it was not where anyone had placed it.*
+>
+> **2. THAT CONTROL HAS ALREADY FAILED ONCE — this is the important one.** In the `wp1533` family, phantom
+> `102` (**Wall's Sausage Rolls**) appeared in **3 of 3 runs**. **Had that family been the frozen set,
+> sausage rolls would have entered Warwick's shop with FULL CONSENSUS and nothing would have caught them.**
+> The vote filters *random* error; **these errors are not random** — semantic substitution recurs by design.
+> **The clean final result is partly a property of which three runs were frozen.**
+
+**This is exactly what Warwick's §4 ruling anticipated** (*"the system must still have a truthful route to
+HUMAN rather than silently turning agreement into certainty"*). **Relayed to Lane AB, whose AC5 now targets
+the real control** rather than `corroborate.js` alone. **2-of-3 is CORROBORATION. 3-of-3 is not verification
+either.**
+
+**Also established:** `inventedFromSuppliedCandidate` is **structurally incapable of firing** —
+`identityPairs` only pairs against products that ARE on the page (`twoLayerScore.js:641-645`), so a phantom
+naming an absent product can never form one. It reads **0 on every run containing the exact failure its name
+describes**, while `inventedFreeGeneration` absorbs three different mechanisms under a name asserting
+unconstrained invention on a closed-enum run. Recorded as an observation. **No Work Order. Vision stays
+parked.** Band 7 flags itself via `lookAgainRegions: [5,7]` and **nothing downstream consumes that flag.**
+
+### 🔧 THE THREE KEEL LANES WERE REFUSED, CORRECTLY, AND RE-ISSUED
+
+**Larry hand-authored all five orders instead of generating them. Every Keel lane refused on sight.** The
+refusals were right on every count and cost one round trip each.
+
+| Re-issued order | Package | Head |
+|---|---|---|
+| `WO-2026-08-13-10` | WP-B15-40 Lane AB | `9c42115` |
+| `WO-2026-08-13-11` | WP-B15-41 Lane C | `ac5c360` |
+| `WO-2026-08-13-12` | WP-B15-44 Lane F | `e9ef794` |
+
+All three now: **generated through `tools/wo/envelope.mjs`**, `authorCount: 0, unresolvedCount: 0,
+ready: true` on live recount · `private_surface: none` · `live_authority: none`.
+
+**⭐ THE BLOCKER BEHIND EVERY REFUSAL IS GONE.** Workers cannot write to live data under *any* deviation,
+and Lane C established **by execution** that no disposable Postgres existed on this machine — which made
+every DB acceptance criterion unprovable. **Larry built one: PostgreSQL 17.4 at `127.0.0.1:55432`, database
+`asdair_test`, migrations 001–020 applied, 31 asdair tables at parity with live, `asdair_rw` carrying
+exactly SELECT+INSERT with UPDATE and DELETE false.** Workers now need **no credential at all**, which
+dissolves the GL-012 violation rather than arguing with it. *(Gaps named: migration `011` — a seed — and the
+trigger function `asdair.command_request_insert_guard` did not come across.)*
+
+**Live persistence is explicitly RECLASSIFIED AS MANUAL in every order**, per § "Nothing may live only in
+Larry's head". No completed-automation claim can arise from a disposable-target proof.
+
+**Three worker findings deleted or replaced an acceptance criterion — the read-back gate earning its keep:**
+Lane AB's stale-`needs human` defect **did not reproduce** (8 holds all genuine, zero shoppable-with-a-held-reason) and became an investigation that may correctly return nothing · Lane F's `READY_TO_SHOP` guard **already existed** in a directory the same order forbade it to touch, keyed on a `shop.status` value Larry had conflated with `human_state` · Lane C found Larry had asserted `node_modules/pg` existed in a worktree where it does not.
+
+### ⚠️ SCHEMA DRIFT, RECORDED WHERE IT WILL BE FOUND
+
+**Three tables exist in the live database that NO repository migration creates:** `command_request`,
+`previously_ordered`, `skill_steps`. Discovered while building the disposable target at parity. **Not
+blocking; not fixed tonight; Warwick's to decide.**
+
+### 🔴 CAPAE — the exposures of this session, recorded honestly including the bad one
+
+- **`work-order-not-generated` — RECURRENCE, and the worst-timed one on record.** Pax graded this family
+  **CLEAN for the first time in five occurrences**, and Larry broke a four-exposure streak **on the very
+  next dispatch**, roughly an hour after reading the audit that recorded it. Five hand-authored orders,
+  three refused on sight. *Reading that a control is working is not the same as operating it.*
+- **`order-premise-not-verified` (proposed) — TWICE MORE.** `node_modules/pg` asserted into Lane C's order;
+  "reconciliation rejects the phantoms" repeated into three orders and falsified by Lane E. In both cases
+  the falsifying evidence was already on disk.
+- **`record-amended-body-not-recut` — clean exposure ×2.** Both map updates superseded the body in place
+  and were committed **at dispatch time, not batched to the morning**.
+
 ### ⚠️ THE ASSURANCE GAP LARRY IS CLOSING WITHOUT BEING ASKED
 
 **Zero of the four overnight packages (WP-B15-34 → 37) carry a Veritas verdict.** Warwick's §4 forbids
