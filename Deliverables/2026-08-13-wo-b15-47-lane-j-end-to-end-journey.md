@@ -105,6 +105,31 @@ operational_handoff: none
 
 # WO-2026-08-13-15 — Lane J: the whole journey, over the real photograph, in one run
 
+> ## ⟦AMENDMENT 1 — Larry, 2026-08-13. Issued after Keel's REFUSE, which was correct on all six findings.⟧
+>
+> **The REFUSE stands as written and nothing in it is disputed. This amendment changes the order, not the verdict.**
+>
+> **A1 — THE VISION CALL IS REMOVED FROM THIS ORDER AND IS LARRY'S.** Your C2 is settled, permanently: the only gateway carrier sits at the **root** of `C:\.fusion247\`, GL-012 makes that never a valid grant, and **three Keel instances have now refused on the same boundary.** Passing it to `--env-file` still lands the value in your process — GL-012 §1's own words are that *"a read-only escape from the declared subtree is precisely the leak this boundary exists to close."* **`network` and `credential_scope` revert to `none`. You need neither.** C1 dissolves with it.
+>
+> **A2 — WHAT YOU BUILD INSTEAD: the chain from a REAL vision output onward, and the runner that drives it.** Larry executes the real `realInterpretPhoto` pass over the committed photograph and commits its **genuine output artefact**. You build the runner that takes that artefact and drives **reconciliation → four-kind provenance → quantity settlement → brand-sorted final list → browser-handoff payload** for real against the disposable Postgres.
+>
+> **This is NOT the fixture-bridging AC1 forbids, and the distinction is the whole point:** a fixture is data invented to stand in for a step that never ran. This artefact is **the actual output of the real first link, produced by the real production interpreter on the real photograph.** The chain is continuous; it crosses **one process boundary, at the credential line, because no other crossing is lawful.** **Say exactly that in your return** — do not describe it as end-to-end without the qualifier, and do not describe it as a fixture either.
+>
+> **A3 — M1 IS RESOLVED. The real catalogue is now on the disposable target:** **109 regulars · 40 rules (31 for household 1, 28 active) · 10 products**, household 1 corrected to **`mum`/`Mum`**. It includes **Richmond Thick Pork Sausages 16 Pack** and **Ariel All-in-1 Pods Original 33 Washes** — AC4's two named cases, now genuinely demonstrable. **`RULE` provenance can now fire, so AC2's fourth kind is reachable.** Your M1 was the best catch of this order.
+>
+> **A4 — M3 AUTHORISED, AND IT IS NOW AN ACCEPTANCE CRITERION.** Add the single-reading guard to `finalise/corroborate.js`: when `runCount < 2`, an observation may **not** be classified `UNANIMOUS` or any corroboration-implying class — emit an explicit single-reading class. **You found that one reading would ship the strongest agreement label in the vocabulary onto every delivered line. That is a real product defect and Warwick's ruling forbids it directly. Mutation-test the guard.**
+>
+> **A5 — DB BINDINGS CORRECTED (my third error of this kind, and yours to rely on over mine):**
+> `ASDAIR_DB_URL` = **owner** `postgresql://postgres@127.0.0.1:55432/asdair_test` · `ASDAIR_WRITE_DB_URL` = `postgresql://asdair_rw:test@…` · `ASDAIR_DB_RW_URL` = `postgresql://asdair_rw:test@…`
+>
+> **A6 — BASELINE CORRECTED to `1086 / 1085 pass / 0 fail / 1 skip`**, becoming 1086/1086/0 with all three URLs bound. **Report against that, not against my 1091.**
+>
+> **A7 — THE WHOLE-DIRECTORY SCAN LINE IS DELETED.** You are right that it cannot pass on a pristine tree. **The first-party form is the acceptance invocation**; report the third-party exit 1 alongside it and name the difference.
+>
+> **A8 — AC3 UNCHANGED AND REINFORCED.** With the real catalogue seeded the numbers may now land near the frozen figures — **that is not permission to tune toward them.** Report what the run produces. **A5's honesty requirement is now stronger, not weaker:** one reading cannot corroborate itself, whatever the count says.
+>
+> **A9 — `readReconciled.js` (M5): read it from the object store at Lane F's `de8560b`.** It is not on this branch and the order should have said so.
+
 **Warwick's clause 7, verbatim, and it is the whole point of this order:** *"The whole journey is demonstrated as a working user experience, **not inferred from unit tests, fixtures or disconnected components**."*
 
 **What is already true, and is NOT what he asked for.** Lane G (`2cc5ac1`) built a genuine production caller — `runPipeline.planWithDecisions` now persists all four provenance kinds — and proved it at **1091/1091/0 skipped**, including on a pristine CRLF checkout. But it said so plainly in its own return: *"Was the real production event exercised? **NO**."* The model consult was faked and the durable store was `fakePg`. **A chain of individually-proven links is not a proven chain.**
