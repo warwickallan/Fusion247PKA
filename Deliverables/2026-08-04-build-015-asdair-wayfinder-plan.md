@@ -2223,6 +2223,79 @@ output, rather than either architecture alone.
 
 ## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-12 (latest) — **REGION GRANULARITY + A TRUSTWORTHY MEASUREMENT.** Authorised by Warwick. **START HERE. This is the current frontier.**
 
+**Status: ⭐ THE OVERNIGHT MISSION IS DELIVERED. THE LIST EXISTS. Vision is FINAL and PARKED. Five work packages complete (WP-B15-33 → 37). ⚠️ ONE ITEM NEEDS WARWICK: migration 020 is committed but UNAPPLIED. Full report: `Deliverables/2026-08-13-overnight-morning-report.md`.**
+
+### ⭐ WHERE THIS BUILD ACTUALLY STANDS — 2026-08-13, post-overnight. **A fresh Larry reads THIS block and nothing above it.**
+
+| Lane | Branch | HEAD | State |
+|---|---|---|---|
+| **Vision — FINAL, PARKED** | `build-015/b15-28-…-v2` | `54c3b0b` | Warwick order: *"No Round 9. No prompt polishing. No new OCR architecture. No model bake-off."* **DO NOT REOPEN.** |
+| **Lane A — reconciliation + final list** | same branch | **`df18e64`** | **THE LIST EXISTS.** |
+| **Cockpit backend** | `build-015/b15-25-cockpit-backend` | **`fc1fe16`** | Converged. |
+| **Cockpit UI** | `build-015/b15-26-cockpit-ui` | **`8a2fabf`** | Converged, Vera CONDITIONAL PASS. |
+
+**All four branches pushed. All 13 worktrees clean. Nothing in flight.**
+
+**THE PRODUCT OUTCOME:** the known 39-line photograph went through the production modules and produced
+**39 products · 53 items · SORTED BY BRAND · 31 shoppable · 8 held with named reasons.** Accounting closes:
+**47 observations, 47 accounted, none missing, none doubled.** Artefacts at
+`services/asdair/pipeline/finalise/out/` on `df18e64`. **No manual rescue, no database surgery, no browser
+action.** Shop parks at `NEEDS_DECISION` — an **honest non-zero**, not a guessed zero.
+
+**⭐ THE ANTI-PHANTOM ANSWER, and it cost nothing.** Vision ships with **no structural anti-phantom
+mechanism**, so reconciliation became it: **agreement between the three frozen readings.** Support from
+2-of-3 selects exactly 39 observations covering all 39 page lines and **excludes all three measured
+inventions** — 3/3 caught, 0/39 real lines lost. **It asserts its own limit in a PASSING test:** three
+readings by one model of one photograph are not independent, so a cleared line is **CORROBORATED, never
+VERIFIED.**
+
+**Two money defects caught:** Richmond resolved to **1 pack** with the refused `16` recorded — *two of three
+runs had read it as quantity 16*. And **one page line resolved to TWO different catalogue products across
+runs**; keying by id alone would have put two roast beefs in the trolley. The 6-pint milk (1 vs 7) is
+**routed, quantity null** — a test asserts a 2-of-3 majority is never taken as truth.
+
+### ⛔ LARRY'S POSITIONAL-FIELD RULING WAS WRONG. Recorded, not quietly reverted.
+
+Larry authorised a transcription-only positional field to make Warwick's structural evidence gate buildable.
+**The measurement killed it on both counts.** It **COST detection** — −14.8% lines per band call,
+permutation p = 0.0127, because asking the model where a line sits makes it **JOIN adjacent page lines** at
+twice the rate. And it **never caught phantoms**: invention was **5.7% in the BEST-resolved bands vs 1.5% in
+the worst**, and both phantoms came from the best-resolved band. **Default OFF by one flag; the gate is kept,
+not deleted.** *This is the second Larry inference this session that the evidence overturned — see also the
+reconciliation misdiagnosis and the confounded D-vs-E variance claim.*
+
+### ⚠️ THE ONE ITEM THAT NEEDS WARWICK
+
+**Migration 020 is committed but NEVER APPLIED to the live database.** No `human_state`, no
+`shop_line_provenance`, no `shop_image_region`. Larry attempted it via MCP; **a safety classifier declined
+and Larry did NOT route around it** — a live schema change while Warwick slept, refused by a control, is
+where a human belongs. Additive, idempotent, already proven on real PostgreSQL 17.4. **Nothing is blocked:**
+everything degrades honestly, and REGULARS/RULE provenance reads `unknown` until it lands. **Its absence
+also prevented an outage** — an unconditional write would have failed *every* status transition.
+
+**Also Warwick's, not blocking:** vision ships **1–2 inventions per run** with no defence of its own.
+Reconciliation catches them by corroboration. **Accepted risk, his to accept or reject.**
+
+### Vera's correction to Larry, carried in her words rather than his
+
+Larry reported *"a detector was broken and reporting success."* **False.** The gate was **loudly red and
+nobody executed it** — including under Vera's own earlier PASS, which she named as her own defect. **The
+durable lesson: a reported count is never evidence; the reviewer runs the gate at the head under review.**
+
+### Parked, reported, not fixed
+
+Telegram lane untouched (deliberate — lower value than the list and Cockpit) · `readDecisions`' savepoint-less
+optional read (pre-existing, latent) · "not this week" command (all three routes outside surface) · rulebook
+consult declined for want of one authority line — *"toffees with no qualifier"* would have resolved a held
+line · two `aka` rows would fix the Double Gloucester / Febreze resolver gap (a data write, not code) ·
+`abAcceptanceHarness.js`'s 41-line trolley · scanner vendor-tree blindness · GL-012 shape divergence ·
+Veritas receipt-hash mismatch (twice, systematic) · the one-word `register`/`deregister` tightening, still
+unanswered and never chased.
+
+---
+
+### ⛔ SUPERSEDED — WP-B15-33 as dispatched. Retained for the directive it carries.
+
 **Status: WP-B15-33 AUTHORISED AND DISPATCHED. ⭐ THE VISION QUESTION IS CLOSED BY WARWICK'S RULING — "TERRA HAS THE GLASSES. The remaining failures are ours." Three bounded defects plus the instrument. NO architecture work.**
 
 ### AMENDMENT — Warwick, 2026-08-12 (post-variance). **His ruling, quoted. Larry's record-keeping is labelled Larry's.**
