@@ -123,6 +123,109 @@ a line's origin is one of exactly four values, and they are never silently inter
 A line asserting PHOTO provenance without a resolvable region must be rejected by the deterministic
 sanity-check stage, not passed through with a low confidence score.
 
+**AMENDMENT 4 — Warwick's ruling, 2026-08-12, after the discriminating test scored 20/41 (49%) and
+Richmond ×16 recurred in a sibling run. Supersedes the pipeline shape above where it conflicts; does
+not restate what still stands.**
+
+**The ruling, his words, load-bearing: "DO NOT switch to Sonnet/Opus and do not start another model
+bake-off... Stick with Terra and improve the PROCESS around it until the production vision path is
+trustworthy."** Warwick separately gave the same photograph to ChatGPT and Claude directly and both
+read it extremely well — **the lesson is that AsdAIr's production vision workflow is impoverished
+relative to a competent multimodal harness, not that Terra cannot read the list.** Give Terra the same
+kind of visual workflow a competent harness provides. This is a weekly ASDA shop, not an OCR research
+programme — keep it proportionate. **No further model comparison, no pausing to ask whether to
+continue. Carry on.**
+
+**Target economic shape, stated so it isn't lost under the detail below:** one normal first-pass Terra
+call where possible; local/deterministic image work is effectively free; additional Terra calls ONLY
+where the first pass genuinely needs closer inspection; do NOT create routine per-line calls just
+because individual crops scored better in isolation; batch/sequence so a difficult list costs a little
+more and a normal list does not; measure real cost from actual gateway usage, never an abstraction like
+"2.4× calls."
+
+1. **The test denominator was wrong and must be corrected before any further scoring.** The photograph
+   has **39 source lines**. The 41-line trolley is NOT OCR ground truth — it's `39 photo lines − 1
+   (Bloo, deliberately skipped) + 3 (Regulars, added separately) = 41`. Grade PHOTO INTERPRETATION
+   against the 39-line photo truth only. Regulars enrichment is a separate stage with its own
+   correctness question — do not count it as OCR success or failure either way. Every re-score from now
+   on reports seven categories separately: correctly identified photo lines; omitted photo lines;
+   invented photo lines; wrong identity; wrong quantity; genuinely uncertain lines; confident-but-wrong
+   lines.
+2. **Household context (Regulars/Favourites/aliases) stays in Terra's recognition context** — already
+   the design's position, restated because it's load-bearing: Warwick already tested context-free
+   reading and it was materially worse. Context may assist recognition; it may NOT manufacture source
+   lines. PHOTO-derived content and REGULARS-derived enrichment remain different provenance classes,
+   unchanged from the four-way rule above.
+3. **Free visual preparation, unchanged in substance from steps 1-2 above** — EXIF orientation, correct
+   auto-rotation, deskew where useful, sufficient original resolution retained, dead borders trimmed
+   where useful, deterministic numbered source regions. **One correction: do not upscale and assume
+   that manufactures information.** Processing only where it genuinely improves what Terra can inspect.
+4. **The normal path still begins with ONE strong whole-page pass** — unchanged from step 2 above, with
+   the per-line structured-output contract now stated completely: application-owned `source_region` ID;
+   the visible/raw text interpretation; the interpreted product meaning; **requested quantity ONLY where
+   actually supported by quantity evidence** (see point 7); a catalogue/household match where available;
+   confidence/uncertainty; `provenance = PHOTO`. A photo-derived line with no supplied region is invalid,
+   unchanged from the four-way provenance rule. Regulars/rules may not leak into PHOTO provenance —
+   **this is now a live, confirmed defect** (point 8 below names it), not just a rule stated in the
+   abstract.
+5. **Do not trust confidence alone — unchanged in principle from step 4 above, list of checks now
+   complete.** After the first pass, deterministic checks (no model tokens) for: missing/invalid region
+   provenance; duplicate/near-duplicate lines; suspicious quantity interpretation; **pack-size numbers
+   mistaken for requested quantity** (point 7); weak or contradictory catalogue identity; household match
+   inconsistent with the visible interpretation; unexplained invented lines; competing matches; other
+   known reconciliation anomalies from this build's record.
+6. **Targeted re-inspection of SUSPECT REGIONS ONLY — corrects the design's prior "one batched call on
+   flagged crops" into something more precise.** The A/B test proved individual-region inspection
+   materially improves accuracy (35/41 named vs. 24/41 bundled, 27/41 correct vs. 21/41) — **that is a
+   lesson about per-region fidelity, not a licence to make every line an individual call by default.**
+   First pass finds the likely lines/regions; deterministic checks (step 5) identify suspect regions;
+   Terra re-inspects ONLY those suspect regions at higher visual fidelity, using the cheapest reliable
+   call shape the gateway supports for however many regions are actually suspect; the re-read reconciles
+   deterministically back onto the SAME source-region identity — a correction of specific first-pass
+   regions, never a second competing transcription of the whole shop. A clean list stays close to one
+   call. A difficult list may legitimately cost more — acceptable if it prevents a wrong £140 trolley.
+7. **Fix quantity semantics as a CLASS, not by moving a threshold.** Raising `MAX_PLAUSIBLE_QUANTITY`
+   would not have been the fix even before this ruling — 16 can be a perfectly legitimate part of a
+   product's own name/pack descriptor ("Richmond 16 Pork Sausages"). **The real invariant: a number
+   inside a product identity is NOT automatically the requested purchase quantity.** Requested quantity
+   must come from actual quantity evidence in the list/household rule/authorised decision — a leading
+   count, an explicit "x3"/"buy 2", a household rule — never merely because a plausible-looking number
+   appears in the product name. This is a schema/prompt-contract fix (separate the raw text from a
+   justified quantity field), not a bound to relocate.
+8. **Identity resolution is a separate concern from vision, and separate concerns get separate root
+   causes.** The wrong-milk match ("ASDA Semi Skimmed 6 Pints" resolved against the Cravendale 2L
+   regular) is a `resolveByCatalogue` bug, not an OCR problem — do not enlarge a crop to try to fix a
+   deterministic resolver defect. Chase, as their own earliest causes, each independently: the wrong-milk
+   identity match; the duplicate Vanish-line reconciliation gap; the provenance leak that let previously-
+   excluded items (TRESemme, Viakal, Minced Beef Hotpot, Lucozade Raspberry) reappear despite being
+   explicitly removed once already; the Yazoo Chocolate regression; the quantity-semantics class fix
+   from point 7.
+9. **Instrument and report ACTUAL cost, not an abstraction.** Use the real gateway usage/token records
+   from the runs already executed tonight (the whole-page path, the individual-region A/B run) plus the
+   proposed adaptive path once built, and this build's actual configured pricing, to report in human
+   terms: *"Normal clean shop: approximately £/$X. Difficult shop requiring N re-reads: approximately
+   £/$Y."* The optimisation target is **cost per trustworthy shop**, never minimum call count — do not
+   save pennies by creating hours of human correction and a wrong basket.
+10. **Re-run the SAME known photograph** (no 20-photo benchmark programme) against the corrected
+    architecture until it demonstrates the intended behaviour. **The target is NOT "39/39 guessed with
+    supreme confidence."** Trustworthy means: every photo-derived line grounded to a real image region;
+    no invented source lines; no silent quantity guesses; no enrichment masquerading as photograph truth;
+    high-confidence lines genuinely right; remaining ambiguous lines surfaced honestly for Cockpit
+    resolution. *"38 resolved, 1 needs Warwick"* is a better outcome than *"39 resolved"* with several
+    confidently wrong.
+11. **Cockpit is the safety valve, not the OCR department** — the redesign continues as already built,
+    unchanged. Warwick will not manually proofread 39 lines every week; the intended experience stays
+    photo → trustworthy automatic interpretation → Cockpit shows only genuine exceptions → Warwick
+    resolves naturally → source truth recomputes → plan proceeds, with each exception showing the real
+    photo crop, what Terra read, what AsdAIr thinks it means, sensible alternatives, free-text
+    correction, and whether a correction is this-shop-only or durable household knowledge.
+12. **Do not stop. Do not ask whether to park this. Do not turn this into a provider comparison.**
+    Vision/source truth remains the critical dependency; a beautiful Cockpit displaying an incorrectly
+    read shopping list is still failure. Keep improving the process until it is economically sane and
+    trustworthy.
+
+---
+
 **Amendment 2 — model question resolved by research, not assumption.** Warwick identified that
 "Sol" (the open question in last night's blocker doc — "is Sol capable enough, and what did Warwick
 mean by it") is a real model, and that Terra/Sol sit alongside a third name, Luna, as a family. The
