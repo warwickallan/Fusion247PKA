@@ -2282,6 +2282,357 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+### ⭐ LANE E DELIVERED — WHY TERRA INVENTS. The answer is a switch, not an argument.
+
+**`Deliverables/2026-08-13-terra-in-enum-false-positive-mechanism.md`, branch `b15-38-terra-invention-analysis` @ `9798648`.**
+
+**The mechanism in one line: Terra fills a gap with the most plausible thing Warwick already buys.** Bands
+overlap by 20px, so every strip is **cut through real handwriting at its edges**. When the clipped line
+reads cleanly, nothing goes wrong. When it degrades, Terra reaches into the supplied candidate list and
+writes down the nearest neighbour **by category** — it does not leave the slot empty.
+
+**The proof is a controlled switch, not a plausible story.** Band 2 carries `1 LENOR OUTDOOR` (Lenor
+**fabric conditioner**). Across six runs: **Lenor read → no phantom. Lenor not read → phantom `TRESemme`**,
+the only other **conditioner** in the catalogue. **6/6, no exceptions, never both, never neither.** The
+bridge is **semantic through the candidate list, not visual** — different aisle, no resemblance, shared
+category word.
+
+| Class | Frozen set | Full estate |
+|---|---|---|
+| A — systematic/repeated bias | 0 | **8** (`17` TRESemme ×4, `102` Wall's ×4) |
+| B — neighbour/region confusion | 1 | 1 |
+| C — catalogue over-selection | 1 (`47`) | 2 (`47`, `103`) |
+| D — genuinely stochastic | 1 (low confidence) | 1 |
+
+**A and C are one mechanism at two frequencies**, split by evidence of recurrence.
+
+### 🔴 TWO PREMISES FALSIFIED, AND ONE OF THEM IS IN WARWICK'S OWN BRIEF
+
+> **1. RECONCILIATION DOES NOT REJECT THE PHANTOMS.** Warwick's brief says *"reconciliation currently
+> rejects the measured phantoms"* and Larry repeated it into three Work Orders. **All three residuals
+> reached `finalLines` with `photo_evidence.supported: true` and `needs_human: false`.** Reconciliation
+> rejected only crossed-out lines and empty strings. **What actually stopped them is cross-run 3-of-3
+> consensus in `finalise`** — a different control, in a different place. *Larry's record-keeping, labelled
+> Larry's: this identifies the load-bearing control, and it was not where anyone had placed it.*
+>
+> **2. THAT CONTROL HAS ALREADY FAILED ONCE — this is the important one.** In the `wp1533` family, phantom
+> `102` (**Wall's Sausage Rolls**) appeared in **3 of 3 runs**. **Had that family been the frozen set,
+> sausage rolls would have entered Warwick's shop with FULL CONSENSUS and nothing would have caught them.**
+> The vote filters *random* error; **these errors are not random** — semantic substitution recurs by design.
+> **The clean final result is partly a property of which three runs were frozen.**
+
+**This is exactly what Warwick's §4 ruling anticipated** (*"the system must still have a truthful route to
+HUMAN rather than silently turning agreement into certainty"*). **Relayed to Lane AB, whose AC5 now targets
+the real control** rather than `corroborate.js` alone. **2-of-3 is CORROBORATION. 3-of-3 is not verification
+either.**
+
+**Also established:** `inventedFromSuppliedCandidate` is **structurally incapable of firing** —
+`identityPairs` only pairs against products that ARE on the page (`twoLayerScore.js:641-645`), so a phantom
+naming an absent product can never form one. It reads **0 on every run containing the exact failure its name
+describes**, while `inventedFreeGeneration` absorbs three different mechanisms under a name asserting
+unconstrained invention on a closed-enum run. Recorded as an observation. **No Work Order. Vision stays
+parked.** Band 7 flags itself via `lookAgainRegions: [5,7]` and **nothing downstream consumes that flag.**
+
+### 🟡 VERA GATE ON LANE D — **CONDITIONAL PASS** at `152e4a0`. Two conditions, both back with Felix.
+
+**She re-ran Larry's whole quoted evidence list herself and all of it reproduced** — 48/136/0, 10/10,
+template, nav, sw-version, clone-portability, asdair-checklist, secret-scan 43 files — **except one stale
+literal, which was Larry's pass-through, not Felix's error** (V-6: the cache version had moved because
+Felix's own next commit touched `app.js`, which is in `SHELL`; `sw-version-check` mutation-proves the
+invalidation property, so **no product defect**).
+
+**V-1 — HIGH. Two contradictory "needs you" counts, 49px apart, above the fold.** Measured at 375px on the
+Exceptions board: `"1 decision still needs you."` at 332px, and `"2 need you"` at 381–407px. `app.js:2921`
+counts open API questions; `:2944-2953` counts questions **plus held lines with no routed question**. **Two
+populations, one screen — on the very board built to stop Warwick inferring from several counters.** It also
+falsifies the code's own comment at `:656-657` claiming the two are *"unable to contradict each other"*;
+that guarantee holds for the Shop screen, not across this pair. **No wrong shop results — the rows are
+correct and complete — but Warwick reads a screen, not a data model.**
+
+**V-2 — MEDIUM. Brand-list rows are disclosures with no visible affordance.** `SUMMARY_COUNT=4,
+WITH_VISIBLE_MARKER=0` at all three breakpoints. Not a WCAG failure (focus ring measured real at 4.95:1,
+native `<details>` exposes state to AT) — **design-system drift**: `.chev` is this cockpit's affordance glyph
+and is already used on six other row types, **including elsewhere on the same screen**. AC5's
+provenance-on-expansion currently sits behind an unmarked control.
+
+**V-3 — routed to IRIS, explicitly NOT Felix's.** `.i-eyebrow.blocked` at `opacity:.85` composites to
+**3.91 light / 4.17 dark**, below AA — and the text carrying it is **"HELD OUT OF THE BASKET"**. This is
+GL-003's open **D-17**; Felix's new CSS introduces no `opacity` and the new markup reuses a class that
+already carried the defect. **Not a regression. Its priority rose because three exception areas became one
+primary board**, so it now renders where Warwick resolves every held line.
+
+**⭐ VERA VERIFIED THE THINGS LARRY MOST NEEDED VERIFIED, by running them rather than reading them:**
+across all **37 AsdAIr scenarios** — zero `ZZ`, zero `undefined`, zero `NaN`, zero `[object Object]`, zero
+bare `null`; `product: null` renders `list_item_name`, never a null. The vocabulary detector **was made to
+fail**: `--self-test` catches **10/10 mutations plus 2 negative controls**, including both the ZZ and the
+VERIFIED injections, and exactly **one** verify-word line survives estate-wide — the sanctioned caveat,
+matched by identity. And `39/53/31/30` appear **only inside comments**; zero in executable code.
+
+**Honesty note she volunteered rather than papered over:** she reproduced the **light** scheme only. She
+closed the gap by proving both `prefers-color-scheme: dark` blocks contain **zero layout properties** — so
+the layout, tap-target, overflow and semantics evidence governs both — and evidenced dark *colour*
+arithmetically against six independently-pinned GL-003 figures. **But she did not render dark in a browser,
+and says Felix's claim that he did is not something she can corroborate.**
+
+**On `.as-remember`, she and Felix agree and Larry concurs:** the **disabled** state is **ACCEPTED** — it
+renders the offer, disables the control, and explains why. The **enabled** state is **CAPABILITY ONLY** and
+cannot be accepted until a real production command exists. *Felix labelled it that way before anyone asked.*
+
+**Vera's process note, owned rather than hidden — and Larry's ruling: ACCEPTED.** She did not return a
+read-back before inspecting, judging the round-trip cost to exceed the risk on a **read-only re-inspection**
+against a named head, surface and breakpoint set. **That is a sound judgement for this round** and she
+flagged it for overruling rather than hoping it passed. Had it been a first dispatch, or had she needed to
+write anything, the hold would have been required.
+
+**⚠️ AND THE RECORD-KEEPING DEFECT IS CONFIRMED AS LARRY'S:** she could not verify the previous round's
+conditions were discharged, *"because there is no durable record of what they were."* Her CONDITIONAL PASS
+was returned inline and never written to a receipt. **The fix is a written receipt, not another review.**
+
+**Two methodology facts worth carrying estate-wide:** `nav-check.mjs` binds **port 8099** and exits 1 with
+`EADDRINUSE` if another gate's probe holds it — **a concurrency artefact, not a product failure**. And
+GL-003 §2c's *"do not fix these"* list **correctly overruled two of her own probe's contrast readings**
+(`.crumb-sep` 3.36, `.chev` 3.80, both ornaments under the 3:1 floor) — evidence that the exclusion list
+earns its place.
+
+### ✅ LANE F COMPLETE — **`de8560b`** on `build-015/b15-39-browser-handoff`. 11 files, 0 outside surface. **NOT accepted.**
+
+**`14/14 mutants killed, ZERO SURVIVORS`** (baseline 9/9). The five new ones by name: `emissionGateIgnored` ·
+`sentinelTreatedAsBrand` · `packSizeBecomesQuantity` · `silentDrop` · `provenanceNotRequired`.
+**157 executed subtests, 157 pass, 0 skipped** (baseline 133) · **12/12 DB-gated against 17.4**, and **12
+cleanly SKIPPED with the variable unset** — so it degrades honestly on a box with no dependencies ·
+secret-scan **exit 0 over 24 files**.
+
+**AC4 is the one that protects the trolley:** Richmond 16 → **1**, Ariel Pods 33 → **1**, `total_units: 2`
+**not 49**. It asserts against `settleQuantity.js` rather than owning it — *"if AB moves them, my
+`PACK_SIZE_TREATED_AS_QUANTITY` assertions are what will notice."*
+
+**AC6 was proven the only way persistence can be:** two real OS processes, `SIGKILL` mid-flight, lease expiry
+on the **database** clock, and worker B resumed **the same `requestId`** with `lines_done: [1]` intact and
+exactly one live request. **Not inspection — kill and revive.**
+
+**AC1's stale artefact, reported and NOT touched** (it is Lane AB's surface): `browser-handoff.json` is
+**stale in shape, not in arithmetic** — its counts are internally consistent, but it **predates 020** and not
+one of its 31 lines carries `provenance`, though the reconciled list records `PHOTO: 39`. **The provenance
+was computed upstream and dropped at the handoff boundary.** Same for `pack_identity`. Lane F's new reader
+carries both. **And a correction worth having: the `ZZ` sentinel does NOT reach that artefact** — its `held[]`
+entries carry only line number, original text and reason, so the sentinel is confined upstream.
+
+#### 🔴 `human_state` HAS NO TRIGGER AND WILL DRIFT — cross-lane, and it lands on the human journey
+
+**Migration 020 adds the column with a default and backfills it ONCE. It installs ZERO triggers.** Lane F
+proved by execution that a row inserted with `status = 'READY_TO_SHOP'` comes back
+`human_state = 'ASDAIR_WORKING'`.
+
+**Consequence, stated in product terms: Cockpit can display a state the machine does not agree with, and do
+it confidently.** Anything writing `status` must write `human_state` in the same transaction or the two
+silently diverge. **Lane AB wired the pipeline's own transitions and proved every status by reading it back
+out of Postgres — so the pipeline path is covered.** The exposure is any *other* writer: direct SQL, another
+service, a future path that forgets.
+
+**Relayed to Lane C mid-build**, with the ruling: **keep reading the stored value — do not re-derive** (one
+canonical value is what 020 is *for*), **detect and surface the disagreement honestly**, and **report rather
+than fix the write side** — triggers are Silas's decision. *It also independently vindicates Lane F's own M3
+challenge: a gate resting on that column would have rested on someone's memory.*
+
+**Two smaller hazards, both now relayed:** `--surface` secret-scan enumerates from the **filesystem**, not
+`git ls-files`, so it sees `node_modules` once anything is installed inside a declared surface — **report
+both results, never narrow the surface**. And **line numbers are not a stable anchor**: the AC7 exclusions
+Larry pinned by line had already moved because Lane F inserted above them. **Verify exclusions by content.**
+
+### ✅ LANE AB COMPLETE — **`58c86ef`** on `build-015/b15-28-…-v2`. 15 files, 0 outside surface. **NOT accepted.**
+
+| AC | Evidence |
+|---|---|
+| **AC1** provenance persists | `provenanceProductionSeam.dbtest.js` — the real `interpretPhotoWithDeps` driving the real writers. Cross-shop region refused `23503` / `shop_line_provenance_region_fk` |
+| **AC2** quantity derivation | `out/quantity-derivation.md`; the sum is asserted at **53** and **names the failing line** |
+| **AC3** investigation | **clean negative + one real finding** (below) |
+| **AC4** `human_state` by running code | read back out of Postgres for **every** status; invalid value refused `23514` |
+| **AC5** corroborated never verified | 8/8 + 3 mutants |
+| **AC6** accounting | `observed 47, accounted 47, established 39, resolved 30, skipped 8, routed 9, closes true` — **exactly the re-baseline. 39 lines / 53 items unchanged** |
+
+**`node --test` with the disposable Postgres: 1079 tests, 1079 pass, 0 fail, ZERO SKIPPED.** Zero skipped is
+the load-bearing number — it means all five DB-gated files *executed* rather than no-opping.
+
+**Four mutants, all RED, all sources restored and verified by grep afterwards** — and the harness asserts the
+source actually **changed** before each run, so a stale anchor can never be reported as a passing mutation.
+**Plus a fifth:** the real migration re-applied with only `shop_line_provenance_region_fk` removed — the
+cross-shop insert then **succeeds**, which is what proves that FK and nothing else does the refusing.
+
+**AC3's answer, and it is a clean negative plus a better finding.** `shop_line_interpretation` **is not a
+table** — it is the *filename* of migration 008, which creates `asdair.shop_line`. **No needs-human field
+exists anywhere in `db/*.sql`.** Nothing can go stale that does not exist. But a stale signal *does* exist,
+**at a stage boundary**: `reasonStillHolds` correctly retains `leading_mark_disagreement` because the vision
+stage has two readings and no authority to choose — while `packIdentityRule`, a *later* stage, reaches the
+same answer from either mark. **Live in vision, stale in finalise, with nothing carrying the discharge
+forward.** AC5's allowlist is now that mechanism, discharging at the point of consumption without mutating
+the vision layer's record.
+
+**Larry's ruling on the two pre-existing tests Keel edited: ACCEPTED, no revert.** Both located the ARLA
+line by resolved `product` name, which is now null because the line is routed. Keel switched them to
+`raw_reading` — the convention that file already uses — **kept every original claim** (`quantity === 4`, the
+two milks stay distinct) and **added** an assertion that ARLA is now held. That is applying the re-baseline,
+not relaxing a requirement, and Keel flagged it rather than letting it pass.
+
+#### 🔴 MIGRATION 020's IDEMPOTENCY GUARD IS NOT SCHEMA-SAFE. Latent in production; verified not yet bitten.
+
+`020_*.sql` guards both composite FKs with `if not exists (select 1 from pg_constraint where conname =
+'<name>')`. **`conname` is unique PER TABLE, not globally, and that lookup is qualified by neither schema nor
+table.** Once a second `asdair`-shaped schema exists in the same database, the guard finds the *other*
+schema's constraint and **silently skips creating both composite FKs** — no error, and the new table comes up
+**without the anti-hallucination guarantee.**
+
+**Invisible until tonight, because no `asdair` schema had ever sat beside a throwaway one until Larry built
+the disposable cluster.** It had already made three existing DB proofs unable to bite.
+
+> **⭐ VERIFIED IN LIVE, not reasoned about:** both FKs **exist and are correctly defined** in production, and
+> only one `asdair` schema exists there — so **the guard has not misfired and the live guarantee is intact.**
+> `db/**` was outside Keel's surface so the migration is untouched; Keel fixed it inside its own surface by
+> namespacing constraint names in `test/dbtestSchema.mjs`. **The migration itself is Silas's decision and
+> Warwick's — recorded, not fixed tonight.**
+
+#### ⭐ AC1's MANUAL HALF — DISCHARGED BY LARRY AGAINST THE LIVE DATABASE
+
+Performed as `asdair_rw` inside a transaction that was **ROLLED BACK**:
+
+- **A** — a PHOTO row citing **its own shop's** region → **ACCEPTED**. The write path works in live.
+- **B** — a **cross-shop** region cite → **REFUSED `23503`, constraint `shop_line_provenance_region_fk`.**
+- **After rollback: regions 0, provenance 0 — live unpolluted.**
+
+**⚠️ The first attempt was a FALSE POSITIVE and is recorded rather than quietly re-run.** It reported
+"refused by the database" — but by `shop_line_provenance_photo_has_model`, because a PHOTO row requires
+`interpreter_model` and that check fired *before* the FK could. **A refusal by the wrong constraint is not
+evidence for the right one.** Re-run with the model set so the FK was the mechanism under test. *This is
+"measure through the ENFORCING mechanism" catching Larry in the act.*
+
+**Live persistence through the real production event remains MANUAL and NOT exercised. No completed-automation
+claim is made.**
+
+### ✅ LANE D COMPLETE — Cockpit is one surface now. **`152e4a0`** on `build-015/b15-26-cockpit-ui`. **With Vera; NOT accepted.**
+
+**Three exception surfaces became ONE board.** Shop's "Needs your attention", Questions' "Still waiting on
+you" and Basket's `held` were three places to look; the Questions view (relabelled **Exceptions**) is now
+the single board, and the other two route to it and render no controls of their own. **X NEED YOU / Y
+RESOLVED / Z STILL BLOCKING come from one partition**, so two screens cannot disagree. Brand-grouped list,
+compact `BRAND · PRODUCT · ×QTY`, provenance on expansion, exceptions separated. Skipped-with-reason and the
+total item count were rendered **nowhere** before and now are.
+
+**Felix's correction to Larry, in his words and worth keeping:** the `execution_packet` retraction changed
+**not one line of logic** — the code already degraded correctly. What changed is what the comments *claim*,
+*"and that mattered: a branch whose comment says 'until X arrives' is a bug when X is not coming, because
+the next reader deletes it."*
+
+**Three controls were caught reporting success while doing nothing** — each found by making it fail rather
+than by trusting it: `instanceof SyntaxError` is false across a `node:vm` realm · `--window-size=375` gave a
+**492px** viewport · an assertion stayed green under a broken join.
+
+**Evidence:** render-vm **48 scenarios / 136 assertions / 0 failed** · self-test 10/10 · secret-scan exit 0
+(43 files) · rendered at 375/768/1280 in both colour schemes · cache version moved so installed PWAs get the
+bundle. **No shop figure is hardcoded** — grep-confirmed, which is why the 30/9 re-baseline needed no change.
+
+**⚠️ CODE-VERIFIED ONLY, and labelled as such by Felix rather than by a reviewer catching it:** the
+`.as-remember` durable-knowledge panel has never been exercised against a live command surface, because
+none exists. **Capability evidence, not acceptance.**
+
+**Larry fixed one thing Felix correctly refused to touch:** `render-vm-check.mjs`'s header claimed shopping
+payloads are *"personal data that must never be committed"* — **false, and the third inversion of Warwick's
+thrice-given ruling.** The practice (synthetic fixtures) was never wrong; the reason was. It now reads
+*a gate must be deterministic*, with the correction and its dates recorded so the next reader inherits the
+ruling instead of the inversion. Comment-only; gate re-run at the new head, same 48/136/0.
+
+### 🔢 ACCEPTANCE RE-BASELINED — `resolved: 31 → 30`, `routed: 8 → 9`. **Larry's decision, recorded before the work, not after.**
+
+**Keel found the real control one layer below where Lane E and Larry had both placed it.** Not
+`corroborate.js`, which only *labels* — **`finalise/produceFinalList.mjs:168-169`, where `support >= 2`
+establishes a line.** *That threshold of two is the 3-of-3 hole in one expression:* a phantom present in all
+three runs sails straight through. It confirms Lane E from a second direction.
+
+**And a second dead signal.** `vision_needs_human` is computed at `corroborate.js:347-348` and **consumed by
+nothing**. Measured against the 39 established lines: **5 carry `vision_needs_human: true`, 4 of them
+unanimous 3-of-3, and all 5 have `identity_disagreement: false` and `settled: true`** — so every one passes
+every existing certainty test and enters the shop as shoppable.
+
+**Keel then reported that Larry's own AC5 and AC6 could not both be true**, and refused to move an
+acceptance baseline himself. Correct on both counts. The three options and the ruling:
+
+1. ⛔ **Wire it wholesale** — honest, but flips ~5 lines and **undoes Warwick's pack-identity ruling**: the 4 `leading_mark_disagreement` lines are exactly the Richmond-16 class that convention deliberately settles.
+2. ⛔ **Prove it over a fixture only** — AC6 survives and the control never bites on real data. Keel named this as theatre rather than take the easy green.
+3. ✅ **ADOPTED — wire only the unresolved class**, `cross_region_duplicate_unresolved`, excluding `leading_mark_disagreement` which `settleQuantity` resolves by deterministic rule.
+
+**Effect: ONE line moves to HUMAN — `4 x 4pts. ARLA SEMI SKIMMED MILK`, a cross-region duplicate that three
+correlated readings agreed on.** That is the precise case Warwick's §4 ruling names, and agreement there
+proves nothing.
+
+> **⚠️ WHAT WARWICK WILL SEE CHANGE, stated plainly rather than buried:** the shop reports **30 shoppable
+> and 9 held**, not 31 and 8. **The 39 products / 53 items accounting is UNCHANGED and still closes** —
+> 47 observed, 47 accounted, none missing, none doubled. **The list did not get worse; it got more honest.**
+> *This is Larry's decision under the authority Warwick gave, taken rather than escalated at 4am.*
+
+### 🔧 THE THREE KEEL LANES WERE REFUSED, CORRECTLY, AND RE-ISSUED
+
+**Larry hand-authored all five orders instead of generating them. Every Keel lane refused on sight.** The
+refusals were right on every count and cost one round trip each.
+
+| Re-issued order | Package | Head |
+|---|---|---|
+| `WO-2026-08-13-10` | WP-B15-40 Lane AB | `9c42115` |
+| `WO-2026-08-13-11` | WP-B15-41 Lane C | `ac5c360` |
+| `WO-2026-08-13-12` | WP-B15-44 Lane F | `e9ef794` |
+
+All three now: **generated through `tools/wo/envelope.mjs`**, `authorCount: 0, unresolvedCount: 0,
+ready: true` on live recount · `private_surface: none` · `live_authority: none`.
+
+**⭐ THE BLOCKER BEHIND EVERY REFUSAL IS GONE.** Workers cannot write to live data under *any* deviation,
+and Lane C established **by execution** that no disposable Postgres existed on this machine — which made
+every DB acceptance criterion unprovable. **Larry built one: PostgreSQL 17.4 at `127.0.0.1:55432`, database
+`asdair_test`, migrations 001–020 applied, 31 asdair tables at parity with live, `asdair_rw` carrying
+exactly SELECT+INSERT with UPDATE and DELETE false.** Workers now need **no credential at all**, which
+dissolves the GL-012 violation rather than arguing with it. *(Gaps named: migration `011` — a seed — and the
+trigger function `asdair.command_request_insert_guard` did not come across.)*
+
+**Live persistence is explicitly RECLASSIFIED AS MANUAL in every order**, per § "Nothing may live only in
+Larry's head". No completed-automation claim can arise from a disposable-target proof.
+
+**Three worker findings deleted or replaced an acceptance criterion — the read-back gate earning its keep:**
+Lane AB's stale-`needs human` defect **did not reproduce** (8 holds all genuine, zero shoppable-with-a-held-reason) and became an investigation that may correctly return nothing · Lane F's `READY_TO_SHOP` guard **already existed** in a directory the same order forbade it to touch, keyed on a `shop.status` value Larry had conflated with `human_state` · Lane C found Larry had asserted `node_modules/pg` existed in a worktree where it does not.
+
+### ⚠️ `asdair.execution_packet` IS READ BY COCKPIT AND EXISTS NOWHERE. **Drift in the opposite direction.**
+
+**`cockpit-api/readPacket.js` reads `asdair.execution_packet`. That table is not among the 31 live tables, no
+migration creates it, and NO PRODUCER EXISTS ANYWHERE IN THE ESTATE** — Lane C established this by
+execution across the whole repository, on this branch and every other. `readPacket` answers
+`packet_state: 'not_built'`, `packet: null`, and does so correctly.
+
+**Larry told Lane D that Lane C would publish `routed_question` on held lines to unblock its exception
+board. That promise would have returned `unknown` forever.** Retracted to Felix in the same round it was
+found, before it cost a night's work.
+
+**The join key Lane D actually needs already exists on a different endpoint: `question_key` on
+`/asdair/workspace`**, published today by `assembleWorkspace.buildQuestions`, matching the
+`routed_question` value carried on all 8 held lines in the finalise artefact. **Nothing is blocked; the
+route was simply not where Larry said it was.**
+
+*Larry's record-keeping, labelled Larry's: this is a second, opposite drift — three tables exist with no
+migration, and one table is consumed with no producer. Both are recorded, neither is fixed tonight, and
+both are Warwick's to decide.*
+
+### ⚠️ SCHEMA DRIFT, RECORDED WHERE IT WILL BE FOUND
+
+**Three tables exist in the live database that NO repository migration creates:** `command_request`,
+`previously_ordered`, `skill_steps`. Discovered while building the disposable target at parity. **Not
+blocking; not fixed tonight; Warwick's to decide.**
+
+### 🔴 CAPAE — the exposures of this session, recorded honestly including the bad one
+
+- **`work-order-not-generated` — RECURRENCE, and the worst-timed one on record.** Pax graded this family
+  **CLEAN for the first time in five occurrences**, and Larry broke a four-exposure streak **on the very
+  next dispatch**, roughly an hour after reading the audit that recorded it. Five hand-authored orders,
+  three refused on sight. *Reading that a control is working is not the same as operating it.*
+- **`order-premise-not-verified` (proposed) — TWICE MORE.** `node_modules/pg` asserted into Lane C's order;
+  "reconciliation rejects the phantoms" repeated into three orders and falsified by Lane E. In both cases
+  the falsifying evidence was already on disk.
+- **`record-amended-body-not-recut` — clean exposure ×2.** Both map updates superseded the body in place
+  and were committed **at dispatch time, not batched to the morning**.
+
 ### ⚠️ THE ASSURANCE GAP LARRY IS CLOSING WITHOUT BEING ASKED
 
 **Zero of the four overnight packages (WP-B15-34 → 37) carry a Veritas verdict.** Warwick's §4 forbids
