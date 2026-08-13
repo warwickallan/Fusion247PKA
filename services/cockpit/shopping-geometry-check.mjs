@@ -562,6 +562,18 @@ function rootTokens(file) {
   }
 }
 
+// ⛔ ONE SHUTDOWN, AND IT DROPS LIVE SOCKETS AS WELL AS CLOSING THE SERVER.
+//  stops ACCEPTING; it does not end connections already open, so a keep-alive socket
+// kept port 8124 bound after the run exited and blocked the next one. Vera hit this and waited it
+// out rather than killing what might have been another worker-s process — a courtesy this file
+// should not have required of her.
+function shutdown() {
+  try { sock.close(); } catch { /* already gone */ }
+  try { edge.kill(); } catch { /* already gone */ }
+  try { releaseHungSockets(); } catch { /* already gone */ }
+  try { if (typeof srv.closeAllConnections === "function") srv.closeAllConnections(); } catch { /* older node */ }
+  try { srv.close(); } catch { /* already gone */ }
+}
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ══ THE WRITE ROUTE, STUBBED — AND WHY A STUB IS THE RIGHT INSTRUMENT HERE ═══════════════════════
@@ -1218,7 +1230,7 @@ function verdict(label, m) {
 process.on('unhandledRejection', (e) => {
   console.error('SHOPPING-GEOMETRY-CHECK — the browser stopped answering: ' + (e && e.message));
   console.error('REQUIRED-BUT-UNAVAILABLE. That is not a pass.');
-  try { sock.close(); edge.kill(); srv.close(); } catch { /* shutting down anyway */ }
+  shutdown();
   process.exit(2);
 });
 
@@ -1495,7 +1507,71 @@ if (process.argv.includes('--send-cases')) {
     releaseHungSockets();
   }
 
-  sock.close(); edge.kill(); srv.close();
+  // ══ HIGH-2 — HER TYPED WORDS SURVIVE A MIS-TAP, AND BOTH UNDOS EXIST ═══════════════════════════
+  // ⛔ MEDIUM-C, VERA, AND HER POINT IS THE ONE THIS SURFACE KEEPS RE-LEARNING: A JUSTIFICATION
+  // WRITTEN IN A COMMENT IS NOT A CONTROL. HIGH-2 was the worst defect in the package — one mis-tap
+  // on "Not now" destroyed something she had typed by hand, with no undo anywhere — and the fix was
+  // closed with prose and nothing else. HIGH-3 was closed by ADDING THE MISSING MEASUREMENT. This
+  // is that, for HIGH-2. Three things are exercised, because three separate things were broken.
+  console.log('HIGH-2 — her typed words survive a mis-tap, and both undos exist:');
+  await gotoPage();
+  checkMode = 'unmatched_new_item';
+  // 1. She types, mis-taps "Not now" (full size, directly beside "Add it"), and comes back.
+  await evalIn('(() => { document.querySelector(".add").click(); })()');
+  await wait(150);
+  await evalIn('(() => { const i = document.querySelector(".a-input"); i.value = "yoghurts for grandad";'
+    + ' i.dispatchEvent(new Event("input", { bubbles: true })); })()');
+  await wait(150);
+  await evalIn('(() => { document.querySelector(".a-cancel").click(); })()');
+  await wait(250);
+  await evalIn('(() => { const a = document.querySelector(".add"); if (a) a.click(); })()');
+  await wait(250);
+  const draftBack = await evalIn('(() => { const i = document.querySelector(".a-input"); return i ? i.value : null; })()');
+  const draftKept = draftBack === 'yoghurts for grandad';
+  console.log('        after "Not now" and reopening, the box holds : ' + JSON.stringify(draftBack));
+  console.log('        ' + (draftKept ? 'ok    B §8.3 rule 8: text typed but not added is preserved'
+    : 'FAIL  a mis-tap destroyed something she typed by hand') + '\n');
+  if (!draftKept) bad++;
+
+  // 2. Adding records an undo that NAMES what it will undo (B §6.6). Without it the undo control on
+  //    screen still offered to un-tick the last ITEM she ticked — a second wrong thing, one tap on.
+  await evalIn('(() => { const g = document.querySelector(".a-add"); if (g) g.click(); })()');
+  await wait(700);
+  const addUndo = await evalIn('(() => { const u = document.querySelector(".undo"); return u ? u.innerText.trim() : null; })()');
+  const addUndoOk = !!addUndo && /yoghurts for grandad/.test(addUndo) && /added/i.test(addUndo);
+  console.log('        the undo after ADDING reads                  : ' + JSON.stringify(addUndo));
+  console.log('        ' + (addUndoOk ? 'ok    it names her words and says what it will do'
+    : 'FAIL  adding records no undo, or one that does not name it') + '\n');
+  if (!addUndoOk) bad++;
+
+  // 3. Removing restores AT THE ORIGINAL INDEX. Re-appending would be an approximation of an undo
+  //    rather than an undo, and with two entries the difference is visible to her.
+  await evalIn('(() => { const a = document.querySelector(".add"); if (a) a.click(); })()');
+  await wait(200);
+  await evalIn('(() => { const i = document.querySelector(".a-input"); i.value = "a nice bit of fish";'
+    + ' i.dispatchEvent(new Event("input", { bubbles: true })); })()');
+  await wait(150);
+  await evalIn('(() => { const g = document.querySelector(".a-add"); if (g) g.click(); })()');
+  await wait(700);
+  const orderBefore = await evalIn('(() => Array.from(document.querySelectorAll(".extra .r-name")).map((n) => n.innerText.trim()))()');
+  await evalIn('(() => { document.querySelectorAll(".extra")[0].click(); })()');
+  await wait(300);
+  const removeUndo = await evalIn('(() => { const u = document.querySelector(".undo"); return u ? u.innerText.trim() : null; })()');
+  await evalIn('(() => { const u = document.querySelector(".undo"); if (u) u.click(); })()');
+  await wait(300);
+  const orderAfter = await evalIn('(() => Array.from(document.querySelectorAll(".extra .r-name")).map((n) => n.innerText.trim()))()');
+  const restoredInPlace = JSON.stringify(orderBefore) === JSON.stringify(orderAfter) && (orderAfter || []).length === 2;
+  const removeUndoOk = !!removeUndo && /yoghurts for grandad/.test(removeUndo);
+  console.log('        order before removing                        : ' + JSON.stringify(orderBefore));
+  console.log('        the undo after REMOVING reads                : ' + JSON.stringify(removeUndo));
+  console.log('        order after undoing the removal              : ' + JSON.stringify(orderAfter));
+  console.log('        ' + (restoredInPlace && removeUndoOk
+    ? 'ok    restored at its ORIGINAL INDEX, not re-appended'
+    : 'FAIL  the undo is missing, or it restores in the wrong place') + '\n');
+  if (!restoredInPlace || !removeUndoOk) bad++;
+  releaseHungSockets();
+
+  shutdown();
   if (bad) { console.error('SEND-CASES FAIL — ' + bad + ' case(s) rendered the wrong outcome.'); process.exit(1); }
   console.log('SEND-CASES PASS — ' + CASES.length + '/' + CASES.length + ' cases rendered the outcome the server actually justified. '
     + 'The sent state was reached by exactly ONE of them, and only by the one that wrote a row.');
@@ -1503,7 +1579,7 @@ if (process.argv.includes('--send-cases')) {
 }
 
 const clean = SELF_TEST ? {} : await measure(null);
-if (AS_JSON) { console.log(JSON.stringify(clean, null, 1)); sock.close(); edge.kill(); srv.close(); process.exit(0); }
+if (AS_JSON) { console.log(JSON.stringify(clean, null, 1)); shutdown(); process.exit(0); }
 
 if (SELF_TEST) {
   const names = Object.keys(MUTATIONS);
@@ -1555,7 +1631,7 @@ if (SELF_TEST) {
   console.log(baseline === 0
     ? '  control  all ' + combos + ' viewport/state combinations clean before mutation (no false positive)'
     : '  CONTROL FAILED — ' + baseline + ' failure(s) on the unmutated surface; the mutations above prove nothing.');
-  sock.close(); edge.kill(); srv.close();
+  shutdown();
   if (missed.length || baseline !== 0) { console.error('SELF-TEST FAIL'); process.exit(1); }
   console.log('SELF-TEST PASS — ' + caught + '/' + names.length + ' mutations caught, control clean, '
     + 'across ' + combos + ' viewport/state combinations (' + VIEWS.length + ' viewports x ' + STATES.length + ' states: '
@@ -1578,7 +1654,7 @@ for (const [label, m] of Object.entries(clean)) {
   for (const b of bad) { failures++; console.error('        ⛔ ' + b); }
   for (const i of info) console.log('        ·  ' + i);
 }
-sock.close(); edge.kill(); srv.close();
+shutdown();
 if (checked === 0) { console.error('SHOPPING-GEOMETRY-CHECK FAIL — zero viewports measured.'); process.exit(1); }
 if (failures) { console.error('SHOPPING-GEOMETRY-CHECK FAIL — ' + failures + ' measured violation(s) across ' + checked + ' viewports.'); process.exit(1); }
 console.log('SHOPPING-GEOMETRY-CHECK PASS — ' + checked + ' viewports measured in a real browser, 0 violations. '

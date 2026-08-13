@@ -133,8 +133,16 @@ body {
    than inventing one.
    :focus-visible AND :focus — the device is touch-only, but a Bluetooth keyboard or a switch device
    must work (B §5.1), and a browser that does not implement :focus-visible must still show a ring. */
-:where(button, [role="checkbox"], a, textarea, input):focus { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
-:where(button, [role="checkbox"], a, textarea, input):focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+/* ⛔ MEDIUM-B, VERA — `[role="button"]` IS IN BOTH LISTS, AND ITS ABSENCE WAS A REGRESSION I MADE.
+   "Take it off" used to be a real `<button>` and matched. MEDIUM-1 turned the whole row into
+   `div[role="button"][tabindex="0"]`, which matches neither list, so the control silently fell back
+   to the browser's default ring. That still passes WCAG AA — and it does NOT meet this surface's
+   own bar, which Addendum B §5.1/§11 sets higher on purpose: 3px, --accent-ink, 2px offset, and
+   >=4.5:1 against BOTH the control and the page.
+   The durable lesson: changing an element's ROLE can change which CSS reaches it, and a selector
+   that enumerates tag names quietly stops applying the moment a tag name changes. */
+:where(button, [role="checkbox"], [role="button"], a, textarea, input):focus { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+:where(button, [role="checkbox"], [role="button"], a, textarea, input):focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
 
 /* ── PAGE FRAME ──────────────────────────────────────────────────────────────────────────────── */
 .page { max-width: 1280px; margin: 0 auto; padding: var(--m-pad); }
@@ -470,9 +478,15 @@ body {
    warmly that she already has the thing and that HER ITEM HAS BEEN KEPT ANYWAY. It carries no
    control, offers no candidate list and asks nothing. On --ok-w (the row is selected) --ink is
    14.39:1. It sits at full width under the item so it reads as being about that item. */
+/* ⛔ MEDIUM-A: this now sits AFTER the row rather than inside it, so it is no longer a flex child
+   and no longer part of the control that removes her item. The negative top margin pulls it up
+   against the row it belongs to — the association is visual proximity, which costs nothing in
+   markup, rather than containment, which cost her the item and cost the sentence its live region.
+   --ink on --bg = 14.48:1 (it used to be measured on --ok-w inside the row); the geometry gate
+   re-measures the composited pairing at every viewport, so this is verified rather than assumed. */
 .e-note {
-  flex: 1 1 100%;
-  margin: var(--m-gap-opposite) 0 0;
+  margin: calc(var(--m-gap-row) * -1 + 8px) 0 var(--m-gap-row);
+  padding: 0 var(--m-pad);
   font-size: var(--m-text-body);
   color: var(--ink);
 }
@@ -614,6 +628,10 @@ body {
   border-radius: var(--m-radius);
   cursor: pointer;
 }
+/* MEDIUM-D: the same visibly-disabled treatment `.send` has carried since B §6.7 — recessed
+   surface, muted token, lighter border, and never a fade. --ink2 on --panel2 = 7.08:1, still over
+   this surface's 7:1 text bar, so the label stays legible while plainly unavailable. */
+.confirm[aria-disabled="true"] { color: var(--ink2); background: var(--panel2); border-color: var(--hair); cursor: default; }
 
 /* ⛔ THE WAY BACK — B §9.5, "an 84-year-old who realises she forgot the bread must not be stuck."
    FULL SIZE, and held to the 88px LARGE floor rather than the 72px general one, because it is the
