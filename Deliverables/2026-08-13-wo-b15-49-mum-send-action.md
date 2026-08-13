@@ -118,26 +118,51 @@ operational_handoff: none
 under WP-B15-48 right now. Your job is to connect to it **without giving up the property that comment was
 protecting.** The success state must remain unreachable by any route except the server saying so.
 
-## THE ROUTE CONTRACT — frozen, and byte-identical in Keel's order. Do not redesign it.
+## THE ROUTE CONTRACT — **AMENDED v2, 2026-08-13.** Frozen, and byte-identical in the other lane's order.
 
-**If you believe it is wrong, say so at read-back — do not silently improve it.** Two workers are building
-the two halves in parallel and this contract is what stops them drifting.
+> **⚠️ v2 SUPERSEDES v1 IN PLACE. If you read v1 before this edit, re-read this block — three things changed.**
+> Keel's read-back established that v1 instructed the UI to tell Mum her list was sent at the exact moment
+> nothing whatsoever happened. That is the failure the contract existed to prevent, and it was mine.
 
 ```
 Cockpit (tailnet)   POST /api/asdair/list
+   proxies to →     POST http://127.0.0.1:8710/asdair/list
 
 request  { "household": 1,
-           "items": [ { "id": "<regulars.id_display>", "name": "<the name SHE was shown>", "qty": 1..20 } ],
-           "note": "<her free text, or omitted>" }
+           "items": [ { "id": "<regulars.id_display>", "name": "<the name SHE was shown>", "qty": 1..20 } ] }
 
 200      { "ok": true, "shop_ref": "...", "shop_id": <n>,
-           "created": true|false, "matched_by": "created"|"shop_ref"|"inbound" }
+           "created": true|false,
+           "matched_by": "insert"|"shop_ref"|"telegram_message"|"superseded_terminal_ref" }
 
 4xx/5xx  { "ok": false, "error": "<machine_code>", "message": "<ONE plain sentence>" }
 ```
 
-**Keel's route does not exist yet when you start.** Build against a stub you start yourself on loopback
-that returns these exact shapes. Larry integrates the two halves and proves them together.
+**AMENDMENT 1 — `matched_by` carries the STORE'S OWN vocabulary, passed through VERBATIM.** v1 invented
+`"created"|"shop_ref"|"inbound"`; `shopStore.createOrResumeShop` actually returns
+`'insert' | 'telegram_message' | 'shop_ref'` and can also return `superseded_terminal_ref`. **Build no
+translation layer** — a renamed enum is a place for the two sides to drift, and the invented word `inbound`
+described nothing. `telegram_message` is **structurally unreachable from the Cockpit** (both Telegram keys
+are null on every submission Mum makes); it stays in the type because the store can return it, and its
+appearance would be a real bug worth seeing rather than a case worth hiding.
+
+**AMENDMENT 2 — `ok:true` ALONE NEVER LICENSES THE WORD "SENT". This is the load-bearing one.**
+
+- `created:true`  → a shop row was written. **The sent state is permitted.**
+- `created:false` → the day's shop already existed and **this submission changed NOTHING durable.**
+  **The UI MUST render this DIFFERENTLY from a successful send** — in substance: *"Today's list has already
+  gone. This didn't change it."* **It must NOT say her list was sent, and it must NOT claim her change
+  landed.**
+
+*Why: `receiveList` is idempotent on `(household_id, shop_ref)` and `shop_ref` is `'SHOP-' + date`. A second
+submission the same day resumes the existing shop and writes nothing — no shop row, no command row, no
+event. v1's sentence "her UI may only say the list was sent when `ok:true`" was satisfied by exactly that
+no-op. Addendum E criterion 9 names this precise defect: "any answer that changes the display but not the
+durable record."*
+
+**AMENDMENT 3 — `note` is REMOVED from the request.** S2 (add something else in her own words) is not built
+and its control is deliberately disabled, so there is no UI that can produce free text. An always-empty
+field would be a small lie about a capability that does not exist. **Send no `note` key at all.**
 
 ## Acceptance criteria
 

@@ -48,6 +48,15 @@ file_surface:
   - services/asdair/cockpit-api/commandSurface.test.js
   - services/asdair/cockpit-api/httpApi.test.js
   - services/cockpit/server.mjs
+  # ── WIDENED BY AMENDMENT 1, 2026-08-13, on Keel's read-back (C1 and M4). ──
+  # Every path below is `services/**` and permitted by the same contract section as the eight above.
+  # The order under-specified the surface; the worker enumerated the breakage rather than sampling it,
+  # and refused to write outside the surface to reach a green. That is the gate working.
+  - services/asdair/cockpit-api/answerRoutes.test.js   # C1: pins ROUTES.length===10 and COMMAND_NAMES.length===10
+  - services/asdair/cockpit-api/cockpitUi.test.js      # C1: deepEquals the operator UI's command list — see the ruling
+  - services/cockpit/asdair-list.mjs                   # M4: the proxy as an IMPORTABLE module, per the asdair-checklist.mjs precedent
+  - services/cockpit/asdair-list-check.mjs             # M4: its executable gate — this is what makes AC3 provable
+  - services/cockpit/provenance.mjs                    # M4/C4: SOURCE_MODULES must gain the new module in the same commit
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -125,27 +134,82 @@ operational_handoff: none
 sentence false by making the sending real — not by deleting the sentence.** Felix is wiring her button
 in parallel under WP-B15-49; you own everything behind the wire.
 
-## THE ROUTE CONTRACT — frozen, and byte-identical in Felix's order. Do not redesign it.
+## THE ROUTE CONTRACT — **AMENDED v2, 2026-08-13.** Frozen, and byte-identical in the other lane's order.
 
-Two workers are building the two halves of this in parallel. This contract is what stops them drifting.
-**If you believe it is wrong, say so at read-back — do not silently improve it.**
+> **⚠️ v2 SUPERSEDES v1 IN PLACE. If you read v1 before this edit, re-read this block — three things changed.**
+> Keel's read-back established that v1 instructed the UI to tell Mum her list was sent at the exact moment
+> nothing whatsoever happened. That is the failure the contract existed to prevent, and it was mine.
 
 ```
 Cockpit (tailnet)   POST /api/asdair/list
    proxies to →     POST http://127.0.0.1:8710/asdair/list
 
 request  { "household": 1,
-           "items": [ { "id": "<regulars.id_display>", "name": "<the name SHE was shown>", "qty": 1..20 } ],
-           "note": "<her free text, or omitted>" }
+           "items": [ { "id": "<regulars.id_display>", "name": "<the name SHE was shown>", "qty": 1..20 } ] }
 
 200      { "ok": true, "shop_ref": "...", "shop_id": <n>,
-           "created": true|false, "matched_by": "created"|"shop_ref"|"inbound" }
+           "created": true|false,
+           "matched_by": "insert"|"shop_ref"|"telegram_message"|"superseded_terminal_ref" }
 
 4xx/5xx  { "ok": false, "error": "<machine_code>", "message": "<ONE plain sentence>" }
 ```
 
-**`created` is load-bearing and is the whole reason `matched_by` is exposed.** Her UI may only say the
-list was sent when `ok:true`. It must never invent a change that did not happen — see AC4.
+**AMENDMENT 1 — `matched_by` carries the STORE'S OWN vocabulary, passed through VERBATIM.** v1 invented
+`"created"|"shop_ref"|"inbound"`; `shopStore.createOrResumeShop` actually returns
+`'insert' | 'telegram_message' | 'shop_ref'` and can also return `superseded_terminal_ref`. **Build no
+translation layer** — a renamed enum is a place for the two sides to drift, and the invented word `inbound`
+described nothing. `telegram_message` is **structurally unreachable from the Cockpit** (both Telegram keys
+are null on every submission Mum makes); it stays in the type because the store can return it, and its
+appearance would be a real bug worth seeing rather than a case worth hiding.
+
+**AMENDMENT 2 — `ok:true` ALONE NEVER LICENSES THE WORD "SENT". This is the load-bearing one.**
+
+- `created:true`  → a shop row was written. **The sent state is permitted.**
+- `created:false` → the day's shop already existed and **this submission changed NOTHING durable.**
+  **The UI MUST render this DIFFERENTLY from a successful send** — in substance: *"Today's list has already
+  gone. This didn't change it."* **It must NOT say her list was sent, and it must NOT claim her change
+  landed.**
+
+*Why: `receiveList` is idempotent on `(household_id, shop_ref)` and `shop_ref` is `'SHOP-' + date`. A second
+submission the same day resumes the existing shop and writes nothing — no shop row, no command row, no
+event. v1's sentence "her UI may only say the list was sent when `ok:true`" was satisfied by exactly that
+no-op. Addendum E criterion 9 names this precise defect: "any answer that changes the display but not the
+durable record."*
+
+**AMENDMENT 3 — `note` is REMOVED from the request.** S2 (add something else in her own words) is not built
+and its control is deliberately disabled, so there is no UI that can produce free text. An always-empty
+field would be a small lie about a capability that does not exist. **Send no `note` key at all.**
+
+## AMENDMENT 1 — Larry's rulings on Keel's read-back, 2026-08-13. **These bind; where they differ from the ACs below, these win.**
+
+**The read-back is ACCEPTED. Every item below was raised by the worker, not found by review.**
+
+| # | Ruling |
+|---|---|
+| **C1** | **Surface WIDENED** (see `file_surface`). On `cockpitUi.test.js`: **do not weaken the test — make it more precise.** Replace the `deepEqual` with **two** assertions: (a) every UI-declared command ∈ `COMMAND_NAMES` (subset), and (b) **`receiveList` is explicitly NOT in the UI's list.** Equality was the wrong contract the moment the backend gained a command no operator button may ever offer; (a)+(b) is strictly stronger than equality, not weaker. **Do not touch the Vue file.** |
+| **C2** | **Settled by AMENDMENT 1 of the contract above — pass the store's value through VERBATIM, build no translation layer.** You were right that a renamed enum is a drift surface. |
+| **C3 / M4** | **The split is APPROVED and it was the right call.** `asdair-list.mjs` + `asdair-list-check.mjs` + `provenance.mjs` are in the surface. This converts an unprovable AC into a proven one, follows the house precedent that already exists for this exact problem, and closes C4 on the way past. **Never import `db.mjs`; never open a live pool.** |
+| **C4** | **Fix it — a tiny fix stays inside the current Work Order.** Add `asdair-checklist.mjs` AND your new module to `SOURCE_MODULES`. Report the pre-existing exit 1 as pre-existing; your commit should leave it exit 0. |
+| **C5** | **Fix it, and treat it as part of AC6.** `read_only: true` becomes a lie the moment the route lands, and AC6 is the honest-health-check criterion. Both consumers are in your surface. |
+| **A1** | **APPROVED — pass a content-derived `spec.sourceId` from the adapter.** This is the most consequential thing in your read-back. Without it a corrected re-send is discarded leaving **no durable trace that she sent anything at all**, and `spec.sourceId` is a first-class input to `receiveList`, so it invents nothing. An identical re-send stays a no-op; a *changed* re-send leaves one honest row. **Derive it deterministically from the submitted items and pin the derivation with a test.** |
+| **A2** | **APPROVED — `413` with the JSON error shape.** AC3 requires every failure to arrive as JSON; that outranks matching `/api/decide`'s `req.destroy()`. Note the deliberate divergence in a comment. |
+| **A3** | **Approved as described.** Stable, ASCII, one line per item, quantity included, pinned by a test. |
+| **M1** | **DISSOLVED — Larry provisioned it.** `npm install --offline` ran in `cockpit-api`, `shop`, `pipeline`, `interpret` and `skill` in your worktree (14 packages each, no network). **Verified by execution: `require.resolve('pg')` from `services/asdair/shop/` resolves to that worktree's own `node_modules`.** No `NODE_PATH` needed. Your refusal to install outside your surface was correct and the provisioning was mine. |
+| **M2** | **Both DSNs supplied, and BOTH VERIFIED BY EXECUTION** against the disposable just now — each connected and read `109` regulars: <br>`ASDAIR_WRITE_DB_URL=postgresql://asdair_rw:test@127.0.0.1:55432/asdair_test` <br>`ASDAIR_DB_URL=postgresql://asdair_ro:test@127.0.0.1:55432/asdair_test` |
+| **M3** | **Correct behaviour, and I am recording it as such.** You were right to refuse to open the credential carrier to verify my claim. The claim stays mine; it does not touch your work. |
+| **M5** | **GRANTED explicitly: start your own cockpit-api and your own loopback HTTP check on any port you choose EXCEPT 8090, 8443, 8710 and 55432**, all of which are live and mine. Kill what you start. |
+| **M6** | **Run it and report it — but read this first, established by Felix today:** `render-check.mjs` asserts operator-shell markers and is separately recorded **broken on this machine** (DEFECT-LEDGER `D-2026-08-03-11`, headless Edge self-relaunches and detaches). **Do not chase a red.** Report what it did, labelled honestly. |
+| **M7** | **Noted, non-blocking, parked.** Clerical; not worth a round trip. |
+
+### AC4 — you were asked whether my model was wrong. It was, twice, and both are now settled.
+
+**Your first correction is upheld and has changed the contract.** `ok:true, created:false` was indistinguishable from success by v1's own wording, which meant the contract told the UI to say "sent" at the exact moment nothing happened. **The contract above is now v2 and says `created:false` MUST render differently. It has been injected byte-identically into Felix's order and Felix has been told mid-build** — verified by hashing the block in both files: `0b810a5f6f4eb451`.
+
+**Your second correction — the terminal-shop 500 — is a real product hole and here is the ruling.** *Cancel this week, then send from the Cockpit* → `collisionShopRef` fails loudly because there is no Telegram message id, and that guard is reachable only through the door you are building.
+
+> **RULING: report it honestly, do not route around it.** Map it to a **named machine code** in the AC3 error shape with a plain sentence for her — in substance *"this week's shop was cancelled, so I can't add to it."* **Do NOT invent a shop identity, and do NOT silently mint an alternative `shop_ref`** — the 2026-08-10 ruling that produced that guard stands, and inventing an identity is exactly what it forbids.
+>
+> **Whether Mum should be permanently unable to re-send after a cancel is a PRODUCT decision, and it is Warwick's, not mine to settle inside a Work Order.** I am recording it as an open product question with my recommendation (let the adapter supply an explicit distinct `shopRef` on terminal collision — legitimate, since `shopRef` is a first-class caller input, and it is a *caller* choice rather than an invention inside the store). **Build the honest error now. The better answer, if Warwick wants it, is a separate decision.**
 
 ## Acceptance criteria
 
