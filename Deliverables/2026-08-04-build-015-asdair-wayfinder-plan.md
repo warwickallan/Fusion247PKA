@@ -2284,6 +2284,19 @@ Warwick's ruling binds the UI, the receipts and Veritas alike.
 
 ## ⟦ROTATION CLOSE⟧ 2026-08-13 — closing head **`c1fcb46`** on `main`. **READ THIS FIRST.**
 
+### 📄 SESSION REPORT — **OUTSTANDING BY DESIGN, NAMED, NOT SILENT**
+
+**Pax commissioned at rotation and may return AFTER the `/clear`.** Expected at
+`Deliverables/2026-08-13-session-report-asdair-finishing.md` + `-payload.json`.
+**Its input is already committed:** `Deliverables/2026-08-13-subagent-token-ledger-asdair-finishing.md`
+(`90a49a2`) — **Total A 4,404,873 deduplicated tokens · 19 agents · 32 returns · 1,657 tool uses**, with the
+cumulative-vs-per-dispatch question **re-tested rather than inherited** (tokens monotonic 8/8; `tool_uses`
+monotonic only 5/8, so it is per-dispatch).
+
+**When it lands: commit it, run `tools/session-report/populate.mjs` (7b) and `capae-sync.mjs` (7c) — note
+capae-sync takes the payload POSITIONALLY, not `--file` — and fold it into this map.**
+**Steps 7 / 7b / 7c are therefore OUTSTANDING at this rotation, by design, not by omission.**
+
 ### 🎯 THE EXACT NEXT ACTION — **BUILD THE WRITE / ACTION PATH. Nothing else.**
 
 **Warwick, 2026-08-13, verbatim: *"Do not stop merely because /shopping.html becomes visible. A page whose
