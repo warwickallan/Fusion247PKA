@@ -153,6 +153,37 @@ const bindings = opts.setup ? opts.setup() : {};
 const unwrap = (v) => (v && typeof v === 'object' && '__v_isRef' in v) ? v.value : v;
 const app = sb.window.FUSION_APPS.find((a) => a.key === 'asdair');
 
+// ══ WP-B15-45 — THE HOUSEHOLD SURFACE (public/shopping.js) ═══════════════════════════════════════
+//
+// A SECOND APP, IN THE SAME GATE, DELIBERATELY. shopping.js is a separate Vue application on a
+// separate page with a separate stylesheet — that separateness is the product requirement
+// (Addendum B §2: a separate surface, never a mode). But a second GATE is not implied by a second
+// surface, and would be worse: two gates drift, and the one nobody runs is the one that goes red.
+// So it loads into the same sandbox and captures the second createApp call.
+//
+// It must load AFTER app.js, because `captured[0]` is the operator app and every existing scenario
+// indexes it. `captured[1]` is this one.
+load('shopping.js');
+const shopOpts = captured[1];
+if (!shopOpts) {
+  throw new Error('render-vm-check: public/shopping.js did not register a Vue app. It calls '
+    + 'Vue.createApp(...).mount("#shop") at the end of its IIFE; if that line moved or the IIFE now '
+    + 'returns early, every household-surface scenario below would silently disappear from this '
+    + 'gate while it kept reporting PASS. Failing loudly instead.');
+}
+// The real setup(), for the same reason the operator app uses the real one: buildSections, the
+// clamp and the count are the logic under test, and a stub would test the stub.
+const shopBindings = shopOpts.setup ? shopOpts.setup() : {};
+// The pure helpers, reached through the app's own published surface so the gate executes THE
+// SHIPPING FUNCTIONS rather than a copy of them. clampQty is a safety property (Addendum B §6.4
+// rule 5, "enforced in state, not only in the view") and a safety property tested only through a
+// rendered template has not been tested at its boundaries at all.
+const SHOP = sb.window.FUSION_SHOPPING;
+if (!SHOP || typeof SHOP.clampQty !== 'function') {
+  throw new Error('render-vm-check: window.FUSION_SHOPPING is not published by shopping.js, so the '
+    + 'quantity clamp cannot be executed directly. Restore the export rather than weakening the check.');
+}
+
 // Write into the REAL refs, so the REAL computeds (asdairShop, asdairTally, asdairRuleGroups,
 // asdairPacketLines, asdairRecon) run. Overriding the context property instead left asdairShop
 // reading a null ref, and the Details scenario silently rendered the offline placeholder WHILE
@@ -437,6 +468,112 @@ function bannedVocabulary(name, textParts) {
     }
   }
   return out;
+}
+
+// ══ WP-B15-45 — THE BUILDER-VOCABULARY DETECTOR FOR THE HOUSEHOLD SURFACE ════════════════════════
+//
+// AC3, and Addendum B §10.2, which lists the banned words. The requirement was explicitly that this
+// be a HARNESS ASSERTION rather than a sweep of the screen — "so the rule travels instead of being
+// fixed at one site". The estate already has the evidence for why: between the Shop fix and the
+// Rules leak in WP-B15-42, the IDENTICAL leak was re-introduced two screens away IN THE SAME COMMIT.
+// A sweep decays the moment anyone adds a string.
+//
+// This runs IN ADDITION to bannedVocabulary above, not instead of it — that one bans dishonest and
+// leaked-machine words everywhere, and everything it bans is also wrong here. This one bans the
+// OPERATOR'S VOCABULARY, which is legitimate on Warwick's surface and never on hers.
+//
+// ⛔ "run" IS DELIBERATELY NOT BANNED, AND THE OMISSION IS THE INTERESTING PART.
+// Addendum B §10.2 lists it. But Addendum B's OWN sanctioned copy, in §7.4 and §9.4, is "They've
+// run out of the usual eggs" and "I couldn't find 'nice ham'". A /\brun\b/ rule fires on the
+// feature — it would go red on the correct wording of the most human sentence on the surface. That
+// is the exact trade the ZZ and drawer exemptions above are written about: a detector that cries
+// wolf gets switched off, and then it is protecting nothing. The word is banned as a NOUN in the
+// operator sense ("the run", "run id") by the status-enum rule below; the verb is left alone.
+// Recorded here rather than silently dropped, because a rule missing from a list looks like an
+// oversight and this one is a decision.
+//
+// Every other §10.2 word is here, word-boundary matched and case-insensitive. None of them collides
+// with any sentence in Addendum B §10's sanctioned copy — checked line by line against §10.3's
+// replacement table, not assumed.
+const MUM_VOCABULARY = Object.freeze([
+  // The headline. Addendum B §2: "'Cockpit' is a builder's word — it must not appear on her screen."
+  { rule: 'the word COCKPIT reaches her screen', re: /\bcockpits?\b/i },
+  // She never learns the system has a name, let alone what it is (Addendum B §1).
+  { rule: 'names the system to her (AsdAIr / Fusion247)', re: /\basda[i1]r\b|\bfusion\s?247\b/i },
+  // Catalogue identity. Addendum B §8.2: "She never sees, types or chooses a catalogue identity."
+  { rule: 'leaks catalogue identity vocabulary',
+    re: /\bcatalogues?\b|\bSKUs?\b|\bproduct[ _-]?ids?\b|\bregulars?\b|\bfavourite[ _-]?ids?\b|\basda[ _-]?(reference|product)\b|\baliase?s?\b/i },
+  // Retail plumbing. She is CHOOSING, not shopping — Addendum B §10.3 removes "add to basket"
+  // entirely rather than translating it.
+  { rule: 'leaks retail-operator vocabulary', re: /\bbaskets?\b|\bcheckouts?\b|\bslots?\b|\bsubmits?\b|\bsubmitted\b/i },
+  // Machine plumbing.
+  { rule: 'leaks machine vocabulary',
+    re: /\bAPIs?\b|\bendpoints?\b|\bpayloads?\b|\btokens?\b|\bsessions?\b|\bsync(ed|ing)?\b|\bpars(e|ed|ing)\b|\bpersist(ed|ing|ence)?\b|\bqueues?\b|\bJSON\b|\bnull\b/i },
+  // Status enums and pipeline state. This is where "run" is banned in its operator sense, and it is
+  // why the verb does not need to be.
+  { rule: 'leaks a status enum or pipeline state',
+    re: /\bneeds[_ ]decision\b|\bhuman[_ ]state\b|\bplan[_ ]status\b|\bunclassified\b|\bexcluded\b|\bresolv(e|ed|ing)\b|\bcandidates?\b|\b(shop|job|run)[_ ]?id\b|\bjobs?\b/i },
+  // Addendum B §10.2 bans "any status code, service name, or SHA". A bare hex string of 7+ is the
+  // shape of both a commit and an ASDA product id — and a product id on her screen is precisely the
+  // §8.2 defect, so a hit here is a true positive either way.
+  { rule: 'leaks a SHA or a bare numeric/hex identifier', re: /\b[0-9a-f]{7,40}\b/i },
+]);
+function mumVocabulary(textParts) {
+  const out = [];
+  for (const s of textParts) {
+    for (const b of MUM_VOCABULARY) {
+      if (b.re.test(s)) out.push(b.rule + ': "' + s.slice(0, 60) + '"');
+    }
+  }
+  return out;
+}
+
+// Render one household-surface scenario. Mirrors scenario() above — including the Proxy `has` trap,
+// which is the load-bearing mechanism and must not be weakened for the second app — but takes plain
+// ref values instead of a view key, because this surface has no view registry: it is one page.
+//
+// `pure: true` renders nothing and is how a check EXECUTES a shipping function directly rather than
+// inferring its behaviour from a screen. text(null) is [], so such a scenario's checks simply
+// ignore the rendered parts. The quantity clamp is tested that way because Addendum B §6.4 rule 5
+// makes it a STATE guarantee, and a boundary proven only by tapping a rendered button is a boundary
+// nobody has actually reached.
+function mumScenario(name, refs, render, opts2 = {}) {
+  for (const [k, v] of Object.entries(refs || {})) {
+    const b = shopBindings[k];
+    if (!b || typeof b !== 'object' || !('value' in b)) {
+      throw new Error('render-vm-check: household scenario "' + name + '" writes "' + k + '", which '
+        + 'shopping.js setup() does not return as a writable ref. Known: '
+        + Object.keys(shopBindings).join(', ') + '. Fix the name here rather than letting the '
+        + 'scenario silently test default state — that is how coverage disappears while staying green.');
+    }
+    b.value = v;
+  }
+  if (opts2.pure) return { name, vnode: null, err: null, missing: [], mum: true };
+  const base = {};
+  for (const k of Object.keys(shopBindings)) {
+    Object.defineProperty(base, k, {
+      enumerable: true, configurable: true,
+      get() { return unwrap(shopBindings[k]); },
+      set() {},
+    });
+  }
+  const missing = new Set();
+  const proxy = new Proxy(base, {
+    has: (t, k) => !(typeof k === 'string' && (k.startsWith('_') || k.startsWith('$')))
+      // Vue's `with(_ctx)` would otherwise swallow the `v-for` scope variables the compiled render
+      // function declares in its own closure. Same reason the operator trap excludes _ and $.
+      ,
+    get(t, k) {
+      if (k === Symbol.unscopables) return undefined;
+      if (k in t) return t[k];
+      if (typeof k === 'string' && k in sb) return sb[k];
+      if (typeof k === 'string' && !k.startsWith('_') && !k.startsWith('$')) missing.add(k);
+      return undefined;
+    },
+  });
+  let vnode = null, err = null;
+  try { vnode = render.call(proxy, proxy, {}); } catch (e) { err = e; }
+  return { name, vnode, err, missing: [...missing], mum: true };
 }
 
 // A shop that EXISTS but has been read with nothing filled in — the shape a brand-new shop has, and
@@ -1283,6 +1420,117 @@ function scenarios(render) {
   return renderPlan(ASDAIR_PLAN, render).concat(renderPlan(SYSTEM_PLAN, render)).concat(renderPlan(HOME_PLAN, render));
 }
 
+// ══ WP-B15-45 — THE HOUSEHOLD SURFACE PLAN ═══════════════════════════════════════════════════════
+//
+// Driven by the SAME committed fixture the operator scenarios use, so the two surfaces cannot
+// disagree about the shape of a regular. The items are structurally faithful to GET /asdair/rules
+// and every value is invented (see the fixture header).
+const REG = (RULES.regulars && Array.isArray(RULES.regulars.items)) ? RULES.regulars.items : [];
+// A row the data layer cannot name in any form. Not hypothetical: householdName() returns null when
+// there is neither an alias nor a name, and the surface must then omit the row and SAY SO rather
+// than render a blank one or invent a name for it.
+const REG_NAMELESS = REG.concat([{ id_display: '99', aka: [], name_display: '', high_level_category_display: 'Chilled', typical_qty_display: '1', active: true }]);
+const REST = { regulars: REG, loaded: true, loadFailed: false, openQuestions: 0, selected: {}, qty: {}, sendState: 'idle', lastUndo: null };
+const M = (over) => Object.assign({}, REST, over);
+
+// Every quantity that reaches the screen is a bare integer text node; a product name never is, and
+// a count renders as a whole sentence. So this is the rendered-side half of the Addendum B §6.4
+// guarantee — the state-side half is executed directly in the clamp scenario below.
+const noSubMinimumQty = (p) => !p.some((s) => /^-?\d+$/.test(s) && Number(s) < 1);
+
+const MUM_PLAN = [
+  ['MUM S1 (her list, nothing pending)', M({}), [
+    ['the household list renders real items from the fixture', (p) => p.some((s) => /oat drink/i.test(s))],
+    ['a section heading renders', (p) => hasText(p, 'Chilled') || hasText(p, 'Food cupboard')],
+    ['⛔ NO banner occupies the slot when nothing is pending (B §9.1)', (p) => !hasText(p, 'question for you')],
+    ['the zero state is a sentence, not a number', (p) => hasText(p, 'chosen anything yet')],
+    ['the primary action is present and worded in her language', (p) => hasText(p, 'SEND MY SHOPPING LIST')],
+    ['the disabled primary action states its reason beside it (B §6.7)', (p) => hasText(p, 'Tap some things first')],
+    ['⛔ no quantity below the floor of 1 reaches the screen', noSubMinimumQty],
+    ['⛔ the word COCKPIT never renders', (p) => !p.some((s) => /cockpit/i.test(s))],
+  ]],
+
+  ['MUM S1 (one question is waiting)', M({ openQuestions: 1 }), [
+    ['the pending banner is present, in words and not a badge (B §7.1)', (p) => hasText(p, 'question for you')],
+    ['⛔ the banner carries NO dismiss control (B §7.1.2)', (p) => !p.some((s) => /^(×|x|close|dismiss|ok|got it)$/i.test(s.trim()))],
+    ['her list is still fully present beneath it', (p) => p.some((s) => /oat drink/i.test(s))],
+  ]],
+
+  ['MUM S1 (two questions are waiting)', M({ openQuestions: 2 }), [
+    ['the count is stated plainly rather than pluralised wrongly', (p) => hasText(p, '2 questions for you')],
+  ]],
+
+  ['MUM S1 (she has chosen things)', M({ selected: { 11: true, 12: true }, qty: { 11: 3 } }), [
+    ['the running count reflects what she chose', (p) => hasText(p, 'chosen 2 things')],
+    ['the changed quantity renders', (p) => p.includes('3')],
+    ['⛔ still no quantity below 1 anywhere', noSubMinimumQty],
+    ['the primary action no longer shows the empty-state reason', (p) => !hasText(p, 'Tap some things first')],
+  ]],
+
+  // AC2. The most important negative assertion on this surface: when the data cannot be read the
+  // screen says so in her words and shows NOTHING ELSE. A screen of invented groceries is worse
+  // than a blank one, because Warwick would believe it.
+  ['MUM S1 (the list cannot be read)', M({ regulars: [], loadFailed: true }), [
+    ['it says so plainly and reassures her nothing is lost', (p) => hasText(p, 'see your shopping list at the moment')],
+    ['⛔ NOT ONE invented item name appears', (p) => !p.some((s) => /oat drink|cheese|juice/i.test(s))],
+    ['⛔ no technical error, code or service name (B §9.5)', (p) => !p.some((s) => /error|failed|500|503|fetch|http/i.test(s))],
+  ]],
+
+  ['MUM S1 (nothing on her list yet)', M({ regulars: [] }), [
+    ['the empty state is a plain sentence', (p) => hasText(p, 'nothing on your list yet')],
+    ['⛔ it is NOT presented as a failure', (p) => !hasText(p, 'see your shopping list at the moment')],
+  ]],
+
+  // ⛔ THE HONEST SEND. This scenario is the one that proves the surface does not lie about the half
+  // that is not built. Addendum B §9.6: "The UI never claims something was sent when it was not."
+  ['MUM S1 (she has pressed the send button)', M({ selected: { 11: true }, sendState: 'not-connected' }), [
+    ['it states plainly that the sending part is not finished', (p) => hasText(p, 'that part isn')],
+    ['it states that nothing was sent and nothing was lost', (p) => hasText(p, 'Nothing has been sent')],
+    ['⛔ it NEVER renders a success or thank-you state', (p) => !p.some((s) => /thank you|on its way|all done|getting your shopping ready/i.test(s))],
+    ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', (p) => !hasText(p, 'SEND MY SHOPPING LIST')],
+    ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],
+  ]],
+
+  ['MUM S1 (a row the data cannot name)', M({ regulars: REG_NAMELESS }), [
+    ['the unnameable row is counted and declared, never blank-rendered', (p) => hasText(p, 'show properly')],
+    ['⛔ no empty-string name is rendered as a product', (p) => !p.some((s) => s.trim() === '')],
+  ]],
+
+  // ── EXECUTED DIRECTLY, NOT RENDERED ────────────────────────────────────────────────────────────
+  // Addendum B §6.4 rule 5 makes the clamp a STATE guarantee: "so a repeated-event, double-fire or
+  // race can never produce 0 or a negative. The disabled button is the affordance; the clamp is the
+  // guarantee. Both are required." A boundary proven only by tapping a rendered button has not been
+  // reached at all — so this calls the shipping function through the app's own published surface.
+  // Addendum E A4 asks for exactly this pairing: adversarial tapping AND a state-level test.
+  ['MUM (the quantity clamp, executed not rendered)', {}, [
+    ['zero clamps up to the floor of 1', () => SHOP.clampQty(0) === 1],
+    ['⛔ a negative can never survive the update', () => SHOP.clampQty(-1) === 1 && SHOP.clampQty(-9999) === 1],
+    ['the floor itself is stable', () => SHOP.clampQty(1) === 1],
+    ['the cap holds at 20', () => SHOP.clampQty(20) === 20 && SHOP.clampQty(21) === 20 && SHOP.clampQty(9999) === 20],
+    ['a normal value passes through', () => SHOP.clampQty(3) === 3],
+    ['⛔ a non-number resolves to the floor, never to NaN or 0', () => SHOP.clampQty(NaN) === 1 && SHOP.clampQty(undefined) === 1 && SHOP.clampQty(null) === 1 && SHOP.clampQty('nonsense') === 1],
+    ['a numeric string from the API is accepted', () => SHOP.clampQty('3') === 3],
+    ['a fractional value cannot land between whole items', () => SHOP.clampQty(2.4) === 2 && SHOP.clampQty(0.4) === 1],
+  ], { pure: true }],
+
+  // The naming fallback Larry approved, executed rather than described — and the third assertion is
+  // the one that matters: no name in, NOTHING invented out.
+  ['MUM (the naming fallback, executed not rendered)', {}, [
+    ['her own words are preferred over the retailer string', () => SHOP.householdName({ aka: ['oat milk'], name_display: 'Example Brand Oat Drink 1L' }) === 'Oat milk'],
+    ['the retailer string is the fallback when she has no word for it', () => SHOP.householdName({ aka: [], name_display: 'Example Brand Oat Drink 1L' }) === 'Example Brand Oat Drink 1L'],
+    ['⛔ with neither, it returns nothing rather than inventing a name', () => SHOP.householdName({ aka: [], name_display: '' }) === null && SHOP.householdName(null) === null],
+    ['⛔ the API word "unknown" never becomes a section heading', () => SHOP.sectionLabel({ high_level_category_display: 'unknown' }) === SHOP.OTHER && SHOP.sectionLabel({}) === SHOP.OTHER],
+  ], { pure: true }],
+];
+
+function mumScenarios(shopRender) {
+  return MUM_PLAN.map(([name, refs, checks, opts2]) => {
+    const r = mumScenario(name, refs, shopRender, opts2 || {});
+    r.checks = checks || null;
+    return r;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // MUTATION TEST — the `has` trap is the mechanism; prove it still catches.
 // A harness whose detector has silently stopped detecting looks exactly like a clean run.
@@ -1432,16 +1680,73 @@ if (SELF_TEST) {
     else { missed.push(name); console.log('  MISSED  ' + name.padEnd(48) + ' -> 0 of ' + n + ' assertions red' + seen); }
   }
 
+  // ── WP-B15-45: THE HOUSEHOLD BUILDER-VOCABULARY MUTATIONS ───────────────────────────────────
+  //
+  // One per rule in MUM_VOCABULARY, for the reason the WP-B15-42 block states and which applies
+  // with more force here: a detector nobody has made fail is not evidence, it is a hope. AC3 asked
+  // specifically that "Cockpit" and a status enum be injected and the harness shown to go red —
+  // that is mutations 1 and 6 below. The other five are here because a ban that is only proven for
+  // the word someone thought to test is a ban on that word, not on the vocabulary.
+  //
+  // Every mutation is IN MEMORY. public/shopping.js is never written, not even temporarily.
+  {
+    const mumAnchor = '<div class="page page-pad">';
+    if (!shopOpts.template.includes(mumAnchor)) {
+      console.error('SELF-TEST FAIL — the household template anchor is missing; rewrite the mutations.');
+      process.exit(1);
+    }
+    const mumCases = {
+      'household: the word COCKPIT reaches her screen':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Back to the Cockpit</p>'),
+      'household: the system names itself to her':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>AsdAIr is getting your shopping ready</p>'),
+      'household: catalogue identity vocabulary leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Choose a regular from the catalogue</p>'),
+      'household: retail-operator vocabulary leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Added to your basket</p>'),
+      'household: machine vocabulary leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>The API endpoint did not answer</p>'),
+      'household: a status enum leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>needs_decision</p>'),
+      'household: a SHA or bare identifier leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Build 3b2a574f</p>'),
+    };
+    total += Object.keys(mumCases).length;
+    for (const [name, mutate] of Object.entries(mumCases)) {
+      const r = mumScenario('mutant', M({}), Vue.compile(mutate(shopOpts.template)));
+      const hits = r.err ? [] : mumVocabulary(text(r.vnode));
+      if (hits.length) { caught++; console.log('  caught  ' + name.padEnd(48) + ' -> ' + hits[0].slice(0, 60)); }
+      else { missed.push(name); console.log('  MISSED  ' + name); }
+    }
+    // The control both ways round, and it is not a formality: Addendum B §7.4 and §9.4 sanction
+    // "They've run out of the usual eggs", which is why /\brun\b/ is deliberately absent from
+    // MUM_VOCABULARY. If someone adds it back, this control goes red BEFORE the gate does, and the
+    // message says which sentence it broke rather than leaving the next reader to find out.
+    const cleanMum = mumScenario('control', M({}), Vue.compile(shopOpts.template.replace(
+      mumAnchor, mumAnchor + '<p>They have run out of the usual eggs, so I have left them out.</p>')));
+    const mumFalsePos = cleanMum.err ? [] : mumVocabulary(text(cleanMum.vnode));
+    console.log(mumFalsePos.length
+      ? '  CONTROL FAILED — sanctioned household copy is being flagged: ' + mumFalsePos[0]
+      : '  control  sanctioned "run out of" copy correctly NOT flagged');
+    if (mumFalsePos.length) missed.push('household vocabulary false-positive');
+  }
+
   setRefs({ asdairWs: WS, asdairWsErr: null, asdairRules: RULES, asdairRulesErr: null });
-  const control = scenarios(Vue.compile(opts.template));
+  const control = scenarios(Vue.compile(opts.template))
+    .concat(mumScenarios(Vue.compile(shopOpts.template)));
   // WP-B15-42: the vocabulary detector is part of the control, not only of the mutations. A detector
   // that fires on the SHIPPING template would make every run red for the wrong reason, and the first
   // thing anyone does with a permanently-red gate is stop reading it.
-  const dirty = control.filter((r) => r.err || r.missing.length || (!r.err && bannedVocabulary(r.name, text(r.vnode)).length));
+  // Both detectors, on whichever surface each scenario belongs to — the same pairing the gate uses.
+  // A control that ran only the operator rules would leave the household ban unproven against false
+  // positives, which is the half that actually decides whether a detector survives contact.
+  const allVocab = (r) => (r.err ? [] : bannedVocabulary(r.name, text(r.vnode))
+    .concat(r.mum ? mumVocabulary(text(r.vnode)) : []));
+  const dirty = control.filter((r) => r.err || r.missing.length || allVocab(r).length);
   console.log(dirty.length
     ? '  CONTROL FAILED — unmutated template reports: ' + dirty.map((d) => d.name
       + (d.err ? ' threw' : (d.missing.length ? ' missing ' + d.missing.join(',')
-        : ' banned vocabulary: ' + bannedVocabulary(d.name, text(d.vnode))[0]))).join(' | ')
+        : ' banned vocabulary: ' + allVocab(d)[0]))).join(' | ')
     : '  control  all ' + control.length + ' unmutated scenarios clean (no false positive)');
   // The verdict layer's own control: on the UNMUTATED template every assertion must pass, and there
   // must be some. A mutation harness that reports reds while the control is also red proves nothing.
@@ -1458,7 +1763,7 @@ if (SELF_TEST) {
 
 const render = Vue.compile(opts.template);
 setRefs({ asdairWs: WS, asdairWsErr: null, asdairRules: RULES, asdairRulesErr: null });
-const results = scenarios(render);
+const results = scenarios(render).concat(mumScenarios(Vue.compile(shopOpts.template)));
 
 let bad = 0, ran = 0, failed = 0;
 const sink = (name, pass, why) => {
@@ -1473,7 +1778,10 @@ for (const r of results) {
   const t = text(r.vnode);
   const n = count(r.vnode).el;
   const blob = strayJsonBlobs(t);
-  const vocab = bannedVocabulary(r.name, t);
+  // Both detectors on the household surface: the estate-wide honesty rules AND the operator-
+  // vocabulary ban that is specific to her screen. Warwick's screens run only the first, because
+  // status enums and service names are exactly what his surface exists to show him.
+  const vocab = bannedVocabulary(r.name, t).concat(r.mum ? mumVocabulary(t) : []);
   const before = ran;
   runChecks(r, sink);
   console.log(String(n).padStart(5) + ' vnodes  ' + String(t.join(' ').length).padStart(6) + ' chars  ' +
