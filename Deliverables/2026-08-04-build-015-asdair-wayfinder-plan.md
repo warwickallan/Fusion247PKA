@@ -2282,7 +2282,75 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
-## ⟦ROTATION CLOSE⟧ 2026-08-13 — closing head **`c1fcb46`** on `main`. **Its next action is DISCHARGED — see the session block below it.**
+## ⟦ACTIVE FRONTIER⟧ 2026-08-13 (later session) — **THE WRITE / ACTION PATH IS IN BUILD.** Warwick: *"carry on lets bloody finish this"*. **START HERE.**
+
+### ⛔⛔ THE ACTIVATION ORDER IS A SAFETY CONSTRAINT, NOT A PREFERENCE. Read before merging anything below.
+
+**The live Cockpit serves `services/cockpit/public/*` FROM DISK IN THE MAIN CHECKOUT, live on save. It
+serves `server.mjs` from memory and needs a RESTART.** (Live process: pid 23640, started 2026-08-10,
+`sha 4cfe0cf`, on `127.0.0.1:8090`.)
+
+> **Therefore: merging Felix's UI without Keel's route, or without restarting the Cockpit, puts a SEND
+> button in front of Mum that POSTs to a route that does not exist.** Her page is live at
+> `http://warwick-yoga/shopping.html` right now. **The honest not-connected copy would have been replaced
+> by a button that genuinely fails.** That is strictly worse than what she has today.
+
+**The only safe order:** merge Keel (WP-B15-48) → **RESTART the Cockpit** → verify the POST route answers
+→ merge Felix (WP-B15-49) → verify end to end → only then tell Warwick it works.
+**Never merge Felix first. Never merge Felix alone.**
+
+### State at this frontier
+
+| | |
+|---|---|
+| `main` (local) | `0c22343` — **UNPUSHED: the `origin/main` push is DENIED by the main-push guard**, which is the gate working, not a fault |
+| Lane C (WP-B15-41) | **MERGED** at `7f61121`. Suites on merged main: **1,100 tests · 1,085 pass · 0 fail · 15 skipped** (all 15 in cockpit-api) |
+| WP-B15-48 · Keel | `build-015/b15-48-cockpit-write-path` in `C:/Fusion247PKA-writepath` — **read-back pending** |
+| WP-B15-49 · Felix | `build-015/b15-49-mum-send-action` in `C:/Fusion247PKA-mumsend` — **read-back ACCEPTED, building.** ⛔ **DO-NOT-COMMIT order: Felix's contract declares no integration role, so Larry commits that worktree** |
+
+**Both orders generated through `tools/wo/envelope.mjs`, recomputed at 0 AUTHOR REQUIRED / 0 UNRESOLVED** —
+the `work-order-not-generated` family is a CLEAN exposure this session.
+
+### Two of Addendum C's six faults died before a line was written
+
+**Established by execution, 2026-08-13, and they are why this work is smaller than the map feared:**
+
+| Addendum C fault | Verdict |
+|---|---|
+| #5 — `require()` of the ESM pipeline from CommonJS | **FALSIFIED on Node v22.18.0.** It SUCCEEDS; `receiveList` and `interpretList` both resolve. Pax marked this UNVERIFIED and version-dependent, and was right to |
+| #6 — cockpit-api holds only the SELECT-only role | **ALREADY PROVISIONED.** `ASDAIR_WRITE_DB_URL` is present in `C:\.fusion247\asdair.env`, and Lane C separates the two roles |
+
+**Still true and still to build:** #1 (no POST proxy in `services/cockpit/server.mjs`) and the one capability
+extension — **`receiveList` is not on the cockpit allowlist**, which Pax named as *"a write of a new shop,
+so it deserves Warwick's explicit yes."* **Warwick has now given it**, in the instruction to finish AsdAIr
+and build the write path. The deny list (checkout · pay · slot · credential) is untouched and Keel's AC1
+requires it be *executed*, not asserted.
+
+### 🔴 The known collision, carried openly rather than discovered later
+
+**`receiveList` is idempotent on `(household_id, shop_ref)` and `shop_ref` derives from the date.** So a
+second submission the same day **RESUMES the existing shop and writes nothing new** — while Addendum B §9.5
+promises *"I want to change something"* returns the page to editable **and re-sends**. Those two facts
+collide. **Keel establishes the real behaviour by execution (his AC4); he is explicitly forbidden to invent
+a mechanism to force it. Felix builds to the safe default: rows stay editable, and the UI reports only what
+the server actually said.** *Felix additionally established that the frozen contract carries no
+"can this shop still accept a change" fact, refused to infer it from `created`, and flagged it rather than
+improving it silently — which is the read-back gate doing its job.*
+
+### 📱 Mum's URL changed — `http://warwick-yoga/shopping.html`
+
+**HTTPS `:8443` fails in Silk on the Fire HD 8** (*"unexpectedly closed the connection"*). A second
+**tailnet-only HTTP Serve route on port 80** now fronts the same Cockpit; the HTTPS route is kept.
+**Canonical detail lives in `services/cockpit/README.md` and is not restated here.** **The cause of Silk's
+failure is NOT established** — TLS 1.2 and 1.3 were both ruled out by execution, Warwick ruled the
+Fire/Tailscale architecture closed, and the HTTP route makes the cause moot rather than answered.
+
+**⚠️ Whether the Serve route survives a power-cycle is UNPROVEN.** Tailscale persists `--bg` serve config by
+design, but *by design* is not *by execution* — and the **power-cycle test with the kill-switch off was
+already the one open item on this map with real product-failure potential.** It now has a second reason to
+be run, and it needs the tablet.
+
+## ⟦ROTATION CLOSE⟧ 2026-08-13 — closing head **`c1fcb46`** on `main`. ⛔ **SUPERSEDED AS FRONTIER by the block above. Its next action is DISCHARGED and its state census is superseded.**
 
 ### 📄 SESSION REPORT — ✅ **DISCHARGED 2026-08-13 (later session). Steps 7 / 7b / 7c are DONE.**
 
