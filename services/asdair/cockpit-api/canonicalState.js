@@ -41,6 +41,7 @@ const {
   HUMAN_STATES,
   STATUS_TO_HUMAN_STATE,
   isHumanState,
+  humanStateFor,
   resolveHumanState,
 } = require('../shop/humanState');
 
@@ -81,10 +82,91 @@ function computeCanonicalState(status) {
   }).human_state;
 }
 
+/**
+ * ⚠️ THE STORED VERDICT CAN DRIFT FROM `status`, AND THE READER MUST SAY SO.
+ *
+ * ── THE HAZARD (found by Lane F, 2026-08-13, proved by execution) ──────────
+ *
+ * Migration 020 adds `asdair.shop.human_state` with a default and backfills it
+ * ONCE. It installs NO TRIGGER. So the column is only correct for as long as
+ * every writer of `status` also writes `human_state` in the same transaction.
+ * Lane F demonstrated the gap directly: a row inserted with
+ * `status = 'READY_TO_SHOP'` came back carrying `human_state = 'ASDAIR_WORKING'`.
+ *
+ * The pipeline's own transitions are covered (Lane AB wired them and read every
+ * status back out of Postgres). The exposure is any OTHER writer - direct SQL, a
+ * future service, a path that forgets. That makes this a STANDING HAZARD rather
+ * than a bug with a fix date, which is exactly why the read layer needs a
+ * position on it.
+ *
+ * ── WHAT THIS FUNCTION DOES, AND THE TWO THINGS IT REFUSES TO DO ───────────
+ *
+ * It COMPARES and it REPORTS. It does not choose.
+ *
+ *   ⛔ It does NOT re-derive the verdict. Reading one stored value is the whole
+ *      point of 020, and a read layer that second-guesses the column has simply
+ *      recreated the second opinion the column exists to abolish. The fix for
+ *      drift belongs at the WRITE side - a trigger or a write-path change - and
+ *      that is Silas's schema decision, outside this surface. REPORTED, not
+ *      fixed.
+ *
+ *   ⛔ It does NOT prefer `status` when they disagree. Silently preferring
+ *      either field turns a visible contradiction into an invisible one, and
+ *      the reader would then be confidently wrong instead of loudly unsure.
+ *
+ * A disagreement is a REAL CONDITION about this shop, and Warwick is better
+ * served seeing "these two records disagree" than a confident single answer
+ * that happens to come from the wrong one. This extends the honesty
+ * `canonical_state_source` already provides; it invents no new mechanism.
+ *
+ * @param {object} status the shopStatus projection
+ * @returns {{checked:boolean, stored:string|null, expected_from_status:string|null,
+ *            agrees:boolean|null, contradiction:string|null}}
+ */
+function detectStateDrift(status) {
+  const s = status && typeof status === 'object' ? status : {};
+  const stored = isHumanState(s.human_state) ? s.human_state : null;
+  const stage = typeof s.stage === 'string' ? s.stage : s.status;
+
+  const notChecked = {
+    checked: false, stored: stored, expected_from_status: null, agrees: null, contradiction: null,
+  };
+
+  // Nothing durable to disagree WITH. Where the value was derived from `status`
+  // there is one source, so drift is not a thing that can happen.
+  if (stored === null || (s.human_state_source && s.human_state_source !== 'column')) return notChecked;
+
+  let expected;
+  try {
+    // The SAME mapping the writer uses, with the SAME needs_review escalation -
+    // comparing against anything else would manufacture disagreements that are
+    // really just two different questions.
+    expected = humanStateFor(stage, { needs_review: s.needs_review });
+  } catch (ignore) {
+    // An unknown status cannot be mapped, so nothing can be concluded. Not an
+    // agreement, and not a contradiction: unchecked.
+    return notChecked;
+  }
+
+  const agrees = expected === stored;
+  return {
+    checked: true,
+    stored: stored,
+    expected_from_status: expected,
+    agrees: agrees,
+    contradiction: agrees ? null
+      : 'The stored human_state says "' + stored + '" while this shop\'s status ("' + String(stage)
+        + '") maps to "' + expected + '". asdair.shop.human_state has NO trigger, so any writer that '
+        + 'updates status without updating human_state in the same transaction leaves the two '
+        + 'disagreeing. Neither has been preferred here.',
+  };
+}
+
 module.exports = {
   CANONICAL_STATES: CANONICAL_STATES,
   // Kept for callers that read the mapping itself. It is now THE map, imported
   // from its one home rather than a local copy of it.
   STAGE_MAP: STATUS_TO_HUMAN_STATE,
   computeCanonicalState: computeCanonicalState,
+  detectStateDrift: detectStateDrift,
 };

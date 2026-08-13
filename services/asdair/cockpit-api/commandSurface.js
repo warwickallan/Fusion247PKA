@@ -171,6 +171,22 @@ function isBound() {
  *
  * The cockpit cannot invent a command: an unknown or forbidden name is refused
  * here, before anything is loaded, and never reaches the pipeline.
+ *
+ * ── WP-B15-41 AC3: `deps` IS THE SECOND ARGUMENT, AND IT WAS MISSING ───────
+ *
+ * Every command in pipeline/commands.js has the signature `(spec, deps)`, and
+ * the first thing answerQuestion does is `store.requireShop(deps, spec)`. This
+ * function called `commands[name](args || {})` - ONE argument - so `deps` was
+ * `undefined` and every real invocation threw before it reached a row. The
+ * surface was bound, name-asserted and deny-listed, and never wired: a green
+ * commandSurface suite proved only that the NAMES matched.
+ *
+ * The container is built by cockpit-api/commandDeps.js and passed in by the
+ * caller. It is deliberately NOT constructed here - this module holds no
+ * connection, no environment variable and no pool, which is what keeps the
+ * whole pure surface loadable and testable on a box with nothing installed.
+ *
+ * @param {{commands?:object, deps?:object}} [options]
  */
 async function dispatch(name, args, options) {
   const opts = options || {};
@@ -186,7 +202,7 @@ async function dispatch(name, args, options) {
     throw e;
   }
   const commands = loadCommands(opts.commands);
-  return commands[name](args || {});
+  return commands[name](args || {}, opts.deps);
 }
 
 module.exports = {

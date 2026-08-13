@@ -156,6 +156,35 @@ function presentLine(line, index) {
   };
 }
 
+/**
+ * ONE held line of the packet.
+ *
+ * ── WP-B15-41 AC2: THE JOIN KEY ───────────────────────────────────────────
+ *
+ * This shape published shop_line_no, original_list_line, reason, detail and
+ * rule_id - and NO join key. A board built on the packet contract could see
+ * that a line was held and could not reach that line's question, its
+ * candidates, or the route to answer it. `routed_question` is that key, it is
+ * part of the packet contract, and the finalise artefact already writes it
+ * (present on all 8 held lines of the real 2026-08-13 shop, e.g. "q1111427e",
+ * which is an asdair.shop_question.question_key).
+ *
+ * ⛔ AND THE HONEST HALF, WHICH MATTERS MORE THAN THE FIELD.
+ *
+ * This pass-through DOES NOT MAKE THE KEY REACHABLE TODAY, and no consumer
+ * should be told that it does. `asdair.execution_packet` DOES NOT EXIST: no
+ * migration under services/asdair/db creates it, and nothing in this estate
+ * writes it - established across the whole repository on 2026-08-13, which is
+ * also why gather() below has always had a `not_built` branch. readPacket
+ * therefore answers `packet_state: 'not_built'` on every database we have, so
+ * every field on this shape - this one included - is unreachable until a packet
+ * producer exists and is assigned to a lane.
+ *
+ * The key a consumer CAN join on today is `question_key`, published per held
+ * line by assembleWorkspace's `exceptions` block on /asdair/workspace. This
+ * field is correct, cheap and forward-compatible; that one is the one that
+ * works. Both exist so nobody has to guess which.
+ */
 function presentHeld(held) {
   const h = held || {};
   const reason = P.text(h.reason);
@@ -165,7 +194,22 @@ function presentHeld(held) {
     reason_display: reason,
     reason_meaning: HELD_REASON_MEANING[reason] || 'unknown',
     detail_display: P.text(h.detail),
-    rule_id_display: P.count(h.rule_id)
+    rule_id_display: P.count(h.rule_id),
+
+    // ⭐ THE JOIN KEY. An asdair.shop_question.question_key. Null-safe: a held
+    // line the planner produced before any question was opened genuinely has
+    // none, and that reads as unknown rather than as an invented id.
+    routed_question: h.routed_question === undefined ? null : h.routed_question,
+    routed_question_display: P.text(h.routed_question),
+    has_routed_question: !MISSING(h.routed_question),
+
+    // ── FINDING F: THE REGION REFERENCE, STRUCTURALLY PRESENT AND EMPTY ────
+    // Migration 020 creates asdair.shop_image_region and DELIBERATELY does not
+    // backfill it; the writer is the vision pipeline (Lane AB). Confirmed empty
+    // (0 rows) on the disposable target on 2026-08-13. Served so a consumer can
+    // bind to it now. NOTHING IS FABRICATED FOR IT.
+    source_region_id_display: P.count(h.source_region_id),
+    has_source_region: !MISSING(h.source_region_id)
   };
 }
 

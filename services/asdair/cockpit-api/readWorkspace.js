@@ -126,12 +126,28 @@ const COLUMN_PROBE_SQL =
   'SELECT column_name FROM information_schema.columns ' +
   'WHERE table_schema = \'asdair\' AND table_name = $1';
 
+// WP-B15-41 AC9. IS THE PROVENANCE LEDGER ACTUALLY HERE?
+//
+// provenance.js used to STATE, in a comment and in a string that reaches the
+// payload, that migration 020 "has not been applied". That was a dated
+// observation written as a permanent fact, and it went false the same day 020
+// was applied. A pure module cannot see a schema, so it must be TOLD - and the
+// only honest way to tell it is to look.
+//
+// to_regclass returns NULL rather than raising when a table is absent, which is
+// what lets "not there" be answered without aborting the surrounding read-only
+// transaction. Same technique readPacket.js already uses for its two optional
+// tables; deliberately not a new pattern.
+const PROVENANCE_LEDGER_PROBE_SQL =
+  "SELECT to_regclass('asdair.shop_line_provenance') IS NOT NULL AS has_ledger";
+
 // Every statement this module can issue, so the SELECT-only property is
 // testable rather than merely asserted in a comment.
 const ALL_SQL = Object.freeze([
   CURRENT_SHOP_SQL, SHOP_LIST_SQL, SHOP_ROW_SQL, EVENTS_SQL, QUESTIONS_SQL, DECISIONS_SQL, ALTERNATIVES_SQL,
   CATALOGUE_SQL, CONFIRMATION_SQL, CONFIRMATION_LINES_SQL, PREVIOUS_ORDER_SQL,
-  PREVIOUS_ORDER_ITEMS_SQL, ROTATION_RULES_SQL, COLUMN_PROBE_SQL
+  PREVIOUS_ORDER_ITEMS_SQL, ROTATION_RULES_SQL, COLUMN_PROBE_SQL,
+  PROVENANCE_LEDGER_PROBE_SQL
 ]);
 
 // asdair.shopping_list_items columns that always exist (migration 001).
@@ -346,6 +362,35 @@ async function readOptional(client, sql, shopId) {
   }
 }
 
+/**
+ * WP-B15-41 AC9. Does asdair.shop_line_provenance exist on THIS database?
+ *
+ * Returns true, false, or `null` for "the question could not be asked" - and
+ * null is a first-class answer, not a failure. provenance.js writes a different
+ * gap sentence for each of the three, because "the ledger is empty", "the
+ * ledger is not there" and "nobody looked" have three different fixes and
+ * collapsing them is how the stale claim survived in the first place.
+ *
+ * Wrapped in a savepoint for the same load-bearing reason readOptional is: one
+ * failed statement aborts the whole Postgres transaction, so a bare try/catch
+ * would take the entire workspace down on the NEXT query.
+ */
+async function probeProvenanceLedger(client) {
+  await client.query('SAVEPOINT provenance_probe');
+  try {
+    const res = await client.query(PROVENANCE_LEDGER_PROBE_SQL);
+    await client.query('RELEASE SAVEPOINT provenance_probe');
+    const row = rows(res)[0];
+    return row && row.has_ledger !== undefined && row.has_ledger !== null ? !!row.has_ledger : null;
+  } catch (ignore) {
+    try { await client.query('ROLLBACK TO SAVEPOINT provenance_probe'); } catch (alsoIgnore) { /* the read is over */ }
+    // NOT `false`. A probe that could not run has not established absence, and
+    // reporting absence from a failed probe is the same class of false claim
+    // this whole criterion exists to remove.
+    return null;
+  }
+}
+
 async function readDecisions(client, shopId) {
   try {
     const res = await client.query(DECISIONS_SQL, [shopId]);
@@ -416,6 +461,8 @@ async function gather(client, opts) {
   const shopLines = await readOptional(client, SHOP_LINES_SQL, status.shop_id);
   const sourceImages = await readOptional(client, SOURCE_IMAGES_SQL, status.shop_id);
   const decisions = await readDecisions(client, status.shop_id);
+  // WP-B15-41 AC9. Asked, not assumed - see probeProvenanceLedger.
+  const provenanceLedgerAvailable = await probeProvenanceLedger(client);
 
   // 4. The list, if one exists yet.
   let listItems = [];
@@ -462,7 +509,8 @@ async function gather(client, opts) {
     previous_order: previousOrder,
     previous_order_items: previousOrderItems,
     rotation_rules: rotationRules,
-    all_stages: SHOP_STATUSES
+    all_stages: SHOP_STATUSES,
+    provenance_ledger_available: provenanceLedgerAvailable
   });
 
   payload.shops = shops.map(function (s) {
@@ -495,6 +543,8 @@ module.exports = {
     gather: gather,
     buildItemSelect: buildItemSelect,
     probeItemColumns: probeItemColumns,
+    probeProvenanceLedger: probeProvenanceLedger,
+    PROVENANCE_LEDGER_PROBE_SQL: PROVENANCE_LEDGER_PROBE_SQL,
     readDecisions: readDecisions,
     CURRENT_SHOP_SQL: CURRENT_SHOP_SQL,
     SHOP_ROW_SQL: SHOP_ROW_SQL,

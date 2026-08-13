@@ -133,12 +133,21 @@ function humanStateFor(status, flags) {
  * PURE. What the backend should report, given a row that MAY OR MAY NOT carry
  * the durable column.
  *
- * THE SEAM THIS FUNCTION EXISTS TO MAKE HONEST (WP-B15-35 AC1). Migration 020
- * is committed to this repository but, as verified read-only against the live
- * database on 2026-08-13, HAS NOT BEEN APPLIED there - `asdair.shop` carries no
- * `human_state` column at all. Code that simply SELECTed it would 500 the whole
- * Cockpit; code that silently fell back would hide the fact that the canonical
- * column is missing. So the fallback is explicit and it is REPORTED:
+ * THE SEAM THIS FUNCTION EXISTS TO MAKE HONEST (WP-B15-35 AC1).
+ *
+ * ⚠️ CORRECTED 2026-08-13 (WP-B15-41). This comment previously stated that
+ * migration 020 "HAS NOT BEEN APPLIED" and that `asdair.shop` carries no
+ * `human_state` column. That was a dated observation written as a standing
+ * fact, and 020 was applied and verified the same day. It is the SECOND copy of
+ * the identical false claim - AC9 named the one in cockpit-api/provenance.js,
+ * and this one was found by searching for the CLAIM rather than by trusting the
+ * one location that had been pointed at.
+ *
+ * The function's reason for existing is unchanged and does not depend on which
+ * migrations are applied: a database may or may not carry the column, code that
+ * simply SELECTed it would 500 the whole Cockpit where it is absent, and code
+ * that silently fell back would hide that the canonical column is missing. So
+ * the fallback is explicit and it is REPORTED:
  *
  *   source 'column'  - the durable value was read. This is the intended state.
  *   source 'derived' - the column is absent (or empty) and the value was

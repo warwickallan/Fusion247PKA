@@ -17,7 +17,12 @@
 // computations that happen to agree - they are ONE computation, returned
 // twice. `countFacts()` derives every number exactly once into a frozen facts
 // object; `sentenceFor()` is then a PURE FUNCTION OF THAT OBJECT and has no
-// access to the raw inputs at all. There is no path by which a sentence can be
+// access to the raw inputs at all.
+//
+// ⚠️ SINCE WP-B15-41 THAT DERIVATION LIVES IN shopArithmetic.js, because the
+// same facts are published by four blocks of the payload and four derivations
+// is four answers (AC6). `countFacts` here is a re-export of it, not a copy.
+// There is no path by which a sentence can be
 // built from a different reading of the data than the counts the UI renders,
 // because the raw data is out of scope by the time the sentence is written.
 //
@@ -42,15 +47,7 @@
 
 'use strict';
 
-const { isHumanState } = require('../shop/humanState');
-
-function fail(message) {
-  throw new Error('explainState: ' + message);
-}
-
-function count(list, predicate) {
-  return (Array.isArray(list) ? list : []).filter(predicate).length;
-}
+const { countShop } = require('./shopArithmetic');
 
 /** Plural-safe "N thing" / "N things". English only; no locale machinery. */
 function plural(n, singular, pluralWord) {
@@ -60,94 +57,27 @@ function plural(n, singular, pluralWord) {
 /**
  * PURE. Derive EVERY number this module will ever report, exactly once.
  *
- * @param {object} input
- * @param {Array}  input.questions   asdair.shop_question rows for this shop
- * @param {Array}  input.lines       asdair.shop_line rows for this shop
- * @param {Array}  input.items       asdair.shopping_list_items rows for the list
- * @param {string} input.stage       asdair.shop.status
- * @param {string} input.human_state the ALREADY-RESOLVED six-value state
- * @returns {object} frozen facts - the single source for both counts and prose
+ * ⚠️ THE DERIVATION MOVED (WP-B15-41 AC6). It now lives in shopArithmetic.js,
+ * and this is a re-export rather than a second implementation.
+ *
+ * WHY IT MOVED, because "we refactored it" is not a reason worth a comment.
+ * This function was the single source for the SENTENCE and for `why.counts`,
+ * and it did that job correctly. But the payload publishes the same facts in
+ * three other blocks - buildQuestions' open/resolved counts, buildPlan's
+ * held/resolved/excluded, and the new AC1 `this_week` summary - and each of
+ * those was deriving its own. Four derivations that agree on the fixtures
+ * somebody wrote are four answers waiting for the input that separates them,
+ * and AC6 exists because two of them separating is a defect rather than a
+ * rounding difference.
+ *
+ * So the derivation is now one function that every publication point projects,
+ * and the structural guarantee below is unchanged and unweakened: sentenceFor()
+ * still cannot see the raw rows, so it still cannot count anything for itself.
+ *
+ * Signature and every field name are unchanged, deliberately - this is a move,
+ * not a redesign, and no existing caller or proof needed editing to accept it.
  */
-function countFacts(input) {
-  const i = input && typeof input === 'object' ? input : {};
-
-  if (!isHumanState(i.human_state)) {
-    fail('human_state "' + String(i.human_state) + '" is not one of the six. This module EXPLAINS the ' +
-      'canonical state and must never derive one of its own - resolve it with shop/humanState.js first.');
-  }
-
-  const questions = Array.isArray(i.questions) ? i.questions : [];
-  const lines = Array.isArray(i.lines) ? i.lines : [];
-  const items = Array.isArray(i.items) ? i.items : [];
-
-  // WHAT COUNTS AS RESOLVED, AND HOW A QUESTION IS JOINED TO IT.
-  //
-  // TWO JOIN KEYS, BOTH REAL, AND THE CHOICE IS NOT COSMETIC:
-  //   * asdair.shop_question carries `list_item_id` - NOT a line number. That
-  //     is the key production actually has (cockpit-api/readWorkspace.js's
-  //     QUESTIONS_SQL selects it), so it is the primary join.
-  //   * asdair.shop_line carries `line_no`, and a caller that has interpreted
-  //     lines to hand may supply them; a question may then be matched by
-  //     `line_no` where it genuinely carries one.
-  //
-  // Supporting only `line_no` would have made this whole rule a no-op on real
-  // data while passing every fixture that invented one - a green proving
-  // nothing, on the exact seam this Work Package exists to close.
-  //
-  // A line/item is RESOLVED once a human confirmed or corrected it, or the run
-  // reached its own conclusion. `corrected` is the durable human confirmation
-  // flag (shopLines.markCorrected writes it); `matched`, `added`, `not_added`
-  // and `excluded_this_week` are conclusions the run or Warwick already
-  // reached.
-  const RESOLVED_ITEM_STATUSES = ['added', 'not_added', 'excluded_this_week'];
-
-  const resolvedLineNos = new Set(
-    lines.filter((l) => l && (l.corrected === true || l.status === 'matched'))
-      .map((l) => Number(l.line_no))
-      .filter((n) => Number.isInteger(n))
-  );
-
-  const resolvedItemIds = new Set(
-    items.filter((it) => it && RESOLVED_ITEM_STATUSES.indexOf(it.status) !== -1)
-      .map((it) => String(it.id))
-      .filter((id) => id !== 'undefined' && id !== 'null')
-  );
-
-  // THE STALE-REFERRAL RULE (AC5). An open question whose subject has since
-  // been resolved is NOT a decision that needs Warwick. It is dead state, and
-  // it is reported separately so its existence is never hidden either.
-  const openQuestions = questions.filter((q) => q && q.status === 'open');
-  const stale = openQuestions.filter((q) => {
-    if (q.list_item_id !== null && q.list_item_id !== undefined &&
-        resolvedItemIds.has(String(q.list_item_id))) return true;
-    const n = Number(q.line_no);
-    return Number.isInteger(n) && resolvedLineNos.has(n);
-  });
-  const staleKeys = new Set(stale.map((q) => q.question_key));
-  const live = openQuestions.filter((q) => !staleKeys.has(q.question_key));
-
-  return Object.freeze({
-    stage: i.stage,
-    human_state: i.human_state,
-
-    // THE NUMBER THAT DRIVES THE SENTENCE AND THE BADGE. One number.
-    decisions_needing_warwick: live.length,
-
-    // Reported so the stale state is visible rather than merely excluded.
-    stale_questions_suppressed: stale.length,
-
-    questions_answered: count(questions, (q) => q && q.status === 'answered'),
-    questions_total: questions.length,
-
-    lines_total: lines.length,
-    lines_resolved: resolvedLineNos.size,
-    lines_unresolved: count(lines, (l) => l && l.corrected !== true && l.status !== 'matched'),
-
-    products_planned: count(items, (it) => it && it.status !== 'excluded_this_week' && it.status !== 'not_added'),
-    products_reconciling: count(items, (it) => it && (it.status === 'requested' || it.status === 'pending')),
-    products_skipped: count(items, (it) => it && it.status === 'excluded_this_week'),
-  });
-}
+const countFacts = countShop;
 
 /**
  * PURE, AND FUNCTION OF THE FACTS ALONE. It cannot see the raw rows, so it
@@ -227,7 +157,11 @@ function sentenceFor(facts) {
  * They are the same arithmetic.
  */
 function explainState(input) {
-  const facts = countFacts(input);
+  // AC6. A caller that has ALREADY derived the facts passes them in rather than
+  // paying for a second derivation - and, more to the point, rather than
+  // creating one. assembleWorkspace does exactly this: it derives once and every
+  // block of the payload, this sentence included, projects that one object.
+  const facts = (input && input.facts) ? input.facts : countFacts(input);
   return {
     human_state: facts.human_state,
     sentence: sentenceFor(facts),

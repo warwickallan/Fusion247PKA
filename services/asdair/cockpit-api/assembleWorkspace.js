@@ -33,9 +33,17 @@
 
 const P = require('./present');
 const { COMMAND_NAMES } = require('./commandSurface');
-const { computeCanonicalState } = require('./canonicalState');
+const { computeCanonicalState, detectStateDrift } = require('./canonicalState');
 const { explainState } = require('./explainState');
 const { computeProvenance } = require('./provenance');
+const {
+  countShop,
+  classifyQuestion,
+  isHeldItem,
+  presentBrand,
+  HELD_ITEM_STATUSES,
+  SKIPPED_ITEM_STATUSES,
+} = require('./shopArithmetic');
 
 // The interpretation vocabulary (services/asdair/interpret/resolveByCatalogue.js).
 const INTERPRETATION_STATUSES = Object.freeze([
@@ -401,14 +409,82 @@ function resolutionSentence(status, decision) {
   }
 }
 
-function buildQuestions(input, cat) {
+/**
+ * WOULD ANSWERING THIS TEACH THE HOUSEHOLD SOMETHING DURABLE? (WP-B15-41 AC2)
+ *
+ * Warwick's question is "is this worth answering carefully, or is it just this
+ * week?". The honest answer is derivable for two shapes and NOT derivable for
+ * the rest, so the third value is `null` and it is displayed as unknown rather
+ * than defaulted to the reassuring branch.
+ *
+ * PRODUCT IDENTITY generalises: asdair.remembered_choice (migration 018) is the
+ * durable home for "when the list says X, he means product Y". QUANTITY does
+ * not: a number for this week's shop is a fact about this week.
+ */
+function durableLearningFor(q) {
+  const hasCandidates = arr(q && q.candidates).length > 0;
+  const text = String((q && (q.question_text || q.question_key)) || '').toLowerCase();
+  const looksQuantity = /\bqty\b|\bquantity\b|how many|how much/.test(text);
+
+  if (hasCandidates && !looksQuantity) {
+    return {
+      value: true,
+      display: 'yes',
+      reason: 'This is a product-identity choice. What you pick is remembered, so the same wording on '
+        + 'next week\'s list resolves itself.'
+    };
+  }
+  if (looksQuantity) {
+    return {
+      value: false,
+      display: 'no',
+      reason: 'This settles a quantity for this week only. It teaches AsdAIr nothing about future shops.'
+    };
+  }
+  return {
+    value: null,
+    display: P.UNKNOWN,
+    // Never "probably not". An unestablished fact is unknown, and saying so is
+    // the whole presentation contract of this service.
+    reason: 'Nothing durable says whether answering this generalises beyond this week.'
+  };
+}
+
+/**
+ * @param {object} input
+ * @param {object} cat    the catalogue index
+ * @param {object} [facts] the ONE frozen arithmetic object (AC6). When supplied
+ *        - which is always, on the production path - the published counts are
+ *        READ from it rather than recounted here. When absent (a direct unit
+ *        test of this function), the local bucketing still uses the SAME
+ *        `classifyQuestion` the arithmetic uses, so the DEFINITION is
+ *        single-source either way and the two cannot mean different things.
+ */
+function buildQuestions(input, cat, facts) {
   const all = arr(input.questions);
-  const open = all.filter(function (q) {
-    return q.status === undefined || q.status === 'open';
-  });
-  const resolved = all.filter(function (q) {
-    return q.status === 'answered' || q.status === 'skipped';
-  });
+
+  // ── AC4: EVERY QUESTION LANDS IN EXACTLY ONE BUCKET ──────────────────────
+  //
+  // The previous filters were `status === undefined || status === 'open'` and
+  // `status === 'answered' || status === 'skipped'`. Those two are NOT total:
+  // any other value - NULL above all - matched NEITHER, so the question
+  // vanished from `items` AND from `resolved`, silently under-reporting both
+  // counts. A question that disappears from the arithmetic is exactly what AC6
+  // exists to prevent.
+  //
+  // ⚠️ THIS IS HARDENING, NOT A LIVE-DEFECT FIX, and must never be reported as
+  // one. asdair.shop_question.status is NOT NULL DEFAULT 'open' with a CHECK
+  // constraining it to open|answered|skipped (migration 006), so the database
+  // cannot produce the input this guards against. The only route in is a caller
+  // that did not read the column. Verified by execution 2026-08-13.
+  //
+  // (For the record, the original comment's premise was also inverted: NULL was
+  // never treated as open, because `null === undefined` is false in JavaScript.)
+  const bucketed = { open: [], answered: [], skipped: [], unknown: [] };
+  all.forEach(function (q) { bucketed[classifyQuestion(q)].push(q); });
+  const open = bucketed.open;
+  const resolved = bucketed.answered.concat(bucketed.skipped);
+  const unknownStatus = bucketed.unknown;
 
   const decisionsByQuestion = new Map();
   arr(input.decisions).forEach(function (d) {
@@ -417,11 +493,39 @@ function buildQuestions(input, cat) {
   });
 
   return {
-    open_count_display: P.count(open.length),
-    resolved_count_display: P.count(resolved.length),
+    // AC6. Projected from the one arithmetic object on the production path.
+    open_count_display: P.count(facts ? facts.questions_open : open.length),
+    resolved_count_display: P.count(facts
+      ? facts.questions_answered + facts.questions_skipped
+      : resolved.length),
+    // The count that drives the badge. NOT the same number as open_count:
+    // stale referrals (an open question about a line that has since been
+    // settled) are open but do not need Warwick, and collapsing the two is how
+    // a resolved line stays on the board.
+    needing_you_count_display: P.count(facts ? facts.decisions_needing_warwick : null),
+    // AC4. Normally 0. A non-zero value means a reader handed us a status the
+    // schema forbids - reported rather than swallowed, and the questions
+    // themselves are listed below so none is lost.
+    unknown_status_count_display: P.count(facts ? facts.questions_unknown_status : unknownStatus.length),
+    unknown_status: unknownStatus.map(function (q) {
+      return {
+        id: q.id === undefined ? null : q.id,
+        question_key: q.question_key,
+        question_text_display: P.text(q.question_text),
+        raw_status_display: P.text(q.status),
+        note: 'This question carries a status outside open/answered/skipped. It is neither counted as '
+          + 'needing you nor as settled, and it is listed here so it is not lost.'
+      };
+    }),
     items: open.map(function (q) {
       return {
         id: q.id === undefined ? null : q.id,
+        // ── THE JOIN KEY (WP-B15-41 AC2) ─────────────────────────────────
+        // This is the key a board joins a held line to its candidates by, and
+        // it is the one that EXISTS today. The packet contract's
+        // `routed_question` names the same value, but nothing writes
+        // asdair.execution_packet - no migration creates it and no producer
+        // exists in this estate - so `question_key` here is the reachable one.
         question_key: q.question_key,
         question_text_display: P.text(q.question_text),
         list_item_id: q.list_item_id === undefined ? null : q.list_item_id,
@@ -435,6 +539,7 @@ function buildQuestions(input, cat) {
             from_catalogue: !!regular
           };
         }),
+        answer_becomes_durable: durableLearningFor(q),
         // Named so the UI cannot invent an action that has no command behind it.
         allowed_replies: [
           { key: 'choose', label: 'Choose this one', command: 'answerQuestion' },
@@ -470,6 +575,429 @@ function buildQuestions(input, cat) {
         decision: decision
       };
     })
+  };
+}
+
+// =====================================================================
+// AC7 - CORROBORATED, NEVER VERIFIED.
+//
+// Warwick's ruling on 2-of-3 agreement: when several independent readings of
+// the same photograph agree, that is CORROBORATION. It is evidence that the
+// reading is probably right. It is NOT verification, because nothing checked
+// the reading against the world - three runs can agree and all be wrong, and a
+// word that implies otherwise invites Warwick to stop looking.
+//
+// ⛔ SCOPE, STATED SO A LATER SWEEP CANNOT WIDEN IT. This governs CORROBORATION
+//    OUTPUT ONLY - the presentation of multi-run agreement about what a line
+//    said. It does NOT reach `reconcile/verifyBasket.js`, whose basket-versus-
+//    plan check is a genuinely different and legitimate concept: that one
+//    compares two observed states and "verify" is the correct word for it.
+//    Renaming it would damage correct code to satisfy a rule about something
+//    else. It is out of this Work Order's surface and it stays as it is.
+//
+// THE DATA IS NOT HERE YET, AND THAT IS SAID RATHER THAN PAPERED OVER. The
+// support/support_of/support_class fields exist in the finalise artefact
+// (services/asdair/pipeline/finalise, Lane AB). asdair.shop_line_provenance has
+// no support columns, so a workspace assembled from durable rows alone cannot
+// report agreement. This function is the ONE place that vocabulary is minted,
+// so when the producer lands there is nowhere else for a "verified" to appear.
+// =====================================================================
+const CORROBORATION_CLASSES = Object.freeze({
+  unanimous: 'every reading agreed',
+  majority: 'most readings agreed',
+  minority: 'only a minority of readings saw this',
+  single: 'seen in one reading only'
+});
+
+function corroborationFor(source) {
+  const s = source && typeof source === 'object' ? source : {};
+  const support = Number(s.support);
+  const of = Number(s.support_of);
+  const known = Number.isFinite(support) && Number.isFinite(of) && of > 0;
+  const cls = typeof s.support_class === 'string' ? s.support_class : null;
+
+  return {
+    known: known,
+    // The literal word, every time, on the primary reading path. There is no
+    // branch of this function that can emit "verified".
+    label: known
+      ? 'corroborated by ' + support + ' of ' + of + ' readings'
+      : 'corroboration unknown',
+    support_display: P.count(known ? support : null),
+    support_of_display: P.count(known ? of : null),
+    support_class_display: P.text(cls),
+    support_class_meaning: cls && CORROBORATION_CLASSES[cls] ? CORROBORATION_CLASSES[cls] : P.UNKNOWN,
+    // The caveat travels WITH the number, so a UI cannot render the reassuring
+    // half and drop the honest half.
+    caveat: 'Agreement between readings is corroboration, not verification. Nothing has checked this '
+      + 'against the shelf.'
+  };
+}
+
+// =====================================================================
+// AC2 - THE EXCEPTION BOARD, SERVED AS DATA.
+//
+// One entry per line the planner could not settle. Everything a person needs to
+// decide, without opening another screen: what AsdAIr read, what it proposes,
+// what the sensible alternatives are, why it is uncertain, whether answering
+// teaches the household something durable - and the JOIN KEY.
+//
+// ── THE JOIN KEY, AND WHY IT IS `question_key` ────────────────────────────
+// A board is useless if it cannot get from a held line to that line's
+// candidates and its answer route. `question_key` is that key, it is on
+// asdair.shop_question, and readWorkspace already selects it.
+//
+// The packet contract names the same value `routed_question` on its held lines,
+// and readPacket.js now passes it through (see presentHeld there). But NOTHING
+// WRITES asdair.execution_packet: no migration creates the table and no producer
+// exists anywhere in this estate, verified 2026-08-13. So `routed_question` is
+// structurally correct and returns unknown on every request today, while THIS
+// key is the one a board can actually join on. Both are published; only one is
+// reachable, and a consumer must not be left guessing which.
+// =====================================================================
+const HELD_REASON_PLAIN = Object.freeze({
+  needs_decision: 'AsdAIr could not settle which product you meant.',
+  requested: 'AsdAIr has asked about this and is waiting for your answer.'
+});
+
+function buildExceptions(input, cat) {
+  const items = arr(input.list_items);
+  const questions = arr(input.questions);
+  const alternatives = arr(input.alternatives);
+
+  // Open questions indexed by the list item they are about, so a held line can
+  // reach its own question rather than the first one on the shop.
+  const openByItem = new Map();
+  questions.forEach(function (q) {
+    if (classifyQuestion(q) !== 'open') return;
+    const k = idKey(q.list_item_id);
+    if (k === null) return;
+    if (!openByItem.has(k)) openByItem.set(k, q);
+  });
+
+  const altsByItem = new Map();
+  alternatives.forEach(function (a) {
+    const k = idKey(a.list_item_id);
+    if (k === null) return;
+    if (!altsByItem.has(k)) altsByItem.set(k, []);
+    altsByItem.get(k).push(a);
+  });
+
+  const held = items.filter(isHeldItem);
+
+  return {
+    // Projected from the ONE arithmetic source by the caller; this count is the
+    // length of what is actually served, so the board and its badge are the
+    // same list by construction.
+    count_display: P.count(held.length),
+    items: held.map(function (item, i) {
+      const k = idKey(item.id);
+      const q = k === null ? null : (openByItem.get(k) || null);
+      const regular = cat.get(item.matched_regular_id);
+
+      // Candidates from the question (which carry catalogue ids) plus shop-floor
+      // alternatives (which do NOT - their id is the alternative row's own key,
+      // and reading it as a regulars id would point at a different product).
+      const candidates = [];
+      arr(q && q.candidates).forEach(function (c, idx) {
+        const r = cat.get(c && (c.id !== undefined ? c.id : c.regular_id));
+        candidates.push({
+          index: idx,
+          source: 'catalogue_candidate',
+          regular_id_display: P.count(r ? r.id : (c && c.id)),
+          label_display: P.text(r ? r.name : (c && (c.name || c.label || c.text))),
+          brand: presentBrand(r ? r.brand : null),
+          from_catalogue: !!r
+        });
+      });
+      arr(altsByItem.get(k)).forEach(function (a, idx) {
+        candidates.push({
+          index: candidates.length + idx,
+          source: 'product_alternative',
+          regular_id_display: P.UNKNOWN,
+          label_display: P.text(a.alternative_name),
+          brand: presentBrand(null),
+          from_catalogue: false
+        });
+      });
+
+      return {
+        line_no: item.line_no === undefined || item.line_no === null ? i + 1 : item.line_no,
+        list_item_id: item.id === undefined ? null : item.id,
+
+        // ⭐ THE JOIN KEY. Null when the held line has no open question yet -
+        // which is a real state (the planner held it before anything was asked)
+        // and is left null rather than invented.
+        question_key: q ? q.question_key : null,
+        question_key_display: P.text(q ? q.question_key : null),
+        question_id: q && q.id !== undefined ? q.id : null,
+        question_text_display: P.text(q ? q.question_text : null),
+
+        // WHAT ASDAIR READ, verbatim. Never edited, never replaced by a product
+        // name - this is the evidence, and it is the thing Warwick recognises.
+        as_written_display: P.text(item.raw_reading !== undefined ? item.raw_reading : item.item_name),
+
+        // WHAT IT PROPOSES. Only ever a name looked up from our own catalogue by
+        // id, exactly as buildLine does. Model prose is never promoted here.
+        proposed_product_display: P.text(regular ? regular.name : null),
+        proposed_regular_id_display: P.count(regular ? regular.id : null),
+        proposed_brand: presentBrand(regular ? regular.brand : null),
+
+        alternatives: candidates,
+        alternatives_count_display: P.count(candidates.length),
+
+        why_uncertain_display: P.text(HELD_REASON_PLAIN[item.status] || item.note || null),
+        plan_status_display: P.text(item.status),
+
+        answer_becomes_durable: q ? durableLearningFor(q) : durableLearningFor({ candidates: [] }),
+
+        // AC7. Structurally present, honest when the producer has not landed.
+        corroboration: corroborationFor(item.provenance_detail),
+
+        // ── AC2 / FINDING F: THE REGION REFERENCE, PRESENT AND EMPTY ────────
+        // Migration 020 creates asdair.shop_image_region and DELIBERATELY does
+        // not backfill it; the writer is Lane AB's pipeline. Confirmed empty on
+        // the target (0 rows) on 2026-08-13. The field is served so a consumer
+        // can bind to it now; NOTHING IS FABRICATED FOR IT, and `pending` says
+        // plainly which producer owes it.
+        image_region: {
+          known: false,
+          region_id_display: P.UNKNOWN,
+          pending: 'asdair.shop_image_region is empty. Migration 020 creates it and deliberately does '
+            + 'not backfill it; the vision pipeline (Lane AB) is what writes it.'
+        },
+
+        // The reply set is the question's, so a board never offers an action
+        // with no command behind it. A held line with no question yet can only
+        // be answered once one is opened.
+        can_answer_now: !!q,
+        allowed_replies: q
+          ? [
+            { key: 'choose', label: 'Choose this one', command: 'answerQuestion' },
+            { key: 'typed', label: 'Type a correction', command: 'answerQuestion' },
+            { key: 'search', label: 'Search ASDA', command: 'answerQuestion' },
+            { key: 'skip', label: 'Skip this week', command: 'answerQuestion' }
+          ]
+          : []
+      };
+    })
+  };
+}
+
+// =====================================================================
+// AC5 - THE FINAL LIST, BRAND-SORTED.
+//
+// The order Warwick shops in, not the order the database happens to return.
+// BRAND, then product name - the same brand_az_then_product_az contract the
+// packet declares, because the ordering IS the speed in a physical shop.
+//
+// ⛔ THE SENTINEL IS A SORT KEY, NOT A BRAND. The producer writes
+//    "ZZ (no brand recorded)" to push unbranded lines last - it appears on all
+//    8 held lines of the real 2026-08-13 shop. Rendering it as a brand would
+//    print a fake manufacturer on the list Warwick shops from. shopArithmetic's
+//    presentBrand() splits the value into what it SORTS as and what it READS
+//    as, and only the sort key ever sees the sentinel.
+//
+// EXCEPTIONS ARE A SEPARATE COLLECTION AND ARE NEVER MIXED IN. A line nobody
+// has settled is not something to put in a trolley, and interleaving the two
+// is how an unresolved item gets bought by accident.
+// =====================================================================
+function buildFinalList(input, cat) {
+  const items = arr(input.list_items);
+  const origins = input.item_origins && input.item_origins.get ? input.item_origins : null;
+
+  const shoppable = items.filter(function (it) {
+    return it && !isHeldItem(it) && SKIPPED_ITEM_STATUSES.indexOf(it.status) === -1;
+  });
+
+  const lines = shoppable.map(function (item, i) {
+    const regular = cat.get(item.matched_regular_id);
+    const brand = presentBrand(regular ? regular.brand : null);
+    const productName = regular ? regular.name : null;
+
+    // PURCHASE QUANTITY: what will actually be bought. `added_qty` once the run
+    // has concluded, otherwise what was requested. Never defaulted to 1 - an
+    // unknown quantity reads as unknown.
+    const purchaseQty = Number.isFinite(Number(item.added_qty)) && Number(item.added_qty) > 0
+      ? Number(item.added_qty)
+      : (Number.isFinite(Number(item.requested_qty)) ? Number(item.requested_qty) : null);
+
+    const origin = origins
+      ? (origins.get(item.id === undefined || item.id === null ? null : String(item.id)) || null)
+      : null;
+
+    return {
+      line_no: item.line_no === undefined || item.line_no === null ? i + 1 : item.line_no,
+      list_item_id: item.id === undefined ? null : item.id,
+
+      // THE THREE FIELDS THE PAGE SHOWS.
+      brand_display: brand.display,
+      product_display: P.text(productName),
+      purchase_quantity_display: P.count(purchaseQty),
+
+      // Kept so a consumer can prove the order rather than trust it, and so the
+      // sentinel is inspectable without ever being printed as a brand.
+      has_brand: brand.known,
+      brand_is_sort_sentinel: brand.is_sentinel,
+
+      // ON EXPANSION: where this line came from, in plain English.
+      provenance: origin,
+      provenance_display: P.text(origin),
+      provenance_meaning: origin ? (PROVENANCE_PLAIN[origin] || P.UNKNOWN) : P.UNKNOWN,
+      asda_product_id_display: P.text(regular ? regular.asda_product_id : null),
+      as_written_display: P.text(item.raw_reading !== undefined ? item.raw_reading : item.item_name),
+      corroboration: corroborationFor(item.provenance_detail),
+
+      _sort: { brand: brand.sort_key, product: String(productName || '').trim().toLowerCase() }
+    };
+  });
+
+  lines.sort(function (a, b) {
+    if (a._sort.brand < b._sort.brand) return -1;
+    if (a._sort.brand > b._sort.brand) return 1;
+    if (a._sort.product < b._sort.product) return -1;
+    if (a._sort.product > b._sort.product) return 1;
+    return 0;
+  });
+  lines.forEach(function (l) { delete l._sort; });
+
+  const units = lines.reduce(function (n, l) {
+    const q = Number(l.purchase_quantity_display);
+    return n + (Number.isFinite(q) ? q : 0);
+  }, 0);
+
+  return {
+    sort_contract: 'brand_az_then_product_az',
+    // Asserted rather than claimed: this module DID the sort, so the contract is
+    // true by construction here - and the test proves it on data that would
+    // break a naive comparison.
+    sort_applied: true,
+    lines: lines,
+    lines_count_display: P.count(lines.length),
+    units_count_display: P.count(units),
+    unbranded_count_display: P.count(lines.filter(function (l) { return !l.has_brand; }).length),
+    exceptions_are_separate: true,
+    exceptions_note: 'Lines nobody has settled are NOT in this list. They are in `exceptions`, and '
+      + 'mixing the two is how an unresolved item ends up in the trolley.'
+  };
+}
+
+const PROVENANCE_PLAIN = Object.freeze({
+  PHOTO: 'read from the photograph of your list',
+  REGULARS: 'added from your Regulars',
+  RULE: 'added by a standing household rule',
+  WARWICK: 'you decided this',
+  SKIPPED: 'deliberately not bought this week'
+});
+
+// =====================================================================
+// AC1 - THIS WEEK'S SHOP, IN ONE PAYLOAD.
+//
+// Every figure here is READ FROM the one frozen arithmetic object. Nothing in
+// this function counts anything (AC6): it is a projection, and the only way to
+// change a number on this block is to change it in shopArithmetic.countShop,
+// which changes it everywhere at once.
+//
+// THE VERDICT READS THE STORED COLUMN. `canonical_state` is
+// asdair.shop.human_state, resolved by shopStatus/humanState and never
+// re-derived from row counts here. That single stored value is the entire point
+// of migration 020, and a recomputation on this block would put a second
+// opinion about the shop's state one line away from the first.
+// =====================================================================
+/**
+ * AC6 - THE INVARIANT, PUBLISHED RATHER THAN ASSUMED.
+ *
+ * Every count that appears in more than one block of this payload is a
+ * projection of the ONE frozen arithmetic object, so those cannot drift by
+ * construction. This block covers the case that construction cannot reach: a
+ * number that comes from a genuinely DIFFERENT source and merely ought to
+ * agree - shopStatus's own rollup of the durable projection.
+ *
+ * WHERE THEY DISAGREE, THE PAYLOAD SAYS SO. It does not pick a winner and it
+ * does not average them. A silent choice between two numbers is how a reader
+ * ends up confidently wrong; a loud disagreement is something someone can fix.
+ */
+function buildCountAgreement(facts, status) {
+  const rollupTotal = status && status.lines && status.lines.total !== null
+    && status.lines.total !== undefined ? Number(status.lines.total) : null;
+  const comparable = rollupTotal !== null && Number.isFinite(rollupTotal);
+  const agrees = comparable ? rollupTotal === facts.lines_total : null;
+
+  return {
+    // The number every "needs you" in this payload projects. Named once so a
+    // consumer can assert against it rather than against a block it happened
+    // to read first.
+    canonical_needing_you_display: P.count(facts.decisions_needing_warwick),
+    canonical_held_lines_display: P.count(facts.uncertain_lines),
+    published_by: [
+      'shop.why.counts.decisions_needing_warwick',
+      'this_week.blocking_decisions_display',
+      'questions.needing_you_count_display'
+    ],
+    // NOT comparable is its own answer. `null` here means the projection had
+    // nothing to say about lines, which is not the same as agreement.
+    line_rollup_comparable: comparable,
+    line_rollup_total_display: P.count(rollupTotal),
+    line_rows_total_display: P.count(facts.lines_total),
+    line_counts_agree: agrees,
+    disagreement: agrees === false
+      ? 'shopStatus reports ' + rollupTotal + ' line(s) for this shop while ' + facts.lines_total
+        + ' asdair.shop_line row(s) were read. One of the two is stale; neither has been preferred here.'
+      : null
+  };
+}
+
+function buildThisWeek(facts, status) {
+  const prov = facts.provenance_counts;
+  const drift = detectStateDrift(status);
+  return {
+    // ── THE VERDICT ────────────────────────────────────────────────────────
+    verdict: facts.human_state,
+    verdict_display: P.text(facts.human_state),
+    verdict_source_display: P.text(status.human_state_source || 'derived'),
+    verdict_is_stored_value: (status.human_state_source || 'derived') === 'column',
+    verdict_note: 'Read from asdair.shop.human_state. This service never re-derives the working/'
+      + 'needs-you verdict from row counts.',
+
+    // ── THE STANDING HAZARD, SURFACED RATHER THAN PAPERED OVER ────────────
+    // Migration 020 installs NO trigger on human_state, so any writer that
+    // updates `status` without updating `human_state` in the same transaction
+    // leaves the two disagreeing - and this service would otherwise display the
+    // stale one with complete confidence. `verdict` above is STILL the stored
+    // value; this block only says whether the shop's own status agrees with it.
+    // Reported, never resolved by preferring a field. The fix is at the write
+    // side and is a schema decision, not this reader's to make.
+    verdict_agrees_with_status: drift.agrees,
+    verdict_drift_checked: drift.checked,
+    verdict_expected_from_status_display: P.text(drift.expected_from_status),
+    verdict_contradiction: drift.contradiction,
+
+    // ── THE SHAPE OF THE SHOP ──────────────────────────────────────────────
+    source_lines_display: P.count(facts.source_lines),
+    final_products_display: P.count(facts.final_products),
+    total_items_display: P.count(facts.final_items),
+    reconciled_products_display: P.count(facts.reconciled_products),
+
+    // ── WHERE IT CAME FROM. Four origins, never collapsed into one total. ──
+    by_provenance: {
+      photo_display: P.count(prov ? prov.PHOTO : null),
+      regulars_display: P.count(prov ? prov.REGULARS : null),
+      rule_display: P.count(prov ? prov.RULE : null),
+      warwick_display: P.count(prov ? prov.WARWICK : null),
+      unattributed_display: P.count(facts.provenance_unattributed)
+    },
+    skipped_display: P.count(prov ? prov.SKIPPED : null),
+
+    // ── WHAT IS NOT SETTLED. Two different populations, kept apart. ────────
+    // `uncertain` is lines the planner could not settle. `blocking` is open
+    // questions genuinely waiting on Warwick, stale referrals already removed.
+    // A held line may carry no question yet, and a question may sit on a line
+    // that has since been settled, so one number could never carry both.
+    uncertain_lines_display: P.count(facts.uncertain_lines),
+    blocking_decisions_display: P.count(facts.decisions_needing_warwick),
+    stale_suppressed_display: P.count(facts.stale_questions_suppressed),
+
+    arithmetic_source: 'cockpit-api/shopArithmetic.js countShop()'
   };
 }
 
@@ -706,19 +1234,55 @@ function assembleWorkspace(input) {
     decisions: arr(src.decisions),
     source_images: arr(src.source_images),
     status: status,
+    // WP-B15-41 AC9. The reader's PROBED answer, never this module's guess.
+    provenance_ledger_available: src.provenance_ledger_available,
   });
-  // Computed ONCE, before the payload is built, so every consumer of this
-  // workspace sees the same numbers and the same sentence (AC3).
-  const explain = explainState({
+
+  // ── AC6: THE ONE DERIVATION, AND EVERYTHING BELOW IS A PROJECTION OF IT ──
+  //
+  // Derived exactly once, here, before any block is built. `why.counts`,
+  // `this_week`, `questions`' counts and `lines_summary` all READ this object;
+  // none of them counts anything for itself. That is what makes "two endpoints
+  // can never report different counts of what needs Warwick" a property of the
+  // shape rather than a thing four functions currently happen to agree on.
+  const facts = countShop({
     stage: status.stage,
     human_state: computeCanonicalState(status),
     questions: arr(src.questions),
-    lines: arr(src.lines),
+    // ⚠️ THE REAL KEY, AND IT WAS WRONG. readWorkspace.js supplies the
+    // asdair.shop_line rows as `shop_lines`; this call read `src.lines`, which
+    // that reader never sets. So every line-derived count in `why.counts` has
+    // been 0 on every real request while `provenance.source_lines` reported the
+    // true figure from the same rows - two blocks of ONE payload disagreeing
+    // about the same fact, which is precisely what AC6 exists to end. Every
+    // fixture passed because the fixtures set `lines` directly.
+    //
+    // Same defect class, and the same fix, as the `list_items` / `items` line
+    // below - which carries a comment saying so, one argument away.
+    lines: arr(src.shop_lines).length > 0 ? arr(src.shop_lines) : arr(src.lines),
     // THE REAL KEY THIS READER SUPPLIES. readWorkspace.js passes the list rows
     // as `list_items`; reading `src.items` would have silently explained an
     // empty list on every real request while every fixture passed.
     items: arr(src.list_items).length > 0 ? arr(src.list_items) : arr(src.items),
+    provenance: prov,
   });
+
+  // The sentence is built from those same facts - explainState re-derives
+  // nothing when handed them, so the prose and the counters remain one
+  // computation returned twice.
+  const explain = explainState({ facts: facts });
+
+  const listItemsForView = arr(src.list_items).length > 0 ? arr(src.list_items) : arr(src.items);
+  const exceptionsInput = {
+    list_items: listItemsForView,
+    questions: arr(src.questions),
+    alternatives: arr(src.alternatives),
+  };
+  const finalListInput = {
+    list_items: listItemsForView,
+    item_origins: prov.item_origins,
+  };
+
   return {
     ok: true,
     generated_from: 'durable state only',
@@ -771,6 +1335,25 @@ function assembleWorkspace(input) {
         resumable: !!status.failure.resumable,
         resume_to_display: P.text(status.failure.resume_to)
       } : null,
+      // ── AC6, AND THE CORRECTION THAT MADE IT HONEST ─────────────────────
+      //
+      // This block reads shopStatus's OWN rollup, and it keeps doing so. An
+      // earlier pass of this Work Order projected it from the frozen facts
+      // instead, on the reasoning that two derivations over the same rows is
+      // exactly what AC6 forbids. That was wrong, and the existing proof
+      // "null durable facts render as unknown and never as 0" caught it
+      // immediately: `status.lines` is NULL when the projection has nothing to
+      // say, while a count over an absent array is 0 - so the change quietly
+      // turned "we do not know" into "there are none", which is the single
+      // rule this whole service is built on.
+      //
+      // The two are also not the same question. `status.lines` is shopStatus's
+      // rollup of the durable projection; `facts.lines_*` counts the shop_line
+      // rows this reader was handed. They SHOULD agree, and where they do not
+      // that is a real signal - so they are reconciled explicitly in
+      // `count_agreement` below rather than one being silently overwritten by
+      // the other. Forcing two different questions to return one number is not
+      // single-sourcing; it is hiding a disagreement.
       lines_summary: {
         total_display: P.count(status.lines ? status.lines.total : null),
         resolved_display: P.count(status.lines ? status.lines.resolved : null),
@@ -835,11 +1418,29 @@ function assembleWorkspace(input) {
       // mechanism, so a gap on screen can be acted on rather than merely
       // noticed. Empty means every bucket above is evidenced.
       gaps: prov.gaps,
+
+      // WP-B15-41 AC9. true / false / null-for-nobody-asked. Lets a reader tell
+      // "the ledger is empty" from "the ledger is absent" from "not probed" -
+      // three situations this service previously collapsed into one false claim
+      // that migration 020 was unapplied.
+      ledger_available: prov.provenance_ledger_available,
     },
+
+    // ── AC1: THIS WEEK'S SHOP, ONE PAYLOAD ─────────────────────────────────
+    this_week: buildThisWeek(facts, status),
+
+    // ── AC6: THE SINGLE-SOURCE INVARIANT, VISIBLE IN THE PAYLOAD ───────────
+    count_agreement: buildCountAgreement(facts, status),
+
+    // ── AC2: THE EXCEPTION BOARD, SERVED AS DATA ───────────────────────────
+    exceptions: buildExceptions(exceptionsInput, cat),
+
+    // ── AC5: THE FINAL LIST, BRAND-SORTED ──────────────────────────────────
+    final_list: buildFinalList(finalListInput, cat),
 
     interpretation: buildInterpretation({ shop: shop, list_items: src.list_items, alternatives: src.alternatives, questions: src.questions, item_origins: prov.item_origins }, cat),
     plan: buildPlan(src, cat),
-    questions: buildQuestions(src, cat),
+    questions: buildQuestions(src, cat, facts),
     browser: buildBrowser(status),
     order: buildOrder({ confirmation: src.confirmation, confirmation_lines: src.confirmation_lines, status: status }, cat),
     history: buildHistory(src, cat),
@@ -870,6 +1471,14 @@ module.exports = {
     resolutionSentence: resolutionSentence,
     buildBrowser: buildBrowser,
     buildOrder: buildOrder,
-    buildHistory: buildHistory
+    buildHistory: buildHistory,
+    buildExceptions: buildExceptions,
+    buildFinalList: buildFinalList,
+    buildThisWeek: buildThisWeek,
+    buildCountAgreement: buildCountAgreement,
+    corroborationFor: corroborationFor,
+    durableLearningFor: durableLearningFor,
+    PROVENANCE_PLAIN: PROVENANCE_PLAIN,
+    CORROBORATION_CLASSES: CORROBORATION_CLASSES
   }
 };

@@ -17,10 +17,25 @@
 // ── THE HONEST GAP, WHICH IS THE WHOLE DESIGN PROBLEM HERE ──────────────────
 //
 // `asdair.shop_line_provenance` is the table that would answer this question
-// exactly. Verified read-only against the live database on 2026-08-13: IT DOES
-// NOT EXIST - migration 020 is committed to this repository and has not been
-// applied. So three of the five buckets are derivable from durable data that
-// does exist, and two are not:
+// exactly.
+//
+// ⚠️ CORRECTED 2026-08-13 (WP-B15-41 AC9). This header previously stated, as a
+// standing fact, that migration 020 "has not been applied". That was true when
+// it was written and became false the same day: 020 was applied and verified.
+// A dated observation had been left phrased as a permanent property of the
+// world, which is the exact failure mode this file's own "unknown is not zero"
+// rule exists to prevent - stated about a schema instead of about a count.
+//
+// So this module no longer ASSERTS anything about which migrations are applied.
+// It cannot: it is pure, it has never held a database handle, and a claim about
+// a schema is not derivable from the rows it is handed. The caller PROBES (see
+// readWorkspace.js's `probeProvenanceLedger`) and passes the answer in as
+// `provenance_ledger_available`; the gap text below is written from that
+// answer, and says "not known" when nobody probed. A module that cannot see a
+// thing must not describe its state.
+//
+// Three of the five buckets are derivable from durable data that exists today,
+// and two are not:
 //
 //   PHOTO    EXACT.   asdair.shop_line rows joined to the list by list_item_id.
 //                     Live check: shop 26 has 39 lines, 39 of them linked.
@@ -116,12 +131,21 @@ function attributeItems(input) {
  * @param {Array}  input.decisions     asdair.shop_decision rows
  * @param {Array}  input.source_images asdair.shop_source_image rows
  * @param {object} input.status        the shopStatus projection
+ * @param {boolean|null} [input.provenance_ledger_available]
+ *        WP-B15-41 AC9. The CALLER'S PROBED answer to "does
+ *        asdair.shop_line_provenance exist on this database" - true, false, or
+ *        `null`/absent for "nobody asked". This module never infers it: it is
+ *        pure, holds no database handle, and cannot see a schema. Absent is
+ *        reported as unknown, NOT as either convenient branch.
  */
 function computeProvenance(input) {
   const i = input && typeof input === 'object' ? input : {};
   const items = arr(i.list_items);
   const lines = arr(i.shop_lines);
   const status = i.status && typeof i.status === 'object' ? i.status : {};
+  const ledgerAvailable = i.provenance_ledger_available === true ? true
+    : i.provenance_ledger_available === false ? false
+      : null;
 
   const attributed = attributeItems(i);
 
@@ -168,9 +192,20 @@ function computeProvenance(input) {
       'The run records one only once it has planned the basket.');
   }
   if (counts.RULE === null) {
+    // ⚠️ WP-B15-41 AC9. THIS STRING REACHES THE PAYLOAD, so it is the one that
+    // actually mattered: correcting only the file header would have left the
+    // false claim in what Warwick reads. The ledger's presence is now the
+    // CALLER'S PROBED ANSWER, never this module's assertion - and where nobody
+    // probed, it says so rather than picking the reassuring branch.
     gaps.push('RULE: nothing durable records that a household rule put an item on this list. ' +
-      'asdair.shop_line_provenance (migration 020) is the ledger that would, and it is not applied ' +
-      'to this database yet.');
+      'asdair.shop_line_provenance (migration 020) is the ledger that would, and ' +
+      (ledgerAvailable === true
+        ? 'it exists on this database but holds no row for this shop - migration 020 deliberately ' +
+          'does not backfill, and the pipeline that writes it has not run for this shop yet.'
+        : ledgerAvailable === false
+          ? 'it is not present on this database - migration 020 has not been applied here.'
+          : 'whether it is present on this database was not established, so this is reported as ' +
+            'unknown rather than guessed in either direction.'));
   }
   if (unattributed > 0) {
     gaps.push('UNATTRIBUTED: ' + unattributed + ' item(s) on the list are spoken for by no durable ' +
@@ -217,6 +252,10 @@ function computeProvenance(input) {
     final_products: finalProducts,
     final_items: finalItems,
     summary: summary,
+    // WP-B15-41 AC9. The probed answer, carried through to the payload so a
+    // reader can tell "the ledger is empty" from "the ledger is not there" from
+    // "nobody looked" - three different situations with three different fixes.
+    provenance_ledger_available: ledgerAvailable,
     // The per-item map, so the line view can label each row without a second
     // pass over the same evidence (AC7).
     item_origins: attributed,
