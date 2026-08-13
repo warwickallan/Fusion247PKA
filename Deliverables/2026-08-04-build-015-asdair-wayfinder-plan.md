@@ -2386,6 +2386,51 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### ✅ VERA GATE — **PASS** on Lane D at `111c8cd`. Both conditions genuinely closed, **verified on the rendered screen.**
+
+**V-1 CLOSED, and Felix's harder fix survives contact with a browser.** At 375px the headline renders in
+full: *"2 things still need you. 1 question to answer, and 1 line AsdAIr held back without asking about it."*
+`AGREES: true` at every breakpoint in both schemes; headline-to-tally spans **125px**, so both figures sit in
+one viewport — which is the whole point of the board. **His claim that "naming a discrepancy is a fix; hiding
+it is a relocation" holds on the screen, not merely in argument.**
+
+**⭐ SHE PROVED HER PROBE DISCRIMINATES BEFORE TRUSTING IT.** Run against `111c8cd^` it reproduces the
+original defect exactly — *"1 decision still needs you."* over a tally of `2`, `WITH_VISIBLE_MARKER: 0`.
+**"A probe that has never seen the bug is not evidence."** Three mutations in an isolated copy, the decisive
+one pinning **agreement with the tally rather than a literal string**.
+
+**And a measurement correction worth keeping:** she used CDP `Emulation.setDeviceMetricsOverride`, **not
+`--window-size`, which Edge clamps to ~492px — so any 375px claim made that way is a width that was never
+rendered.** She hit the clamp herself first. *The "49px vs 24px" apparent conflict was two datums of the same
+gap, not a disagreement.*
+
+**V-4 — she verified that she was wrong and Felix was right, head-to-head against the identical live leak.**
+Her recommended whole-node rule **PASSED while the leak was invisible**; his word-match **FAILED and named
+the node**. And she reproduced his escape hazard on herself: her first probe's detectors were collapsed by a
+text-processing layer into a regex matching everything and one matching nothing — **both "all broken"**. She
+rebuilt them with **zero literal backslashes**, self-tested 12/12 on the exact bytes the browser executes,
+and only then trusted a number. *The structural lesson she draws is the right one: stop putting detectors
+through a text-processing layer at all.*
+
+**🟡 NEW — V-7 (MEDIUM), for Felix's next pass, NOT a re-gate.** `app.js:1301-1303`: the V-1 fix's own
+**zero-branch reintroduces the V-1 contradiction** — reproduced on screen with headline *"1 decision still
+needs you."* over a tally of `0`, `AGREES: false`. The comment above it claims the fallback sentences carry
+no number that can disagree, **which is false for the `NEEDS_WARWICK` branch**. *Same over-broad-assertion
+class Felix correctly fixed 600 lines earlier in the same commit — naming a failure mode does not inoculate
+you against it.* **Not blocking today; a live contradiction the day the backend sentence field ships.**
+
+**Two honesty notes she volunteered:** the V-2 assertion is a **loose bound** (`>= 4` counted globally, so
+four chevs from elsewhere would satisfy it) · V-4's template guard is **uncovered** — she confirmed by
+reverting only that guard and still getting PASS.
+
+**Gates she ran herself, sequentially:** render-vm **48/140/0** · self-test **11/11** · rotation-report
+**124/0** · nav-check **43/0** · sw-version **12/0** · clone-portability **23/0, 5 mutations caught** ·
+secret-scan **exit 0 over 1,318 tracked files** — broader than the 43-file figure previously reported.
+
+**⚠️ Operational, and Larry's:** the `rotation-report.mjs` fix is **server-side and needs a Cockpit restart**
+before the System pane stops printing `undefined/undefined` live. **It is on `build-015/b15-26-cockpit-ui`,
+not on `main`, and the live Cockpit serves from the repo — so the restart is owed at integration, not now.**
+
 ### ✅ LANE G COMPLETE — **`2cc5ac1`.** The Veritas HOLD's cause is fixed. **The HOLD lifting is Veritas's call, not Larry's.**
 
 **A production caller now exists on the journey where before there was none.** `runPipeline.planWithDecisions`
