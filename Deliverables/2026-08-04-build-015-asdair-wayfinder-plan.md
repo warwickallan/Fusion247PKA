@@ -2440,6 +2440,65 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### 🔄 MUM'S COCKPIT — Vera's conditions addressed at **`18b0f98`**. **Back with Vera. TWO NARROWINGS are hers to reject.**
+
+**HIGH-1's mechanism was NOT only the footer, and that is the useful part.** Dropping the footer to normal
+flow below 720px height (or 520px width) was necessary but insufficient: at 640×400 **the row itself was
+260px, not 120px**, because below 860px wide the quantity cluster wraps to its own line — **140px of extra
+height per row, free at 1280px tall and ruinous at 400px.** A second tier at 480px unwraps it. *Both rules
+are "give up the scarcer axis."* The tick then still landed at **y=403 in a 400px viewport — three pixels
+below the fold** — so ~20px of chrome was reclaimed by **tighter leading, not smaller text; the 22px floor
+stands.** He left ~15px of slack deliberately: *"the last two defects here were both knife-edge arithmetic
+that was right for the case I had in mind and wrong for the one I had not measured."*
+
+**MEDIUM-1 took three attempts, each caught by the gate, and the finding generalises:** `pointer-events:none`
+on `.q-num` moved the hit to `.q` and still bubbled · on `.q` it fell **through** to the row underneath ·
+only `@click.stop` killed it. **"`pointer-events: none` makes a region transparent. Transparent is not dead
+when the thing behind it is the target."** The false justification in the stylesheet is rewritten to record
+what was wrong, rather than deleted.
+
+**⭐ THREE OF HIS OWN ASSERTIONS WERE MEASURING THE WRONG THING.** `coveredAtRest` took document order (Vera
+found it) · **the dead-space check used `hit.closest(...)`, which walks the DOM and finds the row whether or
+not a tap can REACH it — so it stayed RED after the defect was genuinely fixed**, and now dispatches a real
+click and records whether a listener fires · **token parity was a comment**, now asserted, with a guard that
+**fails loudly if the parser finds zero, because a check that compares nothing passes everything.**
+
+**Two harness traps now controlled, both previously self-inflicted:** a **backtick inside `MEASURE`** — which
+bit three times here after costing two rounds in WP-B15-42 — now refuses to run · **a missing IIFE silently
+took the geometry self-test from 7/7 to 0/7**: `Runtime.evaluate` runs at the top level of a persistent
+context, so a bare `const` survives and the second call throws **in the page**, making **every mutation read
+as MISSED while the control stayed clean.** `exceptionDetails` is now checked.
+
+| Gate | Result |
+|---|---|
+| `render-vm-check` | **58 scenarios / 183 assertions / 0 failed** |
+| `--self-test` | **18/18** caught, control clean |
+| `shopping-geometry-check` | **10 viewports, real browser, 0 violations** |
+| `--self-test` | **9/9** caught, control clean |
+| token parity | **13 shared GL-003 tokens byte-identical** |
+| secret-scan | exit 0, 48 files |
+
+**MEDIUM-5 shipped as a 46-row fixture** (5 sections, 9 with no household word, so the retailer fallback is
+exercised in bulk). **His observation is the diagnosis of HIGH-1: at n=3 the page barely scrolls, so a sticky
+footer costs almost nothing — "that is part of why HIGH-1 hid."**
+
+**⚠️ TWO NARROWINGS, FLAGGED RATHER THAN MADE QUIETLY — Vera's to accept or reject:** `coveredAtRest` is now
+**reported, not failed**, because once its scope was fixed it fired nearly everywhere — *"overlapping content
+further down the page is what a sticky footer is"*, and failing it would mean never using one, which B §6.7
+requires · the landing assertion tests **the tick being on screen and hit-testable** rather than the whole
+row box, because at 200% zoom the strict reading would mean deleting required copy to buy pixels — **the
+strict figure is reported beside it at every viewport.**
+
+**LOW-1 stated rather than implied:** `vue.global.prod.js` **is** in the operator worker's SHELL, so his
+argument against sharing `styles.css` applies to it too. Accepted for a genuinely different reason — a
+pinned third-party build changes only on deliberate upgrade — but **the honest claim is "decoupled from
+operator styling and markup", not "from every shared byte." If Vue is upgraded, this surface must be
+re-measured.**
+
+**Session log written** (surface released by Larry; the order should not have forbidden it). Its central
+point, which this package earned four times over: **a stated property needs an executable assertion, and the
+assertion must measure BEHAVIOUR rather than DECLARATION.**
+
 ### ✅ MUM'S COCKPIT EXISTS — **`f4dd69f`** on `build-015/b15-45-mum-cockpit-view`. **With Vera. ONE integration step is Larry's.**
 
 **⚠️ THE ROUTE WARWICK ASKED FOR, and the honest caveat:**
