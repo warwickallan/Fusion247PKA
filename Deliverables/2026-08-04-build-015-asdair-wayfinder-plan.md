@@ -2386,6 +2386,45 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### 🔴 LIVE PRODUCTION STATE — established by query, and it settles the Veritas argument empirically
+
+**`asdair.shop_line_provenance` in the LIVE database contains ZERO ROWS.** The tables exist — Larry applied
+020 today — and **nothing has ever written to them in production.** That is not an inference from reading
+`deps.js`; it is the row count. **Veritas's F1 was right on the evidence as well as on the contract.**
+
+| Live shop | Status | Lines | Source image | Note |
+|---|---|---|---|---|
+| **26** | `WAITING_FOR_BROWSER` | **39** | 1 | **The known 39-line photograph, in production.** `needs_review=true` |
+| 28 | `RECEIVED` | 0 | 0 | Arrived **2026-08-11 17:47** and carries neither lines nor a source image |
+| 7 | `READY_TO_SHOP` | 3 | 1 | `needs_review=true` |
+
+**Shop 26 is the demonstration target for Warwick's clauses 5 and 7** — the real photograph, already in the
+production database, with its 39 lines. It has never had provenance written against it because nothing
+writes provenance.
+
+**Shop 28 is an observation, not yet a diagnosis:** a shop in `RECEIVED` with no lines and no source image.
+Whether that is a stalled ingestion, an empty message, or a normal transient state **has not been
+established and is not being asserted.**
+
+### 📍 THE REAL PRODUCTION INGESTION PATH — named, so the demonstration targets the right thing
+
+`services/asdair/pipeline/runtime.js` is **THE LOOP**: *"Poll intake once, advance every shop that has work,
+send whatever is waiting in the outbox, exit cleanly"* — `node --env-file=<env> runtime.js --once`. It is
+explicitly *"a DETERMINISTIC WORKER, NOT AN LLM DAEMON"*, and the **only** model call in the whole system is
+the single grounded vision request.
+
+**⚠️ `services/asdair/interpret/interpret-list.js` is NOT the production path and says so in its own header:**
+*"The live shop interprets through services/asdair/pipeline (`realInterpretPhoto` in `pipeline/deps.js`).
+This file is a second entry point kept for diagnosis. A green result HERE is evidence about THIS process and
+nothing else."* It also records why `--dry-run` was removed: on 2026-08-03 a clean exit behind a
+success-shaped body was read as proof while the gateway served no usable vision alias, **and a broken
+interpretation path reached a live household shop.**
+
+**Sequencing, and it is serial on purpose:** the end-to-end run waits for **Lane G**. Running the production
+loop before the provenance wiring lands would produce another shop with no provenance — the exact gap being
+closed. *Larry holds live authority here; the workers hold neither the network nor the private-surface grant,
+which is why this half is Larry's and not delegable.*
+
 ### ⚠️ TWO THINGS RECORDED BECAUSE THEY ARE NOT LARRY'S TO FIX
 
 **1. Felix's contract has NO integration-role section.** The envelope generator flagged
