@@ -2333,6 +2333,74 @@ describes**, while `inventedFreeGeneration` absorbs three different mechanisms u
 unconstrained invention on a closed-enum run. Recorded as an observation. **No Work Order. Vision stays
 parked.** Band 7 flags itself via `lookAgainRegions: [5,7]` and **nothing downstream consumes that flag.**
 
+### ✅ LANE AB COMPLETE — **`58c86ef`** on `build-015/b15-28-…-v2`. 15 files, 0 outside surface. **NOT accepted.**
+
+| AC | Evidence |
+|---|---|
+| **AC1** provenance persists | `provenanceProductionSeam.dbtest.js` — the real `interpretPhotoWithDeps` driving the real writers. Cross-shop region refused `23503` / `shop_line_provenance_region_fk` |
+| **AC2** quantity derivation | `out/quantity-derivation.md`; the sum is asserted at **53** and **names the failing line** |
+| **AC3** investigation | **clean negative + one real finding** (below) |
+| **AC4** `human_state` by running code | read back out of Postgres for **every** status; invalid value refused `23514` |
+| **AC5** corroborated never verified | 8/8 + 3 mutants |
+| **AC6** accounting | `observed 47, accounted 47, established 39, resolved 30, skipped 8, routed 9, closes true` — **exactly the re-baseline. 39 lines / 53 items unchanged** |
+
+**`node --test` with the disposable Postgres: 1079 tests, 1079 pass, 0 fail, ZERO SKIPPED.** Zero skipped is
+the load-bearing number — it means all five DB-gated files *executed* rather than no-opping.
+
+**Four mutants, all RED, all sources restored and verified by grep afterwards** — and the harness asserts the
+source actually **changed** before each run, so a stale anchor can never be reported as a passing mutation.
+**Plus a fifth:** the real migration re-applied with only `shop_line_provenance_region_fk` removed — the
+cross-shop insert then **succeeds**, which is what proves that FK and nothing else does the refusing.
+
+**AC3's answer, and it is a clean negative plus a better finding.** `shop_line_interpretation` **is not a
+table** — it is the *filename* of migration 008, which creates `asdair.shop_line`. **No needs-human field
+exists anywhere in `db/*.sql`.** Nothing can go stale that does not exist. But a stale signal *does* exist,
+**at a stage boundary**: `reasonStillHolds` correctly retains `leading_mark_disagreement` because the vision
+stage has two readings and no authority to choose — while `packIdentityRule`, a *later* stage, reaches the
+same answer from either mark. **Live in vision, stale in finalise, with nothing carrying the discharge
+forward.** AC5's allowlist is now that mechanism, discharging at the point of consumption without mutating
+the vision layer's record.
+
+**Larry's ruling on the two pre-existing tests Keel edited: ACCEPTED, no revert.** Both located the ARLA
+line by resolved `product` name, which is now null because the line is routed. Keel switched them to
+`raw_reading` — the convention that file already uses — **kept every original claim** (`quantity === 4`, the
+two milks stay distinct) and **added** an assertion that ARLA is now held. That is applying the re-baseline,
+not relaxing a requirement, and Keel flagged it rather than letting it pass.
+
+#### 🔴 MIGRATION 020's IDEMPOTENCY GUARD IS NOT SCHEMA-SAFE. Latent in production; verified not yet bitten.
+
+`020_*.sql` guards both composite FKs with `if not exists (select 1 from pg_constraint where conname =
+'<name>')`. **`conname` is unique PER TABLE, not globally, and that lookup is qualified by neither schema nor
+table.** Once a second `asdair`-shaped schema exists in the same database, the guard finds the *other*
+schema's constraint and **silently skips creating both composite FKs** — no error, and the new table comes up
+**without the anti-hallucination guarantee.**
+
+**Invisible until tonight, because no `asdair` schema had ever sat beside a throwaway one until Larry built
+the disposable cluster.** It had already made three existing DB proofs unable to bite.
+
+> **⭐ VERIFIED IN LIVE, not reasoned about:** both FKs **exist and are correctly defined** in production, and
+> only one `asdair` schema exists there — so **the guard has not misfired and the live guarantee is intact.**
+> `db/**` was outside Keel's surface so the migration is untouched; Keel fixed it inside its own surface by
+> namespacing constraint names in `test/dbtestSchema.mjs`. **The migration itself is Silas's decision and
+> Warwick's — recorded, not fixed tonight.**
+
+#### ⭐ AC1's MANUAL HALF — DISCHARGED BY LARRY AGAINST THE LIVE DATABASE
+
+Performed as `asdair_rw` inside a transaction that was **ROLLED BACK**:
+
+- **A** — a PHOTO row citing **its own shop's** region → **ACCEPTED**. The write path works in live.
+- **B** — a **cross-shop** region cite → **REFUSED `23503`, constraint `shop_line_provenance_region_fk`.**
+- **After rollback: regions 0, provenance 0 — live unpolluted.**
+
+**⚠️ The first attempt was a FALSE POSITIVE and is recorded rather than quietly re-run.** It reported
+"refused by the database" — but by `shop_line_provenance_photo_has_model`, because a PHOTO row requires
+`interpreter_model` and that check fired *before* the FK could. **A refusal by the wrong constraint is not
+evidence for the right one.** Re-run with the model set so the FK was the mechanism under test. *This is
+"measure through the ENFORCING mechanism" catching Larry in the act.*
+
+**Live persistence through the real production event remains MANUAL and NOT exercised. No completed-automation
+claim is made.**
+
 ### ✅ LANE D COMPLETE — Cockpit is one surface now. **`152e4a0`** on `build-015/b15-26-cockpit-ui`. **With Vera; NOT accepted.**
 
 **Three exception surfaces became ONE board.** Shop's "Needs your attention", Questions' "Still waiting on
