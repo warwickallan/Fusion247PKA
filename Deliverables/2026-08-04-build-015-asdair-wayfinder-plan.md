@@ -2282,7 +2282,55 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
-## ⟦ACTIVE FRONTIER⟧ 2026-08-13 (later session) — **THE WRITE / ACTION PATH IS IN BUILD.** Warwick: *"carry on lets bloody finish this"*. **START HERE.**
+## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-13 (CURRENT) — **WARWICK SAW MUM'S COCKPIT ON THE FIRE AND ACCEPTED IT. Four feature requests. START HERE.**
+
+> **Warwick, 2026-08-13, verbatim — the first acceptance of AsdAIr in a long time, recorded because the
+> record has carried nothing but defects:** *"let me say for first time in a long time with fucking asdair
+> I am happy and smiling, I can see what you have done for mums cockpit on the fire and its good :-)"*
+>
+> **And immediately, his four feature requests, verbatim:** *"Add something else doesnt work? If anything is
+> added here it needs to sense check against existing regulars to ensure it is genuinely new. Also when she
+> hits "send my shopping list" I think app should then display todays date and confirm, so she cant submit
+> by accident and also we will then get a date for the actual shop. I then need to get a notificantion on
+> shopperbot to say mum has submitted a shopping list, then the rest of the process should be as mine. I
+> will deal with any questions and such through my existing process."*
+
+> **⛔ THIS IS A FEATURE REQUEST, NOT A SCOPE CHANGE — Warwick's own correction, 2026-08-13, verbatim:
+> *"Its not a scope change! Its a feature request!"*** Larry had written it up as a *"material change to
+> agreed scope"*, which is the phrase that invokes the `product-decision` interrupt machinery. **It is
+> ordinary product input on a product Warwick owns, and the correct response is to build it — not to
+> process it.** *Recorded because dressing a feature request in governance language makes Warwick navigate
+> Larry's process instead of Larry doing the work, which is the same failure class as escalating something
+> already decided.*
+
+**One consequence stands regardless of the label:** S2 ("add something else") had been parked as unbuilt,
+and Larry had ruled `note` omitted from the route contract on that basis. **Both are now superseded** —
+Warwick wants the control to work.
+
+### The four features, and what already exists for each — established by execution, not assumed
+
+| # | Requirement | Existing machinery | Genuinely new |
+|---|---|---|---|
+| **1** | *"Add something else"* works, and **sense-checks against existing regulars to ensure it is genuinely new** | ✅ **`services/asdair/interpret/resolveByCatalogue.js`** already classifies a line as `matched` · `possible_duplicate` · `needs_confirmation` · `unmatched_new_item`, and `resolveAll` already marks a repeat of the same regular `possible_duplicate` *"rather than silently ordering it twice"* | **Exposing it at the moment she types** — a read-only check route — plus the S2 input itself |
+| **2** | SEND shows **today's date and a confirm**, so she cannot submit by accident **and the shop gets a date** | ✅ **`receiveList` already takes `listDate` as a first-class input** and derives `shop_ref` from it | The confirm screen, and passing her confirmed date through as `listDate` |
+| **3** | **ShopperBot notification to Warwick when Mum submits** | ✅ **`services/asdair/bot/sendShopperMessage.js`** — sends as `@Fusion247shopperbot`, `SHOPPER_BOT_TOKEN` by name only, hermetic, **never polls** | Firing it from the real submission event |
+| **4** | *"the rest of the process should be as mine"* · *"I will deal with any questions through my existing process"* | ✅ **Already satisfied by design** — `receiveList` is the same channel-neutral seam Telegram uses; Addendum C's whole point | Nothing. **This is the requirement that is met by NOT building something** |
+
+**⛔ THE READ OF REQUIREMENT 4 THAT GOVERNS REQUIREMENT 1: MUM IS NEVER ASKED A QUESTION.** Warwick deals
+with questions through his existing process. So the sense-check is a **friendly nudge** — *"you've already
+got that on your list"* — and **NOT an interrogation.** `needs_confirmation` and `unmatched_new_item` both
+**go through**, and Warwick answers downstream exactly as he does for his own lists. *A check that stops an
+84-year-old to adjudicate a catalogue match would be a defect, not diligence.*
+
+### Route: the write path ships FIRST, then these. Thin working slice, not a bigger bang.
+
+- **WP-B15-48 (Keel) and WP-B15-49 (Felix) continue** — the write path is the foundation all four sit on.
+- **Felix is amended IN FLIGHT** with requirement 2 (confirm screen) and requirement 1's UI half, because
+  the confirm step changes the send flow fundamentally and finding out later would be rework.
+- **WP-B15-50 carries requirement 1's backend (the check route) and requirement 3 (the notification)**, and
+  is dispatched when Keel returns — it builds on the route he is laying now.
+
+## ⟦PRIOR FRONTIER⟧ 2026-08-13 (earlier the same session) — **THE WRITE / ACTION PATH IN BUILD.** Still accurate and still the active build; superseded only as the top of the map by the Work Package above.
 
 ### ⛔⛔ THE ACTIVATION ORDER IS A SAFETY CONSTRAINT, NOT A PREFERENCE. Read before merging anything below.
 
