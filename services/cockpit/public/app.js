@@ -653,8 +653,23 @@ createApp({
     // A BACKEND-SUPPLIED sentence always wins, because the backend WP (AC3) builds one from the same
     // data as its counts. Only when none is supplied does this derive one — and the derivation takes
     // its SHAPE from the canonical state (the same value the status chip renders) and its NUMBERS
-    // from the same fields the on-screen counters read. Neither half is independently computed,
-    // which is what makes the sentence and the counters unable to contradict each other.
+    // from the same fields the on-screen counters read. Neither half is independently computed.
+    //
+    // ⛔ THE EXACT SCOPE OF THAT GUARANTEE — CORRECTED AFTER VERA V-1 (HIGH). THE ORIGINAL WORDING
+    // WAS FALSE. It read "…which is what makes the sentence and the counters unable to contradict
+    // each other", full stop. That holds only for the SHOP SCREEN'S counters, which read the same
+    // `lines_summary` / `questions` fields this derivation reads.
+    //
+    // It does NOT hold across screens. The Exceptions board counts a DIFFERENT POPULATION — open
+    // questions PLUS held lines carrying no routed question — so this sentence and that tally
+    // legitimately produce different numbers from different facts. They shipped 49px apart at 375px:
+    // "1 decision still needs you." above a tally reading "2", on the very board built to stop
+    // Warwick inferring from several counters. The board now derives its own headline from its own
+    // population (`asdairBoardSentence`) and names the difference in words.
+    //
+    // The lesson is the one already recorded against the `execution_packet` branches in this file:
+    // a comment asserting an invariant the code does not have is worse than no comment, because the
+    // next reader trusts it instead of checking. State the scope, or do not claim the guarantee.
     //
     // ⚠️ ASSUMPTION, REPORTED: the backend sentence field name is not yet published. These are the
     // names probed for, in order; if the real one differs it is a ONE-LINE change here.
@@ -1267,6 +1282,38 @@ createApp({
      * the lists read the same partition — the counters cannot say 3 while 4 rows render. */
     const asdairBoardOpen = computed(() => asdairBoard.value.filter((e) => !e.resolved));
     const asdairBoardDone = computed(() => asdairBoard.value.filter((e) => e.resolved));
+    // ---- ⛔ VERA V-1 (HIGH) — THE BOARD'S HEADLINE COMES FROM THE BOARD -------------------------
+    // The Exceptions screen used to lead with `asdairBlockingSentence`, which counts OPEN QUESTIONS.
+    // Its tally counts the BOARD — open questions plus held lines carrying no routed question. Both
+    // numbers were correct about their own population and they rendered 49px apart, which is exactly
+    // the "infer it from several counters" failure this board exists to remove.
+    //
+    // ⛔ AND THE FIX IS NOT SIMPLY "USE THE BIGGER NUMBER". The Shop screen legitimately still says
+    // "1 decision still needs you" — that IS the open-question count, and Larry ruled it stays. So
+    // the two screens can still show different figures, and a person moving between them deserves to
+    // know why. This sentence therefore does the reconciliation ITSELF, in words, on the one screen
+    // where both populations are visible. Naming the difference is the honest fix; hiding it by
+    // matching the numbers would only move the contradiction somewhere Warwick cannot see it.
+    //
+    // With nothing needing him the canonical sentence takes over again, because "Everything is
+    // resolved. Ready to build the ASDA basket." and "Basket build failed." are state-shaped facts a
+    // tally cannot express, and neither carries a number that can disagree with anything.
+    const asdairBoardSentence = computed(() => {
+      const n = asdairBoardCounts.value.needYou;
+      if (!n) return asdairBlockingSentence.value;
+      const q = asdairBoardOpen.value.filter((e) => e.kind === 'question').length;
+      const h = n - q;
+      const lead = n + ' ' + plural(n, 'thing', 'things') + ' still ' + plural(n, 'needs', 'need') + ' you.';
+      if (h > 0 && q > 0) {
+        return lead + ' ' + q + ' ' + plural(q, 'question', 'questions') + ' to answer, and '
+          + h + ' ' + plural(h, 'line', 'lines') + ' AsdAIr held back without asking about '
+          + plural(h, 'it', 'them') + '.';
+      }
+      if (h > 0) {
+        return lead + ' AsdAIr held ' + plural(h, 'this line', 'these lines') + ' back without asking a question.';
+      }
+      return lead;
+    });
     /** AC3 — X NEED YOU / Y RESOLVED / Z STILL BLOCKING, always visible, always from ONE derivation.
      * A count nobody published stays null and renders as "not reported", never as a zero. */
     const asdairBoardCounts = computed(() => {
@@ -1964,7 +2011,7 @@ createApp({
       asdairFinalDoc, asdairListSource, asdairListRows, asdairListResolvedRows, asdairListExceptionRows,
       asdairListGroups, asdairListSortBroken, asdairListTotals, asdairSkippedLines, asdairFinalShop,
       asdairResolvedQuestionKeys, asdairLineSettled, asdairLiveAttentionLines, asdairStaleAttentionCount,
-      asdairBoard, asdairBoardOpen, asdairBoardDone, asdairBoardCounts, asdairHeldByQuestion,
+      asdairBoard, asdairBoardOpen, asdairBoardDone, asdairBoardCounts, asdairBoardSentence, asdairHeldByQuestion,
       asdairRememberCommand, asdairRemember, asdairOfferRemember, asdairDismissRemember, asdairRememberAnswer,
       state, area, detail, busy, loading, loadErr,
       kindOf, catLabel, moduleLabel, oneLine, ago, terse, impactStars, outputTitle, humanValue, humanPoints, spinOf, mdToHtml, notifyMark, build, housekeeping, host, when,
@@ -2270,10 +2317,21 @@ createApp({
                   <template v-for="g in asdairListGroups" :key="g.key">
                     <h3 class="as-sec">{{ g.label }}<span class="g-count">{{ g.rows.length }}</span></h3>
                     <details v-for="r in g.rows" :key="r.key" class="as-line">
+                      <!-- ⛔ VERA V-2 — THE .chev IS THE AFFORDANCE, AND IT WAS MISSING.
+                           This row is a disclosure whose whole job is AC5's provenance-on-expansion,
+                           and it shipped with list-style:none and the webkit marker hidden with
+                           NOTHING in their place: SUMMARY_COUNT=4, WITH_VISIBLE_MARKER=0 at all
+                           three breakpoints. Not a WCAG failure — the focus ring is real and native
+                           details exposes its state to AT — but design-system drift, because this
+                           cockpit already says the affordance glyph is the .chev and six other row
+                           types use it, including elsewhere on this same screen. --ink3 on --panel
+                           is 3.80, which clears the 3:1 ornament floor that governs it (GL-003 §2c
+                           lists .chev among the legitimate --ink3 uses, so this adds no defect). -->
                       <summary class="as-line-sum">
                         <span class="as-line-name">{{ asdairSaid(r.product, asdairSaid(r.raw, 'AsdAIr couldn’t read this line')) }}</span>
                         <span class="as-line-qty" v-if="r.qty !== null">×{{ r.qty }}</span>
                         <span class="as-line-qty as-line-qty-unk" v-else>qty not set</span>
+                        <span class="chev as-line-chev" aria-hidden="true">›</span>
                       </summary>
                       <div class="as-line-body">
                         <div class="as-sub" v-if="r.brand">Brand: {{ r.brand }}</div>
@@ -2916,9 +2974,13 @@ createApp({
                    AsdAIr read · the product it proposes · sensible alternatives · why it is
                    uncertain · and the ways to answer. -->
               <div v-else-if="currentView.key==='questions'" class="asdair-view">
-                <!-- The same one sentence that leads the Shop screen, so the two screens can never
-                     tell Warwick two different stories about the same shop. ONE source, rendered twice. -->
-                <p v-if="asdairBlockingSentence" class="as-answer">{{ asdairBlockingSentence }}</p>
+                <!-- ⛔ VERA V-1 (HIGH). This used to render asdairBlockingSentence, which counts
+                     OPEN QUESTIONS, directly above a tally counting the BOARD — measured 49px apart
+                     at 375px reading "1 decision still needs you." and "2". asdairBoardSentence
+                     derives from the SAME population the tally does, so the two cannot disagree, and
+                     it names in words why this screen's figure can differ from the Shop screen's.
+                     (No backticks in this template — it is a JS template literal.) -->
+                <p v-if="asdairBoardSentence" class="as-answer">{{ asdairBoardSentence }}</p>
                 <p v-if="asdairFlash" class="as-flash" role="status" aria-live="polite">{{ asdairFlash }}</p>
 
                 <!-- AC2 — the durable-knowledge offer, raised only by an answer that actually
@@ -3475,7 +3537,16 @@ createApp({
           <div v-if="rrRequested && !rrErr && rrOverview" class="cap-exec">
             <div class="cap-counts">
               <span class="rr-chip t-neutral">{{ rrOverview.sessions }} session{{ rrOverview.sessions === 1 ? '' : 's' }}</span>
-              <span v-if="rrOverview.woFirstPass" class="rr-chip" :class="rrOverview.woFirstPass.success === 0 && rrOverview.woFirstPass.total > 0 ? 't-urgent' : 't-quiet'">WO first pass {{ rrOverview.woFirstPass.success }}/{{ rrOverview.woFirstPass.total }}</span>
+              <!-- ⛔ VERA V-4 — THE LEAK, FIXED. This rendered the literal "undefined/undefined" in
+                   the SYSTEM (every field and container null) case, live since 2026-08-08.
+                   rotation-report.mjs builds woFirstPass whenever woTotal is not strictly null, so
+                   the OBJECT can exist while both figures inside it are undefined — and v-if on the
+                   object alone cannot see that. Guarded with rrHas, the same idiom every other row
+                   in this pane already uses, so an unmeasured pair says "not established" rather
+                   than printing JavaScript at Warwick. A raw undefined on screen is the same class
+                   as the word unknown reaching a product name: an absence dressed as a value. -->
+              <span v-if="rrOverview.woFirstPass && rrHas(rrOverview.woFirstPass.success) && rrHas(rrOverview.woFirstPass.total)" class="rr-chip" :class="rrOverview.woFirstPass.success === 0 && rrOverview.woFirstPass.total > 0 ? 't-urgent' : 't-quiet'">WO first pass {{ rrOverview.woFirstPass.success }}/{{ rrOverview.woFirstPass.total }}</span>
+              <span v-else-if="rrOverview.woFirstPass" class="rr-chip t-quiet">WO first pass not established</span>
               <span v-if="rrOverview.amendments !== null" class="rr-chip t-quiet">{{ rrOverview.amendments }} amendment{{ rrOverview.amendments === 1 ? '' : 's' }}</span>
               <span v-if="rrOverview.refusals !== null" class="rr-chip t-quiet">{{ rrOverview.refusals }} refusal{{ rrOverview.refusals === 1 ? '' : 's' }}</span>
               <span v-if="rrOverview.failuresTotal" class="rr-chip t-urgent">🔴 {{ rrOverview.failuresTotal }} prevention failure{{ rrOverview.failuresTotal === 1 ? '' : 's' }}</span>

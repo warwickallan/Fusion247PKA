@@ -403,6 +403,23 @@ const BANNED_VOCABULARY = Object.freeze([
   { rule: 'says VERIFIED where only CORROBORATION exists', re: /\bverif(y|ied|ication|ies)\b/i,
     allow: (s) => SANCTIONED_CAVEAT !== null && s.trim() === SANCTIONED_CAVEAT },
   { rule: 'leaks the API word "unknown" as a value', re: /^unknown$/i, whole: true },
+  // VERA V-4. `unknown` is the API saying it does not hold a fact; `undefined`, `NaN` and
+  // `[object Object]` are JAVASCRIPT leaking through a template — a missing binding, a number
+  // derived from a null, an object where a string belonged. Same class, worse tell.
+  //
+  // ⛔ NOT WHOLE-NODE MATCHED, AND THAT IS A DELIBERATE DEPARTURE FROM THE RECOMMENDATION. The rule
+  // was recommended as `/^(undefined|NaN|\[object Object\])$/` with a whole-node match. Implemented
+  // that way it went GREEN — and the very leak it was recommended for was live in an executed
+  // scenario at the time. The node reads "undefined/undefined", because Vue renders each
+  // interpolation into the SAME text node as the literal "/" between them. A whole-node match can
+  // never see that, and it is the normal shape: a leaked value almost always has punctuation, a
+  // unit or a sibling field beside it.
+  //
+  // Word-matched instead. Safe against false positives because no product copy in this cockpit
+  // contains these tokens — absence is said as "unknown", "not established" or "not confirmed" —
+  // and `--self-test` mutates through a REAL undefined property to prove it still fires.
+  { rule: 'leaks a raw JavaScript value (undefined / NaN / [object Object])',
+    re: /\b(undefined|NaN)\b|\[object Object\]/ },
   { rule: 'leaks the "ZZ" brand sort sentinel', re: /\bZZ\b|no brand recorded/i,
     // "No brand recorded" IS the sanctioned heading for an unbranded run — it is a statement about
     // the record, not a brand name — so the heading form is allowed and the sentinel form is not.
@@ -721,8 +738,20 @@ const ASDAIR_PLAN = [
     ['QUESTIONS · crop, and the honest absence of one', 'questions', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
       ['a question with no recorded region SAYS so rather than showing a fabricated crop',
         (p) => hasText(p, 'AsdAIr hasn’t recorded which part of the photograph this line came from')],
-      ['the same one sentence leads this screen too, so two screens cannot tell two stories',
-        (p) => hasText(p, '2 decisions still need you.')],
+      // ⛔ RE-CUT AFTER VERA V-1 (HIGH), NOT DELETED. This asserted that the Shop screen's exact
+      // sentence — "2 decisions still need you.", counting OPEN QUESTIONS — also leads this screen,
+      // on the reasoning that one sentence in two places cannot tell two stories. That reasoning was
+      // wrong, and this assertion was actively holding the defect in place: this screen's tally
+      // counts a DIFFERENT population (questions plus unrouted held lines), so copying the
+      // question-count sentence here guaranteed a contradiction the moment the two populations
+      // differed. It did, by one, 49px apart, at 375px.
+      //
+      // The VALUE survives — two figures on one screen must not disagree — and is now expressed
+      // correctly: the headline is derived from the same population as the tally beneath it. In THIS
+      // fixture there are no held lines, so board and questions coincide and the figure is still 2;
+      // the 'one coherent board' scenario carries the case where they differ.
+      ['the headline is derived from THIS screen population, and agrees with its own tally',
+        (p) => hasText(p, '2 things still need you.') && valueAfter(p, 'Needs you') === '2'],
       ['an answered question can be CHANGED', (p) => hasText(p, 'Change this answer')],
       ['applied-to-this-shop vs remembered-for-future is stated, never inferred',
         (p) => hasText(p, 'Applied to this shop.') || hasText(p, 'Remembered for future shops')],
@@ -760,6 +789,11 @@ const ASDAIR_PLAN = [
           (p) => hasText(p, '1 BAG SYNTHETIC SWEETS')],
         ['an unbranded line gets a heading that describes the RECORD, not a brand name',
           (p) => hasText(p, 'No brand recorded')],
+        // ⛔ VERA V-2 — every disclosure row carries the cockpit's affordance glyph. Counted, not
+        // spot-checked: one chev per list row, or the marker has gone missing from some of them
+        // again. The rendered text is the only place a vnode-level check can see this glyph.
+        ['⛔ V-2 — every brand-list row carries the .chev affordance, not a bare invisible summary',
+          (p) => p.filter((s) => s.trim() === '›').length >= 4],
         // AC6 — Warwick's ruling, on the surface that carries the evidence.
         ['AC6 — support is reported as CORROBORATION',
           (p) => hasText(p, 'Corroborated') && hasText(p, 'All 3 readings of the photograph agreed on this line.')],
@@ -801,6 +835,20 @@ const ASDAIR_PLAN = [
           (p) => hasText(p, 'HELD OUT OF THE BASKET')],
         ['AC3 — X NEED YOU / Y RESOLVED / Z STILL BLOCKING, at a glance',
           (p) => hasText(p, 'need you') && hasText(p, 'resolved') && hasText(p, 'still blocking')],
+        // ⛔ VERA V-1 (HIGH), AND THE FIXTURE REPRODUCES IT EXACTLY. 1 open question + 1 unjoined
+        // held line: the OLD headline counted questions and said "1 decision still needs you.",
+        // 49px above a tally counting the board and reading "2". Two populations, one screen, on
+        // the board built to stop precisely that. Three halves are pinned — the headline agrees
+        // with the tally, the stale phrasing is GONE, and the difference from the Shop screen is
+        // named rather than hidden.
+        ['⛔ V-1 — the headline agrees with the tally it sits 49px above',
+          (p) => hasText(p, '2 things still need you.') && valueAfter(p, 'Needs you') === '2'],
+        ['⛔ V-1 — the open-question sentence no longer leads this board',
+          (p) => !hasText(p, '1 decision still needs you.')],
+        ['V-1 — and it NAMES why this figure differs from the Shop screen instead of hiding it',
+          (p) => hasText(p, '1 question to answer, and 1 line AsdAIr held back without asking about it.')],
+        // ⛔ VERA V-2 — the affordance glyph. AC5's provenance-on-expansion sits behind this control,
+        // and it shipped with no visible marker at any breakpoint (SUMMARY_COUNT=4, WITH_VISIBLE=0).
         ['AC3 — answered questions stay VISIBLE and COLLAPSIBLE, never gone',
           (p) => hasText(p, 'Resolved') && hasText(p, 'Change this answer')
             && hasText(p, 'Kept on screen on purpose')],
@@ -1291,6 +1339,11 @@ if (SELF_TEST) {
         (t) => t.replace(anchor, anchor + '<p>{{ "unknown" }}</p>'),
       'vocabulary: the ZZ brand sort sentinel is rendered as a brand':
         (t) => t.replace(anchor, anchor + '<p>ZZ (no brand recorded)</p>'),
+      // VERA V-4. Mutated through a REAL undefined property, and CONCATENATED — which is how the
+      // live leak actually rendered ("undefined/undefined"). A bare `{{ undefined }}` is useless as
+      // a mutation: Vue renders it as an empty string, so it proves nothing. Found by running it.
+      'vocabulary: a raw JavaScript undefined reaches the screen':
+        (t) => t.replace(anchor, anchor + '<p>WO first pass {{ currentApp.noSuchField + "/" + currentApp.noSuchField }}</p>'),
     };
     total += Object.keys(vocabCases).length;
     for (const [name, mutate] of Object.entries(vocabCases)) {

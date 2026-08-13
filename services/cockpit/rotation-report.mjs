@@ -333,23 +333,42 @@ export function findingHeadline(finding) {
   };
 }
 
-/** Only measures that are actually established. Absent stays absent — it is counted, not rendered. */
+/** Only measures that are actually established. Absent stays absent — it is counted, not rendered.
+ *
+ * ⛔ FIXED — VERA V-4, 2026-08-13. This rendered the literal string "undefined/undefined" on
+ * Warwick's System pane, live since 2026-08-08, for any report whose containers are null.
+ *
+ * THE MECHANISM, because it is subtle and it will recur: `r.workOrders || {}` turns a NULL container
+ * into an EMPTY OBJECT, whose fields are then `undefined` — and `undefined !== null` is TRUE. So a
+ * guard written as `!== null` PASSES for a value that was never measured, and the template dutifully
+ * prints JavaScript at a human. The `|| {}` fallback and the `!== null` guard are individually
+ * reasonable and lethal together.
+ *
+ * The tell that this was a known hazard: the FOURTH guard below already read
+ * `!== null && !== undefined`. One of four. That is what a defect class looks like just before it
+ * ships — fixed in the place it bit, left alone everywhere else. `has()` now closes all four.
+ *
+ * Rendering an absence as a value is the same defect as the API's word `unknown` reaching a product
+ * name, and the estate's rule is the same in both places: unknown, not established and zero are
+ * three different facts and none may be dressed as another.
+ */
+const measured = (v) => v !== null && v !== undefined;
 export function headlineMeasures(r) {
   const out = [];
   const wo = r.workOrders || {};
-  if (wo.total !== null && wo.firstDispatchSuccess !== null) {
+  if (measured(wo.total) && measured(wo.firstDispatchSuccess)) {
     out.push({ label: 'WO first pass', value: `${wo.firstDispatchSuccess}/${wo.total}`,
       tone: wo.total > 0 && wo.firstDispatchSuccess === 0 ? 'urgent' : 'quiet' });
   }
-  if (r.allocation && r.allocation.reworkPct !== null) {
+  if (r.allocation && measured(r.allocation.reworkPct)) {
     out.push({ label: 'Rework', value: `${r.allocation.reworkPct}%`,
       tone: r.allocation.reworkPct >= 25 ? 'urgent' : 'quiet' });
   }
-  if (r.subagentTokens !== null) {
+  if (measured(r.subagentTokens)) {
     const m = r.subagentTokens / 1_000_000;
     out.push({ label: 'Subagent', value: m >= 1 ? `${m.toFixed(2)}M` : `${Math.round(r.subagentTokens / 1000)}k`, tone: 'quiet' });
   }
-  if (r.specialistDispatches !== null && r.specialistDispatches !== undefined) {
+  if (measured(r.specialistDispatches)) {
     out.push({ label: 'Dispatches', value: String(r.specialistDispatches), tone: 'quiet' });
   }
   return out.slice(0, 4);

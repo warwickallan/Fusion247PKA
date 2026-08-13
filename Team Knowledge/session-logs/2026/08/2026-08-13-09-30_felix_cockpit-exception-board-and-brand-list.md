@@ -163,6 +163,69 @@ was added and no token value changed**, so every existing figure in §2b still h
 adding to the table — **Iris's edit, not mine.** The previous Felix amendment to GL-003 was recorded
 as a rule violation and I am not repeating it.
 
+## Vera's CONDITIONAL PASS on `152e4a0` — both conditions, and what they taught
+
+**V-1 (HIGH) — two contradictory "needs you" counts, 49px apart, on the board built to stop exactly
+that.** The headline derived from `asdairOpenQuestions` (open QUESTIONS); the tally from
+`asdairBoard` (questions **plus** held lines with no routed question). Both correct about their own
+population.
+
+**The fix that mattered was not "use the bigger number".** The Shop screen legitimately keeps saying
+"1 decision still needs you", so the two screens can still show different figures — matching them
+would move the contradiction to where Warwick cannot see it, across a navigation. The board's
+headline now derives from the board's own population **and reconciles the difference in words**:
+*"2 things still need you. 1 question to answer, and 1 line AsdAIr held back without asking about
+it."* **Naming a discrepancy is a fix; hiding it is a relocation.**
+
+**An assertion was holding the defect in place.** *"the same one sentence leads this screen too, so
+two screens cannot tell two stories"* asserted the Shop sentence appears here — which **guaranteed**
+the contradiction the moment the populations diverged. Re-cut, not deleted: the value survives,
+expressed against the right population. **A green assertion can be the thing enforcing the bug.**
+
+**And I had to correct a comment claiming an invariant the code does not have** — *"the sentence and
+the counters unable to contradict each other"*, true of the Shop screen only. **That is the same
+defect I had already named against the `execution_packet` branches, committed by me, in the same
+file, hours later. Naming a failure mode does not inoculate you against it.**
+
+**V-2 (MEDIUM) — brand-list rows were disclosures with no visible affordance.** `SUMMARY_COUNT=4,
+WITH_VISIBLE_MARKER=0`. Not a WCAG failure — the focus ring is real and native `<details>` exposes
+state to AT — but design-system drift, since `.chev` is this cockpit's affordance glyph and six other
+row types use it. Fixed by **inheriting** the shared `.chev` rule rather than restating colour and
+size, so the row cannot drift from the other six, plus a 90° rotation so **the affordance and its
+state are one object** instead of two marks.
+
+## ⛔ V-4: the recommended rule was insufficient, and only running it showed that
+
+Recommended as `/^(undefined|NaN|\[object Object\])$/`, whole-node matched. **Implemented exactly as
+recommended it went green — while the very leak it was recommended for was live in an executed
+scenario.** The node reads `undefined/undefined`, because Vue renders both interpolations and the
+literal `/` between them into **one** text node. **A whole-node match can never see the normal case**,
+where a leaked value has punctuation, a unit or a sibling field beside it. Word-matched instead.
+
+**The leak's mechanism is the part worth carrying.** In `rotation-report.mjs`,
+`const wo = r.workOrders || {}` turns a **null container into an empty object**, whose fields are
+`undefined` — and `undefined !== null` is **true**, so a guard written `!== null` passes for a value
+nobody measured. The `|| {}` fallback and the `!== null` guard are each reasonable and lethal
+together. **The tell that this was a known hazard: the fourth of four guards in that function already
+read `!== null && !== undefined`. One of four. That is what a defect class looks like just before it
+ships** — fixed where it bit, left alone everywhere else. All four now route through one `measured()`.
+
+⚠️ **That fix is in `rotation-report.mjs`, a server-side sibling — it needs a cockpit RESTART to
+reach the live System pane.** The `public/*` changes are live on save; this one is not.
+
+## The probe lied twice, the same way — the backtick trap wearing a hat
+
+Two new probe checks reported nonsense: `V1-AGREE = NO` on a screen where both figures read 2, and
+`V4-raw-js-leak = LEAK` permanently. **Same root cause, and neither was a product defect:** the probe
+script is embedded in a **JS template literal**, which processes escapes before the regex engine sees
+them. `\d+` collapses to `d+`; `\[object Object\]` collapses to `[object Object]` — **a character
+class matching almost any text**. Established by executing the collapse, not by reasoning about it.
+
+The original probe checks survived because they were written with doubled `\\b`; my later patch wrote
+singles. **Generalisation: anything you inject as a string is one escape layer away from meaning
+something else, and a broken detector fails toward "all fine" or "all broken" — both of which look
+like findings.** The probe now uses character ranges and `indexOf`, with no backslashes at all.
+
 ## Reported, not fixed (outside my surface)
 
 - `provenance-check.mjs` still FAILs 1/30 — `provenance.mjs`'s `SOURCE_MODULES` omits
