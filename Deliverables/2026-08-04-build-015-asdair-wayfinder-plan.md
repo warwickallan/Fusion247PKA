@@ -2322,6 +2322,35 @@ got that on your list"* — and **NOT an interrogation.** `needs_confirmation` a
 **go through**, and Warwick answers downstream exactly as he does for his own lists. *A check that stops an
 84-year-old to adjudicate a catalogue match would be a defect, not diligence.*
 
+### 🔴 MERGE HOLD ON FELIX'S UI — **built, green, committed, and DELIBERATELY NOT MERGED.** Established by execution.
+
+**WP-B15-49 is DONE at `42bdfcc` on `build-015/b15-49-mum-send-action`** — all four gates green together
+(geometry **70 states / 0 violations**, self-test **15/15 across 70**, send-cases **10/10**, render-vm-check
+**219 assertions / 0 failed**, secret-scan **exit 0 SCANNED 5 of 5**). **It is not merged, and the reason is
+not caution — it is a specific false sentence it would put in front of Mum.**
+
+Her page already sends `list_date` and `extras`, and renders off `recorded_new`. **Against the live route
+today all three are absent:**
+
+| Field | Live behaviour NOW | What Mum would see |
+|---|---|---|
+| `recorded_new` | **absent → `undefined` → falsy** | A re-send that DID record her change renders **"nothing has changed"** — the exact false sentence contract v3 exists to kill, arriving from the opposite direction |
+| `extras` | **silently IGNORED** — `buildReceiveListSpec` reads only `household` and `items` | Her typed *"some of those little cakes"* **disappears without a word** |
+| `list_date` | **ignored — and correctly so, see below** | Nothing visible; the server's date is used |
+
+> **Her page and the route ship together, or not at all.** Merging the UI alone satisfies the letter of
+> "the write path landed first" while breaking its purpose. **`public/*` is served live from disk in the
+> main checkout, so a merge is instantly in front of her** — there is no staging step to catch it.
+
+**⚖️ THE `list_date` TENSION, resolved in favour of the CODE, not the contract.** `cockpitIntake.js:264`
+derives `listDate` from the receiver's own stamp, and Keel's header states the reason: *"a runtime with a
+wrong clock is a wrong `shop_ref`, and a wrong `shop_ref` is a duplicated week."* **Mum's Fire tablet is
+exactly the class of device that carries a wrong clock.** Larry's ruling, issued to WP-B15-50: **the server
+keeps ownership of the date; the client's `list_date` becomes an ASSERTION THAT IS CHECKED, never a source.
+A mismatch never blocks her** — it is accepted, the server's date is used, and the disagreement is surfaced
+to Warwick in the ShopperBot message. *A field that would have been decorative becomes a real check on a
+real hazard.*
+
 ### Route: the write path ships FIRST, then these. Thin working slice, not a bigger bang.
 
 - **WP-B15-48 (Keel) and WP-B15-49 (Felix) continue** — the write path is the foundation all four sit on.
