@@ -2386,6 +2386,64 @@ assertion rather than a sweep.
 `cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
 problem, not a new application — which is the reuse Warwick asked for.
 
+### ✅ LANE G COMPLETE — **`2cc5ac1`.** The Veritas HOLD's cause is fixed. **The HOLD lifting is Veritas's call, not Larry's.**
+
+**A production caller now exists on the journey where before there was none.** `runPipeline.planWithDecisions`
+calls `persistPlanProvenance` (new `planProvenance.js`): **REGULARS** when the planner adds a line the photo
+did not carry, **RULE** when the rulebook changes one, **WARWICK** when a recorded decision does.
+
+**`1091 tests · 1091 pass · 0 fail · 0 SKIPPED`** — and, decisively, **the same on a pristine
+`core.autocrlf=true` checkout**, where Veritas had measured `58c86ef` at **1078 pass / 1 fail**. The CRLF
+condition was confirmed genuinely present (75 CRLF lines, 0 bare LF in that export) before it was fixed, so
+AC5 closed a real defect rather than a theoretical one.
+
+**Four mutants, all killed, every restoration verified by sha256 AND grep rather than assumed:** neutering
+the `isPhoto !== hasRegion` guard · collapsing WARWICK into REGULARS · **dropping `region_iff_photo` in a
+throwaway schema — baseline REFUSED `23514`, under the mutant ACCEPTED, so that named constraint IS the
+control** · a stale artefact under CRLF, proving normalisation did not kill the guard.
+
+**AC2 is now three layers, two of them mutation-proven:** the module never names `PHOTO`; the client-side
+check; the database's biconditional. Direct inserts past every application guard were refused **`23514`**
+(no region) and **`23503`** (another shop's region).
+
+**AC4 held by leaving it alone:** `47/47, 39 established, 30 resolved, 9 routed, 39 lines, 53 items`, and
+**`git status` on `finalise/out/` empty — no artefact regenerated.**
+
+> **⚠️ KEEL'S OWN ANSWER TO THE QUESTION VERITAS GRADES, and it is why Lane J exists: *"Was the real
+> production event exercised? NO."*** What ran is the real production *function* with the real planner,
+> rulebook, decision application, derivation and writer against a **real but disposable** Postgres. **Fake,
+> and named: the model consult (a gateway call `network: none` forbids) and the surrounding durable store.**
+> *"A chain of individually-proven links is not a proven chain."*
+
+**One judgement call flagged for review rather than buried:** `producedList.test.js`'s *"migration 020 is NOT
+depended upon"* failed once the wiring landed, because it asserted a table was `undefined`. Keel
+**re-anchored rather than relaxed** it — it now asserts the real invariant against the **module's source**,
+with comments stripped and **the stripper asserting it stripped**, which the old test never did.
+
+**Residuals reported, not fixed:** the idempotence guard is a read-then-insert, not a constraint — a
+concurrent double-advance could duplicate an *audit* row, never corrupt one, and closing it needs a schema
+decision · REGULARS origin derives from `shop_line.list_item_id`, with a made-to-fail test for the case
+where a future path omits it · `imagePrep.js` contains two NUL bytes (a correct JPEG `Exif\0\0` literal)
+which makes it read as binary to `grep` and could mislead a future source-scanning control.
+
+### 🚀 LANE J DISPATCHED — **the chain, not the links.** WP-B15-47, `1cf3857`.
+
+**Two grants make it attemptable for the first time.** The **photograph is committed** (`testdata/known-list/`,
+sha256 verified against live shop 26's fingerprint) — it lived only in the secrets store, which is exactly
+why every prior order faked its input. And **bounded `network: gateway-vision-only` +
+`credential_scope: consume-env-file-by-path-never-open`**, declared on the field: the runtime loads the env
+file, the worker never opens it.
+
+**AC1's defining test: no step may be handed data a fixture supplied on behalf of the step before it.**
+**AC3 deliberately gives no target** — the established figures came from three frozen readings, this is one
+live reading, and *a number engineered to match is worth less than one that honestly differs.* **AC5 follows:
+one reading cannot corroborate itself.**
+
+**⛔ EXCLUDED AT EVERY AUTHORITY LEVEL: live database, live Telegram, the production trigger.** `runtime.js`
+sends whatever is queued in the outbox — **firing it would message Mum unprompted**, which is outward,
+irreversible, and affects someone who has not consented to a test. *That is Larry's refusal, not a missing
+grant.*
+
 ### 🔴 LIVE PRODUCTION STATE — established by query, and it settles the Veritas argument empirically
 
 **`asdair.shop_line_provenance` in the LIVE database contains ZERO ROWS.** The tables exist — Larry applied
