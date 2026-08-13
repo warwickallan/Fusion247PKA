@@ -71,7 +71,7 @@ contract_conflicts: none
 capability_evidence:
   source: executed probe
   # guidance: authoritative live inventory | executed probe | unknown
-  result: Gateway reachable and serving 9 models including gpt-5.6-terra (vision-capable). Photograph committed at services/asdair/pipeline/testdata/known-list/mum-list-2026-08-11.jpg, sha256 89f33073... verified equal to live asdair.shop_source_image fingerprint for shop 26. Disposable PostgreSQL 17.4 at 127.0.0.1:55432 db asdair_test, 31 tables, seeded household_id=1. Lane G landed planProvenance at 2cc5ac1 with 1091/1091/0 skipped including on a pristine CRLF checkout.
+  result: Gateway reachable and serving 9 models including gpt-5.6-terra (vision-capable). Photograph committed at services/asdair/pipeline/testdata/known-list/mum-list-2026-08-11.jpg, sha256 89f33073... verified equal to live asdair.shop_source_image fingerprint for shop 26. Disposable PostgreSQL 17.4 at 127.0.0.1:55432 db asdair_test, 31 tables, seeded household_id=1. Lane G landed planProvenance at 2cc5ac1. CORRECTED BY AMENDMENT 1: this tree's measured baseline is 1086/1085 pass/0 fail/1 skip, becoming 1086/1086/0 with all three DB URLs bound. The 1091 figure was never this tree's. Real catalogue now seeded: 109 regulars, 40 rules (31 household 1, 28 active), 10 products, household 1 = mum.
   # guidance: capabilities actually OBSERVED. unknown is honest but is NOT permission
 
 # --- authority ---
@@ -79,11 +79,11 @@ capability_evidence:
 # these and never redrafts them from memory (J1-3). They are EMITTED, not omitted: every worker
 # contract and the canonical template require them present, and `private_surface` is GL-012's
 # only route to a worker that inherits nothing else. Any deviation carries its escalation.
-credential_scope: consume-env-file-by-path-never-open
-# DEVIATION from standing default `none`. ESCALATION: Larry, 2026-08-13, under Warwick's standing phase instruction that the journey be demonstrated as a working user experience and not inferred from fixtures. Bounded: ONE grounded vision request to FUSION_GATEWAY_URL for the committed photograph; the env file is passed to node --env-file and is never opened, read, printed or committed by the worker.
+credential_scope: none
+# NO DEVIATION. Standing default `none` applies. The deviation formerly recorded here was REVOKED by AMENDMENT 1 (Larry, 2026-08-13): the only gateway carrier sits at the ROOT of C:/.fusion247/, which GL-012 never permits as a grant, and three Keel instances refused on that boundary. The worker makes no gateway call and opens no credential carrier.
 live_authority: none
-network: gateway-vision-only
-# DEVIATION from standing default `none`. ESCALATION: Larry, 2026-08-13, under Warwick's standing phase instruction that the journey be demonstrated as a working user experience and not inferred from fixtures. Bounded: ONE grounded vision request to FUSION_GATEWAY_URL for the committed photograph; the env file is passed to node --env-file and is never opened, read, printed or committed by the worker.
+network: none
+# NO DEVIATION. Standing default `none` applies. The deviation formerly recorded here was REVOKED by AMENDMENT 1 (Larry, 2026-08-13): the only gateway carrier sits at the ROOT of C:/.fusion247/, which GL-012 never permits as a grant, and three Keel instances refused on that boundary. The worker makes no gateway call and opens no credential carrier.
 dependency_policy: no-new-runtime-deps
 private_surface: none
 
@@ -138,13 +138,11 @@ operational_handoff: none
 
 **1. THE PHOTOGRAPH IS NOW COMMITTED.** `services/asdair/pipeline/testdata/known-list/mum-list-2026-08-11.jpg`, **sha256 `89f33073296b4808f544b1f6111f10c723e532106f339d94cdae90633de80a16`**. Verified equal to the `fingerprint` on live `asdair.shop_source_image` for shop 26 — **this is the photograph production actually ingested**, not a lookalike. It previously lived only in the secrets store, which is why every prior order faked its input. **You can now open it directly. Nothing under `C:\.fusion247\` is in your scope.**
 
-**2. `network: gateway-vision-only` and `credential_scope: consume-env-file-by-path-never-open`**, declared on the field with authority recorded. **The permitted shape is exact:** pass the env file to `node --env-file=<path>` so the *runtime* loads it. **You never open, read, print, echo or commit that file, and no connection string or key may appear in anything you author.** `handoffCli.test.js:379` already fails the suite on a literal connection string — that control is your friend here.
-
-Gateway confirmed reachable, serving **9 models including `gpt-5.6-terra`** (vision-capable).
+**2. ⛔ THE CREDENTIAL GRANT DESCRIBED HERE IS REVOKED BY AMENDMENT 1. `network: none`, `credential_scope: none`, and the worker makes NO gateway call.** Larry executes the single credentialed `vision()` HTTP call and commits its **verbatim responses**; the worker replays them through the real orchestrator so region planning, sanity checks, the follow-up decision, the merge and both provenance writers execute **in the worker's own run, against the worker's own shop** — which is what AC2 actually requires. **No connection string or key may appear in anything you author**; `handoffCli.test.js:379` already fails the suite on a literal one.
 
 ## Acceptance criteria
 
-**AC1 — ONE CONTINUOUS RUN, NO FIXTURE STANDING IN FOR THE STEP BEFORE IT.** A single command takes the committed photograph → **real grounded vision call** → reconciliation → provenance persistence → final brand-sorted list → browser-handoff payload, against the disposable Postgres. **The defining test: no step may be handed data a fixture supplied on behalf of the previous step.** If any link still needs a stub, that link is the finding and you say so rather than bridging it.
+**AC1 — ONE CONTINUOUS RUN, NO FIXTURE STANDING IN FOR THE STEP BEFORE IT.** ⛔ **RE-CUT BY AMENDMENT 1 — the worker makes NO gateway call.** The runner replays Larry's committed verbatim model responses through the real orchestrator, so image prep, region planning, sanity checks, the follow-up decision, the merge and both provenance writers all execute in the worker's own run → reconciliation → provenance persistence → final brand-sorted list → browser-handoff payload, against the disposable Postgres. **The defining test: no step may be handed data a fixture supplied on behalf of the previous step.** If any link still needs a stub, that link is the finding and you say so rather than bridging it.
 
 **AC2 — ALL FOUR PROVENANCE KINDS PERSIST FROM THIS RUN.** Read back from Postgres, **scoped to the shop this run creates** — the cluster is shared and moved under Lane G mid-build (PHOTO rows went 9→17 from another lane). PHOTO rows must cite a region of **this run's own** photograph.
 
@@ -161,8 +159,8 @@ Gateway confirmed reachable, serving **9 models including `gpt-5.6-terra`** (vis
 - **The single command**, with its full output, and the run's own identifiers so it can be re-run.
 - **Provenance rows read back by kind**, scoped to this run's shop.
 - **The handoff payload**, with its counts and the brand ordering visible.
-- `cd services/asdair/pipeline && node --test` with the DB env → **executed subtest count, pass/fail split, and SKIPPED count.** Lane G's baseline is **1091/1091/0**.
-- `bash scripts/secret-scan.sh --surface <first-party paths>` → exit code AND coverage. **Additionally confirm no key or connection string reached any file you authored.**
+- `cd services/asdair/pipeline && node --test` with all THREE DB URLs bound → **executed subtest count, pass/fail split, and SKIPPED count.** ⛔ **RE-CUT BY AMENDMENT 1: the baseline is `1086 / 1085 pass / 0 fail / 1 skip`, becoming 1086/1086/0 with all three bound. The earlier 1091/1091/0 was never this tree's figure.**
+- `bash scripts/secret-scan.sh --surface <first-party paths>` → exit code AND coverage. ⛔ **The whole-directory form is DELETED by AMENDMENT 1 — it cannot pass on a pristine tree (exit 1 on four gitignored third-party `node_modules` bytes). Report that result alongside and name the difference.** Additionally confirm no key or connection string reached any file you authored.
 - `bash scripts/secret-scan.sh --surface services/asdair/pipeline` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
 
 ## Inputs supplied
@@ -205,9 +203,9 @@ Also out: `cockpit-api/**` · the Cockpit UI · `handoff/**` (Lane F's branch) �
 | **permitted_file_surface** | CITED — `Team/Keel - Implementation Engineer/AGENTS.md` § Where Keel writes @ blob a7f9cfe3eb6b (305 chars — read it there; not inlined, per the SSOT rule) | `Team/Keel - Implementation Engineer/AGENTS.md` |
 | **prohibited_file_surface** | CITED — `Team/Keel - Implementation Engineer/AGENTS.md` § Scope boundaries — what Keel never does @ blob a7f9cfe3eb6b (1,484 chars — read it there; not inlined, per the SSOT rule) | `Team/Keel - Implementation Engineer/AGENTS.md` |
 | **critical_rules** | CITED — `Team/Keel - Implementation Engineer/AGENTS.md` § Critical rules @ blob a7f9cfe3eb6b (13,888 chars — read it there; not inlined, per the SSOT rule) | `Team/Keel - Implementation Engineer/AGENTS.md` |
-| **credential_scope** | DEVIATED (operative) — consume-env-file-by-path-never-open  ·  supersedes standing default `none` | `order frontmatter (deviation) — ESCALATION: Larry, 2026-08-13, under Warwick's standing phase instruction that the journey be demonstrated as a working user experience and not inferred from fixtures. Bounded: ONE grounded vision request to FUSION_GATEWAY_URL for the committed photograph; the env file is passed to node --env-file and is never opened, read, printed or committed by the worker.` |
+| **credential_scope** | **none** — ⛔ RE-CUT BY AMENDMENT 1. The prior `consume-env-file-by-path-never-open` deviation is REVOKED: the only carrier sits at the ROOT of the secrets store, which GL-012 never permits. THIS ROW IS THE OPERATIVE VALUE. | `AMENDMENT 1, Larry 2026-08-13` |
 | **live_authority** | none | `Team Knowledge/Templates/work-order.md:authority defaults` |
-| **network** | DEVIATED (operative) — gateway-vision-only  ·  supersedes standing default `none` | `order frontmatter (deviation) — ESCALATION: Larry, 2026-08-13, under Warwick's standing phase instruction that the journey be demonstrated as a working user experience and not inferred from fixtures. Bounded: ONE grounded vision request to FUSION_GATEWAY_URL for the committed photograph; the env file is passed to node --env-file and is never opened, read, printed or committed by the worker.` |
+| **network** | **none** — ⛔ RE-CUT BY AMENDMENT 1. The prior `gateway-vision-only` deviation is REVOKED; the worker makes no gateway call. THIS ROW IS THE OPERATIVE VALUE. | `AMENDMENT 1, Larry 2026-08-13` |
 | **dependency_policy** | no-new-runtime-deps | `Team Knowledge/Templates/work-order.md:authority defaults` |
 | **private_surface** | none | `Team Knowledge/Templates/work-order.md:authority defaults` |
 | **git_authority** | GRANTED — `Team/Keel - Implementation Engineer/AGENTS.md` § The integration role @ blob a7f9cfe3eb6b (2,831 chars — read it there; not inlined, per the SSOT rule) | `Team/Keel - Implementation Engineer/AGENTS.md:The integration role — durable and bounded (Warwick's ruling, 2026-08-02)` |
