@@ -135,6 +135,49 @@ function dateOnly(value) {
  * directive, so seeing one here would mean the constraint is gone - which is
  * something to show, not to paper over.
  */
+/**
+ * WP-B15-35 AC8. ONE RULE, IN WARWICK'S OWN TERMS.
+ *
+ * Warwick's examples are the specification:
+ *   "Never automatically substitute products - applies to every shop"
+ *   "Cravendale Semi-Skimmed - usually buy 4 x 2L"
+ *
+ * So: the rule's own sentence, then WHO IT APPLIES TO, in words. No category
+ * key, no directive token, no scope enum, no id - those all stay available on
+ * the row beside this for anyone who wants them, and none of them is what a
+ * human reads.
+ *
+ * A rule whose text is missing gets no invented sentence: it returns null and
+ * is shown as the unexplained rule it is (D-2026-08-03-16 already counts
+ * those, and hiding them here would undo that).
+ */
+function plainRule(r) {
+  if (P._internal.isMissing(r.rule_text)) return null;
+  const text = String(r.rule_text).trim().replace(/\s*[.;]+\s*$/, '');
+
+  // WHO it applies to, most specific first. A product beats a search term,
+  // and a term beats a category - saying all three would be noise.
+  let applies = null;
+  if (!P._internal.isMissing(r.matched_product)) applies = 'applies to ' + String(r.matched_product).trim();
+  else if (!P._internal.isMissing(r.match_term)) applies = 'applies when you ask for ' + String(r.match_term).trim();
+  else if (!P._internal.isMissing(r.match_category)) applies = 'applies to ' + String(r.match_category).trim();
+  else if (String(r.scope || '').trim().toLowerCase() === 'global') applies = 'applies to every shop';
+
+  // ⛔ NEVER SAY THE SAME THING TWICE. Live rulebook, 2026-08-13:
+  //   "Tomato sauce means Heinz Tomato Ketchup 910g - applies to Heinz Tomato
+  //    Ketchup 910g"
+  // The rule's own sentence very often already names the product it is about,
+  // and appending the target then reads like a machine talking to itself -
+  // which is exactly the "database view" this Work Order exists to get away
+  // from. Where the text already contains the target, the clause is dropped.
+  if (applies !== null) {
+    const target = applies.replace(/^applies (to|when you ask for) /, '').trim().toLowerCase();
+    if (target !== '' && text.toLowerCase().indexOf(target) !== -1) return text;
+  }
+
+  return applies === null ? text : text + ' - ' + applies;
+}
+
 function presentRule(r) {
   const directive = r.directive === null || r.directive === undefined ? null : String(r.directive);
   const hasTarget = !P._internal.isMissing(r.match_term) || !P._internal.isMissing(r.match_category);
@@ -147,6 +190,9 @@ function presentRule(r) {
     directive_meaning: DIRECTIVES.indexOf(directive) === -1 ? P.UNKNOWN : DIRECTIVE_MEANING[directive],
     category_display: P.text(r.category),
     rule_text_display: P.text(r.rule_text),
+    // AC8: the same rule as one human sentence. This is the field the Cockpit
+    // shows; everything else on this row is the detail behind it.
+    plain_display: P.text(plainRule(r)),
     scope_display: P.text(r.scope),
     match_term_display: P.text(r.match_term),
     match_category_display: P.text(r.match_category),
@@ -255,6 +301,33 @@ function assembleRules(src) {
       // cannot explain itself. A count, measured, never estimated.
       without_note_display: P.count(ruleRows.filter(function (r) { return !r.has_note; }).length),
       groups: groups,
+
+      // ── AC8: WHAT THIS SURFACE CAN AND CANNOT DO, SAID PLAINLY ─────────
+      //
+      // "Do NOT pretend broad rule CRUD exists if it does not." It does not.
+      // There is no rule command anywhere on the AsdAIr command surface -
+      // pipeline/commandNames.js is an allowlist and carries none - so every
+      // sentence below is checkable against that list rather than being a
+      // description of intent. The UI renders these words; it must never
+      // offer an action this block does not claim.
+      management: {
+        can_read: true,
+        can_create: false,
+        can_edit: false,
+        can_delete: false,
+        can_deactivate: false,
+        can_reorder: false,
+        how_rules_are_made:
+          'Rules are LEARNED, not typed. When you answer a question and the answer is meant to hold ' +
+          'in future, that decision is promoted into the rulebook. An answer you mark as this-week-only ' +
+          'is never promoted.',
+        what_this_screen_cannot_do:
+          'This screen shows the rulebook. It cannot add, edit, delete, switch off or reorder a rule, ' +
+          'and no such command exists anywhere in AsdAIr today - not on the Cockpit and not on Telegram. ' +
+          'Changing a rule means answering the relevant question differently next time, or changing it ' +
+          'directly in the database.',
+      },
+
       items: ruleRows
     },
     decisions: {

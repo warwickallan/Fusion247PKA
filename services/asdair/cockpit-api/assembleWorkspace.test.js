@@ -597,3 +597,101 @@ test('WP-B15-35: the sentence and the counter in the payload cannot disagree', (
     'the sentence must quote the same number the badge renders');
   assert.equal(w.shop.why.counts.stale_questions_suppressed, 2);
 });
+
+// =====================================================================
+// WP-B15-35 AC4/AC7/AC8 - the payload the parallel Cockpit UI reads.
+// These pin the CONTRACT, not the internals: the UI's asdairProvenance()
+// reads exactly these `*_display` keys and maps the literal 'unknown' to an
+// honest gap, so a rename here breaks a screen.
+// =====================================================================
+
+function wsWith(over) {
+  return assembleWorkspace(Object.assign({
+    status: {
+      shop_id: 26, shop_ref: 'SHOP-2026-08-13', household_id: 1,
+      stage: 'NEEDS_DECISION', stage_label: 'waiting on your answers',
+      human_state: 'NEEDS_WARWICK', human_state_source: 'derived',
+      needs_review: true, is_terminal: false, list_id: 7,
+    },
+    shop: { list_id: 7 },
+    questions: [], decisions: [], list_items: [], shop_lines: [], source_images: [],
+  }, over || {}));
+}
+
+test('AC4: the provenance block carries the exact *_display keys the UI reads', () => {
+  const w = wsWith({
+    shop_lines: [{ line_no: 1, list_item_id: 1, corrected: false }],
+    list_items: [{ id: 1, status: 'requested', requested_qty: 1 }],
+    status: {
+      shop_id: 26, shop_ref: 'SHOP-2026-08-13', household_id: 1, stage: 'PROCESSING',
+      stage_label: 'working', human_state: 'ASDAIR_WORKING', human_state_source: 'derived',
+      needs_review: false, is_terminal: false, list_id: 7, regulars_added: 2,
+    },
+  });
+
+  for (const k of ['photo_display', 'regulars_display', 'rules_display', 'warwick_display',
+    'skipped_display', 'source_lines_display', 'source_read_status_display',
+    'reconciled_products_display', 'final_products_display', 'final_items_display',
+    'summary_display']) {
+    assert.ok(Object.prototype.hasOwnProperty.call(w.provenance, k), 'missing UI contract key: ' + k);
+  }
+
+  assert.equal(w.provenance.photo_display, '1');
+  assert.equal(w.provenance.regulars_display, '2');
+});
+
+test('AC4: an unevidenced origin reaches the UI as the literal "unknown", never "0"', () => {
+  const w = wsWith({
+    shop_lines: [{ line_no: 1, list_item_id: 1, corrected: false }],
+    list_items: [{ id: 1, status: 'requested', requested_qty: 1 }],
+  });
+
+  // The UI's asdairCount() maps 'unknown' -> null -> an honest gap on screen.
+  // '0' would render as a confident, false claim that no rule fired.
+  assert.equal(w.provenance.rules_display, 'unknown');
+  assert.notEqual(w.provenance.rules_display, '0');
+  assert.ok(Array.isArray(w.provenance.gaps) && w.provenance.gaps.length > 0,
+    'an unknown must arrive with the words that explain it');
+});
+
+test('AC7: every interpretation line carries its own provenance for the exception view', () => {
+  const w = wsWith({
+    shop_lines: [
+      { line_no: 1, list_item_id: 1, corrected: false },
+      { line_no: 2, list_item_id: 2, corrected: true },
+    ],
+    list_items: [
+      { id: 1, status: 'requested', requested_qty: 1, item_name: 'milk' },
+      { id: 2, status: 'requested', requested_qty: 1, item_name: 'bread' },
+      { id: 3, status: 'excluded_this_week', requested_qty: 1, item_name: 'olive oil' },
+    ],
+  });
+
+  const byId = new Map(w.interpretation.lines.map((l) => [String(l.list_item_id), l]));
+  assert.equal(byId.get('1').provenance, 'PHOTO');
+  assert.equal(byId.get('2').provenance, 'WARWICK', 'a corrected line is Warwick\'s');
+  assert.equal(byId.get('3').provenance, 'SKIPPED');
+});
+
+test('AC7: a line nothing speaks for carries NULL provenance, not a guess', () => {
+  const w = wsWith({
+    shop_lines: [],
+    list_items: [{ id: 9, status: 'requested', requested_qty: 1, item_name: 'mystery' }],
+  });
+  assert.equal(w.interpretation.lines[0].provenance, null,
+    'the UI counts an unlabelled line as unattributed - it must not be labelled on a hunch');
+});
+
+test('AC7: the exception-first buckets the UI filters on are all present per line', () => {
+  // The UI splits on `status` (needs_confirmation / possible_duplicate /
+  // unreadable) and on `provenance !== PHOTO`. Both fields must exist on every
+  // line or the default view silently shows everything - the 39-line
+  // proofreading job Warwick refused.
+  const w = wsWith({
+    shop_lines: [{ line_no: 1, list_item_id: 1, corrected: false }],
+    list_items: [{ id: 1, status: 'requested', requested_qty: 1, item_name: 'milk' }],
+  });
+  const l = w.interpretation.lines[0];
+  assert.ok(Object.prototype.hasOwnProperty.call(l, 'status'));
+  assert.ok(Object.prototype.hasOwnProperty.call(l, 'provenance'));
+});

@@ -23,7 +23,14 @@
 
 'use strict';
 
-const TRANSACTION_STATEMENTS = ['BEGIN', 'COMMIT', 'ROLLBACK', 'BEGIN TRANSACTION READ ONLY'];
+// Transaction CONTROL, not data. Savepoints were added WP-B15-35: an optional
+// read (a table not every database has yet) must be able to fail without
+// aborting the surrounding snapshot, and in Postgres only a savepoint achieves
+// that. None of these reads or writes a row.
+const TRANSACTION_STATEMENTS = [
+  'BEGIN', 'COMMIT', 'ROLLBACK', 'BEGIN TRANSACTION READ ONLY',
+  'SAVEPOINT optional_read', 'RELEASE SAVEPOINT optional_read', 'ROLLBACK TO SAVEPOINT optional_read',
+];
 
 // script: [{ match: string|RegExp, rows: array|function(params), repeat?: true }]
 // Steps are matched in order and CONSUMED unless `repeat` is set, so a script

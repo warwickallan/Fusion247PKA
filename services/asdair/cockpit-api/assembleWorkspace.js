@@ -35,6 +35,7 @@ const P = require('./present');
 const { COMMAND_NAMES } = require('./commandSurface');
 const { computeCanonicalState } = require('./canonicalState');
 const { explainState } = require('./explainState');
+const { computeProvenance } = require('./provenance');
 
 // The interpretation vocabulary (services/asdair/interpret/resolveByCatalogue.js).
 const INTERPRETATION_STATUSES = Object.freeze([
@@ -117,7 +118,7 @@ function indexCatalogue(catalogue) {
 // ---------------------------------------------------------------------
 // ONE interpretation line.
 // ---------------------------------------------------------------------
-function buildLine(item, index, cat, alternativesByItem, questionsByItem, seenRegulars) {
+function buildLine(item, index, cat, alternativesByItem, questionsByItem, seenRegulars, itemOrigins) {
   const rawReading = item.raw_reading !== undefined ? item.raw_reading : item.item_name;
   const regularId = item.matched_regular_id === undefined ? null : item.matched_regular_id;
   const regular = cat.get(regularId);
@@ -219,6 +220,15 @@ function buildLine(item, index, cat, alternativesByItem, questionsByItem, seenRe
     plan_status: item.status === undefined ? null : item.status,
     plan_status_display: P.text(item.status),
     note_display: P.text(item.note),
+
+    // AC4/AC7: WHERE THIS LINE CAME FROM. One of PHOTO / REGULARS / RULE /
+    // WARWICK / SKIPPED, or null where nothing durable speaks for it - and
+    // null is left as null, never guessed into the likeliest bucket. The UI
+    // reads `provenance` and counts an unlabelled line as unattributed.
+    provenance: (itemOrigins && itemOrigins.get
+      ? (itemOrigins.get(item.id === undefined || item.id === null ? null : String(item.id)) || null)
+      : null),
+
     integrity_warnings: integrity
   };
 }
@@ -242,7 +252,7 @@ function buildInterpretation(input, cat) {
 
   const seen = new Set();
   const lines = arr(input.list_items).map(function (item, i) {
-    return buildLine(item, i, cat, alternativesByItem, questionsByItem, seen);
+    return buildLine(item, i, cat, alternativesByItem, questionsByItem, seen, input.item_origins);
   });
 
   const tally = { matched: 0, needs_confirmation: 0, unmatched_new_item: 0, unreadable: 0, possible_duplicate: 0 };
@@ -687,6 +697,16 @@ function assembleWorkspace(input) {
     };
   }
 
+  // WHERE EVERY LINE CAME FROM (AC4). Computed once, here, and consumed both
+  // by the summary block and by the per-line labels - so the board and the
+  // breakdown can never attribute the same item to two different origins.
+  const prov = computeProvenance({
+    shop_lines: arr(src.shop_lines),
+    list_items: arr(src.list_items),
+    decisions: arr(src.decisions),
+    source_images: arr(src.source_images),
+    status: status,
+  });
   // Computed ONCE, before the payload is built, so every consumer of this
   // workspace sees the same numbers and the same sentence (AC3).
   const explain = explainState({
@@ -786,7 +806,38 @@ function assembleWorkspace(input) {
       needs_review_display: P.bool(status.needs_review)
     },
 
-    interpretation: buildInterpretation({ shop: shop, list_items: src.list_items, alternatives: src.alternatives, questions: src.questions }, cat),
+    // ── AC4: THE PROVENANCE BREAKDOWN ────────────────────────────────────
+    // `*_display` string fields, because that is the contract the parallel
+    // Cockpit UI built against: it reads each value through its own
+    // asdairCount(), which maps the literal 'unknown' to null and renders an
+    // HONEST GAP rather than a number. P.count() emits exactly that - so an
+    // origin we cannot evidence arrives as 'unknown' and is DISPLAYED as a
+    // gap, never as a fabricated zero.
+    //
+    // The four origins stay separate keys. There is deliberately no combined
+    // 'added by AsdAIr' total anywhere in this block.
+    provenance: {
+      photo_display: P.count(prov.counts.PHOTO),
+      regulars_display: P.count(prov.counts.REGULARS),
+      rules_display: P.count(prov.counts.RULE),
+      warwick_display: P.count(prov.counts.WARWICK),
+      skipped_display: P.count(prov.counts.SKIPPED),
+      unattributed_display: P.count(prov.unattributed),
+
+      source_lines_display: P.count(prov.source_lines),
+      source_read_status_display: P.text(prov.source_read_status),
+      reconciled_products_display: P.count(prov.reconciled_products),
+      final_products_display: P.count(prov.final_products),
+      final_items_display: P.count(prov.final_items),
+      summary_display: P.text(prov.summary),
+
+      // WHAT WE CANNOT EVIDENCE, IN WORDS. Each entry names the missing
+      // mechanism, so a gap on screen can be acted on rather than merely
+      // noticed. Empty means every bucket above is evidenced.
+      gaps: prov.gaps,
+    },
+
+    interpretation: buildInterpretation({ shop: shop, list_items: src.list_items, alternatives: src.alternatives, questions: src.questions, item_origins: prov.item_origins }, cat),
     plan: buildPlan(src, cat),
     questions: buildQuestions(src, cat),
     browser: buildBrowser(status),

@@ -223,3 +223,88 @@ test('the rules read carries the household through and reports it back', async (
   assert.equal(p.household_id_display, '1');
   for (const q of client.issued) assert.deepEqual(q.params, [1]);
 });
+
+// =====================================================================
+// WP-B15-35 AC8 - rules in human terms, and an honest statement of limits.
+// =====================================================================
+
+test('AC8: a rule reads as one human sentence naming who it applies to', () => {
+  const p = assembleRules({
+    rules: [
+      { id: 1, category: 'substitution', scope: 'global', directive: 'info', active: true,
+        rule_text: 'Never automatically substitute products.' },
+      { id: 2, category: 'quantity', scope: 'product', directive: 'info', active: true,
+        rule_text: 'Usually buy 4 x 2L', matched_product: 'Cravendale Semi-Skimmed' },
+    ],
+    rule_qa_log: [],
+  });
+
+  const plain = p.rules.items.map((r) => r.plain_display);
+  assert.equal(plain[0], 'Never automatically substitute products - applies to every shop');
+  assert.equal(plain[1], 'Usually buy 4 x 2L - applies to Cravendale Semi-Skimmed');
+});
+
+test('AC8: no SQL, no enum key and no id leaks into the human sentence', () => {
+  const p = assembleRules({
+    rules: [{ id: 77, category: 'substitution', scope: 'global', directive: 'prefer', active: true,
+      rule_text: 'Prefer the larger pack', match_category: 'dairy' }],
+    rule_qa_log: [],
+  });
+  const s = p.rules.items[0].plain_display;
+  assert.equal(/select|where|null|directive|scope=|category=/i.test(s), false,
+    'the human sentence must not expose data mechanics: ' + s);
+  assert.equal(/\b77\b/.test(s), false, 'a row id is not something Warwick reads');
+});
+
+test('AC8: a rule with no text gets NO invented sentence', () => {
+  const p = assembleRules({
+    rules: [{ id: 3, category: 'quantity', scope: 'global', directive: 'info', active: true, rule_text: null }],
+    rule_qa_log: [],
+  });
+  assert.equal(p.rules.items[0].plain_display, 'unknown',
+    'an unexplained rule must stay visibly unexplained - D-2026-08-03-16 counts these');
+});
+
+test('AC8: the surface states plainly that rule CRUD does NOT exist', () => {
+  const p = assembleRules({ rules: [], rule_qa_log: [] });
+  const m = p.rules.management;
+
+  assert.equal(m.can_read, true);
+  for (const k of ['can_create', 'can_edit', 'can_delete', 'can_deactivate', 'can_reorder']) {
+    assert.equal(m[k], false, k + ' must be false - no such command exists on the AsdAIr surface');
+  }
+  assert.match(m.what_this_screen_cannot_do, /cannot add, edit, delete, switch off or reorder/);
+  assert.match(m.how_rules_are_made, /LEARNED, not typed/);
+});
+
+test('AC8: the claim "no rule command exists" is checked against the real allowlist', async () => {
+  // Not a description of intent. pipeline/commandNames.js IS the allowlist, so
+  // if a rule command is ever added this test fails and the words above must
+  // be corrected in the same change.
+  const { COMMAND_NAMES } = await import('../pipeline/commandNames.js');
+  const ruleCommands = COMMAND_NAMES.filter((n) => /rule/i.test(n));
+  assert.deepEqual(ruleCommands, [],
+    'a rule command now exists - readRules.js\'s management block is claiming otherwise');
+});
+
+test('AC8: the target clause is dropped when the rule text already names it', () => {
+  // Live rulebook, 2026-08-13: "Tomato sauce means Heinz Tomato Ketchup 910g -
+  // applies to Heinz Tomato Ketchup 910g". Saying it twice reads like a
+  // machine talking to itself, which is the database-view feel this Work Order
+  // exists to remove. Found by running the service against real data.
+  const p = assembleRules({
+    rules: [
+      { id: 1, category: 'mapping', scope: 'product', directive: 'info', active: true,
+        rule_text: 'Tomato sauce means Heinz Tomato Ketchup 910g',
+        matched_product: 'Heinz Tomato Ketchup 910g' },
+      { id: 2, category: 'quantity', scope: 'product', directive: 'info', active: true,
+        rule_text: 'Usually buy 4 x 2L', matched_product: 'Cravendale Semi-Skimmed' },
+    ],
+    rule_qa_log: [],
+  });
+
+  assert.equal(p.rules.items[0].plain_display, 'Tomato sauce means Heinz Tomato Ketchup 910g',
+    'the product must not be repeated back at Warwick');
+  assert.equal(p.rules.items[1].plain_display, 'Usually buy 4 x 2L - applies to Cravendale Semi-Skimmed',
+    'but it MUST still be named when the text does not say it');
+});
