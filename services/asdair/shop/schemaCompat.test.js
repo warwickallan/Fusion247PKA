@@ -132,8 +132,32 @@ test('every column the writer INSERTs exists on the table it targets', SKIP, fun
   });
 });
 
+// A column can also arrive on asdair.shop AFTER 006, by ALTER. Migration 020
+// adds `human_state` that way. Collecting those keeps this guard honest in the
+// only direction that matters: a column named in the code but created by NO
+// migration at all still fails, which is the drift the test exists to catch.
+// Widening the parse is not weakening the assertion - the assertion is
+// unchanged, the inventory it checks against is now complete.
+function alterAddedShopColumns() {
+  const dir = path.join(__dirname, '..', 'db');
+  if (!fs.existsSync(dir)) return [];
+  const found = [];
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
+    const sql = fs.readFileSync(path.join(dir, file), 'utf8');
+    const re = /alter\s+table\s+asdair\.shop\s+add\s+column\s+(?:if\s+not\s+exists\s+)?([a-z_][a-z0-9_]*)/gi;
+    let m;
+    while ((m = re.exec(sql)) !== null) found.push(m[1].toLowerCase());
+  }
+  return found;
+}
+
 test('every column the writer UPDATEs or reads back exists on asdair.shop', SKIP, function () {
-  const shop = parseTableColumns(SQL, 'asdair.shop');
+  const shop = parseTableColumns(SQL, 'asdair.shop').concat(alterAddedShopColumns());
+
+  // The inventory must not be empty, or every assertion below would be a check
+  // that passes because it looked at nothing.
+  assert.ok(shop.length > 5, 'parsed a suspiciously small column inventory (' + shop.length + ')');
+
   store._internal.SHOP_UPDATE_ALLOWED_COLUMNS.forEach(function (col) {
     assert.ok(shop.indexOf(col) !== -1, 'asdair.shop has no column "' + col + '"');
   });
@@ -143,6 +167,12 @@ test('every column the writer UPDATEs or reads back exists on asdair.shop', SKIP
   store._internal.SHOP_SELECT_COLUMNS.forEach(function (col) {
     assert.ok(shop.indexOf(col) !== -1, 'asdair.shop has no column "' + col + '"');
   });
+
+  // The specific column WP-B15-35 depends on, named so its absence reads as
+  // itself rather than as a generic drift message.
+  assert.ok(shop.indexOf('human_state') !== -1,
+    'asdair.shop.human_state is created by no migration in db/ - the six-value canonical state has ' +
+    'no durable home');
 });
 
 test('the idempotency indexes the writers rely on are actually in the migration', SKIP, function () {

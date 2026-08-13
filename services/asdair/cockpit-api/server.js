@@ -8,8 +8,20 @@
 // NOT STARTED BY IMPORTING IT. `node server.js` starts it; Larry deploys it.
 // Nothing in this build ever starts it automatically.
 //
-// CONFIG (all from the environment, never from a file this repo reads):
-//   ASDAIR_DB_URL                    the SELECT-only asdair_ro connection string
+// CONFIG (all from the environment, never from a file this repo reads).
+// ⚠️ CONFIG_SPEC near the bottom of this file is the MACHINE-READABLE version
+// of this list and is what validateConfig() enforces at startup (WP-B15-41
+// AC8). This comment is the prose copy; if the two ever disagree, CONFIG_SPEC
+// is the one that runs.
+//   ASDAIR_DB_URL                    the SELECT-only asdair_ro connection string.
+//                                    REQUIRED - the service refuses to start
+//                                    without it rather than opening a port that
+//                                    500s every read.
+//   ASDAIR_WRITE_DB_URL              the asdair_rw connection string. Needed
+//                                    only to APPLY an answer (POST
+//                                    /asdair/answer*). Absent = those routes
+//                                    answer 503 not_configured, in words, and
+//                                    the read surface is unaffected.
 //   ASDAIR_COCKPIT_PORT              default 8710
 //   ASDAIR_COCKPIT_BIND              default 127.0.0.1 (loopback; a tailnet
 //                                    address must be set DELIBERATELY)
@@ -164,21 +176,217 @@ function createServer() {
   });
 }
 
-function start() {
-  const port = Number(process.env.ASDAIR_COCKPIT_PORT || 8710);
-  const bind = process.env.ASDAIR_COCKPIT_BIND || '127.0.0.1';
+// =====================================================================
+// AC8 - STARTUP VALIDATES ITS CONFIG AND FAILS LOUDLY.
+//
+// This service had NO configuration validation. It read every variable at the
+// moment of use, deep inside a request, so a missing ASDAIR_DB_URL produced a
+// listening port that answered every read with a 500 - a process that looks
+// alive and cannot do its job. `node server.js` exited 0 and stayed up.
+//
+// THE RULE: a service that cannot do its job must refuse to start, and it must
+// say which variable and what shape it wanted. It must NOT print the value.
+//
+// ── WHOSE JOB THIS IS, AND WHOSE IT IS NOT ────────────────────────────────
+// The SCHEMA and the validation are the implementer's: which variables exist,
+// what shape each must have, and the service failing fast when one is missing
+// or malformed. The VALUES and their placement are the operator's. That split
+// is why nothing here reads, logs, echoes or interpolates a value - the checks
+// below look at shape and never at content.
+//
+// PORT and BIND are validated because a bad value silently changes the security
+// posture: `ASDAIR_COCKPIT_BIND=0.0.0.0` on a typo would expose a loopback
+// service to the network, so a bind address is a deliberate value or the
+// default, never a fallback from something unparseable.
+// =====================================================================
+
+const CONFIG_SPEC = Object.freeze([
+  {
+    name: 'ASDAIR_DB_URL',
+    required: true,
+    describe: 'the SELECT-only asdair_ro connection string. Every read depends on it.',
+    check: function (v) {
+      return /^postgres(ql)?:\/\/./.test(v) ? null : 'must be a postgres:// or postgresql:// connection string';
+    }
+  },
+  {
+    name: 'ASDAIR_WRITE_DB_URL',
+    // NOT required to start. The read surface is the service's primary job and
+    // is fully useful without it; only the three resolution routes need a
+    // writer, and they answer 503 "not_configured" in words when it is absent.
+    // Refusing to boot a working reader because an optional capability is
+    // unconfigured would be a worse failure than the one this guards against.
+    required: false,
+    describe: 'the asdair_rw connection string. Required only to APPLY an answer '
+      + '(POST /asdair/answer*); the read surface does not need it.',
+    check: function (v) {
+      return /^postgres(ql)?:\/\/./.test(v) ? null : 'must be a postgres:// or postgresql:// connection string';
+    }
+  },
+  {
+    name: 'ASDAIR_COCKPIT_PORT',
+    required: false,
+    describe: 'TCP port. Defaults to 8710.',
+    check: function (v) {
+      const n = Number(v);
+      return Number.isInteger(n) && n > 0 && n < 65536 ? null : 'must be an integer port between 1 and 65535';
+    }
+  },
+  {
+    name: 'ASDAIR_COCKPIT_BIND',
+    required: false,
+    describe: 'bind address. Defaults to 127.0.0.1 (loopback). A tailnet or public address must be set DELIBERATELY.',
+    check: function (v) {
+      return /^[A-Za-z0-9.:_-]+$/.test(v) ? null : 'must be a bare host or IP address';
+    }
+  },
+  {
+    name: 'ASDAIR_COCKPIT_ALLOWED_ORIGIN',
+    required: false,
+    describe: 'exact origin of the cockpit. Unset = no CORS header at all, which is the safe default. There is no "*".',
+    check: function (v) {
+      return /^https?:\/\/[^/]+$/.test(v) ? null : 'must be an exact origin like https://host:port, with no path and no "*"';
+    }
+  },
+  {
+    name: 'ASDAIR_MEDIA_ROOT',
+    required: false,
+    describe: 'directory the retained list photos live under. Unset = /asdair/media is disabled.',
+    check: function () { return null; }
+  }
+]);
+
+/**
+ * PURE. Validate an environment against CONFIG_SPEC.
+ *
+ * Pure and injectable so the rule is EXECUTED by a test rather than asserted in
+ * a comment - the same reason serialiseBody is exported below, and the same
+ * lesson: a check that lives inline in a startup closure cannot be proven.
+ *
+ * @returns {{ok:boolean, errors:string[], warnings:string[], enabled:object}}
+ */
+function validateConfig(env) {
+  const e = env || {};
+  const errors = [];
+  const warnings = [];
+
+  CONFIG_SPEC.forEach(function (spec) {
+    const raw = e[spec.name];
+    const present = raw !== undefined && raw !== null && String(raw).trim() !== '';
+    if (!present) {
+      if (spec.required) errors.push(spec.name + ' is not set - ' + spec.describe);
+      return;
+    }
+    // NOTE: `problem` describes the SHAPE that was wanted. The value never
+    // appears in it, because these strings are printed and a connection string
+    // in a log is a leaked credential.
+    const problem = spec.check(String(raw).trim());
+    if (problem) errors.push(spec.name + ' is malformed - it ' + problem + '. (' + spec.describe + ')');
+  });
+
+  if (!e.ASDAIR_WRITE_DB_URL) {
+    warnings.push('ASDAIR_WRITE_DB_URL is not set, so answers CANNOT be applied. '
+      + 'POST /asdair/answer, /asdair/answer/choose and /asdair/answer/skip will answer 503 not_configured. '
+      + 'The read surface is unaffected.');
+  }
+  if (!e.ASDAIR_COCKPIT_ALLOWED_ORIGIN) {
+    warnings.push('ASDAIR_COCKPIT_ALLOWED_ORIGIN is not set, so no CORS header is sent and a browser '
+      + 'page cannot read this service. That is the safe default, not an error.');
+  }
+  if (!e.ASDAIR_MEDIA_ROOT) {
+    warnings.push('ASDAIR_MEDIA_ROOT is not set, so GET /asdair/media is disabled.');
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors: errors,
+    warnings: warnings,
+    // Which capabilities this configuration actually delivers. Reported at
+    // startup so an operator reads what the service CAN do rather than
+    // inferring it from which warnings did not appear.
+    enabled: {
+      read: !!e.ASDAIR_DB_URL,
+      apply_answers: !!e.ASDAIR_WRITE_DB_URL,
+      media: !!e.ASDAIR_MEDIA_ROOT,
+      browser_access: !!e.ASDAIR_COCKPIT_ALLOWED_ORIGIN
+    }
+  };
+}
+
+/**
+ * @param {{env?:object, exit?:Function, log?:Function, errorLog?:Function}} [options]
+ *        Injected by the tests. Production supplies none of them.
+ */
+function start(options) {
+  const opts = options || {};
+  const env = opts.env || process.env;
+  const log = opts.log || console.log;
+  const errorLog = opts.errorLog || console.error;
+
+  // ── VALIDATE BEFORE LISTENING. The order is the whole point: a port that is
+  // open is a claim that the service works, and this service must not make that
+  // claim before it has checked that it can.
+  const config = validateConfig(env);
+  config.warnings.forEach(function (w) { errorLog('asdair cockpit-api: NOTE - ' + w); });
+
+  if (!config.ok) {
+    errorLog('asdair cockpit-api: REFUSING TO START - configuration is incomplete or malformed.');
+    config.errors.forEach(function (m) { errorLog('  * ' + m); });
+    errorLog('  No port has been opened. Fix the variable(s) above and start again.');
+    // A non-zero exit is what makes this LOUD to a supervisor: a process that
+    // stays up while broken is the failure mode being closed here.
+    const exit = opts.exit || function (code) { process.exit(code); };
+    exit(1);
+    return null;
+  }
+
+  const port = Number(env.ASDAIR_COCKPIT_PORT || 8710);
+  const bind = env.ASDAIR_COCKPIT_BIND || '127.0.0.1';
   const server = createServer();
   server.listen(port, bind, function () {
     // Config only. No connection string, no secret, ever.
-    console.log('asdair cockpit-api listening on ' + bind + ':' + String(port) +
-      ' (read-only; media ' + (process.env.ASDAIR_MEDIA_ROOT ? 'enabled' : 'disabled') + ')');
+    log('asdair cockpit-api listening on ' + bind + ':' + String(port) +
+      ' (reads ' + (config.enabled.read ? 'on' : 'OFF') +
+      '; apply-answers ' + (config.enabled.apply_answers ? 'on' : 'off') +
+      '; media ' + (config.enabled.media ? 'enabled' : 'disabled') + ')');
   });
+
+  // ── A RESTART LOSES NOTHING ─────────────────────────────────────────────
+  //
+  // Because there is nothing to lose: every fact this service reports is read
+  // from Postgres on the request that reports it, and every answer is written
+  // to Postgres before the response is sent. There is no queue, no in-memory
+  // cache, no session, no write-behind buffer and no accumulated state in this
+  // process - the only things held across requests are connection POOLS, which
+  // are pure performance and are rebuilt on demand.
+  //
+  // So recovery is "start it again". This handler exists to make the shutdown
+  // ORDERLY rather than to preserve anything: it stops accepting new work and
+  // closes the pools so the database is not left holding sockets that no
+  // process is on the other end of.
+  //
+  // (Recovery DESIGN is the implementer's; recovery EXECUTION is the
+  // operator's. This is the design half.)
+  const shutdown = function (signal) {
+    log('asdair cockpit-api: ' + signal + ' received - closing. Nothing is buffered, so nothing is lost.');
+    server.close(function () {
+      require('./commandDeps').closeCommandDeps().then(function () {
+        log('asdair cockpit-api: closed.');
+      }).catch(function () { /* shutting down; a failed pool close is not news */ });
+    });
+  };
+  ['SIGINT', 'SIGTERM'].forEach(function (sig) {
+    process.on(sig, function () { shutdown(sig); });
+  });
+
   return server;
 }
 
 module.exports = {
   createServer: createServer,
   start: start,
+  validateConfig: validateConfig,
+  CONFIG_SPEC: CONFIG_SPEC,
   // Exported so the string-vs-JSON rule is EXECUTED by a test rather than
   // asserted in a comment. It was wrong for the checklist's whole lifetime and
   // nothing could have caught it: it lived inline in a closure.

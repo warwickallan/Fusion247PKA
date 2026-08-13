@@ -5,9 +5,14 @@
 // handleRequest() takes a plain {method, path, query, body} and returns a
 // plain {status, body}. server.js binds it to node:http and does nothing else.
 //
-// SEVEN ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
+// TEN ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
 // the count was stale, the list was not. Keep this count honest - ROUTES below
 // is the machine-readable answer and httpApi.test.js asserts the two agree.)
+//
+// WP-B15-41 moved this from SEVEN to TEN: the three resolution routes below.
+// The pinned literal in httpApi.test.js is edited in the same commit, on
+// purpose - that pin exists so growing the surface is a deliberate act, and it
+// has now caught four additions in a row.
 //   GET  /asdair/health     - CAN THIS SERVICE DO ITS JOB. Dependency-aware:
 //                             it connects and runs SELECT 1 before saying yes.
 //                             It used to be a literal `ok: true` and reported
@@ -58,8 +63,46 @@ const ROUTES = Object.freeze([
   'GET /asdair/packet',
   'GET /asdair/checklist',
   'POST /asdair/command',
-  'GET /asdair/media'
+  'GET /asdair/media',
+  // WP-B15-41 AC3. THREE ROUTES OVER ONE UNCHANGED COMMAND. See ANSWER_ROUTES.
+  'POST /asdair/answer',
+  'POST /asdair/answer/choose',
+  'POST /asdair/answer/skip'
 ]);
+
+/**
+ * ── AC3: THE THREE WAYS A QUESTION GETS SETTLED ───────────────────────────
+ *
+ * ⛔ THE COMMAND SURFACE DOES NOT GROW. All three land on `answerQuestion`,
+ *    which already covers every shape and is already first-answer-wins
+ *    idempotent - it returns the existing row unchanged with `changed: false`
+ *    once the question is no longer open. Adding `chooseCandidate` and
+ *    `skipThisWeek` commands would have created a second way to write the same
+ *    row, which is the exact drift commandSurface.js exists to prevent and the
+ *    reason an answer given on the phone clears the question in the cockpit.
+ *
+ * So these are ROUTES: three shapes of one HTTP request onto one command.
+ * POST /asdair/command still forwards the raw command for a caller that wants
+ * it; these exist so a UI does not have to know the spec shape of a pipeline
+ * function in order to answer a question.
+ *
+ *   POST /asdair/answer         { shop, question_key, answer_text }
+ *                               free text          -> answer_source "typed"
+ *   POST /asdair/answer/choose  { shop, question_key, answer_text }
+ *                               a candidate tapped -> answer_source "button"
+ *   POST /asdair/answer/skip    { shop, question_key }
+ *                               "not this week"    -> status skipped
+ *
+ * EACH REPORTS WHETHER THE ANSWER WAS APPLIED, not merely that it was accepted:
+ * `applied` is the durable outcome and `already_answered` separates "you had
+ * already settled this" from "this just landed". Both come from the command's
+ * own report of what the row did - never from this layer assuming it worked.
+ */
+const ANSWER_ROUTES = Object.freeze({
+  '/asdair/answer': { source: 'typed', skip: false, needs_text: true },
+  '/asdair/answer/choose': { source: 'button', skip: false, needs_text: true },
+  '/asdair/answer/skip': { source: 'button', skip: true, needs_text: false }
+});
 
 function json(status, body) {
   return { status: status, headers: { 'content-type': 'application/json; charset=utf-8' }, body: body };
@@ -96,6 +139,29 @@ function resolveMediaPath(rawMediaPath, mediaRoot) {
     return { ok: false, reason: 'outside_media_root' };
   }
   return { ok: true, path: candidate };
+}
+
+/**
+ * WP-B15-41 AC3. Which dependency container does this dispatch use?
+ *
+ * THE RULE, and it is one line so it cannot rot: an INJECTED caller owns its
+ * own implementation, and a real one gets the real container.
+ *
+ *   * `commandDeps` injected  -> use it, whatever it is (including null).
+ *   * `dispatch` or `commands` injected -> the caller has supplied the
+ *     behaviour, so there is nothing for a container to do and building one
+ *     would demand a database that a pure test has no business needing.
+ *   * neither -> the real container, built lazily by commandDeps.js, which is
+ *     the ONLY path that opens a pool.
+ *
+ * Required lazily and inside the guard, so importing httpApi.js still needs
+ * neither `pg` nor an environment variable.
+ */
+function resolveCommandDeps(d) {
+  if (Object.prototype.hasOwnProperty.call(d, 'commandDeps')) return d.commandDeps;
+  if (d.dispatch || d.commands) return undefined;
+  // eslint-disable-next-line global-require
+  return require('./commandDeps').getCommandDeps();
 }
 
 function readBody(body) {
@@ -237,6 +303,109 @@ async function handleRequest(req, deps) {
     });
   }
 
+  // ── AC3: THE THREE RESOLUTION ROUTES ─────────────────────────────────────
+  if (Object.prototype.hasOwnProperty.call(ANSWER_ROUTES, route)) {
+    if (method !== 'POST') {
+      return json(405, { ok: false, error: 'method_not_allowed', message: 'POST only.' });
+    }
+    const shape = ANSWER_ROUTES[route];
+    const body = readBody(req && req.body);
+    if (body === null) {
+      return json(400, { ok: false, error: 'bad_json', message: 'Request body is not valid JSON.' });
+    }
+
+    const shop = body.shop === undefined || body.shop === null ? null : String(body.shop).trim();
+    const questionKey = body.question_key === undefined || body.question_key === null
+      ? '' : String(body.question_key).trim();
+    const answerText = body.answer_text === undefined || body.answer_text === null
+      ? '' : String(body.answer_text).trim();
+
+    // Refused HERE, by name, rather than allowed through to fail somewhere less
+    // legible. A question cannot be answered without knowing which question.
+    if (shop === null || shop === '') {
+      return json(400, { ok: false, error: 'no_shop', message: 'A shop must be named to answer a question.' });
+    }
+    if (questionKey === '') {
+      return json(400, { ok: false, error: 'no_question', message: 'question_key is required - it names which question this answers.' });
+    }
+    if (shape.needs_text && answerText === '') {
+      return json(400, {
+        ok: false,
+        error: 'no_answer_text',
+        message: 'answer_text is required on this route. To settle a question WITHOUT choosing a '
+          + 'product, POST /asdair/answer/skip - which records "not this week" as a real decision '
+          + 'rather than as an empty answer.'
+      });
+    }
+
+    // A shop is named by ref ("SHOP-2026-08-13") or by id, exactly as every GET
+    // route here already accepts. `shopRef` and `shopId` are separate fields on
+    // the command's spec, so which one this is has to be decided rather than
+    // guessed - and an all-digits handle is an id.
+    const byId = /^\d+$/.test(shop);
+    const spec = {
+      [byId ? 'shopId' : 'shopRef']: byId ? Number(shop) : shop,
+      // The audit trail records WHICH surface acted, exactly as the Telegram
+      // path records its responder.
+      actor: 'cockpit:' + String(body.actor || 'warwick'),
+      questionKey: questionKey,
+      answerSource: shape.source,
+      skip: shape.skip,
+    };
+    if (!shape.skip) spec.answerText = answerText;
+
+    const dispatch = d.dispatch || commandSurface.dispatch;
+    let deps;
+    try {
+      deps = resolveCommandDeps(d);
+    } catch (err) {
+      // A missing connection string is a CONFIGURATION failure, not a bad
+      // request, and it must say so in words rather than 500 with a stack.
+      return json(503, {
+        ok: false,
+        error: err && err.code === 'ASDAIR_CONFIG_MISSING' ? 'not_configured' : 'command_failed',
+        applied: false,
+        message: safeMessage(err)
+      });
+    }
+
+    try {
+      const result = await dispatch('answerQuestion', spec, { commands: d.commands, deps: deps });
+      const r = result && typeof result === 'object' ? result : {};
+      return json(200, {
+        ok: true,
+        route: route,
+        question_key: questionKey,
+        // ── THE CONFIRMATION THAT THE ANSWER WAS APPLIED ──────────────────
+        // `changed` is shopStore's own report that the UPDATE hit an open row.
+        // A first answer is applied and changed; a repeat is applied (the row
+        // holds the answer) but NOT changed. Saying "you already answered this"
+        // is more truthful than silently doing nothing AND than pretending it
+        // just landed.
+        applied: r.changed === true || r.already_answered === true,
+        changed: r.changed === true,
+        already_answered: r.already_answered === true,
+        answer_source: shape.source,
+        skipped: shape.skip,
+        result: result === undefined ? null : result
+      });
+    } catch (err) {
+      const code = err && err.code;
+      const status = code === 'ASDAIR_COMMANDS_NOT_BOUND' ? 503
+        : (code === 'ASDAIR_COMMAND_UNKNOWN' || code === 'ASDAIR_COMMAND_FORBIDDEN') ? 400 : 500;
+      // `applied: false` on EVERY failure path. A caller must never have to
+      // infer from an error shape whether the durable row moved.
+      return json(status, {
+        ok: false,
+        error: code || 'command_failed',
+        route: route,
+        question_key: questionKey,
+        applied: false,
+        message: safeMessage(err)
+      });
+    }
+  }
+
   if (route === '/asdair/command') {
     if (method !== 'POST') {
       return json(405, { ok: false, error: 'method_not_allowed', message: 'POST only.' });
@@ -262,7 +431,10 @@ async function handleRequest(req, deps) {
         requested_by: 'cockpit:' + String(body.actor || 'warwick'),
         idempotency_key: body.idempotency_key || null
       });
-      const result = await dispatch(name, args, { commands: d.commands });
+      // AC3. The container the commands are actually called with. Without it
+      // every write command on this route threw on an undefined `deps` before
+      // it reached a row - the surface was bound and never wired.
+      const result = await dispatch(name, args, { commands: d.commands, deps: resolveCommandDeps(d) });
       return json(200, { ok: true, command: name, result: result === undefined ? null : result });
     } catch (err) {
       const code = err && err.code;
@@ -285,5 +457,11 @@ module.exports = {
   handleRequest: handleRequest,
   resolveMediaPath: resolveMediaPath,
   ROUTES: ROUTES,
-  _internal: { json: json, readBody: readBody, safeMessage: safeMessage }
+  ANSWER_ROUTES: ANSWER_ROUTES,
+  _internal: {
+    json: json,
+    readBody: readBody,
+    safeMessage: safeMessage,
+    resolveCommandDeps: resolveCommandDeps
+  }
 };

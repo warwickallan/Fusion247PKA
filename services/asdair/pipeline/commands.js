@@ -335,12 +335,36 @@ export async function correctLine(spec, deps) {
     qty = null;
   }
 
+  // WP-B15-35 AC6. OPTIONAL, AND THE HONEST HALF OF THE SHAPE MISMATCH.
+  //
+  // `shopLines.markCorrected(deps, shopId, lineNo, confirmedBy)` needs an
+  // INTEGER line number. This command has only ever carried an item_name
+  // STRING, so the two could not be joined without either a cast (dishonest -
+  // Number('Cravendale') is NaN) or a guess.
+  //
+  // A caller that KNOWS the line - the Cockpit board renders shop_line rows and
+  // therefore has line_no in hand - may now say so, and the correction is
+  // recorded against that exact line. A caller that does not (Telegram free
+  // text, where Warwick types a product name) omits it, and the pipeline
+  // resolves it by unique name match or records that it could not. Neither
+  // path invents a line number.
+  let lineNo = spec.lineNo;
+  if (lineNo !== undefined && lineNo !== null && lineNo !== '') {
+    lineNo = Number(lineNo);
+    if (!Number.isInteger(lineNo) || lineNo < 1) {
+      throw new Error('commands: correctLine lineNo must be omitted or a positive integer - it is ' +
+        'asdair.shop_line.line_no, never a name');
+    }
+  } else {
+    lineNo = null;
+  }
+
   const recorded = await record(deps, {
     command: COMMANDS.CORRECT_LINE, shop, actor,
     discriminator: normaliseTerm(itemName),
-    payload: { item_name: itemName, requested_qty: qty, status, note: spec.note ?? null },
+    payload: { item_name: itemName, line_no: lineNo, requested_qty: qty, status, note: spec.note ?? null },
   });
-  return receipt(COMMANDS.CORRECT_LINE, shop, recorded, { item_name: itemName });
+  return receipt(COMMANDS.CORRECT_LINE, shop, recorded, { item_name: itemName, line_no: lineNo });
 }
 
 // =====================================================================

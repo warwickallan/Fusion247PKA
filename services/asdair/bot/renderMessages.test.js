@@ -26,6 +26,13 @@ import {
   renderReconciliationSummary,
   renderStatus,
   value,
+  // WO-2026-08-11-B15-COCKPIT-BE-01 AC4, AMENDMENT 2 - the three additive
+  // Cockpit-notification shapes, and the url-button helper they use instead
+  // of callback_data.
+  renderListRead,
+  renderShopReady,
+  renderBasketBuilt,
+  urlButton,
 } from './renderMessages.js';
 import {
   ACTION_VALUES,
@@ -104,6 +111,14 @@ const SAMPLES = {
   // of the confidence gate: the first card that can honestly say how many
   // lines the model itself was unsure about.
   photo_read: { shopRef: REF, productsRead: 41, itemsKnown: 58, needsClarification: 3, implausiblyLow: false },
+  // WO-2026-08-11-B15-COCKPIT-BE-01 AC4, AMENDMENT 2. Telegram's new role
+  // under the Cockpit redesign: three notification-only shapes, each with a
+  // `url` button (not `callback_data`) pointing at the Cockpit - see
+  // renderMessages.js's own "Cockpit notification shapes" section for why
+  // these were not registered until this file was in file_surface too.
+  list_read: { shopRef: REF, lines: 41, regularsAdded: 3, needAttention: 5, cockpitLink: 'https://cockpit.example.ts.net:8443/asdair' },
+  shop_ready: { shopRef: REF, resolvedCount: 41, totalCount: 41, cockpitLink: 'https://cockpit.example.ts.net:8443/asdair' },
+  basket_built: { shopRef: REF, added: 39, missing: 2, cockpitLink: 'https://cockpit.example.ts.net:8443/asdair' },
 };
 
 function everyButton(rendered) {
@@ -133,10 +148,15 @@ test('the catalogue covers every message the directive specifies', () => {
   // - and the other two exist because a refusal that only ever travelled as a
   // Telegram toast did not reach him: the toast expires with "query is too old"
   // and the fallback was a journal line he will never read.
+  // 'basket_built' / 'list_read' / 'shop_ready' added by WO-2026-08-11-B15-
+  // COCKPIT-BE-01 AC4 (AMENDMENT 2) - Telegram's three-shape notification-only
+  // role under the Cockpit redesign. ADDITIVE: nothing above was removed -
+  // their runtime.js/runPipeline.js enqueue callers are a separate, later WP.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
-    'basket_ready', 'clarification_deferred', 'confirm_interpretation', 'confirmation_received',
-    'control_refused', 'failure', 'lines_unresolved', 'photo_read', 'plan_ready', 'progress',
-    'question', 'question_board', 'receipt', 'reconciliation_summary', 'reply_not_taken', 'status',
+    'basket_built', 'basket_ready', 'clarification_deferred', 'confirm_interpretation',
+    'confirmation_received', 'control_refused', 'failure', 'lines_unresolved', 'list_read',
+    'photo_read', 'plan_ready', 'progress', 'question', 'question_board', 'receipt',
+    'reconciliation_summary', 'reply_not_taken', 'shop_ready', 'status',
   ]);
 });
 
@@ -149,6 +169,21 @@ test('EVERY renderer returns { text, reply_markup } with a non-empty text and we
     for (const b of everyButton(out)) {
       assert.equal(typeof b.text, 'string', `${name}: button label`);
       assert.ok(b.text.length > 0 && b.text.length <= MAX_BUTTON_LABEL_CHARS, `${name}: label length`);
+
+      // A URL button (WO-2026-08-11-B15-COCKPIT-BE-01 AC4, AMENDMENT 2) is a
+      // real Telegram link, never a command this runtime dispatches, so it
+      // carries `url` and deliberately NO `callback_data` - urlButton() in
+      // renderMessages.js builds exactly that shape. Assert the URL is a
+      // non-empty string and stop there; the callback-specific checks below
+      // apply only to the callback_data-shaped buttons every other renderer
+      // in this catalogue still uses.
+      if (b.url !== undefined) {
+        assert.equal(b.callback_data, undefined, `${name}: a url button must not also carry callback_data`);
+        assert.equal(typeof b.url, 'string', `${name}: button url`);
+        assert.ok(b.url.length > 0, `${name}: empty button url`);
+        continue;
+      }
+
       assert.ok(byteLength(b.callback_data) <= CALLBACK_DATA_MAX_BYTES, `${name}: callback_data too long`);
       const parsed = parseCallbackData(b.callback_data);
       assert.equal(parsed.ok, true, `${name}: unparseable callback_data ${b.callback_data}`);
@@ -178,10 +213,82 @@ test('no renderer emits a checkout or payment action', () => {
   for (const [name, render] of Object.entries(MESSAGES)) {
     const out = render(SAMPLES[name]);
     for (const b of everyButton(out)) {
+      // A url button (see the note above) has no callback action at all -
+      // it is an external link, not a command this runtime could dispatch,
+      // so there is nothing here for a forbidden-action check to examine.
+      if (b.url !== undefined) continue;
       const { action } = parseCallbackData(b.callback_data);
       assert.ok(!['checkout', 'pay', 'order', 'slot'].includes(action), `${name} offers ${action}`);
     }
   }
+});
+
+// ── WO-2026-08-11-B15-COCKPIT-BE-01 AC4: the three Cockpit notification shapes ──
+// Telegram's role under the Cockpit redesign: notification-only, no
+// per-question decision flow, a url button linking to the Cockpit instead.
+
+test('renderListRead: the real counts and shop ref reach the text, and the Cockpit link is a url button', () => {
+  const out = renderListRead(SAMPLES.list_read);
+  assert.match(out.text, /Lines read:\s*41/);
+  assert.match(out.text, /Regulars added:\s*3/);
+  assert.match(out.text, /Need your attention:\s*5/);
+  assert.match(out.text, new RegExp(REF), 'the shop ref never reached the rendered text');
+  assert.match(out.text, /read/i, 'the card must say what it is confirming - that the list was READ');
+  const buttons = everyButton(out);
+  assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].url, SAMPLES.list_read.cockpitLink);
+  assert.equal(buttons[0].callback_data, undefined, 'a Cockpit link must never also carry a dispatchable command');
+});
+
+test('renderListRead: a missing link renders no button row at all, not a dead one', () => {
+  const out = renderListRead({ shopRef: REF, lines: 10 });
+  assert.deepEqual(out.reply_markup.inline_keyboard, []);
+});
+
+test('renderListRead: missing counts render "unknown", never a fabricated 0', () => {
+  const out = renderListRead({ shopRef: REF });
+  assert.match(out.text, /Lines read:\s*unknown/);
+  assert.match(out.text, /Regulars added:\s*unknown/);
+  assert.match(out.text, /Need your attention:\s*unknown/);
+});
+
+test('renderShopReady: reports resolved-of-total and says nothing is outstanding', () => {
+  const out = renderShopReady(SAMPLES.shop_ready);
+  assert.match(out.text, /Resolved:\s*41 of 41/);
+  assert.match(out.text, /nothing is outstanding/i);
+  assert.match(out.text, /ready to build the basket/i);
+  const buttons = everyButton(out);
+  assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].url, SAMPLES.shop_ready.cockpitLink);
+});
+
+test('renderShopReady: offers no button when no Cockpit link is supplied', () => {
+  const out = renderShopReady({ shopRef: REF, resolvedCount: 5, totalCount: 5 });
+  assert.deepEqual(out.reply_markup.inline_keyboard, []);
+});
+
+test('renderBasketBuilt: reports added/missing and carries the NO-ORDER boundary every basket card states', () => {
+  const out = renderBasketBuilt(SAMPLES.basket_built);
+  assert.match(out.text, /Added:\s*39/);
+  assert.match(out.text, /Missing:\s*2/);
+  assert.match(out.text, /Nothing has been ordered/, 'the basket-built card must restate the no-order boundary');
+  const buttons = everyButton(out);
+  assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].url, SAMPLES.basket_built.cockpitLink);
+});
+
+test('urlButton: builds { text, url } and never a callback_data field, even accidentally', () => {
+  const b = urlButton('Open in Cockpit', 'https://cockpit.example.ts.net:8443/asdair');
+  assert.deepEqual(Object.keys(b).sort(), ['text', 'url']);
+  assert.equal(b.text, 'Open in Cockpit');
+  assert.equal(b.url, 'https://cockpit.example.ts.net:8443/asdair');
+});
+
+test('all three new shapes fail closed on a missing or oversized shopRef, exactly like every other renderer', () => {
+  [renderListRead, renderShopReady, renderBasketBuilt].forEach((render) => {
+    assert.throws(() => render({ shopRef: undefined }), /shopRef/);
+    assert.throws(() => render({ shopRef: 'r'.repeat(MAX_SHOP_REF_BYTES + 1) }), /shopRef/);
+  });
 });
 
 // ── WP-B15-22: the photo read confirmation card ─────────────────────────────

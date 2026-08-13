@@ -165,17 +165,22 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   assert.equal(res.status, 404);
   assert.deepEqual(res.body.routes, ROUTES);
   // Pinned to a LITERAL so growing the surface is a deliberate edit here, never
-  // a silent side effect. It has already done that job THREE times: adding
+  // a silent side effect. It has already done that job FOUR times: adding
   // GET /asdair/rules failed this line before anything else noticed, then
-  // GET /asdair/packet, and then GET /asdair/checklist.
-  assert.equal(ROUTES.length, 7);
+  // GET /asdair/packet, then GET /asdair/checklist, and then WP-B15-41's three
+  // resolution routes (7 -> 10). Each time the number was changed on purpose,
+  // in the same commit as the route, which is exactly what the pin is for.
+  assert.equal(ROUTES.length, 10);
   assert.ok(ROUTES.includes('GET /asdair/rules'));
   assert.ok(ROUTES.includes('GET /asdair/packet'));
   assert.ok(ROUTES.includes('GET /asdair/checklist'));
+  assert.ok(ROUTES.includes('POST /asdair/answer'));
+  assert.ok(ROUTES.includes('POST /asdair/answer/choose'));
+  assert.ok(ROUTES.includes('POST /asdair/answer/skip'));
   // The header comment above ROUTES states a count in prose. Prose rots; this
   // asserts the two agree, which is why the header's stale "THREE" cannot recur.
   const header = require('node:fs').readFileSync(require('node:path').join(__dirname, 'httpApi.js'), 'utf8');
-  assert.ok(/SEVEN ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
+  assert.ok(/TEN ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
 });
 
 test('the packet route forwards the reader payload verbatim', async () => {

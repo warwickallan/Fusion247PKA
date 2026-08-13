@@ -98,8 +98,27 @@ test('a full read issues nothing but SELECTs and returns a complete payload', as
   const client = makeClient(script());
   const payload = await RW.readWorkspace({ shop: 7, household_id: 1, client: client });
 
-  statements(client).forEach((sql) => {
-    assert.match(sql.trim(), /^SELECT\b/, 'non-SELECT statement issued: ' + sql.slice(0, 60));
+  // TRANSACTION CONTROL IS NOT A DATA STATEMENT. Savepoints arrived with
+  // WP-B15-35's optional reads: in Postgres one failed statement aborts the
+  // whole transaction, so an optional read is only optional if it can be
+  // rolled back to a savepoint. These three touch no row.
+  //
+  // The assertion is NOT relaxed - it is made specific. Every DATA statement
+  // must still be a SELECT, and the mutation check is NEW: no INSERT, UPDATE,
+  // DELETE, TRUNCATE, DROP, ALTER or CREATE may appear at all.
+  const TXN_CONTROL = /^(SAVEPOINT|RELEASE SAVEPOINT|ROLLBACK TO SAVEPOINT)/;
+  const seen = statements(client);
+  assert.ok(seen.length > 5, 'a statement sweep over nothing proves nothing (' + seen.length + ')');
+  seen.forEach((sql) => {
+    const t = sql.trim();
+    // ANCHORED, and it must be. An unanchored match fires on the column names
+    // `created_at` and `updated_at`, which every SELECT here carries - and a
+    // check that fails on correct code is a check people learn to delete. A
+    // mutation is issued AS a statement, so its verb is at the start.
+    assert.equal(/^(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE)/i.test(t), false,
+      'a mutating statement reached the read service: ' + t.slice(0, 60));
+    if (TXN_CONTROL.test(t)) return;
+    assert.match(t, /^SELECT /, 'non-SELECT statement issued: ' + t.slice(0, 60));
   });
 
   assert.equal(payload.ok, true);

@@ -44,8 +44,8 @@ function shopRow(overrides) {
 function script(over) {
   const o = over || {};
   const steps = [
-    { match: 'FROM asdair.shop WHERE id = $1', rows: o.shop === undefined ? [shopRow()] : o.shop },
-    { match: 'FROM asdair.shop WHERE shop_ref = $1', rows: o.byRef || [] },
+    { match: 'FROM asdair.shop s WHERE id = $1', rows: o.shop === undefined ? [shopRow()] : o.shop },
+    { match: 'FROM asdair.shop s WHERE shop_ref = $1', rows: o.byRef || [] },
     { match: 'FROM asdair.shopping_list_items', rows: o.items || [] },
     { match: 'FROM asdair.shop_question WHERE shop_id = $1 GROUP BY status', rows: o.questionCounts || [] },
     { match: "FROM asdair.shop_question WHERE shop_id = $1 AND status = 'open'", rows: o.openQuestions || [] },

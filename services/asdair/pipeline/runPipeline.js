@@ -1778,6 +1778,53 @@ async function buildAnswerGrounding(deps, shop, question) {
   };
 }
 
+/**
+ * WP-B15-35 AC6. Resolve a correction to the shop_line it is ABOUT, honestly.
+ *
+ * THE SHAPE MISMATCH THIS EXISTS TO RESOLVE. A correction carries an item_name
+ * STRING; `shopLines.markCorrected` needs an INTEGER line_no. Casting one to
+ * the other is not a resolution, it is a fabrication - Number('Cravendale') is
+ * NaN, and marking line NaN would either throw or silently mark nothing while
+ * reporting success.
+ *
+ * Three outcomes, and the caller is always told which:
+ *   * 'explicit'          - the command carried line_no. The Cockpit board
+ *                           renders shop_line rows, so it knows the number and
+ *                           can now say so (commands.js correctLine).
+ *   * 'unique-name-match' - exactly ONE interpreted line normalises to the same
+ *                           term. Unambiguous, therefore safe to act on.
+ *   * null                - zero matches, or MORE THAN ONE. Nothing is marked
+ *                           and the reason is recorded. Marking the first of
+ *                           several would confirm a line Warwick never looked
+ *                           at, which is worse than not marking at all.
+ */
+function resolveCorrectionLine(correction, interpretedLines) {
+  const explicit = correction.payload && correction.payload.line_no;
+  if (Number.isInteger(explicit) && explicit > 0) {
+    return { line_no: explicit, basis: 'explicit', reason: null };
+  }
+
+  const term = normaliseTerm(correction.payload && correction.payload.item_name);
+  if (term === '') {
+    return { line_no: null, basis: null, reason: 'the correction carries no usable item name' };
+  }
+
+  const matches = (Array.isArray(interpretedLines) ? interpretedLines : [])
+    .filter((l) => normaliseTerm(l.raw_reading) === term || normaliseTerm(l.canonical_name) === term);
+
+  if (matches.length === 1) {
+    return { line_no: Number(matches[0].line_no), basis: 'unique-name-match', reason: null };
+  }
+  return {
+    line_no: null,
+    basis: null,
+    reason: matches.length === 0
+      ? `no interpreted line reads as "${correction.payload.item_name}"`
+      : `${matches.length} interpreted lines read as "${correction.payload.item_name}" - ambiguous, so ` +
+        'none was marked. Re-issue the correction with an explicit line_no.',
+  };
+}
+
 /** APPLY CORRECTIONS. A correction is a new durable intent against the same
  *  list; add_list_item's upsert makes applying it twice a no-op. */
 async function stepApplyCorrections(deps, snapshot) {
@@ -1785,6 +1832,10 @@ async function stepApplyCorrections(deps, snapshot) {
   const listDate = listDateOf(shop.shop_ref);
   const corrections = pendingCommands(snapshot, COMMANDS.CORRECT_LINE);
   const applied = [];
+
+  // Read ONCE for the whole batch, and only when a correction actually has to
+  // be resolved by name.
+  let interpreted = null;
 
   for (const c of corrections) {
     const intents = [{
@@ -1805,8 +1856,47 @@ async function stepApplyCorrections(deps, snapshot) {
     }];
     deps.assertAllowedIntents(intents);
     const written = await deps.executeIntents(intents, { householdId: shop.household_id, listDate });
-    await store.resolveCommand(deps, c.id, 'done', `applied to list ${written.listId}`);
-    applied.push({ item_name: c.payload.item_name, list_id: written.listId });
+
+    // ── WP-B15-35 AC6: THE PRODUCTION CALLER markCorrected NEVER HAD ──────
+    //
+    // A correction IS a human confirmation of that line - which is exactly what
+    // `corrected` means ("a confirmed line is immune to being overwritten by a
+    // later re-read"). Nothing in production called markCorrected until now, so
+    // a re-interpretation could silently overwrite a line Warwick had just
+    // fixed, and the question board kept referring a line he had resolved.
+    // Confirmed against live data on 2026-08-13: `corrected` is false on all
+    // 155 real shop_line rows.
+    //
+    // Ordered AFTER the durable list write deliberately: the correction landing
+    // on the list is the outcome Warwick asked for; marking the line is
+    // provenance about it, and must never be able to lose the correction.
+    if (interpreted === null && !Number.isInteger(c.payload && c.payload.line_no)) {
+      interpreted = await shopLines.listLines(deps, shop.id);
+    }
+    const resolvedLine = resolveCorrectionLine(c, interpreted || []);
+
+    let marked = null;
+    if (resolvedLine.line_no !== null) {
+      marked = await shopLines.markCorrected(
+        deps, shop.id, resolvedLine.line_no, c.payload.actor || 'asdair:pipeline'
+      );
+    }
+
+    const note = resolvedLine.line_no === null
+      ? `applied to list ${written.listId}; line NOT marked corrected (${resolvedLine.reason})`
+      : `applied to list ${written.listId}; line ${resolvedLine.line_no} marked corrected (${resolvedLine.basis})`;
+    await store.resolveCommand(deps, c.id, 'done', note);
+
+    applied.push({
+      item_name: c.payload.item_name,
+      list_id: written.listId,
+      // REPORTED, never swallowed. An unresolvable correction is a real thing
+      // an operator may need to see; a silent null would hide it.
+      line_no: resolvedLine.line_no,
+      marked_corrected: marked !== null,
+      line_match_basis: resolvedLine.basis,
+      line_match_reason: resolvedLine.reason || null,
+    });
   }
 
   return { stepped: applied.length > 0, from: shop.status, to: null, corrections: applied };

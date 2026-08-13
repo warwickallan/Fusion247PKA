@@ -1119,12 +1119,143 @@ export function renderPhotoRead({
   };
 }
 
+// =====================================================================
+// ── 14. Cockpit notification shapes (WO-2026-08-11-B15-COCKPIT-BE-01 AC4,
+//         AMENDMENT 1 additive-only, registered under AMENDMENT 2) ────────
+//
+// The design (`Deliverables/2026-08-11-cockpit-and-vision-pipeline-design.md`
+// Part 2, "Telegram's new role"): Telegram becomes notification-only —
+// "list read", "shop ready", "basket built", each linking to the Cockpit for
+// the actual decision. No card-per-question, no in-Telegram decision flow.
+//
+// THESE THREE ARE NOW REGISTERED IN `MESSAGES` BELOW. They were built first
+// and deliberately left unregistered for one round: registering them broke
+// the then-out-of-surface `renderMessages.test.js` two independent ways -
+// its pinned exact key-set assertion, and its catalogue-wide loops assuming
+// every button is `callback_data`-shaped. Rather than force these renderers
+// into a `callback_data` shape just to satisfy that test (they correctly use
+// `urlButton()` - a real Telegram `url`, never a command this runtime would
+// dispatch, per the design's "link to Cockpit" requirement), `file_surface`
+// was widened by exactly that one file (AMENDMENT 2), which now carries the
+// matching key-set entries, SAMPLES fixtures, and a url-button branch in its
+// two callback_data-assuming loops.
+//
+// ADDITIVE ONLY, STILL. The existing ~12 message kinds above are untouched,
+// and so are their services/asdair/pipeline/runtime.js and runPipeline.js
+// enqueue callers (out of scope for this WP). Collapsing to exactly three is
+// a named follow-on for whichever WP next legitimately touches both the
+// Cockpit and pipeline layers together.
+//
+// Otherwise these follow every rule the rest of this module follows: PURE,
+// plain text, `count()`/`value()` for every dynamic field, nothing fabricated.
+// =====================================================================
+
+/**
+ * PURE. One inline URL button. Deliberately distinct from `button()` above,
+ * which always builds `callback_data` through the protocol — these three
+ * notification cards point at the Cockpit, an external link Telegram opens
+ * directly, never a command this runtime would dispatch. A separate helper
+ * keeps `button()`'s callback_data contract from ever being weakened to
+ * accept a bare URL by mistake.
+ */
+export function urlButton(label, url) {
+  return { text: labelFor(label), url: String(url) };
+}
+
+/**
+ * PURE. Renders no row at all when no link was supplied — the same rule
+ * `renderProgress`'s `checklistPath` already follows: a dead link on a card
+ * someone is holding is worse than the card saying nothing about one.
+ */
+function cockpitLinkRow(cockpitLink) {
+  return typeof cockpitLink === 'string' && cockpitLink.trim() !== ''
+    ? [[urlButton('Open in Cockpit', cockpitLink.trim())]]
+    : [];
+}
+
+/**
+ * PURE. "List read" — role 1 of 3. A list arrived and AsdAIr read it; any
+ * decision happens in the Cockpit, so this card offers no answer buttons of
+ * its own, only a link.
+ *
+ * @param {{shopRef:string, lines?:number, regularsAdded?:number,
+ *          needAttention?:number, cockpitLink?:string}} spec
+ */
+export function renderListRead({
+  shopRef, lines, regularsAdded, needAttention, cockpitLink,
+} = {}) {
+  assertShopRef(shopRef);
+  return {
+    text: block([
+      '📷 Shopping list read',
+      `Ref: ${value(shopRef)}`,
+      `Lines read: ${count(lines)}`,
+      `Regulars added: ${count(regularsAdded)}`,
+      `Need your attention: ${count(needAttention)}`,
+    ]),
+    reply_markup: keyboard(cockpitLinkRow(cockpitLink)),
+  };
+}
+
+/**
+ * PURE. "Shop ready" — role 2 of 3. Every question is answered; building the
+ * basket is an action taken in the Cockpit, never from a Telegram button, so
+ * this card is notification-only.
+ *
+ * @param {{shopRef:string, resolvedCount?:number, totalCount?:number,
+ *          cockpitLink?:string}} spec
+ */
+export function renderShopReady({
+  shopRef, resolvedCount, totalCount, cockpitLink,
+} = {}) {
+  assertShopRef(shopRef);
+  return {
+    text: block([
+      '✅ Shop ready',
+      `Ref: ${value(shopRef)}`,
+      `Resolved: ${count(resolvedCount)} of ${count(totalCount)}`,
+      'Nothing is outstanding — ready to build the basket.',
+    ]),
+    reply_markup: keyboard(cockpitLinkRow(cockpitLink)),
+  };
+}
+
+/**
+ * PURE. "Basket built" — role 3 of 3. The supervised runner finished;
+ * whether it reconciles is reviewed in the Cockpit, never decided from this
+ * card.
+ *
+ * @param {{shopRef:string, added?:number, missing?:number,
+ *          cockpitLink?:string}} spec
+ */
+export function renderBasketBuilt({
+  shopRef, added, missing, cockpitLink,
+} = {}) {
+  assertShopRef(shopRef);
+  return {
+    text: block([
+      '🧺 Basket built',
+      `Ref: ${value(shopRef)}`,
+      `Added: ${count(added)}`,
+      `Missing: ${count(missing)}`,
+      '',
+      NO_ORDER_LINE,
+    ]),
+    reply_markup: keyboard(cockpitLinkRow(cockpitLink)),
+  };
+}
+
 /**
  * The catalogue, by name. Lets a caller (and the test suite) enumerate every
  * renderer without importing them one at a time — the shape test in
  * renderMessages.test.js walks this map, so a NEW renderer added here is
  * automatically covered by the "every renderer returns {text, reply_markup}"
  * and "no secret leaks into rendered output" proofs.
+ *
+ * `renderListRead` / `renderShopReady` / `renderBasketBuilt` ARE registered
+ * below (WO-2026-08-11-B15-COCKPIT-BE-01 AC4, AMENDMENT 2) — see the section
+ * header above them for why they were built first and registered one round
+ * later, once `renderMessages.test.js` itself was in file_surface.
  *
  * ── A KIND WITH NO ENTRY HERE IS A SILENT DROP ──────────────────────────────
  * runtime.js drainOutbox resolves an outbox row whose `kind` is absent from this
@@ -1250,4 +1381,13 @@ export const MESSAGES = Object.freeze({
   reconciliation_summary: renderReconciliationSummary,
   clarification_deferred: renderClarificationDeferred,
   photo_read: renderPhotoRead,
+  // ADDITIVE (AC4, AMENDMENT 2) - the three-shape Cockpit-notification role.
+  // The 16 kinds above stay exactly as they are: their runtime.js/
+  // runPipeline.js callers are unchanged (out of scope for this WP), so
+  // removing any of them here would make drainOutbox silently abandon a
+  // still-enqueued kind. Collapsing to exactly these three is a named
+  // follow-on WP once both layers can legitimately be touched together.
+  list_read: renderListRead,
+  shop_ready: renderShopReady,
+  basket_built: renderBasketBuilt,
 });

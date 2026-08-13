@@ -55,6 +55,22 @@ const EVENTS_SQL =
   'SELECT event_type, from_status, to_status, description, occurred_at ' +
   'FROM asdair.shop_event WHERE shop_id = $1 ORDER BY id ASC LIMIT 500';
 
+// WP-B15-35 AC4. The durable interpretation of the PHOTOGRAPH, and the source
+// image that produced it. SELECT-only, like everything in this reader.
+//
+// Without these two the provenance breakdown cannot say what came from the
+// photograph, and it reports UNKNOWN rather than zero - so a reader that
+// skipped them degrades honestly instead of claiming the photo yielded
+// nothing. Live: shop 26 has 39 shop_line rows, all 39 bound to list items.
+const SHOP_LINES_SQL =
+  'SELECT id, shop_id, line_no, raw_reading, matched_regular_id, match_basis, match_confidence, ' +
+  'status, confirmed_by, corrected, list_item_id ' +
+  'FROM asdair.shop_line WHERE shop_id = $1 ORDER BY line_no ASC';
+
+const SOURCE_IMAGES_SQL =
+  'SELECT shop_id, fingerprint, algo, byte_length, captured_at ' +
+  'FROM asdair.shop_source_image WHERE shop_id = $1 ORDER BY captured_at ASC';
+
 const QUESTIONS_SQL =
   'SELECT id, list_item_id, question_key, question_text, candidates, status, answer_text, ' +
   'answer_source, asked_at, answered_at FROM asdair.shop_question WHERE shop_id = $1 ORDER BY id ASC';
@@ -110,12 +126,28 @@ const COLUMN_PROBE_SQL =
   'SELECT column_name FROM information_schema.columns ' +
   'WHERE table_schema = \'asdair\' AND table_name = $1';
 
+// WP-B15-41 AC9. IS THE PROVENANCE LEDGER ACTUALLY HERE?
+//
+// provenance.js used to STATE, in a comment and in a string that reaches the
+// payload, that migration 020 "has not been applied". That was a dated
+// observation written as a permanent fact, and it went false the same day 020
+// was applied. A pure module cannot see a schema, so it must be TOLD - and the
+// only honest way to tell it is to look.
+//
+// to_regclass returns NULL rather than raising when a table is absent, which is
+// what lets "not there" be answered without aborting the surrounding read-only
+// transaction. Same technique readPacket.js already uses for its two optional
+// tables; deliberately not a new pattern.
+const PROVENANCE_LEDGER_PROBE_SQL =
+  "SELECT to_regclass('asdair.shop_line_provenance') IS NOT NULL AS has_ledger";
+
 // Every statement this module can issue, so the SELECT-only property is
 // testable rather than merely asserted in a comment.
 const ALL_SQL = Object.freeze([
   CURRENT_SHOP_SQL, SHOP_LIST_SQL, SHOP_ROW_SQL, EVENTS_SQL, QUESTIONS_SQL, DECISIONS_SQL, ALTERNATIVES_SQL,
   CATALOGUE_SQL, CONFIRMATION_SQL, CONFIRMATION_LINES_SQL, PREVIOUS_ORDER_SQL,
-  PREVIOUS_ORDER_ITEMS_SQL, ROTATION_RULES_SQL, COLUMN_PROBE_SQL
+  PREVIOUS_ORDER_ITEMS_SQL, ROTATION_RULES_SQL, COLUMN_PROBE_SQL,
+  PROVENANCE_LEDGER_PROBE_SQL
 ]);
 
 // asdair.shopping_list_items columns that always exist (migration 001).
@@ -294,6 +326,71 @@ async function probeItemColumns(client) {
 // decisions known" rather than a 500 - the workspace still reads, it just
 // cannot show the machine-interpreted resolution and falls back to the raw
 // answer_text (assembleWorkspace.js's buildQuestions does that fallback).
+/**
+ * WP-B15-35 AC4. Read a table that may not exist on every database yet.
+ *
+ * Returns [] on "relation does not exist", exactly as readDecisions already
+ * does for migration 017 - a workspace must not 500 because one optional
+ * table has not landed. It returns an ARRAY either way, which is what makes
+ * the provenance breakdown report a real zero rather than an unknown; the
+ * unknown case is a caller that never asked at all.
+ */
+async function readOptional(client, sql, shopId) {
+  // ⚠️ THE SAVEPOINT IS LOAD-BEARING, NOT DEFENSIVE DECORATION.
+  //
+  // In Postgres, ONE failed statement aborts the whole transaction: every
+  // later statement returns "current transaction is aborted" until a rollback.
+  // So a bare try/catch here does NOT make a read optional - it swallows the
+  // error and then the ENTIRE workspace fails on the next query, with a
+  // message pointing nowhere near the cause.
+  //
+  // Found by execution on 2026-08-13: a wrong column list on shop_source_image
+  // took the whole /asdair/workspace route to `read_failed` even though the
+  // read was wrapped in try/catch. The catch was there; it did nothing useful.
+  //
+  // Rolling back to a savepoint discards only the failed statement and leaves
+  // the surrounding read-only snapshot intact, which is what "optional" has
+  // to mean for it to be worth anything.
+  await client.query('SAVEPOINT optional_read');
+  try {
+    const res = rows(await client.query(sql, [shopId]));
+    await client.query('RELEASE SAVEPOINT optional_read');
+    return res;
+  } catch (ignore) {
+    await client.query('ROLLBACK TO SAVEPOINT optional_read');
+    return [];
+  }
+}
+
+/**
+ * WP-B15-41 AC9. Does asdair.shop_line_provenance exist on THIS database?
+ *
+ * Returns true, false, or `null` for "the question could not be asked" - and
+ * null is a first-class answer, not a failure. provenance.js writes a different
+ * gap sentence for each of the three, because "the ledger is empty", "the
+ * ledger is not there" and "nobody looked" have three different fixes and
+ * collapsing them is how the stale claim survived in the first place.
+ *
+ * Wrapped in a savepoint for the same load-bearing reason readOptional is: one
+ * failed statement aborts the whole Postgres transaction, so a bare try/catch
+ * would take the entire workspace down on the NEXT query.
+ */
+async function probeProvenanceLedger(client) {
+  await client.query('SAVEPOINT provenance_probe');
+  try {
+    const res = await client.query(PROVENANCE_LEDGER_PROBE_SQL);
+    await client.query('RELEASE SAVEPOINT provenance_probe');
+    const row = rows(res)[0];
+    return row && row.has_ledger !== undefined && row.has_ledger !== null ? !!row.has_ledger : null;
+  } catch (ignore) {
+    try { await client.query('ROLLBACK TO SAVEPOINT provenance_probe'); } catch (alsoIgnore) { /* the read is over */ }
+    // NOT `false`. A probe that could not run has not established absence, and
+    // reporting absence from a failed probe is the same class of false claim
+    // this whole criterion exists to remove.
+    return null;
+  }
+}
+
 async function readDecisions(client, shopId) {
   try {
     const res = await client.query(DECISIONS_SQL, [shopId]);
@@ -357,7 +454,15 @@ async function gather(client, opts) {
 
   const events = rows(await client.query(EVENTS_SQL, [status.shop_id]));
   const questions = rows(await client.query(QUESTIONS_SQL, [status.shop_id]));
+
+  // AC4. Both are optional in the sense that a database without them must not
+  // 500 the workspace - readOptional treats "relation does not exist" as
+  // "none recorded", exactly as readDecisions already does for migration 017.
+  const shopLines = await readOptional(client, SHOP_LINES_SQL, status.shop_id);
+  const sourceImages = await readOptional(client, SOURCE_IMAGES_SQL, status.shop_id);
   const decisions = await readDecisions(client, status.shop_id);
+  // WP-B15-41 AC9. Asked, not assumed - see probeProvenanceLedger.
+  const provenanceLedgerAvailable = await probeProvenanceLedger(client);
 
   // 4. The list, if one exists yet.
   let listItems = [];
@@ -396,13 +501,16 @@ async function gather(client, opts) {
     alternatives: alternatives,
     questions: questions,
     decisions: decisions,
+    shop_lines: shopLines,
+    source_images: sourceImages,
     catalogue: catalogue,
     confirmation: confirmation,
     confirmation_lines: confirmationLines,
     previous_order: previousOrder,
     previous_order_items: previousOrderItems,
     rotation_rules: rotationRules,
-    all_stages: SHOP_STATUSES
+    all_stages: SHOP_STATUSES,
+    provenance_ledger_available: provenanceLedgerAvailable
   });
 
   payload.shops = shops.map(function (s) {
@@ -435,6 +543,8 @@ module.exports = {
     gather: gather,
     buildItemSelect: buildItemSelect,
     probeItemColumns: probeItemColumns,
+    probeProvenanceLedger: probeProvenanceLedger,
+    PROVENANCE_LEDGER_PROBE_SQL: PROVENANCE_LEDGER_PROBE_SQL,
     readDecisions: readDecisions,
     CURRENT_SHOP_SQL: CURRENT_SHOP_SQL,
     SHOP_ROW_SQL: SHOP_ROW_SQL,
