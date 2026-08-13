@@ -874,3 +874,67 @@ test('R2: the rulebook error path is the module\'s ONE layer - deps.js adds no s
   assert.match(rulebookSrc, /addFlag\(item, 'rulebook not consulted'\)/,
     'skill/rulebook.js no longer flags the lines an unreachable consumer left unjudged');
 });
+
+// =====================================================================
+// WP-B15-35 AC6 - shopLines.markCorrected HAS A PRODUCTION CALLER.
+//
+// The header of this file names it as the outstanding member of the recurring
+// defect class: "`shopLines.markCorrected` still has zero [production
+// callers]. In every case the unit tests were green."
+//
+// It no longer has zero. These assertions are what stops it returning to zero:
+// they read runPipeline.js's own source, so a stub cannot satisfy them and
+// deleting the call is a test failure rather than a silent regression.
+//
+// Live confirmation of what unwired cost, taken read-only on 2026-08-13:
+// `corrected` was false on ALL 155 real asdair.shop_line rows - the flag had
+// never been set by anything, ever.
+// =====================================================================
+
+test('AC6: stepApplyCorrections actually CALLS shopLines.markCorrected', () => {
+  assert.match(runPipelineSrc, /shopLines\.markCorrected\(/,
+    'markCorrected has no production caller again - a corrected line can be silently overwritten by '
+    + 'the next re-read, and the question board keeps referring a line Warwick already resolved');
+
+  // Inside the corrections step specifically, not merely somewhere in the file.
+  const at = runPipelineSrc.indexOf('async function stepApplyCorrections');
+  assert.notEqual(at, -1, 'stepApplyCorrections is gone - re-point this assertion before trusting it');
+  const body = runPipelineSrc.slice(at, at + 3000);
+  assert.match(body, /shopLines\.markCorrected\(/,
+    'the call must live in the corrections step, which is the moment a human confirms a line');
+});
+
+test('AC6: the line number is RESOLVED, never cast from the item name', () => {
+  // The shape mismatch this Work Package was sent to resolve honestly: the
+  // command carries an item_name STRING, markCorrected needs an INTEGER
+  // line_no. A cast would be a fabrication - Number('Cravendale') is NaN.
+  assert.match(runPipelineSrc, /function resolveCorrectionLine\(/,
+    'the resolver is gone - the two shapes are being joined some other way, check it is honest');
+
+  const at = runPipelineSrc.indexOf('function resolveCorrectionLine');
+  const body = runPipelineSrc.slice(at, at + 2000);
+
+  assert.match(body, /Number\.isInteger\(explicit\)/,
+    'an explicitly supplied line_no must be integer-checked, not trusted');
+  assert.match(body, /matches\.length === 1/,
+    'a name must resolve only on a UNIQUE match - marking the first of several would confirm a line '
+    + 'Warwick never looked at');
+  assert.equal(/Number\(\s*correction\.payload\.item_name\s*\)/.test(body), false,
+    'the item name must never be cast to a number');
+});
+
+test('AC6: an unresolvable correction is REPORTED, and still applies to the list', () => {
+  const at = runPipelineSrc.indexOf('async function stepApplyCorrections');
+  const body = runPipelineSrc.slice(at, at + 3000);
+
+  // The correction reaching the list is the outcome Warwick asked for. Marking
+  // the line is provenance about it, and must never be able to lose it.
+  const writeAt = body.indexOf('deps.executeIntents');
+  const markAt = body.indexOf('shopLines.markCorrected');
+  assert.ok(writeAt !== -1 && markAt !== -1 && writeAt < markAt,
+    'the durable list write must happen BEFORE the line is marked, so a failure to mark cannot lose '
+    + 'the correction itself');
+
+  assert.match(body, /line_match_reason/,
+    'a correction that could not be resolved to a line must say why, not return a silent null');
+});

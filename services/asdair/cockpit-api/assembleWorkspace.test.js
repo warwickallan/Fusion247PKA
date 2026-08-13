@@ -523,3 +523,77 @@ test('history reports what the shop taught the household', () => {
   assert.deepEqual(p.history.aliases_learned.map((r) => r.regular_id_display), ['12']);
   assert.deepEqual(p.history.product_ids_captured.map((r) => r.asda_product_id_display), ['A-1003']);
 });
+
+// =====================================================================
+// WP-B15-35 - the canonical state seam and the one truthful sentence, as the
+// UI actually receives them. These assert the PAYLOAD shape the parallel
+// Cockpit UI work package is building against.
+// =====================================================================
+
+test('WP-B15-35: the payload carries canonical_state, its SOURCE, and why', () => {
+  const w = assembleWorkspace({
+    status: {
+      shop_id: 1, shop_ref: 'SHOP-2026-08-13', household_id: 1,
+      stage: 'NEEDS_DECISION', stage_label: 'waiting on your answers',
+      human_state: 'NEEDS_WARWICK', human_state_source: 'column',
+      needs_review: true, is_terminal: false,
+    },
+    questions: [{ question_key: 'q:1', status: 'open', line_no: 1 }],
+    lines: [{ line_no: 1, status: 'needs_confirmation', corrected: false }],
+    items: [],
+  });
+
+  assert.equal(w.ok, true);
+  assert.equal(w.shop.canonical_state, 'NEEDS_WARWICK');
+  assert.equal(w.shop.canonical_state_source, 'column');
+  assert.equal(w.shop.why.sentence, '1 decision still needs you.');
+  assert.equal(w.shop.why.counts.decisions_needing_warwick, 1);
+});
+
+test('WP-B15-35: canonical_state_source reports "derived" when the column is absent', () => {
+  // The live condition on 2026-08-13. The UI must be able to show that the
+  // value is not durable rather than being told a comfortable lie.
+  const w = assembleWorkspace({
+    status: {
+      shop_id: 1, shop_ref: 'SHOP-2026-08-13', household_id: 1,
+      stage: 'PROCESSING', stage_label: 'working through the list',
+      human_state: 'ASDAIR_WORKING', human_state_source: 'derived',
+      needs_review: false, is_terminal: false,
+    },
+    questions: [], lines: [], items: [{ status: 'requested' }, { status: 'pending' }],
+  });
+
+  assert.equal(w.shop.canonical_state_source, 'derived');
+  assert.equal(w.shop.why.sentence, 'Nothing needs you. AsdAIr is reconciling 2 products.');
+});
+
+test('WP-B15-35: the sentence and the counter in the payload cannot disagree', () => {
+  // Same construction as explainState.test.js's contradiction case, asserted
+  // here at the API boundary - because that is where the UI reads them, and a
+  // disagreement there is what Warwick would actually see.
+  const w = assembleWorkspace({
+    status: {
+      shop_id: 1, shop_ref: 'SHOP-2026-08-13', household_id: 1,
+      stage: 'NEEDS_DECISION', stage_label: 'waiting on your answers',
+      human_state: 'NEEDS_WARWICK', human_state_source: 'column',
+      needs_review: true, is_terminal: false,
+    },
+    questions: [
+      { question_key: 'q:1', status: 'open', line_no: 1 },
+      { question_key: 'q:2', status: 'open', line_no: 2 },
+      { question_key: 'q:3', status: 'open', line_no: 3 },
+    ],
+    lines: [
+      { line_no: 1, status: 'matched', corrected: false },
+      { line_no: 2, status: 'needs_confirmation', corrected: true },
+      { line_no: 3, status: 'needs_confirmation', corrected: false },
+    ],
+    items: [],
+  });
+
+  const n = w.shop.why.counts.decisions_needing_warwick;
+  assert.equal(n, 1, 'two of the three open questions are about resolved lines');
+  assert.match(w.shop.why.sentence, new RegExp('^' + n + ' decision'),
+    'the sentence must quote the same number the badge renders');
+  assert.equal(w.shop.why.counts.stale_questions_suppressed, 2);
+});

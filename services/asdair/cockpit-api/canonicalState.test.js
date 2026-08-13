@@ -26,9 +26,9 @@ test('every real pipeline stage is mapped - no silent fallthrough for a new stag
 });
 
 test('an unknown or missing stage is refused loudly, never guessed', () => {
-  assert.throws(() => computeCanonicalState({ stage: 'NOT_A_REAL_STAGE' }), /unknown or missing stage/);
-  assert.throws(() => computeCanonicalState({}), /unknown or missing stage/);
-  assert.throws(() => computeCanonicalState(null), /unknown or missing stage/);
+  assert.throws(() => computeCanonicalState({ stage: 'NOT_A_REAL_STAGE' }), /unknown or missing st(age|atus)/);
+  assert.throws(() => computeCanonicalState({}), /unknown or missing st(age|atus)/);
+  assert.throws(() => computeCanonicalState(null), /unknown or missing st(age|atus)/);
 });
 
 test('FAILED is unconditional, even if needs_review is somehow also true', () => {
@@ -36,9 +36,17 @@ test('FAILED is unconditional, even if needs_review is somehow also true', () =>
   assert.equal(computeCanonicalState({ stage: 'FAILED', needs_review: false }), 'FAILED');
 });
 
-test('RECONCILED and CANCELLED are both COMPLETE, unconditionally', () => {
+test('RECONCILED is COMPLETE and CANCELLED is FAILED, both unconditionally', () => {
   assert.equal(computeCanonicalState({ stage: 'RECONCILED', needs_review: true }), 'COMPLETE');
-  assert.equal(computeCanonicalState({ stage: 'CANCELLED', needs_review: true }), 'COMPLETE');
+
+  // WP-B15-35: CANCELLED was COMPLETE here and in migration 020's proposed
+  // default. OVERRULED (Larry, 2026-08-13): "Complete" tells Warwick his shop
+  // is done, which for a cancelled shop implies groceries are coming when
+  // nothing was ordered. FAILED is imprecise - cancellation is deliberate, not
+  // breakage - but imprecise in the SAFE direction, and explainState.js
+  // carries the nuance the closed six-value set cannot
+  // ("This shop was cancelled. Nothing was ordered.").
+  assert.equal(computeCanonicalState({ stage: 'CANCELLED', needs_review: true }), 'FAILED');
 });
 
 test('needs_review escalates a live, non-terminal stage to NEEDS_WARWICK even outside NEEDS_DECISION', () => {

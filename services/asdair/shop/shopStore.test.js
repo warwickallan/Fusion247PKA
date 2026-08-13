@@ -29,6 +29,14 @@ const path = require('node:path');
 const store = require('./shopStore');
 const { makeClient, statements, shapes, countMatching, indexOfMatching } = require('./fakeClient');
 
+// WP-B15-35. Pre-seed the human_state capability probe as ABSENT for this file,
+// so every existing statement-sequence assertion below is unchanged - they
+// assert the exact order and COUNT of statements in a transition, which is the
+// guarantee this file exists to hold, and a capability lookup must not be
+// allowed to erode it. The probe and the column write have their own dedicated
+// cases at the END of this file, where the sequence is asserted deliberately.
+store._internal._setHumanStateProbe(false);
+
 const HH = 1;
 const SHOP_ID = 42;
 
@@ -671,8 +679,13 @@ test('the shop UPDATE is built from an allowlist that excludes identity and evid
   // text) is deliberately still absent from this allowlist and must stay so.
   assert.equal(allowed.indexOf('transcript'), -1,
     'the raw transcript text must never be settable while progressing a shop - only its provenance/summary');
+  // WP-B15-35: `human_state` added. It is a DERIVED PROJECTION of `status`,
+  // written by the same statement, and carries no evidence and no identity -
+  // which is why it belongs on this list while `transcript` still does not.
+  // The literal is pinned here, outside the source it checks, so adding a
+  // column to the allowlist is a deliberate two-file act rather than a drift.
   assert.deepEqual(allowed, [
-    'status', 'last_error', 'list_id',
+    'status', 'human_state', 'last_error', 'list_id',
     'transcript_provider', 'transcript_model', 'transcript_confidence',
   ]);
   assert.deepEqual(store._internal.SHOP_UPDATE_LITERALS, { updated_at: 'now()' });
@@ -697,4 +710,130 @@ test('pg is required lazily, so the pure paths load with no dependencies install
   assert.equal(/^const .*require\(['"]pg['"]\)/m.test(code), false,
     'pg must not be required at module scope');
   assert.match(code, /const \{ Pool \} = require\('pg'\)/);
+});
+
+// =====================================================================
+// WP-B15-35 - shop.human_state: the capability probe and the column write.
+//
+// THE SEAM AC1 EXISTS TO CLOSE. Migration 020 defines asdair.shop.human_state
+// and hands the mapping to this code path. Verified read-only against the live
+// database on 2026-08-13, the migration is NOT applied there - so the write
+// must be capability-gated or every transition in production would fail on a
+// column that does not exist.
+//
+// These cases prove BOTH branches, and prove the gate reports itself rather
+// than degrading silently.
+// =====================================================================
+
+/** The probe is process-cached, so each case below sets the state it needs. */
+function withProbe(present, fn) {
+  return async function () {
+    store._internal._setHumanStateProbe(present);
+    try { await fn(); } finally { store._internal._setHumanStateProbe(false); }
+  };
+}
+
+test('WHEN THE COLUMN EXISTS the transition writes human_state beside status',
+  withProbe(true, async function () {
+    const client = makeClient([
+      { match: 'FROM asdair.shop WHERE id = $1 FOR UPDATE', rows: [shopRow({ status: 'RECEIVED' })] },
+      { match: 'UPDATE asdair.shop SET', rows: [shopRow({ status: 'PROCESSING' })] },
+      { match: 'INSERT INTO asdair.shop_event', rows: [{ id: 7, occurred_at: 'now' }] }
+    ]);
+
+    await store.transition(SHOP_ID, 'PROCESSING', 'list parsed', { client: client });
+
+    const update = client.log[2];
+    assert.match(update.sql, /human_state = \$\d+/,
+      'the canonical column must be written by the SAME statement that moves status');
+    assert.ok(update.params.indexOf('ASDAIR_WORKING') !== -1,
+      'PROCESSING must persist as ASDAIR_WORKING - the value the readers derive for it');
+  }));
+
+test('WHEN THE COLUMN IS ABSENT the transition still works and writes no human_state',
+  withProbe(false, async function () {
+    // The production reality tonight. A shop must still be able to progress.
+    const client = makeClient([
+      { match: 'FROM asdair.shop WHERE id = $1 FOR UPDATE', rows: [shopRow({ status: 'RECEIVED' })] },
+      { match: 'UPDATE asdair.shop SET', rows: [shopRow({ status: 'PROCESSING' })] },
+      { match: 'INSERT INTO asdair.shop_event', rows: [{ id: 7, occurred_at: 'now' }] }
+    ]);
+
+    const result = await store.transition(SHOP_ID, 'PROCESSING', 'list parsed', { client: client });
+    assert.equal(result.changed, true, 'a missing column must never block the week');
+
+    const update = client.log[2];
+    assert.equal(/human_state/.test(update.sql), false,
+      'writing a column the database does not have would 500 every transition');
+  }));
+
+test('needs_review escalates the PERSISTED value, not just the displayed one',
+  withProbe(true, async function () {
+    const client = makeClient([
+      { match: 'FROM asdair.shop WHERE id = $1 FOR UPDATE', rows: [shopRow({ status: 'RECEIVED', needs_review: true })] },
+      { match: 'UPDATE asdair.shop SET', rows: [shopRow({ status: 'PROCESSING' })] },
+      { match: 'INSERT INTO asdair.shop_event', rows: [{ id: 7, occurred_at: 'now' }] }
+    ]);
+
+    await store.transition(SHOP_ID, 'PROCESSING', 'list parsed', { client: client });
+
+    assert.ok(client.log[2].params.indexOf('NEEDS_WARWICK') !== -1,
+      'a shop flagged needs_review must persist as NEEDS_WARWICK, or Telegram and Cockpit would ' +
+      'read a durable value that disagrees with what the reader derives');
+  }));
+
+test('recordFailure persists FAILED as the human state too',
+  withProbe(true, async function () {
+    const client = makeClient([
+      { match: 'FROM asdair.shop WHERE id = $1 FOR UPDATE', rows: [shopRow({ status: 'PROCESSING' })] },
+      { match: 'UPDATE asdair.shop SET', rows: [shopRow({ status: 'FAILED' })] },
+      { match: 'INSERT INTO asdair.shop_event', rows: [{ id: 9, occurred_at: 'now' }] }
+    ]);
+
+    await store.recordFailure(SHOP_ID, 'gateway refused', { client: client });
+
+    assert.ok(client.log[2].params.indexOf('FAILED') !== -1,
+      'a parked shop must not keep reporting the state it was in before it broke');
+  }));
+
+test('the probe asks the CATALOGUE, never the shop table, and caches its answer', async function () {
+  store._internal._resetHumanStateProbe();
+  try {
+    const client = makeClient([
+      { match: 'information_schema.columns', rows: [{ '?column?': 1 }], repeat: true }
+    ]);
+
+    assert.equal(await store._internal.hasHumanStateColumn(client), true);
+    assert.equal(await store._internal.hasHumanStateColumn(client), true);
+
+    assert.equal(client.log.length, 1, 'the probe must run ONCE per process, not once per transition');
+    assert.match(client.log[0].sql, /information_schema\.columns/);
+    assert.equal(/FROM asdair\.shop\b/.test(client.log[0].sql), false,
+      'the probe must not read a single row of shop data');
+  } finally {
+    store._internal._setHumanStateProbe(false);
+  }
+});
+
+test('an ABSENT column is reported loudly on stderr, once, naming the migration', async function () {
+  store._internal._resetHumanStateProbe();
+  const written = [];
+  const realError = console.error;
+  console.error = function (line) { written.push(String(line)); };
+
+  try {
+    const client = makeClient([{ match: 'information_schema.columns', rows: [], repeat: true }]);
+    assert.equal(await store._internal.hasHumanStateColumn(client), false);
+    await store._internal.hasHumanStateColumn(client);
+  } finally {
+    console.error = realError;
+    store._internal._setHumanStateProbe(false);
+  }
+
+  assert.equal(written.length, 1, 'exactly one warning per process - loud, not a log flood');
+  const parsed = JSON.parse(written[0]);
+  assert.equal(parsed.level, 'warn');
+  assert.equal(parsed.event, 'human_state_column_absent');
+  assert.match(parsed.migration, /020_shop_line_provenance_and_human_state\.sql/,
+    'the warning must name the migration that has not been run, or nobody can act on it');
 });

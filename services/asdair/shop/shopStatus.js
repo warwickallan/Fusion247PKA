@@ -39,6 +39,10 @@
 
 const { SHOP_STATUSES, isShopRef, _internal: stateInternal } = require('./shopState');
 
+// THE one six-value derivation, shared with the writer (shopStore.js) so the
+// durable value and the derived value cannot differ in content.
+const { resolveHumanState } = require('./humanState');
+
 const toDbId = stateInternal.toDbId;
 
 // A human sentence per stage, so every surface (Telegram, cockpit, CLI) says
@@ -64,15 +68,32 @@ const STAGE_LABELS = {
 const RESOLVED_ITEM_STATUSES = ['added', 'not_added', 'excluded_this_week'];
 const OPEN_ITEM_STATUSES = ['requested', 'needs_decision'];
 
+// THE COLUMN-TOLERANT READ OF human_state (WP-B15-35 AC1).
+//
+// `to_jsonb(s) ->> 'human_state'` returns the column's value where migration
+// 020 has been applied, and SQL NULL where it has not - WITHOUT erroring, and
+// without a capability probe or a second statement. Verified by execution
+// against the live database on 2026-08-13, where the column does NOT exist:
+// the expression returns null for every row rather than failing the query.
+//
+// This matters because the alternative was a plain `s.human_state`, which would
+// take the whole Cockpit down the moment it met a database the migration had not
+// reached. A reader must degrade to an honest null, never to a 500.
+//
+// What happens to that null is NOT decided here: shop/humanState.js's
+// resolveHumanState() derives the value from `status` instead and REPORTS that
+// it did so, so a missing migration is visible in the payload rather than
+// papered over.
+const SHOP_COLUMNS_SQL =
+  'id, household_id, shop_ref, status, source_kind, list_id, needs_review, ' +
+  'transcript_confidence, last_error, created_at, updated_at, ' +
+  "to_jsonb(s) ->> 'human_state' AS human_state";
+
 const SHOP_BY_ID_SQL =
-  'SELECT id, household_id, shop_ref, status, source_kind, list_id, needs_review, ' +
-  'transcript_confidence, last_error, created_at, updated_at ' +
-  'FROM asdair.shop WHERE id = $1';
+  'SELECT ' + SHOP_COLUMNS_SQL + ' FROM asdair.shop s WHERE id = $1';
 
 const SHOP_BY_REF_SQL =
-  'SELECT id, household_id, shop_ref, status, source_kind, list_id, needs_review, ' +
-  'transcript_confidence, last_error, created_at, updated_at ' +
-  'FROM asdair.shop WHERE shop_ref = $1 ORDER BY id ASC';
+  'SELECT ' + SHOP_COLUMNS_SQL + ' FROM asdair.shop s WHERE shop_ref = $1 ORDER BY id ASC';
 
 const ITEM_COUNTS_SQL =
   'SELECT status, count(*)::int AS n FROM asdair.shopping_list_items WHERE list_id = $1 GROUP BY status';
@@ -391,6 +412,10 @@ async function project(client, handle, opts) {
 
   const lastEvent = firstRow(await client.query(LAST_EVENT_SQL, [shop.id]));
 
+  // Resolved ONCE, here, from the row this projection already holds. Nothing
+  // downstream re-derives it - that is the whole of AC2.
+  const humanState = resolveHumanState(shop);
+
   return {
     shop_id: shop.id,
     shop_ref: shop.shop_ref,
@@ -403,6 +428,14 @@ async function project(client, handle, opts) {
     stage_label: STAGE_LABELS[shop.status] || shop.status,
     is_terminal: shop.status === 'RECONCILED' || shop.status === 'CANCELLED',
     needs_review: shop.needs_review === undefined ? null : shop.needs_review,
+
+    // THE ONE canonical six-value human-facing state (WP-B15-35 AC1/AC2).
+    // Read from the durable column when migration 020 has been applied;
+    // derived by the SAME mapping the writer uses when it has not - and
+    // `human_state_source` says which, so nobody has to guess whether the
+    // value they are looking at is durable.
+    human_state: humanState.human_state,
+    human_state_source: humanState.source,
     transcript_confidence: toNumberOrNull(shop.transcript_confidence),
 
     list_id: shop.list_id === undefined ? null : shop.list_id,

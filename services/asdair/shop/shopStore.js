@@ -75,6 +75,11 @@ const {
   _internal: stateInternal
 } = require('./shopState');
 
+// THE one six-value mapping (WP-B15-35 AC1/AC2). Imported, never re-derived:
+// every reader calls the same function, so the value this module writes and the
+// value a reader computes when the column is absent cannot differ.
+const { humanStateFor } = require('./humanState');
+
 const toDbId = stateInternal.toDbId;
 const requireText = stateInternal.requireText;
 
@@ -118,8 +123,16 @@ const PENDING_SELECT_LIST =
 // METADATA ONLY - provenance and a confidence summary - never the reading,
 // the prompt or the photo; that sanitisation is store.recordGroundingEvidence's
 // own deliberate privacy decision and stays undisturbed here.
+//
+// `human_state` added WP-B15-35 (migration 020 section 5). It is written by
+// THIS path and no other, which is the whole point of the column: migration 020
+// says in as many words that it must be "written by the SAME code path that
+// already transitions shop.status, so Cockpit and Telegram only ever SELECT
+// this column and never independently derive their own reading of it". It is
+// therefore set beside `status` in applyTransition's callers, never on its own,
+// and it is IMPOSSIBLE for a status change to leave it stale.
 const SHOP_UPDATE_ALLOWED_COLUMNS = [
-  'status', 'last_error', 'list_id',
+  'status', 'human_state', 'last_error', 'list_id',
   'transcript_provider', 'transcript_model', 'transcript_confidence',
 ];
 
@@ -394,6 +407,113 @@ async function recordShopCreated(client, shop, built, supersededRef) {
 // the whole operation to ROLLBACK with a clear message - rather than
 // overwriting a status the validation never saw.
 //
+// ---------------------------------------------------------------------
+// THE human_state CAPABILITY PROBE (WP-B15-35 AC1).
+//
+// WHY A PROBE AND NOT A PLAIN COLUMN WRITE. Migration 020 is committed to this
+// repository. Verified read-only against the live database on 2026-08-13, it
+// HAS NOT BEEN APPLIED there: `asdair.shop` carries no `human_state` column.
+// An unconditional `SET human_state = $n` would therefore take down every
+// status transition in production - a lost week, caused by a column that is
+// meant to make the product clearer.
+//
+// So the write is capability-gated, and the gate has exactly two honest
+// outcomes, never a silent third:
+//   * column present -> it is written, always, beside status.
+//   * column absent  -> it is skipped, AND A LOUD ONE-TIME WARNING IS EMITTED
+//                       naming the migration that has not been run. The
+//                       Cockpit reader independently reports `source:
+//                       "derived"` for the same shop, so the condition is
+//                       visible from both ends rather than inferred.
+//
+// The probe runs ONCE per process and is cached. It is a catalogue lookup, not
+// a table read: no rows of shop data are touched by it.
+//
+// THIS GATE IS TEMPORARY BY DESIGN. Once migration 020 is applied, the column
+// is always present and `_resetHumanStateProbe` exists only for the tests.
+// Deleting the gate is safe the day the migration is confirmed applied
+// everywhere; deleting it before then reintroduces the outage above.
+// ---------------------------------------------------------------------
+const HUMAN_STATE_COLUMN_SQL =
+  "SELECT 1 FROM information_schema.columns " +
+  "WHERE table_schema = 'asdair' AND table_name = 'shop' AND column_name = 'human_state'";
+
+let humanStateColumnPresent = null;   // null = not yet probed
+let humanStateWarningEmitted = false;
+
+async function hasHumanStateColumn(client) {
+  if (humanStateColumnPresent !== null) return humanStateColumnPresent;
+
+  // FAILS SAFE, DELIBERATELY. If the catalogue cannot be read at all - a role
+  // without information_schema visibility, a client that does not implement it
+  // - the answer is "absent", never an exception. This is a PROVENANCE
+  // ENHANCEMENT to a status transition; it must never be able to stop a shop
+  // progressing. The one-time warning below still fires, so a probe that
+  // cannot run is loud rather than invisible.
+  let res;
+  try {
+    res = await client.query(HUMAN_STATE_COLUMN_SQL);
+  } catch {
+    res = null;
+  }
+  humanStateColumnPresent = res !== null && rowCount(res) === 1;
+
+  if (!humanStateColumnPresent && !humanStateWarningEmitted) {
+    humanStateWarningEmitted = true;
+    // Structured, one line, on stderr. NOT thrown: the shop must still be able
+    // to progress. NOT silent: a missing canonical column is exactly the kind
+    // of thing that otherwise gets discovered weeks later.
+    console.error(JSON.stringify({
+      level: 'warn',
+      component: 'asdair.shopStore',
+      event: 'human_state_column_absent',
+      migration: 'db/020_shop_line_provenance_and_human_state.sql',
+      effect: 'shop.human_state is NOT being written; Cockpit and Telegram fall back to deriving ' +
+        'the six-value state from shop.status. Content is identical (one shared mapping in ' +
+        'shop/humanState.js) but the value is not durable. Apply migration 020 to close this.',
+    }));
+  }
+
+  return humanStateColumnPresent;
+}
+
+/** Tests only. The probe is process-cached; this clears it between cases. */
+function _resetHumanStateProbe() {
+  humanStateColumnPresent = null;
+  humanStateWarningEmitted = false;
+}
+
+/**
+ * Tests only. Pre-seed the cached answer so a case does not spend a statement
+ * on the catalogue lookup.
+ *
+ * WHY THIS EXISTS RATHER THAN THE TESTS SCRIPTING THE PROBE: shopStore.test.js
+ * asserts the EXACT statement sequence of a transition ("read under a row lock,
+ * write the status, write the event, commit - with nothing between the UPDATE
+ * and its event"). That assertion is the point of the file and must not be
+ * loosened to accommodate a capability lookup. Pre-seeding keeps every existing
+ * sequence assertion byte-for-byte intact while the probe stays fully exercised
+ * by its own dedicated cases.
+ */
+function _setHumanStateProbe(present) {
+  humanStateColumnPresent = present === null ? null : Boolean(present);
+  humanStateWarningEmitted = true;
+}
+
+/**
+ * Add `human_state` to a transition's SET, when the database can take it.
+ *
+ * Derived by shop/humanState.js - THE one mapping, shared with every reader, so
+ * the value written here and the value a reader derives when the column is
+ * absent are the same value by construction and not by agreement.
+ */
+async function withHumanState(client, set, toStatus, shopRow) {
+  if (!(await hasHumanStateColumn(client))) return set;
+  return Object.assign({}, set, {
+    human_state: humanStateFor(toStatus, { needs_review: shopRow ? shopRow.needs_review : null }),
+  });
+}
+
 async function applyTransition(client, spec) {
   const params = [];
   const assignments = [];
@@ -476,7 +596,7 @@ async function transition(shopId, toStatus, description, options) {
       shop_id: id,
       from_status: shop.status,
       to_status: built.to_status,
-      set: { status: built.to_status },
+      set: await withHumanState(client, { status: built.to_status }, built.to_status, shop),
       event: built.event
     });
 
@@ -514,7 +634,7 @@ async function recordFailure(shopId, error, options) {
         shop_id: id,
         from_status: 'FAILED',
         to_status: 'FAILED',
-        set: { status: 'FAILED', last_error: message },
+        set: await withHumanState(client, { status: 'FAILED', last_error: message }, 'FAILED', shop),
         event: {
           event_type: 'failure',
           // Deliberately the ORIGINAL resume point, not 'FAILED': the durable
@@ -542,7 +662,7 @@ async function recordFailure(shopId, error, options) {
       shop_id: id,
       from_status: shop.status,
       to_status: 'FAILED',
-      set: { status: 'FAILED', last_error: message },
+      set: await withHumanState(client, { status: 'FAILED', last_error: message }, 'FAILED', shop),
       event: {
         event_type: 'failure',
         from_status: shop.status,
@@ -919,6 +1039,11 @@ module.exports = {
     applyTransition: applyTransition,
     inTransaction: inTransaction,
     jsonParam: jsonParam,
+    hasHumanStateColumn: hasHumanStateColumn,
+    withHumanState: withHumanState,
+    _resetHumanStateProbe: _resetHumanStateProbe,
+    _setHumanStateProbe: _setHumanStateProbe,
+    HUMAN_STATE_COLUMN_SQL: HUMAN_STATE_COLUMN_SQL,
     SHOP_SELECT_COLUMNS: SHOP_SELECT_COLUMNS,
     SHOP_UPDATE_ALLOWED_COLUMNS: SHOP_UPDATE_ALLOWED_COLUMNS,
     SHOP_UPDATE_LITERALS: SHOP_UPDATE_LITERALS,

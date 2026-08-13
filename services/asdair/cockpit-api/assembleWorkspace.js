@@ -34,6 +34,7 @@
 const P = require('./present');
 const { COMMAND_NAMES } = require('./commandSurface');
 const { computeCanonicalState } = require('./canonicalState');
+const { explainState } = require('./explainState');
 
 // The interpretation vocabulary (services/asdair/interpret/resolveByCatalogue.js).
 const INTERPRETATION_STATUSES = Object.freeze([
@@ -686,6 +687,18 @@ function assembleWorkspace(input) {
     };
   }
 
+  // Computed ONCE, before the payload is built, so every consumer of this
+  // workspace sees the same numbers and the same sentence (AC3).
+  const explain = explainState({
+    stage: status.stage,
+    human_state: computeCanonicalState(status),
+    questions: arr(src.questions),
+    lines: arr(src.lines),
+    // THE REAL KEY THIS READER SUPPLIES. readWorkspace.js passes the list rows
+    // as `list_items`; reading `src.items` would have silently explained an
+    // empty list on every real request while every fixture passed.
+    items: arr(src.list_items).length > 0 ? arr(src.list_items) : arr(src.items),
+  });
   return {
     ok: true,
     generated_from: 'durable state only',
@@ -698,12 +711,27 @@ function assembleWorkspace(input) {
       stage: status.stage,
       stage_display: P.text(status.stage),
       stage_label_display: P.text(status.stage_label),
-      // THE ONE canonical six-value state (AC1) - computed by canonicalState.js
-      // and nowhere else. See that file's header: this is a documented
-      // placeholder pending the durable field the vision-pipeline WP will
-      // introduce, derived here from the SAME `status` this module already
-      // has - no new read, no raw-count recomputation.
+      // THE ONE canonical six-value state (WP-B15-35 AC1/AC2). No longer a
+      // placeholder: it is now asdair.shop.human_state, read from the durable
+      // column where migration 020 has been applied and derived by the SAME
+      // shared mapping (shop/humanState.js) where it has not. canonicalState.js
+      // delegates and derives nothing of its own, so no second surface can
+      // reach a different answer.
       canonical_state: computeCanonicalState(status),
+      // WHICH PATH ANSWERED: 'column' (durable) or 'derived' (migration 020 not
+      // applied here). Exposed rather than hidden so a missing migration is
+      // visible in the payload instead of being silently papered over.
+      canonical_state_source: status.human_state_source || 'derived',
+
+      // "WHY ISN'T MY BASKET READY?" - ONE TRUTHFUL SENTENCE (AC3).
+      //
+      // `why.sentence` is what Warwick reads; `why.counts` is what the UI
+      // renders beside it. They are the SAME arithmetic, computed once in
+      // explainState.js - the sentence is a pure function of the counts and
+      // cannot see the raw rows at all, so a counter and the sentence cannot
+      // contradict each other. That is the whole point: Warwick must never be
+      // asked to reconcile two numbers himself.
+      why: explain,
       // The 12 states, so the UI can show where this shop sits in the whole
       // lifecycle rather than only its current label. Supplied by the reader
       // from shopStatus.SHOP_STATUSES - never hand-typed into the UI.
