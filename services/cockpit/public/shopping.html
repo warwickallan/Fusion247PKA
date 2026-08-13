@@ -35,6 +35,22 @@
        ⛔ NO WEBFONT. GL-003 §3: the stack is system-native by design. Addendum B §3 repeats it for
        this surface, and Addendum A adds the reason that matters here — the tablet may be on a slow
        or dropping household connection, and a font that fails to load must never delay her words.
+
+       ⚠️ ONE THING THIS PAGE *DOES* SHARE WITH THE OPERATOR SHELL — STATED RATHER THAN LEFT IMPLIED
+       (Vera, WP-B15-45 LOW-1). /vendor/vue.global.prod.js IS in the service worker's SHELL list, so
+       the argument made above against sharing styles.css applies to it too: on a device that has
+       installed the operator app, this page is served Vue from that worker's cache.
+
+       It is accepted rather than overlooked, and the reasoning is not the same as for the
+       stylesheet. The vendored Vue is a PINNED third-party build that changes only when someone
+       deliberately upgrades it; styles.css is edited by ordinary operator-side work and would carry
+       those edits onto her screen days later with no deploy. A stale pinned runtime is a much
+       narrower risk than a stale stylesheet, and the alternative — a second copy of Vue under its
+       own path — costs 160KB and a second thing to keep in step.
+
+       ⛔ IT IS NOT ZERO RISK, and the honest form of the claim is therefore: this page is decoupled
+       from operator STYLING and operator MARKUP, not from every shared byte. If the vendored Vue is
+       ever upgraded, this surface must be re-rendered and re-measured like any other consumer.
   ═══════════════════════════════════════════════════════════════════════════════════════════════ -->
 
   <!-- PINNED SCHEME. Approved by Larry as Assumption 3, and the reason is hers, not ours: a screen

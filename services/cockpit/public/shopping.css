@@ -196,8 +196,18 @@ body {
    controls with OPPOSITE effect" — and that is what is built.
    The reasoning, which is what decided it: a mis-tap from row-select onto + costs one visible,
    reversible unit. A mis-tap between - and + is the one that must never happen, so that is the pair
-   that gets guaranteed dead space (the quantity display sits between them and is inert). The gutter
-   below gives the same guarantee between the row body and the first quantity control. */
+   that gets guaranteed dead space. The gutter below gives the same guarantee between the row body
+   and the first quantity control.
+
+   ⛔ THIS PARAGRAPH USED TO END "(the quantity display sits between them and is inert)". THAT WAS
+   FALSE AS BUILT, and Vera caught it at the WP-B15-45 gate. `.q-num` supplied the 72px of DISTANCE
+   and none of the DEADNESS: it sits inside the row, the row is the select target, so a tap landing
+   between MINUS and PLUS bubbled to the row and toggled it. On an item she had already chosen, a
+   near-miss on MINUS REMOVED IT.
+   The declaration that makes the sentence true is `pointer-events: none` on `.q-num` (below). The
+   lesson is the one this whole surface keeps re-learning: a justification written in a comment is
+   not a control, and geometric separation is not inertness. The gate now HIT-TESTS that midpoint
+   rather than measuring the gap. */
 .row {
   display: flex;
   align-items: center;
@@ -269,6 +279,21 @@ body {
 
 /* The quantity cluster. Kept out of the row's select target: B §6.3 requires the -/+ controls to
    stop event propagation, which shopping.js does. */
+/* ⛔ MEDIUM-1, VERA — AND IT TOOK THREE ATTEMPTS, EACH CAUGHT BY THE GATE, WHICH IS THE ARGUMENT
+   FOR HIT-TESTING RATHER THAN MEASURING DISTANCE. A geometric check would have read 72px and
+   reported success at every one of these stages:
+     1. `.q-num` inert            -> the hit moved up to `.q`, which still bubbled   ("q -> row")
+     2. `.q` also inert           -> the hit fell THROUGH to the row underneath      ("row -> row")
+        `pointer-events: none` makes an element transparent to taps; it does not make the space
+        dead, because the row behind it is still a target. Transparency is the opposite of what
+        was wanted.
+     3. `.q` SWALLOWS the tap     -> dead, and provably so.
+   The cluster stops propagation without doing anything. A tap there reaches `.q`, goes no further,
+   and changes nothing.
+   ⚠️ This is a div that consumes a click, which looks like the "no div with a click handler" rule
+   in B §11. It is not one: that rule forbids a div ACTING AS A CONTROL — no role, no tabindex, no
+   accessible name, nothing to announce and nothing to activate. This div is the opposite; its
+   entire job is to be the place where a mis-tap safely dies. */
 .q { flex: 0 0 auto; display: flex; align-items: center; gap: 0; }
 
 /* ⛔ `flex: 0 0 auto` IS A SAFETY DECLARATION, NOT TIDINESS — AND IT IS HERE BECAUSE MEASURING
@@ -470,4 +495,108 @@ body {
      space at the end of a scroll, and the failure mode of too little is a control she cannot
      reach. Those are not symmetric costs. */
   .page-pad { padding-bottom: 320px; }
+}
+
+/* ══ SHORT VIEWPORTS — HIGH-1, VERA ══════════════════════════════════════════════════════════════
+   ⛔ THE FOOTER'S HEIGHT WAS UNBOUNDED AND IT ATE AN UNBOUNDED SHARE OF A SHORT VIEWPORT.
+
+   What was actually shipping, measured:
+     * 1024x600 — FIRE HD 8 CLASS, her likely device — with a question pending: the banner pushed
+       row 0 behind a 192px footer. `elementFromPoint` at row 0's tick returned `.f-count`.
+       THE LANDING SCREEN CONTAINED NO TAPPABLE ITEM AT ALL.
+     * 640x400 (200% zoom): the footer was 249px of 400 — 62% of the screen. No item visible, the
+       instruction clipped mid-phrase, and the pending banner not even in the initial viewport.
+
+   Nothing was permanently unreachable, and that is exactly why it survived the first gate: the
+   assertion asked "can she eventually get there" when the question that matters for a
+   technology-phobic 84-year-old is "what is on the screen when she arrives". For her the first
+   screen IS the product, and in the highest-priority state it had no shopping on it.
+
+   THE RULE THIS ENFORCES: one full item row AND the banner survive in the initial viewport, always.
+   Breaks B §7.1.1, B §9, E A4 and WCAG 1.4.4 otherwise.
+
+   THE FIX, and why this shape rather than a smaller footer.
+   Below 720px of viewport height the sticky footer is DROPPED TO NORMAL FLOW. A sticky bar is a
+   trade — it buys "the action is always reachable" and pays in permanently-occluded screen — and
+   that trade only makes sense when there is screen to spare. At 600px, and certainly at 400px,
+   there is not: no footer small enough to fit also carries an 88px action, and shrinking the action
+   would break the target floor that exists for her hands. So on a short screen the list wins the
+   viewport and the action sits at the end of a short scroll, which is the one motion Addendum B
+   §6.1 says this design leans on and the one she already knows.
+   The header and banner are tightened at the same time, because at 400px the header alone was a
+   third of the screen. Nothing drops below a reading floor: the smallest text here is 24px, still
+   above the 22px body floor and well above Addendum E A3's 18px absolute floor. Only the page
+   TITLE shrinks, and a title is not something she has to read to act.
+
+   ⚠️ Keyed to HEIGHT, deliberately. The portrait block above is keyed to width and catches a
+   narrow screen; this one catches a SHORT screen, and 1024x600 is short without being narrow —
+   which is why the width-keyed rules never fired on the device most likely to be hers. */
+/* ⚠️ Keyed to height OR to a very narrow width. A 320px-wide viewport is not short in pixels, but
+   every block on the page wraps to three or four times its normal height there, so the footer ends
+   up consuming the same ruinous share of the screen. Height is the honest predicate for her real
+   device; width catches the WCAG 1.4.10 reflow case, which failed for identical reasons. */
+@media (max-height: 720px), (max-width: 520px) {
+  .foot {
+    position: static;
+    /* A hard ceiling as well as the flow change: if a future state adds a third line to this
+       footer, it must not be able to reclaim the screen it just gave back. */
+    max-height: 40vh;
+    overflow: hidden;
+  }
+  /* With the footer in flow there is nothing to clear, so the reserved space goes back to the list.
+     Leaving 320px here would have put a third of a short screen of blank padding under her list. */
+  .page-pad { padding-bottom: var(--m-pad); }
+
+  .page { padding: 12px; }
+  .head { padding: 8px 0 4px; }
+  .h-title { font-size: 30px; margin-bottom: 6px; }
+  .sec { margin: 14px 0 12px; }
+  .banner { padding: 14px; margin-bottom: 12px; border-left-width: 8px; }
+  .banner h2 { font-size: 24px; margin-bottom: 4px; }
+}
+
+/* ── VERY SHORT: 200% ZOOM TERRITORY ─────────────────────────────────────────────────────────────
+   400px of usable height, which is 1280x800 or 800x1280 at 200% browser zoom (WCAG 1.4.4, E A4).
+   The arithmetic is brutal and worth writing down, because it is what forced a second tier:
+     row (120, a floor that cannot move) + banner + header + section heading must fit in 400.
+   HIGH-2 made this HARDER, and that is an honest trade rather than a regression: telling her that
+   Warwick will sort the question out is a second sentence, and at this width it wraps to three
+   lines. The banner grew by roughly 45px in exactly the state where space is scarcest. Given the
+   choice between a banner that fits and a banner that is honest, the banner is honest and every
+   other block gives up its slack instead.
+   Nothing here crosses a reading floor. The smallest text on this surface remains 22px — Addendum
+   B §5.1's body floor, above Addendum E A1's 20px and well above A3's 18px absolute floor. What
+   shrinks is the page TITLE and the whitespace, neither of which she has to read in order to act. */
+@media (max-height: 480px) {
+  /* ⛔ THE ROW UNWRAPS AGAIN HERE, WHICH LOOKS LIKE IT CONTRADICTS THE PORTRAIT RULE ABOVE AND DOES
+     NOT. The portrait rule wraps the quantity cluster onto its own line because there is not enough
+     WIDTH; that costs 140px of HEIGHT per row (260px instead of 120px), which is free when the
+     screen is 1280px tall and ruinous when it is 400px.
+     Measured at 640x400: header 115 + banner 160 + heading 36 = 311px, then a 260px row — so the
+     first row ended at y=595 in a 400px viewport and she arrived at a screen with no usable item on
+     it. Unwrapped, the same row is 120px.
+     Both rules are "give up the scarcer axis". Below 480px of height the scarcer axis is height. */
+  .row { flex-wrap: nowrap; }
+  .r-body { flex: 1 1 auto; }
+  .q { width: auto; margin-top: 0; }
+
+  /* Tighter leading, not smaller text. The floor is unchanged at 22px; what is reclaimed is the
+     space BETWEEN lines, which costs legibility far less than shrinking the glyphs would. */
+  body { line-height: 1.3; }
+
+  /* ⛔ THESE ARE MEASURED VALUES, NOT ROUND ONES, AND THE MARGIN IS DELIBERATE.
+     At 640x400 (a 1280x800 tablet at 200% zoom) with a question pending, the first row's TICK was
+     landing at y=403 in a 400px viewport — three pixels below the fold, which reads to her as a
+     screen with no shopping on it. The chrome above the row gives up ~20px between them here, which
+     puts the tick at ~385 with roughly 15px of slack.
+     Slack is the point. The last two defects in this package were both knife-edge arithmetic that
+     was correct for the case I had in mind and wrong for the one I had not measured, so a value
+     that only just fits is treated as a value that does not. */
+  .page { padding: 8px; }
+  .h-title { font-size: 26px; margin-bottom: 4px; }
+  .head { padding: 0; }
+  .sec { font-size: 24px; margin: 4px 0 4px; }
+  .banner { padding: 8px; margin-bottom: 6px; }
+  .banner h2 { font-size: 22px; }
+  .row { margin-bottom: 12px; }
 }

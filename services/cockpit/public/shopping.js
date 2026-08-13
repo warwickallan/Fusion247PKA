@@ -295,15 +295,35 @@
 
       '  <header class="head">',
       '    <h1 class="h-title">This week’s shopping</h1>',
-      '    <p class="h-say">Tap the things you’d like. Then press the green button at the bottom.</p>',
+      // ⛔ MEDIUM-2, VERA — AND IT IS A DEFECT IN ADDENDUM B §6.2, NOT A TYPO HERE. The wireframe's
+      // instruction is "Then press the green button at the bottom." The action renders GREY until
+      // her first selection, because B §6.7 itself requires it to be visibly disabled with the
+      // reason beside it. So the spec's own instruction is wrong at exactly the moment she needs
+      // it: on arrival, with nothing chosen, there is no green button to press.
+      // Naming the control by its WORDS is the right fix regardless — colour may never be the sole
+      // carrier of meaning (B §5.1, WCAG 1.4.1), and an instruction that depends on colour fails
+      // the same test the rest of this surface is built to pass. Recorded against Addendum B
+      // rather than silently diverging from it.
+      '    <p class="h-say">Tap the things you’d like. Then press SEND MY SHOPPING LIST at the bottom.</p>',
       '  </header>',
 
       // The ONE banner slot. B §9.1: the ABSENCE of a banner is itself the resting-state signal,
       // which is only safe because nothing else may ever occupy this slot.
       // aria-live=assertive plus role=status: on load with something pending it is announced.
+      //
+      // ⛔ HIGH-2, VERA — THE SECOND SENTENCE IS THE FIX AND IT IS NOT COSMETIC.
+      // This banner tells her the system needs something from her, and S3 (the question screen) is
+      // correctly out of scope tonight — so it contained ZERO controls. It asked her for something,
+      // offered no way to give it, and did not say so. Every other unbuilt affordance on this page
+      // states its own limit plainly: the send action says the sending part is not finished, the
+      // add control says telling me in your own words is not ready. This one was silent, and
+      // silence in front of a demand is the worst thing this surface can do to a person who is
+      // already afraid of breaking it.
+      // One sentence, her register, naming the human who will act. B §9.5's rule — it must state
+      // that a human knows — applied to a limitation rather than to a failure. Not a screen build.
       '  <div v-if="askLabel" class="banner ask" role="status" aria-live="assertive">',
       '    <h2>{{ askLabel }}</h2>',
-      '    <p>I need to check something with you before I can get your shopping.</p>',
+      '    <p>I need to check something with you before I can get your shopping. I can’t ask you here just yet, so Warwick will sort this one out for you.</p>',
       '  </div>',
 
       // AC2's honest empty state. It says what is true and what she should do, and it never
@@ -325,6 +345,16 @@
       '      class="row"',
       '      :class="{ on: isOn(it) }"',
       '      role="checkbox"',
+      // ⛔ MEDIUM-3, VERA. Without an explicit label, a role=checkbox computes its accessible name
+      // from its CONTENTS — which here includes the two nested buttons and the live quantity. The
+      // row announced as "Example oat drink One less Example oat drink Example oat drink, 2 One
+      // more Example oat drink". For a screen-reader user that is the item's identity buried in
+      // its own controls, and it also breaks WCAG 2.5.3 Label in Name: the accessible name no
+      // longer matches the visible label.
+      // Addendum A recommends NOT enabling VoiceView for her, and that does not make this
+      // optional — the same brief says to build the semantics anyway so it works correctly if it
+      // is ever needed or switched on by accident, which is a state she can reach by mis-tap.
+      '      :aria-label="it.name"',
       '      :aria-checked="isOn(it) ? \'true\' : \'false\'"',
       '      tabindex="0"',
       '      @click="toggle(it)"',
@@ -340,7 +370,12 @@
       '      </div>',
       // The 24px inert gutter between the row body and the first quantity control is the flex gap
       // on .row. See the long note in shopping.css for why that pair, and not every pair, gets it.
-      '      <div class="q">',
+      // ⛔ @click.stop WITH NO HANDLER — this is the dead space, MEDIUM-1 (Vera). The cluster
+      // swallows any tap that lands between MINUS and PLUS so it can never reach the row's
+      // toggle. See the long note on .q in shopping.css for the two attempts that failed and
+      // why `pointer-events: none` was the wrong instrument: it makes a region transparent,
+      // and transparent is not dead when the row behind it is itself the target.
+      '      <div class="q" @click.stop>',
       // @click.stop on both: B §6.3 requires the quantity controls to stop propagation, or every
       // quantity change would also toggle the row underneath it.
       // The accessible name carries the PRODUCT, never a bare plus or minus (B §11, WCAG 2.5.3).

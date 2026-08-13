@@ -1444,7 +1444,17 @@ const MUM_PLAN = [
     ['a section heading renders', (p) => hasText(p, 'Chilled') || hasText(p, 'Food cupboard')],
     ['⛔ NO banner occupies the slot when nothing is pending (B §9.1)', (p) => !hasText(p, 'question for you')],
     ['the zero state is a sentence, not a number', (p) => hasText(p, 'chosen anything yet')],
-    ['the primary action is present and worded in her language', (p) => hasText(p, 'SEND MY SHOPPING LIST')],
+    // ⛔ EXACT-NODE MATCH, NOT `hasText`. Since MEDIUM-2 the header instruction also contains the
+    // string "SEND MY SHOPPING LIST" — naming the control by its words is the whole point of that
+    // fix — so a substring search anywhere on the page would pass while the BUTTON was missing.
+    // The button is its own text node; the instruction is a sentence containing it.
+    ['the primary action is present and worded in her language', (p) => p.some((x) => x.trim() === 'SEND MY SHOPPING LIST')],
+    // ⛔ MEDIUM-2, VERA — a defect inherited from Addendum B §6.2's wireframe, not introduced here.
+    // "Press the green button" is wrong at the one moment she reads it: on arrival, with nothing
+    // chosen, B §6.7 requires that button to be visibly DISABLED, and it renders grey. Colour may
+    // never be the sole carrier of meaning (WCAG 1.4.1); the control is named by its words.
+    ['⛔ the instruction names the action by its WORDS, never by its colour',
+      (p) => p.some((s) => /press SEND MY SHOPPING LIST/.test(s)) && !p.some((s) => /green button/i.test(s))],
     ['the disabled primary action states its reason beside it (B §6.7)', (p) => hasText(p, 'Tap some things first')],
     ['⛔ no quantity below the floor of 1 reaches the screen', noSubMinimumQty],
     ['⛔ the word COCKPIT never renders', (p) => !p.some((s) => /cockpit/i.test(s))],
@@ -1452,6 +1462,13 @@ const MUM_PLAN = [
 
   ['MUM S1 (one question is waiting)', M({ openQuestions: 1 }), [
     ['the pending banner is present, in words and not a badge (B §7.1)', (p) => hasText(p, 'question for you')],
+    // ⛔ HIGH-2, VERA. The banner asked her for something, offered no control to give it, and did
+    // not say so — S3 being out of scope is correct, but silence in front of a demand is not.
+    // Every other unbuilt affordance on this page states its own limit; this one now does too.
+    ['⛔ the banner STATES that she cannot answer here yet, rather than asking silently',
+      (p) => hasText(p, 'can’t ask you here just yet')],
+    ['⛔ and it names the human who will act, so she is not left holding it (B §9.5)',
+      (p) => p.some((s) => /Warwick will sort this one out/.test(s))],
     ['⛔ the banner carries NO dismiss control (B §7.1.2)', (p) => !p.some((s) => /^(×|x|close|dismiss|ok|got it)$/i.test(s.trim()))],
     ['her list is still fully present beneath it', (p) => p.some((s) => /oat drink/i.test(s))],
   ]],
@@ -1487,7 +1504,10 @@ const MUM_PLAN = [
     ['it states plainly that the sending part is not finished', (p) => hasText(p, 'that part isn')],
     ['it states that nothing was sent and nothing was lost', (p) => hasText(p, 'Nothing has been sent')],
     ['⛔ it NEVER renders a success or thank-you state', (p) => !p.some((s) => /thank you|on its way|all done|getting your shopping ready/i.test(s))],
-    ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', (p) => !hasText(p, 'SEND MY SHOPPING LIST')],
+    // Same precision, and this is the direction that actually bit: the absence check went RED on a
+    // correct surface the moment the instruction started naming the button. A negative assertion
+    // scoped to the whole page is only as good as the copy never mentioning the thing.
+    ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', (p) => !p.some((x) => x.trim() === 'SEND MY SHOPPING LIST')],
     ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],
   ]],
 
