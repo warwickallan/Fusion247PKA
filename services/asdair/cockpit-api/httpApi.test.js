@@ -249,13 +249,15 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   // a silent side effect. It has already done that job FOUR times: adding
   // GET /asdair/rules failed this line before anything else noticed, then
   // GET /asdair/packet, then GET /asdair/checklist, and then WP-B15-41's three
-  // resolution routes (7 -> 10), then WP-B15-48's write door (10 -> 11), and
-  // then WP-B15-50's sense-check (11 -> 12).
+  // resolution routes (7 -> 10), then WP-B15-48's write door (10 -> 11), then
+  // WP-B15-50's sense-check (11 -> 12), and then WP-B15-51's display-name
+  // write (12 -> 13).
   // Each time the number was changed on purpose, in the same commit as the
   // route, which is exactly what the pin is for.
-  assert.equal(ROUTES.length, 12);
+  assert.equal(ROUTES.length, 13);
   assert.ok(ROUTES.includes('POST /asdair/list'));
   assert.ok(ROUTES.includes('POST /asdair/check-item'));
+  assert.ok(ROUTES.includes('POST /asdair/display-name'));
   assert.ok(ROUTES.includes('GET /asdair/rules'));
   assert.ok(ROUTES.includes('GET /asdair/packet'));
   assert.ok(ROUTES.includes('GET /asdair/checklist'));
@@ -265,7 +267,120 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   // The header comment above ROUTES states a count in prose. Prose rots; this
   // asserts the two agree, which is why the header's stale "THREE" cannot recur.
   const header = require('node:fs').readFileSync(require('node:path').join(__dirname, 'httpApi.js'), 'utf8');
-  assert.ok(/TWELVE ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
+  assert.ok(/THIRTEEN ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
+});
+
+// =====================================================================
+// WP-B15-51 AC4 - POST /asdair/display-name
+//
+// What MUM READS, set by WARWICK. The route's whole job is to be narrow: two
+// keys in, one column changed.
+// =====================================================================
+
+/** A stub write connection that records what the route asked to run. */
+function recordingWrite(rows) {
+  const seen = [];
+  const writeQuery = async (sql, params) => {
+    seen.push({ sql, params });
+    return { rows: rows === undefined ? [{ id: 4, display_name: 'Milk' }] : rows };
+  };
+  return { writeQuery, seen };
+}
+
+test('POST /asdair/display-name saves the name and answers with what was stored', async () => {
+  const w = recordingWrite();
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/display-name', body: { id: 4, display_name: '  Milk  ' } },
+    { writeQuery: w.writeQuery }
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { ok: true, id: 4, display_name: 'Milk' });
+  assert.deepEqual(w.seen[0].params, ['Milk', 4]);
+});
+
+test('AC4: a body carrying name and aka changes neither - they never reach the statement', async () => {
+  const w = recordingWrite();
+  const res = await handleRequest(
+    {
+      method: 'POST',
+      path: '/asdair/display-name',
+      // The hostile body the Work Order named.
+      body: { id: 4, display_name: 'Milk', name: 'HACKED', aka: ['hacked'] }
+    },
+    { writeQuery: w.writeQuery }
+  );
+  assert.equal(res.status, 200);
+  assert.equal(w.seen.length, 1);
+  // One statement, and neither forbidden column appears as an assignment or a
+  // parameter. `display_name` is stripped before the `name` check so its own
+  // substring cannot mask a real `name =`.
+  const bare = w.seen[0].sql.replace(/display_name/g, 'COL');
+  assert.ok(!/\bname\s*=/.test(bare), 'the route assigned `name`');
+  assert.ok(!/\baka\s*=/.test(bare), 'the route assigned `aka`');
+  assert.deepEqual(w.seen[0].params, ['Milk', 4], 'a forbidden value reached the parameters');
+});
+
+test('POST /asdair/display-name: null clears it', async () => {
+  const w = recordingWrite([{ id: 4, display_name: null }]);
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/display-name', body: { id: 4, display_name: null } },
+    { writeQuery: w.writeQuery }
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.body.display_name, null);
+  assert.equal(w.seen[0].params[0], null);
+});
+
+test('POST /asdair/display-name: an over-long name is a 400 with a plain sentence, not a truncation', async () => {
+  const w = recordingWrite();
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/display-name', body: { id: 4, display_name: 'x'.repeat(200) } },
+    { writeQuery: w.writeQuery }
+  );
+  assert.equal(res.status, 400);
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.error, 'display_name_too_long');
+  assert.equal(typeof res.body.message, 'string');
+  assert.equal(w.seen.length, 0, 'nothing should have been written');
+});
+
+test('POST /asdair/display-name: a GET is 405 and bad JSON is 400', async () => {
+  const w = recordingWrite();
+  const get = await handleRequest({ method: 'GET', path: '/asdair/display-name' }, { writeQuery: w.writeQuery });
+  assert.equal(get.status, 405);
+  assert.equal(get.body.error, 'method_not_allowed');
+
+  const bad = await handleRequest(
+    { method: 'POST', path: '/asdair/display-name', body: '{not json' },
+    { writeQuery: w.writeQuery }
+  );
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.error, 'bad_json');
+  assert.equal(w.seen.length, 0);
+});
+
+test('POST /asdair/display-name: an unknown catalogue id is refused, never a quiet success', async () => {
+  const w = recordingWrite([]);
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/display-name', body: { id: 999999, display_name: 'Milk' } },
+    { writeQuery: w.writeQuery }
+  );
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error, 'regular_not_found');
+});
+
+test('POST /asdair/display-name: a database failure never leaks a connection string', async () => {
+  const writeQuery = async () => {
+    throw new Error('connect ECONNREFUSED postgresql://asdair_rw:hunter2@127.0.0.1:55432/asdair_test');
+  };
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/display-name', body: { id: 4, display_name: 'Milk' } },
+    { writeQuery }
+  );
+  assert.equal(res.status, 500);
+  assert.equal(res.body.error, 'display_name_failed');
+  assert.ok(!/hunter2/.test(res.body.message), 'a credential reached the response');
+  assert.match(res.body.message, /\[redacted-connection-string\]/);
 });
 
 // =====================================================================

@@ -37,6 +37,39 @@ test('optional interpretation columns are read only when the database reports th
   assert.ok(!sql.includes('match_confidence'));
 });
 
+// ---------------------------------------------------------------------
+// WP-B15-51 AC3 - display_name reaches the workspace payload, ALONGSIDE name
+// ---------------------------------------------------------------------
+test('AC3: the catalogue SELECT gains display_name when the database has it', () => {
+  const sql = RW._internal.buildCatalogueSelect(['id', 'name', 'aka', 'display_name']);
+  assert.match(sql.trim(), /^SELECT\b/);
+  assert.ok(sql.includes('display_name'), 'display_name did not reach the statement');
+  // ALONGSIDE, never instead of: Warwick's tile shows her name large and the
+  // ASDA listing small underneath, so the payload has to carry both.
+  assert.ok(/\bname\b/.test(sql.replace(/display_name/g, '')), 'name was displaced');
+  assert.ok(sql.includes('aka'), 'aka was displaced');
+  assert.ok(sql.includes('FROM asdair.regulars'));
+  assert.ok(sql.includes('ORDER BY id ASC'));
+});
+
+test('AC3: a database WITHOUT migration 021 gets the base SELECT and does not 500', () => {
+  // This is the LIVE case until the migration is applied by hand, not a
+  // hypothetical: a blind column list would take the whole workspace read down.
+  const sql = RW._internal.buildCatalogueSelect(['id', 'name', 'aka']);
+  assert.ok(!sql.includes('display_name'), 'a column the database lacks reached the statement');
+  assert.equal(sql, RW._internal.CATALOGUE_SQL);
+  // And the empty probe result (a database that would not answer) degrades the
+  // same way rather than guessing.
+  assert.equal(RW._internal.buildCatalogueSelect([]), RW._internal.CATALOGUE_SQL);
+});
+
+test('AC3: a catalogue column outside the whitelist can never reach a statement', () => {
+  const sql = RW._internal.buildCatalogueSelect(['id', 'name', 'aka', 'display_name; DROP TABLE x', 'secret_column']);
+  assert.ok(!sql.includes('DROP'), 'an injected fragment reached the statement');
+  assert.ok(!sql.includes('secret_column'), 'an unwhitelisted column reached the statement');
+  assert.ok(sql.includes('display_name') === false, 'the mangled name should not have matched the whitelist');
+});
+
 test('a column name outside the whitelist can never reach a statement', () => {
   const sql = RW._internal.buildItemSelect(RW.ITEM_BASE_COLUMNS.concat(['id; drop table asdair.shop --', 'secret_token']));
   assert.ok(!sql.includes('drop table'));

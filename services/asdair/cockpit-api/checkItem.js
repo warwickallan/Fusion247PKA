@@ -54,6 +54,9 @@
 'use strict';
 
 const resolver = require('../interpret/resolveByCatalogue.js');
+// WP-B15-51. What MUM READS. `displayNameFor` is the one rule for that, shared
+// with the write route so what Warwick types and what she reads cannot drift.
+const displayName = require('./displayName');
 
 // ---------------------------------------------------------------------
 // The closed vocabulary. Frozen, and asserted against the check-item route
@@ -95,10 +98,25 @@ const IDENTIFYING_STATUSES = Object.freeze(['matched', 'possible_duplicate']);
 // household", and matching an inactive row would tell her she already has
 // something the household stopped buying. `active IS NOT FALSE` treats a NULL
 // as active, which is how the column reads everywhere else in this service.
-const REGULARS_SQL =
+// WP-B15-51. `display_name` joins the three, and it is the ONE column here that
+// is not about identity - it is what she is TOLD once identity is settled. It is
+// appended only when the database has it (migration 021 reaches live by hand
+// after this merges), by the same whitelist-then-intersect route readWorkspace
+// uses; without that, this nudge would 500 on a live schema that has not caught
+// up, and a failing sense-check drops what she typed.
+const REGULARS_BASE_SQL =
   'SELECT id, name, aka FROM asdair.regulars ' +
   'WHERE household_id = $1 AND active IS NOT FALSE ' +
   'ORDER BY id ASC';
+
+const REGULARS_DISPLAY_SQL =
+  'SELECT id, name, aka, display_name FROM asdair.regulars ' +
+  'WHERE household_id = $1 AND active IS NOT FALSE ' +
+  'ORDER BY id ASC';
+
+// Kept under its original name: readWorkspace.test.js-style SELECT-only
+// assertions and every existing reference read this constant.
+const REGULARS_SQL = REGULARS_BASE_SQL;
 
 /** Errors carry a machine code so the HTTP layer maps them without matching on prose. */
 function invalid(code, message) {
@@ -202,12 +220,27 @@ function classifyItem(input) {
   }
 
   const onList = already.has(matchedId);
+
+  // ── WP-B15-51 AC3a. WHAT SHE IS TOLD, NOT WHAT THE MATCHER DECIDED ────────
+  //
+  // THE LIVE DEFECT THIS CLOSES. Warwick typed "milk" into "add something else"
+  // on the real Cockpit on 2026-08-13 and this route answered "You've already
+  // got cravendale arla filtered fresh semi skimmed milk on your list" - the raw
+  // retailer catalogue string, read out to an 84-year-old, from a surface nobody
+  // had listed as one where a product name reaches her.
+  //
+  // The identity above is UNCHANGED and still comes from the resolver. Only the
+  // WORDS change, and only after identity is settled - which is why this lookup
+  // happens here rather than anywhere near `regulars` on its way in.
+  const matched = regulars.filter(function (r) { return idKey(r && r.id) === matchedId; })[0] || null;
+  const fallbackName = verdict.matched_product_name === undefined ? null : verdict.matched_product_name;
+
   return sealed({
     // She already has it either way. `possible_duplicate` is the stronger case -
     // it is ALSO already on the list she is looking at - and the page says so
     // warmly. She may still add it: this route advises, it never refuses.
     status: onList ? 'possible_duplicate' : 'matched',
-    matched_name: verdict.matched_product_name === undefined ? null : verdict.matched_product_name,
+    matched_name: displayName.displayNameFor(matched, fallbackName),
     matched_regular_id: Number(matchedId),
     already_on_list: onList
   });
@@ -230,17 +263,26 @@ async function loadRegulars(options) {
   // Lazily, and only when there is no injected client: importing this module
   // must not require `pg` or an environment variable.
   // eslint-disable-next-line global-require
-  const client = injected || await require('./readWorkspace')._internal.getPool().connect();
+  // eslint-disable-next-line global-require
+  const workspace = require('./readWorkspace');
+  const client = injected || await workspace._internal.getPool().connect();
   try {
     if (!injected) await client.query('BEGIN TRANSACTION READ ONLY');
-    const res = await client.query(REGULARS_SQL, [householdId]);
+    // ONE definition of "which optional regulars columns exist", shared with the
+    // workspace reader rather than written twice.
+    const present = await workspace._internal.probeRegularsColumns(client);
+    const haveDisplayName = present.indexOf('display_name') !== -1;
+    const res = await client.query(haveDisplayName ? REGULARS_DISPLAY_SQL : REGULARS_BASE_SQL, [householdId]);
     if (!injected) await client.query('COMMIT');
     const rows = res && Array.isArray(res.rows) ? res.rows : [];
     return rows.map(function (r) {
       return {
         id: r.id,
         name: r.name,
-        aka: Array.isArray(r.aka) ? r.aka : []
+        aka: Array.isArray(r.aka) ? r.aka : [],
+        // Carried through even when absent, so classifyItem has one shape to
+        // read. `displayNameFor` treats null as "not set".
+        display_name: r.display_name === undefined ? null : r.display_name
       };
     });
   } catch (err) {
@@ -260,6 +302,8 @@ module.exports = {
   RESPONSE_KEYS: RESPONSE_KEYS,
   IDENTIFYING_STATUSES: IDENTIFYING_STATUSES,
   REGULARS_SQL: REGULARS_SQL,
+  REGULARS_BASE_SQL: REGULARS_BASE_SQL,
+  REGULARS_DISPLAY_SQL: REGULARS_DISPLAY_SQL,
   _internal: {
     sealed: sealed,
     idKey: idKey,

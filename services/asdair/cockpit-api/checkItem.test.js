@@ -80,6 +80,68 @@ function structuralOffence(body) {
 }
 
 // =====================================================================
+// WP-B15-51 AC3a - WHAT SHE IS TOLD, not what the catalogue is called
+//
+// THE LIVE DEFECT. Warwick typed "milk" into "add something else" on the real
+// Cockpit on 2026-08-13 and this route answered:
+//
+//   "You've already got cravendale arla filtered fresh semi skimmed milk on
+//    your list - I've kept this too."
+//
+// It worked, and it read the raw retailer catalogue string out to an
+// 84-year-old - the exact defect display_name exists to kill, surfacing
+// somewhere nobody had listed as a place a product name reaches her.
+//
+// The IDENTITY is unchanged in every test below. Only the WORDS move.
+// =====================================================================
+
+const REGULARS_WITH_DISPLAY = [
+  { id: 11, name: 'Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer', aka: ['milk', 'semi skimmed'], display_name: 'Milk' },
+  { id: 12, name: 'Hovis soft white medium', aka: ['bread'], display_name: null },
+  { id: 13, name: 'Cathedral City mature cheddar', aka: ['cheese'], display_name: '   ' }
+];
+
+test('AC3a: matched_name is the DISPLAY name when Warwick has set one', () => {
+  const out = checkItem.classifyItem({ text: 'milk', regulars: REGULARS_WITH_DISPLAY, chosen: [] });
+  assert.equal(out.status, 'matched');
+  assert.equal(out.matched_regular_id, 11, 'identity must be unchanged');
+  assert.equal(out.matched_name, 'Milk');
+  assert.ok(!/cravendale/i.test(out.matched_name), 'the catalogue string reached her again');
+});
+
+test('AC3a: it falls back to the catalogue name when no display name is set', () => {
+  const nullCase = checkItem.classifyItem({ text: 'bread', regulars: REGULARS_WITH_DISPLAY, chosen: [] });
+  assert.equal(nullCase.matched_name, 'Hovis soft white medium');
+  // Whitespace-only is "not set", never a blank name on her screen.
+  const blankCase = checkItem.classifyItem({ text: 'cheese', regulars: REGULARS_WITH_DISPLAY, chosen: [] });
+  assert.equal(blankCase.matched_name, 'Cathedral City mature cheddar');
+});
+
+test('AC3a: a display name never becomes a matching term', () => {
+  const rows = [
+    { id: 31, name: 'Warburtons Toastie 800g', aka: ['toastie'], display_name: 'milk' },
+    { id: 32, name: 'Semi skimmed milk 4 pints', aka: ['milk'], display_name: null }
+  ];
+  const out = checkItem.classifyItem({ text: 'milk', regulars: rows, chosen: [] });
+  assert.equal(out.matched_regular_id, 32, 'a display_name pulled the match onto the wrong product');
+});
+
+test('AC3a: the sealed response is unchanged - display_name added no key', () => {
+  const out = checkItem.classifyItem({ text: 'milk', regulars: REGULARS_WITH_DISPLAY, chosen: [] });
+  assert.deepEqual(Object.keys(out).sort(), [...checkItem.RESPONSE_KEYS].sort());
+  assert.equal(structuralOffence(out), null);
+});
+
+test('AC3a: the display-name SELECT is SELECT-only and asks for exactly one more column', () => {
+  assert.match(checkItem.REGULARS_DISPLAY_SQL, /^SELECT /);
+  assert.ok(!/\b(insert|update|delete|drop|alter)\b/i.test(checkItem.REGULARS_DISPLAY_SQL));
+  assert.equal(
+    checkItem.REGULARS_DISPLAY_SQL,
+    checkItem.REGULARS_BASE_SQL.replace('SELECT id, name, aka', 'SELECT id, name, aka, display_name')
+  );
+});
+
+// =====================================================================
 // AC1 - it classifies, using the resolver that already exists
 // =====================================================================
 
