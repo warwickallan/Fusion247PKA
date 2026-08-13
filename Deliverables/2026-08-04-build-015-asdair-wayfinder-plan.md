@@ -2337,6 +2337,24 @@ the server actually said.** *Felix additionally established that the frozen cont
 "can this shop still accept a change" fact, refused to infer it from `created`, and flagged it rather than
 improving it silently — which is the read-back gate doing its job.*
 
+### ❓ OPEN PRODUCT DECISION FOR WARWICK — **can Mum re-send after a cancelled week?** *(Not blocking. The honest error is being built now.)*
+
+**Found by Keel at read-back, by reading the store rather than assuming.** If the day's shop is TERMINAL
+(`CANCELLED` / `RECONCILED`), `createOrResumeShop` does **not** resume it — it calls
+`collisionShopRef(deadRef, telegram_message_id)`, which **fails loudly when there is no Telegram message
+id**, deliberately (ruled 2026-08-10: *refuse rather than invent an identity*). **Every Cockpit submission
+has no message id.** So *cancel this week → Mum sends a new list from her Cockpit* → **500**, from a guard
+that is unreachable via Telegram and reachable only through the door being built now.
+
+- **BUILT NOW (Larry's ruling, deliberately narrow):** a **named machine code** and a plain sentence for
+  her — *"this week's shop was cancelled, so I can't add to it."* **No invented shop identity. No silently
+  minted alternative `shop_ref`.** The 2026-08-10 ruling stands.
+- **LARRY'S RECOMMENDATION, for Warwick's decision:** let the adapter supply an **explicit distinct
+  `shopRef`** on terminal collision. `shopRef` is a first-class caller input to `receiveList`, so this is a
+  *caller* choice, not an invention inside the store — which is the line the 2026-08-10 ruling actually draws.
+- **The consequence of doing nothing:** a cancelled week leaves Mum with no way to send until someone
+  starts a new shop for her. **Larry is not deciding that; deferring it would be deciding it.**
+
 ### 📱 Mum's URL changed — `http://warwick-yoga/shopping.html`
 
 **HTTPS `:8443` fails in Silk on the Fire HD 8** (*"unexpectedly closed the connection"*). A second
