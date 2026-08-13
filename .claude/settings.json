@@ -106,6 +106,17 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/Fusion247PKA/tools/governor/permission-invariant.mjs",
+            "statusMessage": "checking the permission invariant"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
