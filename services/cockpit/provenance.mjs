@@ -52,6 +52,16 @@ export const SOURCE_MODULES = [
   // answering correctly only by coincidence. Veritas proved it by mutation at `83bcdec`: appending
   // a comment to `capae.mjs` left the digest at `b5a1529657be5225` before, during and after.
   // Adding a module to `server.mjs` means adding it HERE, in the same commit.
+  //
+  // WP-B15-48 adds TWO, and only one of them is this Work Package's own work.
+  // `asdair-list.mjs` is the new write-door proxy and belongs here by the rule above.
+  // `asdair-checklist.mjs` was ALREADY in server.mjs's real import closure and ALREADY absent from
+  // this list: `provenance-check.mjs` was failing (exit 1) on this branch AND on main before any of
+  // this work began, so the digest was blind to the checklist proxy exactly as it had been blind to
+  // CAPAE. Adding one without the other would have left the check red and made the new blindness
+  // indistinguishable from the old, so both land together.
+  'asdair-checklist.mjs',
+  'asdair-list.mjs',
   'capae.mjs',
   'db.mjs',
   'down-reason.mjs',

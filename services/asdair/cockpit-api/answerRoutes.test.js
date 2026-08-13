@@ -66,11 +66,16 @@ test('AC3: resolveCommandDeps builds nothing when the caller injected behaviour'
 // THE THREE SHAPES.
 // ---------------------------------------------------------------------
 test('AC3: the surface grew by three ROUTES and by zero COMMANDS', () => {
-  assert.equal(ROUTES.length, 10);
+  // WP-B15-48 moved both numbers by exactly one, and neither move belongs to
+  // WP-B15-41's AC3: the eleventh route is POST /asdair/list and the eleventh
+  // command is `receiveList`. The pin stays, and the point of THIS test is
+  // unchanged - the three ANSWER routes still land on one existing command and
+  // added no command of their own.
+  assert.equal(ROUTES.length, 11);
   assert.deepEqual(Object.keys(ANSWER_ROUTES).sort(),
     ['/asdair/answer', '/asdair/answer/choose', '/asdair/answer/skip']);
   // THE POINT OF AC3. All three land on one existing command.
-  assert.equal(commandSurface.COMMAND_NAMES.length, 10);
+  assert.equal(commandSurface.COMMAND_NAMES.length, 11);
   assert.ok(commandSurface.COMMAND_NAMES.includes('answerQuestion'));
   assert.ok(!commandSurface.COMMAND_NAMES.includes('chooseCandidate'));
   assert.ok(!commandSurface.COMMAND_NAMES.includes('skipThisWeek'));

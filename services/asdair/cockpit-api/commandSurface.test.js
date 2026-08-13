@@ -14,6 +14,9 @@ const CS = require('./commandSurface');
 // The exact surface named in the BUILD-015 directive, written out longhand so
 // this assertion is independent of the module it checks.
 const EXPECTED = [
+  // WP-B15-48 moved this from TEN to ELEVEN. The number was changed on purpose,
+  // in the same commit as the surface, which is exactly what the pin is for.
+  'receiveList',
   'confirmInterpretation',
   'correctLine',
   'buildShop',
@@ -36,8 +39,45 @@ function stubSurface(record) {
 
 test('the command names match the shared surface EXACTLY - no more, no fewer', () => {
   assert.deepEqual([...CS.COMMAND_NAMES], EXPECTED);
-  assert.equal(CS.COMMAND_NAMES.length, 10);
+  assert.equal(CS.COMMAND_NAMES.length, 11);
   assert.ok(Object.isFrozen(CS.COMMAND_NAMES));
+});
+
+// ---------------------------------------------------------------------
+// WP-B15-48 AC1. THE SURFACE GREW BY ONE COMMAND, AND THE DENY LIST IS
+// UNWEAKENED - PROVEN BY CALLING IT, NOT BY READING THE ARRAY.
+//
+// A test that asserts the literal FORBIDDEN_COMMAND_PATTERNS array still has
+// six entries proves nothing about behaviour: the patterns could be gutted and
+// the count kept. So every assertion below CALLS isForbiddenName(), which is
+// the function the dispatcher actually consults, and the four names named in
+// the Work Order are checked in the exact spellings it named them in.
+// ---------------------------------------------------------------------
+test('AC1: growing the surface did NOT weaken the deny list - the four named actions are still refused', () => {
+  ['checkout', 'payNow', 'book_slot', 'submitOrder'].forEach((n) => {
+    assert.equal(CS.isForbiddenName(n), true, n + ' must still be refused after the surface grew');
+  });
+  // And the dispatcher refuses them before anything is loaded - the deny list
+  // is only worth something at the point of dispatch.
+  ['checkout', 'payNow', 'book_slot', 'submitOrder'].forEach(async (n) => {
+    await assert.rejects(() => CS.dispatch(n, {}, { commands: stubSurface() }),
+      (err) => { assert.equal(err.code, 'ASDAIR_COMMAND_FORBIDDEN'); return true; });
+  });
+});
+
+test('AC1: receiveList is a legitimate INTAKE command, on the surface and not on the deny list', () => {
+  assert.ok(CS.COMMAND_NAMES.includes('receiveList'));
+  assert.equal(CS.isForbiddenName('receiveList'), false);
+  assert.equal(CS.isCommandName('receiveList'), true);
+  // It WRITES. It must never be listed as read-only, or the HTTP layer would
+  // route a write down the read path.
+  assert.equal(CS.READ_ONLY_COMMANDS.includes('receiveList'), false);
+});
+
+test('AC1: the real pipeline module exports receiveList - the surface is not a promise about a stub', () => {
+  if (!CS.isBound()) return;
+  const mod = require(CS.PIPELINE_COMMANDS_PATH);
+  assert.equal(typeof mod.receiveList, 'function');
 });
 
 test('the canonical implementation is named as services/asdair/pipeline/commands.js', () => {

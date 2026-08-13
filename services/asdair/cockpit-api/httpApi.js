@@ -5,10 +5,11 @@
 // handleRequest() takes a plain {method, path, query, body} and returns a
 // plain {status, body}. server.js binds it to node:http and does nothing else.
 //
-// TEN ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
+// ELEVEN ROUTES, AND NO MORE. (The header once said "THREE" while listing four;
 // the count was stale, the list was not. Keep this count honest - ROUTES below
 // is the machine-readable answer and httpApi.test.js asserts the two agree.)
 //
+// WP-B15-48 moved this from TEN to ELEVEN: POST /asdair/list, the write door.
 // WP-B15-41 moved this from SEVEN to TEN: the three resolution routes below.
 // The pinned literal in httpApi.test.js is edited in the same commit, on
 // purpose - that pin exists so growing the surface is a deliberate act, and it
@@ -28,6 +29,11 @@
 //                             reconciliation for ONE shop (SELECT only)
 //   POST /asdair/command    - dispatch ONE named command from the shared surface
 //   GET  /asdair/media      - the retained photo of the list
+//   POST /asdair/list       - THE WRITE DOOR. One tapped list from Mum's
+//                             Cockpit becomes one durable shop, through the
+//                             SHARED receiveList command. `created` in the
+//                             response is load-bearing: false means the day's
+//                             shop already existed and nothing durable changed.
 //
 // WHY /asdair/rules IS A SEPARATE ROUTE rather than another key on the
 // workspace: the workspace is scoped to one shop and is already the largest
@@ -55,6 +61,9 @@
 
 const path = require('path');
 const commandSurface = require('./commandSurface');
+// The Cockpit's translator. PURE - no `pg`, no environment - so importing this
+// transport still needs neither, exactly as before.
+const cockpitIntake = require('./cockpitIntake');
 
 const ROUTES = Object.freeze([
   'GET /asdair/health',
@@ -64,6 +73,9 @@ const ROUTES = Object.freeze([
   'GET /asdair/checklist',
   'POST /asdair/command',
   'GET /asdair/media',
+  // WP-B15-48 AC3. THE WRITE DOOR: the one route on this service that creates
+  // something. Mum's Cockpit proxies to it; it holds no logic of its own.
+  'POST /asdair/list',
   // WP-B15-41 AC3. THREE ROUTES OVER ONE UNCHANGED COMMAND. See ANSWER_ROUTES.
   'POST /asdair/answer',
   'POST /asdair/answer/choose',
@@ -205,18 +217,45 @@ async function handleRequest(req, deps) {
       // is itself ill health - it must never fall through to a reassuring green.
       dep = { ok: false, dependency: 'database', checked: true, reason: 'check_failed', detail: 'the dependency check itself failed', message: safeMessage(err) };
     }
+    // ── WP-B15-48 AC6. TWO THINGS THIS USED TO SAY THAT WERE NOT TRUE ───────
+    //
+    // 1. `command_surface_bound` was `d.commands ? true : isBound()`, and
+    //    isBound() is `require.resolve` - it finds the FILE without evaluating
+    //    it. A module that throws on import, or that has drifted so it no
+    //    longer exposes this surface, resolved exactly as happily as a working
+    //    one: the flag meant "a file exists on disk" while reading as "commands
+    //    work". The injected branch was worse - `d.commands ? true` asserted
+    //    nothing whatsoever about what was injected. It now calls
+    //    isDispatchable(), which LOADS and ASSERTS the surface: the same work
+    //    dispatch does before it calls a command.
+    //
+    // 2. `read_only: true` was a literal, and stopped being true the moment
+    //    POST /asdair/list landed. This service writes now - exactly one route,
+    //    through the shared receiveList command. Telling a consumer that is
+    //    deciding whether it is safe to call that this service cannot write is
+    //    the same class of lie as (1), and this is the criterion about lies.
+    const dispatchable = commandSurface.isDispatchable(d.commands);
     const body = {
-      ok: dep.ok === true,
+      ok: dep.ok === true && dispatchable,
       service: 'asdair-cockpit-api',
-      read_only: true,
-      command_surface_bound: d.commands ? true : commandSurface.isBound(),
+      read_only: false,
+      command_surface_bound: dispatchable,
       command_names: commandSurface.COMMAND_NAMES,
       dependencies: [dep]
     };
     if (!body.ok) {
-      body.error = 'dependency_unavailable';
-      // One line the cockpit can show verbatim. Never contains configuration.
-      body.message = 'AsdAIr\'s reader cannot reach its database - ' + (dep.detail || 'reason unknown') + '.';
+      // WHICH of the two failed decides what the operator is told. A database
+      // that is down and a command surface that will not load need different
+      // actions, and one message covering both would name neither.
+      if (dep.ok !== true) {
+        body.error = 'dependency_unavailable';
+        // One line the cockpit can show verbatim. Never contains configuration.
+        body.message = 'AsdAIr\'s reader cannot reach its database - ' + (dep.detail || 'reason unknown') + '.';
+      } else {
+        body.error = 'command_surface_unbound';
+        body.message = 'AsdAIr can read, but no command can be dispatched - its shared command '
+          + 'surface did not load. Nothing sent from the cockpit would be applied.';
+      }
     }
     return json(body.ok ? 200 : 503, body);
   }
@@ -406,6 +445,80 @@ async function handleRequest(req, deps) {
     }
   }
 
+  // ── WP-B15-48 AC3: THE WRITE DOOR. POST /asdair/list ─────────────────────
+  //
+  // The one route on this service that creates something. It holds no shopping
+  // logic and no intake logic of its own: cockpitIntake.js translates the
+  // request into the spec, and the SHARED `receiveList` does the rest, exactly
+  // as it does for Telegram.
+  if (route === '/asdair/list') {
+    if (method !== 'POST') {
+      return json(405, { ok: false, error: 'method_not_allowed', message: 'POST only.' });
+    }
+    const body = readBody(req && req.body);
+    if (body === null) {
+      return json(400, { ok: false, error: 'bad_json', message: 'Request body is not valid JSON.' });
+    }
+
+    // THE STAMP IS TAKEN ONCE, HERE, at the edge - and is injectable, so a test
+    // pins the week rather than depending on the day it runs. Everything
+    // downstream derives the shop_ref from this one value.
+    const receivedAt = typeof d.now === 'function' ? d.now() : new Date().toISOString();
+
+    let built;
+    try {
+      built = cockpitIntake.buildReceiveListSpec(body, { receivedAt: receivedAt });
+    } catch (err) {
+      // `expose` marks the errors that are about HER submission - safe to show,
+      // and useful. Anything else is ours and is reported as a plain failure.
+      if (err && err.expose === true) {
+        return json(400, { ok: false, error: err.code || 'list_invalid', message: err.message });
+      }
+      return json(500, { ok: false, error: 'list_failed', message: safeMessage(err) });
+    }
+
+    const dispatchList = d.dispatch || commandSurface.dispatch;
+    let listDeps;
+    try {
+      listDeps = resolveCommandDeps(d);
+    } catch (err) {
+      return json(503, {
+        ok: false,
+        error: err && err.code === 'ASDAIR_CONFIG_MISSING' ? 'not_configured' : 'list_failed',
+        message: safeMessage(err)
+      });
+    }
+
+    try {
+      const result = await dispatchList('receiveList', built.spec, { commands: d.commands, deps: listDeps });
+      const r = result && typeof result === 'object' ? result : {};
+      return json(200, {
+        ok: true,
+        shop_ref: r.shop_ref === undefined ? null : r.shop_ref,
+        shop_id: r.shop_id === undefined ? null : r.shop_id,
+        // ── `created` IS LOAD-BEARING (route contract v2) ──────────────────
+        // TRUE only when a shop row was actually written. On FALSE the day's
+        // shop already existed and this submission changed nothing durable -
+        // the UI must render that differently and must NOT say the list was
+        // sent. It is taken from the store's own report, never inferred here.
+        created: r.created === true,
+        // THE STORE'S OWN VOCABULARY, PASSED THROUGH VERBATIM. No translation
+        // layer: a renamed enum is a place for the two sides to drift.
+        // `superseded_terminal_ref` is reported as the match when the store had
+        // to start a fresh shop because a terminal one owned the date.
+        matched_by: r.superseded_terminal_ref ? 'superseded_terminal_ref' : (r.matched_by || null),
+        superseded_terminal_ref: r.superseded_terminal_ref || null,
+        // What the durable record now holds for this submission. `duplicate`
+        // is the store saying this exact intent was already recorded.
+        duplicate: r.duplicate === true,
+        source_id: r.source_id || null,
+        items: built.items.length
+      });
+    } catch (err) {
+      return json(listErrorStatus(err), listErrorBody(err));
+    }
+  }
+
   if (route === '/asdair/command') {
     if (method !== 'POST') {
       return json(405, { ok: false, error: 'method_not_allowed', message: 'POST only.' });
@@ -445,6 +558,69 @@ async function handleRequest(req, deps) {
   }
 
   return json(404, { ok: false, error: 'not_found', routes: ROUTES });
+}
+
+// ── WP-B15-48. THE TERMINAL-SHOP COLLISION, NAMED RATHER THAN ROUTED AROUND ─
+//
+// THE HOLE, STATED EXACTLY. Cancel this week, then send a list from the
+// Cockpit: shopStore sees the ref matched a TERMINAL shop, refuses to resume a
+// dead row (correctly), and asks shopState.collisionShopRef for a fresh
+// identity - which REFUSES when there is no inbound Telegram message id to
+// ground it on. That refusal is deliberate and was ruled on 2026-08-10: an
+// invented identity (a counter, a timestamp, a random suffix) would either
+// need a clock that module refuses to have, or would make a retry create a
+// second shop. A loud refusal on an edge path is recoverable; a fabricated
+// identity is not.
+//
+// Every Cockpit submission has no message id, so the guard is reachable ONLY
+// through this door. THIS CODE DOES NOT ROUTE AROUND IT. It does not mint a
+// shop_ref, does not pass a fake message id, and does not retry: it recognises
+// the condition and gives her one plain sentence instead of a 500.
+//
+// WHETHER SHE SHOULD BE ABLE TO RE-SEND AFTER A CANCELLED WEEK IS A PRODUCT
+// DECISION, and it is Warwick's. It is recorded as an open question, not
+// resolved here in code.
+//
+// ⚠️ MATCHED ON THE MESSAGE, BECAUSE shopState THROWS A PLAIN Error WITH NO
+// CODE. That is fragile on its own, so httpApi.test.js generates the error from
+// the REAL shopState.collisionShopRef and asserts this predicate still
+// recognises it. If the upstream wording changes, that test goes red here
+// rather than the condition silently becoming a 500 in front of an 84-year-old.
+function isTerminalCollision(err) {
+  const msg = err && err.message ? String(err.message) : '';
+  return /collisionShopRef/.test(msg) && /message id/i.test(msg);
+}
+
+function listErrorStatus(err) {
+  const code = err && err.code;
+  if (isTerminalCollision(err)) return 409;                       // a real conflict with a real row
+  // A missing connection string is a CONFIGURATION failure, not a bad request -
+  // the same mapping the answer routes already use. It surfaces from the
+  // dispatch rather than from resolveCommandDeps, because the pools are opened
+  // lazily on first real use.
+  if (code === 'ASDAIR_CONFIG_MISSING' || code === 'ASDAIR_COMMANDS_NOT_BOUND') return 503;
+  if (code === 'ASDAIR_COMMAND_UNKNOWN' || code === 'ASDAIR_COMMAND_FORBIDDEN') return 400;
+  return 500;
+}
+
+function listErrorBody(err) {
+  if (err && err.code === 'ASDAIR_CONFIG_MISSING') {
+    return { ok: false, error: 'not_configured', message: safeMessage(err) };
+  }
+  if (isTerminalCollision(err)) {
+    return {
+      ok: false,
+      error: 'shop_already_finished',
+      // ONE plain sentence, in her words, saying what is true and what she can
+      // do. It never mentions a shop_ref, a message id or a collision.
+      message: "This week's shop has already been finished or cancelled, so I can't add to it."
+    };
+  }
+  return {
+    ok: false,
+    error: (err && err.code) || 'list_failed',
+    message: safeMessage(err)
+  };
 }
 
 // Never let a connection string or anything env-shaped reach a browser.

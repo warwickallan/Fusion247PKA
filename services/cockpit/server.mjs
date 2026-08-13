@@ -35,6 +35,11 @@ import { PRIVATE_API_PREFIX, privateApiCtx, servePrivateApi } from './private-ap
 // lives in this file cannot be executed by any gate, because importing this file opens live pools.
 // asdair-checklist-check.mjs runs it end to end over real HTTP. Its header carries the reasoning.
 import { ASDAIR_CHECKLIST_ROUTE, proxyAsdairChecklist } from './asdair-checklist.mjs';
+// WP-B15-48 — THE WRITE DOOR, and the first POST proxy on this server. Mum's list, forwarded to the
+// AsdAIr service that can actually record it as a durable shop. Its own module for exactly the
+// reason above; asdair-list-check.mjs runs the real handler over a real socket, which is the only
+// way a proxy's behaviour can be proven at all.
+import { ASDAIR_LIST_ROUTE, proxyAsdairList } from './asdair-list.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -402,6 +407,10 @@ const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/asdair/media')) return proxyAsdairMedia(req, res);
     // THE CHECKLIST. Not `j(res, ...)`: this one answers a document a person reads, not JSON.
     if (req.url.startsWith(ASDAIR_CHECKLIST_ROUTE)) return proxyAsdairChecklist(req, res, ASDAIR_ORIGIN);
+    // THE WRITE DOOR (WP-B15-48). The one route on this server that can change something in AsdAIr.
+    // It reads its own capped body and answers in the JSON error shape on every path, so the UI can
+    // always tell "did not send" from "sent" — which is why it is not `j(res, ...)` either.
+    if (req.url.startsWith(ASDAIR_LIST_ROUTE)) return proxyAsdairList(req, res, ASDAIR_ORIGIN);
     // Private-app same-origin bridge (opt-in via COCKPIT_PRIVATE_API). Must run before static.
     if (req.url.startsWith(PRIVATE_API_PREFIX)) return servePrivateApi(req, res, PRIVATE_API);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {

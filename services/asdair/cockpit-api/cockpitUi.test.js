@@ -28,11 +28,49 @@ const MODULE_VUE = path.join(UI_DIR, 'module.vue');
 const workspaceSrc = fs.readFileSync(WORKSPACE_VUE, 'utf8');
 const moduleSrc = fs.readFileSync(MODULE_VUE, 'utf8');
 
-test('the workspace declares EXACTLY the shared command surface', () => {
+// ---------------------------------------------------------------------
+// WP-B15-48: EQUALITY WAS THE WRONG CONTRACT, AND THIS IS STRICTLY STRONGER
+// THAN THE EQUALITY IT REPLACES - NOT A RELAXATION TO GO GREEN.
+//
+// This asserted `declared` deepEquals COMMAND_NAMES. That held only while every
+// command was an operator action. `receiveList` is INTAKE: it is the door a
+// list arrives through, and an operator button that "receives a list" is
+// meaningless at best and a way to fabricate a shop at worst. Under equality,
+// adding it to the backend would have FORCED it into the operator UI's list -
+// the test would have demanded the exact thing that must never happen.
+//
+// So the contract is now two assertions instead of one:
+//   (a) SUBSET  - the UI may not name a command the shared surface does not have
+//                 (the original protection: a cockpit button that silently
+//                 stops matching the Telegram button);
+//   (b) EXCLUSION - `receiveList` is NOT in the UI's list, by name.
+//
+// (a) alone would merely PERMIT the drift. (b) is what makes the test state the
+// true rule. Together they forbid both directions; equality forbade one and
+// mandated the wrong thing in the other.
+// ---------------------------------------------------------------------
+function declaredUiCommands() {
   const block = workspaceSrc.match(/const COMMANDS = \[([\s\S]*?)\];/);
   assert.ok(block, 'asdairWorkspace.vue must declare a COMMANDS list');
-  const declared = block[1].match(/'([A-Za-z]+)'/g).map((s) => s.replace(/'/g, ''));
-  assert.deepEqual(declared, [...COMMAND_NAMES]);
+  return block[1].match(/'([A-Za-z]+)'/g).map((s) => s.replace(/'/g, ''));
+}
+
+test('the workspace declares a SUBSET of the shared command surface - it may invent nothing', () => {
+  const declared = declaredUiCommands();
+  assert.ok(declared.length > 0, 'the UI should declare at least one command');
+  declared.forEach((c) => {
+    assert.ok(COMMAND_NAMES.includes(c),
+      'the operator UI declares "' + c + '", which is not in the shared command surface');
+  });
+});
+
+test('the operator UI does NOT offer receiveList - intake is never an operator button', () => {
+  const declared = declaredUiCommands();
+  assert.equal(declared.includes('receiveList'), false,
+    'receiveList is how a list ARRIVES from a channel. An operator button that receives a list would '
+    + 'fabricate a shop from the console; it must never appear in the operator UI.');
+  // And it must not be reachable from the UI by any other route either.
+  assert.doesNotMatch(workspaceSrc, /\b(?:run|post)\(\s*'receiveList'/);
 });
 
 test('every command the UI actually calls exists in the shared surface', () => {

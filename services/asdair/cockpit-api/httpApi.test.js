@@ -9,7 +9,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const { handleRequest, resolveMediaPath, ROUTES } = require('./httpApi');
-const { COMMAND_NAMES } = require('./commandSurface');
+const commandSurface = require('./commandSurface');
+const { COMMAND_NAMES } = commandSurface;
 
 function stubCommands(seen) {
   const mod = {};
@@ -35,10 +36,90 @@ test('health is 200 and ok when its dependency is reachable', async () => {
   );
   assert.equal(res.status, 200);
   assert.equal(res.body.ok, true);
-  assert.equal(res.body.read_only, true);
+  // WP-B15-48 AC6. This said `true` while POST /asdair/list was writing shops.
+  // The literal moved because the fact moved, and the pin is what forced the
+  // question to be asked.
+  assert.equal(res.body.read_only, false);
   assert.deepEqual(res.body.command_names, COMMAND_NAMES);
   assert.equal(res.body.dependencies[0].dependency, 'database');
   assert.equal(res.body.dependencies[0].checked, true);
+});
+
+// ── WP-B15-48 AC6. `command_surface_bound` MUST MEAN "DISPATCH WOULD WORK" ──
+//
+// It used to mean "a file exists on disk" (`require.resolve`, which never
+// evaluates the module) or, on the injected branch, literally nothing at all -
+// `d.commands ? true` asserted no property whatsoever of what was injected.
+//
+// THE MUTATIONS BELOW ARE THE PROOF. Each hands health a surface that is
+// PRESENT but UNUSABLE - exactly the case the old check could not see - and
+// requires the flag to go false and the service to answer 503. Under the old
+// implementation every one of these returned `command_surface_bound: true`.
+
+test('AC6: a surface that is present but MISSING A COMMAND is reported unbound, not bound', async () => {
+  const broken = {};
+  COMMAND_NAMES.forEach((n) => { broken[n] = async () => ({}); });
+  delete broken.receiveList;                       // present, loadable, and unusable
+
+  const res = await handleRequest(
+    { method: 'GET', path: '/asdair/health' },
+    {
+      commands: broken,
+      checkDependencies: async () => ({ ok: true, dependency: 'database', checked: true, latency_ms: 3 })
+    }
+  );
+  assert.equal(res.body.command_surface_bound, false, 'the old require.resolve check said TRUE here');
+  assert.equal(res.status, 503, 'a service whose commands cannot dispatch is not healthy');
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.error, 'command_surface_unbound');
+  assert.match(res.body.message, /nothing sent from the cockpit would be applied/i);
+});
+
+test('AC6: a surface carrying a FORBIDDEN command is reported unbound', async () => {
+  const rogue = {};
+  COMMAND_NAMES.forEach((n) => { rogue[n] = async () => ({}); });
+  rogue.checkoutBasket = async () => ({});
+
+  const res = await handleRequest(
+    { method: 'GET', path: '/asdair/health' },
+    {
+      commands: rogue,
+      checkDependencies: async () => ({ ok: true, dependency: 'database', checked: true })
+    }
+  );
+  assert.equal(res.body.command_surface_bound, false);
+  assert.equal(res.status, 503);
+});
+
+test('AC6: a database that is UP and a surface that is DOWN are reported as different failures', async () => {
+  const broken = {};
+  COMMAND_NAMES.forEach((n) => { broken[n] = async () => ({}); });
+  delete broken.buildShop;
+
+  const surfaceDown = await handleRequest(
+    { method: 'GET', path: '/asdair/health' },
+    { commands: broken, checkDependencies: async () => ({ ok: true, dependency: 'database', checked: true }) }
+  );
+  const dbDown = await handleRequest(
+    { method: 'GET', path: '/asdair/health' },
+    { checkDependencies: async () => ({ ok: false, dependency: 'database', checked: true, detail: 'nothing is listening' }) }
+  );
+
+  assert.equal(surfaceDown.body.error, 'command_surface_unbound');
+  assert.equal(dbDown.body.error, 'dependency_unavailable');
+  assert.notEqual(surfaceDown.body.message, dbDown.body.message,
+    'one message covering both failures would name neither');
+});
+
+test('AC6: the health flag tracks the REAL module when nothing is injected', async () => {
+  const res = await handleRequest(
+    { method: 'GET', path: '/asdair/health' },
+    { checkDependencies: async () => ({ ok: true, dependency: 'database', checked: true }) }
+  );
+  // The real pipeline module is on this checkout and does expose the surface,
+  // so this is true - and it is true because it was LOADED and ASSERTED.
+  assert.equal(res.body.command_surface_bound, commandSurface.isDispatchable());
+  assert.equal(res.body.command_surface_bound, true);
 });
 
 // THE MUTATION. Break the dependency and prove health goes red. This is the
@@ -168,9 +249,11 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   // a silent side effect. It has already done that job FOUR times: adding
   // GET /asdair/rules failed this line before anything else noticed, then
   // GET /asdair/packet, then GET /asdair/checklist, and then WP-B15-41's three
-  // resolution routes (7 -> 10). Each time the number was changed on purpose,
-  // in the same commit as the route, which is exactly what the pin is for.
-  assert.equal(ROUTES.length, 10);
+  // resolution routes (7 -> 10), and then WP-B15-48's write door (10 -> 11).
+  // Each time the number was changed on purpose, in the same commit as the
+  // route, which is exactly what the pin is for.
+  assert.equal(ROUTES.length, 11);
+  assert.ok(ROUTES.includes('POST /asdair/list'));
   assert.ok(ROUTES.includes('GET /asdair/rules'));
   assert.ok(ROUTES.includes('GET /asdair/packet'));
   assert.ok(ROUTES.includes('GET /asdair/checklist'));
@@ -180,7 +263,199 @@ test('an unknown route is a 404 that names the whole surface', async () => {
   // The header comment above ROUTES states a count in prose. Prose rots; this
   // asserts the two agree, which is why the header's stale "THREE" cannot recur.
   const header = require('node:fs').readFileSync(require('node:path').join(__dirname, 'httpApi.js'), 'utf8');
-  assert.ok(/TEN ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
+  assert.ok(/ELEVEN ROUTES/.test(header), 'the header route count no longer matches ROUTES.length');
+});
+
+// =====================================================================
+// WP-B15-48 AC3 - POST /asdair/list, THE WRITE DOOR
+//
+// Offline: `commands` is injected, so nothing here opens a pool. The live
+// HTTP-and-Postgres proof is AC5 and lives in the return.
+// =====================================================================
+
+const LIST_BODY = {
+  household: 1,
+  items: [{ id: '13', name: 'Arla semi-skimmed 4pt', qty: 2 }, { id: '12', name: 'Weetabix Protein', qty: 1 }]
+};
+const AT = () => '2026-08-13T09:15:00.000Z';
+
+/** A stub surface whose receiveList returns whatever the store would have. */
+function listCommands(receipt, seen) {
+  const mod = {};
+  COMMAND_NAMES.forEach((n) => { mod[n] = async () => ({}); });
+  mod.receiveList = async (spec, deps) => {
+    if (seen) seen.push({ spec: spec, deps: deps });
+    return receipt;
+  };
+  return mod;
+}
+
+const CREATED = {
+  ok: true, command: 'receiveList', shop_id: 41, shop_ref: 'SHOP-2026-08-13', household_id: 1,
+  status: 'RECEIVED', created: true, resumed: false, matched_by: 'insert',
+  source_id: 'cockpit:mum:list:36c46f6a78207ba6', superseded_terminal_ref: null, duplicate: false
+};
+const RESUMED = Object.assign({}, CREATED, {
+  created: false, resumed: true, matched_by: 'shop_ref', duplicate: true
+});
+
+test('AC3: a POST creates a shop and reports created:true with the store\'s own matched_by', async () => {
+  const seen = [];
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+    { commands: listCommands(CREATED, seen), commandDeps: null, now: AT }
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.created, true);
+  assert.equal(res.body.shop_ref, 'SHOP-2026-08-13');
+  assert.equal(res.body.shop_id, 41);
+  assert.equal(res.body.matched_by, 'insert');
+  assert.equal(res.body.items, 2);
+  // The route holds no logic: what reached the command is the adapter's spec.
+  assert.equal(seen[0].spec.actor, 'cockpit:mum');
+  assert.equal(seen[0].spec.sourceKind, 'text');
+  assert.equal(seen[0].spec.listDate, '2026-08-13');
+  assert.equal(seen[0].spec.rawText, '2 x Arla semi-skimmed 4pt\n1 x Weetabix Protein');
+});
+
+test('AC4: a RESUMED submission reports created:false - the UI may not call that "sent"', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+    { commands: listCommands(RESUMED), commandDeps: null, now: AT }
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.body.ok, true);
+  // ok:true ALONE never licenses the word "sent" (route contract v2). `created`
+  // is the field that decides, and it is taken from the store, never inferred.
+  assert.equal(res.body.created, false);
+  assert.equal(res.body.matched_by, 'shop_ref');
+  assert.equal(res.body.duplicate, true);
+});
+
+test('AC3: matched_by is passed through VERBATIM - no translation layer, no invented words', async () => {
+  const vocab = ['insert', 'shop_ref', 'telegram_message'];
+  for (const word of vocab) {
+    const res = await handleRequest(
+      { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+      { commands: listCommands(Object.assign({}, CREATED, { matched_by: word })), commandDeps: null, now: AT }
+    );
+    assert.equal(res.body.matched_by, word, word + ' must survive the route unchanged');
+  }
+  // And the fourth value in the contract's type is reported when the store had
+  // to start a fresh shop because a terminal one owned the date.
+  const superseded = await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+    {
+      commands: listCommands(Object.assign({}, CREATED, { superseded_terminal_ref: 'SHOP-2026-08-13' })),
+      commandDeps: null, now: AT
+    }
+  );
+  assert.equal(superseded.body.matched_by, 'superseded_terminal_ref');
+  assert.equal(superseded.body.superseded_terminal_ref, 'SHOP-2026-08-13');
+});
+
+test('AC3: the stamp is taken ONCE at the edge and decides the week', async () => {
+  const seen = [];
+  await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+    { commands: listCommands(CREATED, seen), commandDeps: null, now: () => '2019-01-02T23:00:00.000Z' }
+  );
+  assert.equal(seen[0].spec.listDate, '2019-01-02');
+});
+
+test('AC3: every refusal arrives as the JSON error shape, never as bare text', async () => {
+  const cases = [
+    [{ household: 1, items: [] }, 400, 'list_empty'],
+    [{ household: 1, items: [{ name: 'milk', qty: 99 }] }, 400, 'list_qty_invalid'],
+    [{ items: LIST_BODY.items }, 400, 'household_missing'],
+  ];
+  for (const [body, status, code] of cases) {
+    const res = await handleRequest(
+      { method: 'POST', path: '/asdair/list', body: body },
+      { commands: listCommands(CREATED), commandDeps: null, now: AT }
+    );
+    assert.equal(res.status, status);
+    assert.equal(res.body.ok, false);
+    assert.equal(res.body.error, code);
+    assert.equal(typeof res.body.message, 'string');
+    assert.ok(res.body.message.length > 0);
+  }
+});
+
+test('AC3: the list route is POST only, and bad JSON is refused as JSON', async () => {
+  const get = await handleRequest({ method: 'GET', path: '/asdair/list' }, { commandDeps: null });
+  assert.equal(get.status, 405);
+  assert.equal(get.body.error, 'method_not_allowed');
+
+  const bad = await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: '{not json' },
+    { commands: listCommands(CREATED), commandDeps: null, now: AT }
+  );
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.error, 'bad_json');
+});
+
+test('AC3: a missing connection string is 503 not_configured, and never leaks the string', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+    {
+      commands: listCommands(CREATED),
+      now: AT,
+      dispatch: async () => { throw Object.assign(new Error('ASDAIR_WRITE_DB_URL is not set'), { code: 'ASDAIR_CONFIG_MISSING' }); }
+    }
+  );
+  assert.equal(res.status, 503, 'a missing connection string is a configuration failure, not a bad request');
+  assert.equal(res.body.ok, false);
+  assert.equal(res.body.error, 'not_configured');
+  // It names the VARIABLE and never a value - the operator is left in no doubt
+  // which one, and the browser learns nothing.
+  assert.match(res.body.message, /ASDAIR_WRITE_DB_URL/);
+});
+
+test('AC3: a leaked connection string is scrubbed out of a list failure', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+    {
+      commandDeps: null, now: AT,
+      dispatch: async () => { throw new Error('connect ECONNREFUSED postgresql://user:pw@host:5432/db'); }
+    }
+  );
+  assert.equal(res.status, 500);
+  assert.ok(!JSON.stringify(res.body).includes('user:pw'));
+  assert.ok(JSON.stringify(res.body).includes('[redacted-connection-string]'));
+});
+
+// ── THE TERMINAL-SHOP HOLE, AND THE PIN THAT KEEPS THE MAPPING HONEST ──────
+//
+// The predicate in httpApi.js matches on the message text, because shopState
+// throws a plain Error with no code. This test GENERATES that error from the
+// REAL shopState.collisionShopRef rather than hand-writing the string, so if
+// the upstream wording ever changes, this goes red HERE instead of the
+// condition silently becoming a 500 in front of an 84-year-old.
+test('AC4: a cancelled week is a named 409, and the real upstream error still matches', async () => {
+  const shopState = require('../shop/shopState');
+  let realError = null;
+  try {
+    // Exactly what shopStore does for a Cockpit submission whose date is held
+    // by a TERMINAL shop: no Telegram message id to ground a fresh identity on.
+    shopState.collisionShopRef('SHOP-2026-08-13', null);
+  } catch (err) {
+    realError = err;
+  }
+  assert.ok(realError, 'collisionShopRef must still refuse without a message id');
+
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/list', body: LIST_BODY },
+    { commandDeps: null, now: AT, dispatch: async () => { throw realError; } }
+  );
+  assert.equal(res.status, 409, 'a dead week is a conflict, not a crash');
+  assert.equal(res.body.error, 'shop_already_finished');
+  assert.match(res.body.message, /already been finished or cancelled/i);
+  // Her sentence never mentions a ref, a message id or a collision.
+  assert.doesNotMatch(res.body.message, /shop_ref|SHOP-|message id|collision/i);
+  // And nothing was invented to route around it.
+  assert.equal(res.body.shop_ref, undefined);
 });
 
 test('the packet route forwards the reader payload verbatim', async () => {
