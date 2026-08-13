@@ -71,7 +71,19 @@ test('AC3: the surface grew by three ROUTES and by zero COMMANDS', () => {
   // command is `receiveList`. The pin stays, and the point of THIS test is
   // unchanged - the three ANSWER routes still land on one existing command and
   // added no command of their own.
-  assert.equal(ROUTES.length, 11);
+  //
+  // WP-B15-50: the TWELFTH route is POST /asdair/check-item, and it adds NO
+  // command - it is a read-only catalogue lookup, not a dispatch. So this number
+  // moves while COMMAND_NAMES below deliberately does not, which is exactly the
+  // point this test exists to make.
+  //
+  // ⚠️ THIS IS THE SECOND ROUTE-COUNT PIN AND IT HAS NOW BLOCKED TWO WORK
+  // PACKAGES IN A ROW (B15-48, B15-50), because the other one lives in
+  // httpApi.test.js and the declared surface only ever named that one. ADDING A
+  // ROUTE MOVES BOTH. Larry edited this line by hand under a stated Rule 4
+  // exception, after Keel correctly REFUSED to write outside its declared
+  // surface to reach a green - which is the behaviour that surfaced it.
+  assert.equal(ROUTES.length, 12);
   assert.deepEqual(Object.keys(ANSWER_ROUTES).sort(),
     ['/asdair/answer', '/asdair/answer/choose', '/asdair/answer/skip']);
   // THE POINT OF AC3. All three land on one existing command.
