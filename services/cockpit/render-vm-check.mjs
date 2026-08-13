@@ -1430,8 +1430,44 @@ const REG = (RULES.regulars && Array.isArray(RULES.regulars.items)) ? RULES.regu
 // there is neither an alias nor a name, and the surface must then omit the row and SAY SO rather
 // than render a blank one or invent a name for it.
 const REG_NAMELESS = REG.concat([{ id_display: '99', aka: [], name_display: '', high_level_category_display: 'Chilled', typical_qty_display: '1', active: true }]);
-const REST = { regulars: REG, loaded: true, loadFailed: false, openQuestions: 0, selected: {}, qty: {}, sendState: 'idle', lastUndo: null };
+// ⛔ EVERY WRITABLE REF THE SURFACE OWNS IS RESET HERE, AND THE NEW ONES ARE NOT OPTIONAL.
+// `mumScenario` writes into ONE setup() instance that is shared by every scenario in this plan, so
+// any ref a scenario sets and this object does not reset LEAKS FORWARD. A later scenario would then
+// render a state nobody asked for while reporting a pass on the state it names — coverage quietly
+// testing the wrong thing, which is the exact failure mode this file exists to prevent.
+const REST = {
+  regulars: REG, loaded: true, loadFailed: false, openQuestions: 0, selected: {}, qty: {},
+  sendState: 'idle', lastUndo: null,
+  // WP-B15-49: the confirm step, the three settled outcomes, and her own words.
+  sentCount: 0, hasSent: false, changedSinceSent: false,
+  confirmShown: '', confirmDate: null,
+  extras: [], addOpen: false, draft: '', addBusy: false,
+};
 const M = (over) => Object.assign({}, REST, over);
+
+// ⛔ THE SUCCESS-LANGUAGE PREDICATE — RE-SCOPED AT WP-B15-49, NOT DELETED, AND THIS IS NOW THE
+// PLACE ROUTE CONTRACT v3's CORE PROPERTY IS EASIEST TO FIND.
+//
+// It began life inside the single "she has pressed the send button" scenario, where its job was to
+// stop the surface claiming success while there was NO WRITE PATH AT ALL. That job is UNCHANGED.
+// What changed is that a success state became legitimate — and legitimate in exactly one
+// circumstance: the server answered `created: true`, meaning a shop row was actually written.
+//
+// So instead of deleting it with the state it was attached to, it now travels with EVERY state
+// EXCEPT that one. `confirm` has sent nothing yet. `failed` did not arrive. Both `already-sent-*`
+// states were ACCEPTED by the server and changed today's shop not at all. If success language ever
+// appears in any of them, the page is telling her something happened that did not — Addendum E
+// criterion 9, "any answer that changes the display but not the durable record".
+const NO_SUCCESS_LANGUAGE = (p) => !p.some((s) =>
+  /thank you|on its way|all done|getting your shopping ready|i.ve sent|is on the way/i.test(s));
+
+// ⛔ B §6.7, "after sending, it is replaced by the sent state, not left tappable". Carried across
+// from the retired scenario rather than dropped: it was a GOOD assertion pointed at a dead state.
+// It now holds on the confirm screen AND on all three settled outcomes — five states instead of one.
+// EXACT-NODE MATCH, not `hasText`, for the reason the original recorded: since MEDIUM-2 the header
+// instruction itself contains the string "SEND MY SHOPPING LIST", so a substring search anywhere on
+// the page would pass while the BUTTON was missing.
+const actionNotTappable = (p) => !p.some((x) => x.trim() === 'SEND MY SHOPPING LIST');
 
 // Every quantity that reaches the screen is a bare integer text node; a product name never is, and
 // a count renders as a whole sentence. So this is the rendered-side half of the Addendum B §6.4
@@ -1498,18 +1534,101 @@ const MUM_PLAN = [
     ['⛔ it is NOT presented as a failure', (p) => !hasText(p, 'see your shopping list at the moment')],
   ]],
 
-  // ⛔ THE HONEST SEND. This scenario is the one that proves the surface does not lie about the half
-  // that is not built. Addendum B §9.6: "The UI never claims something was sent when it was not."
-  ['MUM S1 (she has pressed the send button)', M({ selected: { 11: true }, sendState: 'not-connected' }), [
-    ['it states plainly that the sending part is not finished', (p) => hasText(p, 'that part isn')],
-    ['it states that nothing was sent and nothing was lost', (p) => hasText(p, 'Nothing has been sent')],
-    ['⛔ it NEVER renders a success or thank-you state', (p) => !p.some((s) => /thank you|on its way|all done|getting your shopping ready/i.test(s))],
-    // Same precision, and this is the direction that actually bit: the absence check went RED on a
-    // correct surface the moment the instruction started naming the button. A negative assertion
-    // scoped to the whole page is only as good as the copy never mentioning the thing.
-    ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', (p) => !p.some((x) => x.trim() === 'SEND MY SHOPPING LIST')],
-    ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],
-  ]],
+  // ══ THE SEND JOURNEY — FIVE STATES THAT EXIST, REPLACING ONE THAT DOES NOT ═══════════════════════
+  //
+  // ⛔ WHAT WAS HERE, AND WHY IT HAD TO GO. A single scenario drove `sendState: 'not-connected'` and
+  // asserted the copy "that part isn't finished". WP-B15-49 connected the write path, so that state
+  // and that sentence no longer exist — the scenario was asserting the ABSENCE of the feature the
+  // order existed to build, and its three failures were the gate correctly reporting that it had
+  // been left behind. A test that fails because the product improved is a stale test, not a defect.
+  //
+  // Both of its assertions worth keeping were KEPT and re-pointed rather than deleted — see
+  // `actionNotTappable` and `NO_SUCCESS_LANGUAGE` above, which now cover five states between them
+  // instead of one. Addendum B §9.6's rule is unchanged and is what all five of these enforce:
+  // "The UI never claims something was sent when it was not."
+
+  // 1. She has pressed SEND. Nothing has left the page. Warwick's accident guard (2026-08-13).
+  ['MUM S4 (the confirm screen — nothing has been sent yet)',
+    M({ selected: { 11: true }, sendState: 'confirm', confirmShown: 'Thursday 13 August' }), [
+      ['the date she is being asked to confirm is on screen', (p) => hasText(p, 'Thursday 13 August')],
+      ['it says plainly that nothing has gone yet', (p) => hasText(p, 'Nothing has been sent yet')],
+      ['⛔ NO success or thank-you language — nothing has been written', NO_SUCCESS_LANGUAGE],
+      ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
+      ['the commit control is present and is named in words', (p) => hasText(p, 'YES, SEND IT')],
+      ['⛔ her way OUT is present — she is never cornered by a confirmation', (p) => hasText(p, 'No, not yet')],
+      ['her list is still visible behind the question', (p) => p.some((s) => /oat drink/i.test(s))],
+    ]],
+
+  // 2. created:true — a shop row was written. THE ONLY STATE IN WHICH SUCCESS LANGUAGE IS HONEST.
+  ['MUM S4 (sent — the server wrote a row)',
+    M({ selected: { 11: true }, sendState: 'sent', sentCount: 1, hasSent: true }), [
+      ['it tells her plainly that it went', (p) => hasText(p, 'Sent')],
+      ['⛔ success language is PERMITTED HERE AND ONLY HERE, because a row was written',
+        (p) => hasText(p, 'thank you') && hasText(p, 'getting your shopping ready')],
+      ['it says how much went', (p) => p.some((s) => /sent 1 thing/i.test(s))],
+      ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
+      ['the way back to editing is offered at full size (B §9.5)', (p) => hasText(p, 'I want to change something')],
+      ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],
+    ]],
+
+  // 3. created:false, recorded_new:true — today's shop is untouched, but her change WAS recorded
+  //    and Warwick has been told. The promise is only made because the server earned it.
+  ['MUM S4 (already gone today — her change was recorded and Warwick told)',
+    M({ selected: { 11: true }, sendState: 'already-sent-noted' }), [
+      ['it says what actually happened to today-s list', (p) => hasText(p, 'already gone')],
+      ['⛔ NO success or thank-you language — NOTHING was written to today-s shop', NO_SUCCESS_LANGUAGE],
+      ['⛔ it does NOT tell her the list was sent', (p) => !p.some((s) => /^Sent/.test(s.trim()))],
+      ['it makes the promise the server earned: a human has been told', (p) => hasText(p, 'told Warwick')],
+      ['nothing she chose has been lost', (p) => hasText(p, 'has been lost')],
+      ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
+      ['she is not stranded — there is a worded route back (B §9.5)', (p) => hasText(p, 'Back to my shopping')],
+    ]],
+
+  // 4. created:false, recorded_new:false — an identical re-send. NOTHING happened anywhere.
+  //    ⛔ THIS SCENARIO IS THE ONE THAT PROVES ROUTE CONTRACT v3 WAS WORTH HAVING. Under v2 this
+  //    case and case 3 were indistinguishable, so both would have received the same sentence — and
+  //    one of those sentences would have been a promise nobody had kept.
+  ['MUM S4 (already gone today — and nothing at all changed)',
+    M({ selected: { 11: true }, sendState: 'already-sent-unchanged' }), [
+      ['it says what actually happened to today-s list', (p) => hasText(p, 'already gone')],
+      ['it says plainly that nothing changed', (p) => hasText(p, 'Nothing has changed')],
+      ['⛔ NO success or thank-you language — nothing was written', NO_SUCCESS_LANGUAGE],
+      ['⛔⛔ IT DOES NOT PROMISE WARWICK WAS TOLD — no record was written, so no promise is earned',
+        (p) => !hasText(p, 'told Warwick')],
+      ['nothing she chose has been lost', (p) => hasText(p, 'has been lost')],
+      ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
+      ['she is not stranded — there is a worded route back (B §9.5)', (p) => hasText(p, 'Back to my shopping')],
+    ]],
+
+  // 5. It did not arrive at all.
+  ['MUM S5 (not sent — it did not arrive)',
+    M({ selected: { 11: true }, sendState: 'failed' }), [
+      ['it says plainly that it could not send', (p) => hasText(p, 'send your list just now')],
+      ['it says nothing has been lost and her choices are still here', (p) => hasText(p, 'Nothing has been lost')],
+      ['⛔ NO success or thank-you language — it did not arrive', NO_SUCCESS_LANGUAGE],
+      ['⛔ NO machine detail reaches her: no status code, no error code, no stack text',
+        (p) => !p.some((s) => /\b(unknown|error|exception|failed|500|404|timeout|econn|json)\b/i.test(s))],
+      ['a full-size way to try again is offered (B §9.6)', (p) => hasText(p, 'Try again')],
+      ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
+      ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],
+    ]],
+
+  // 6. ADDED AT WP-B15-49, not merely re-pointed. "Add something else" became a real input this
+  //    package (Warwick, 2026-08-13), and a gate that covered the send journey while ignoring the
+  //    other new surface would carry exactly the hole Vera named at Gate 3 — coverage that stops
+  //    where the previous author stopped looking.
+  ['MUM S2 (she has added something in her own words)',
+    M({ extras: [{ id: 1, text: 'that nice ham', note: 'You have already got Cravendale on your list. I have kept this too.' }] }), [
+      ['⛔ HER EXACT WORDS are shown back to her, unchanged and un-tidied',
+        (p) => p.some((s) => s.trim() === 'that nice ham')],
+      ['the sense-check nudge is rendered', (p) => hasText(p, 'already got Cravendale')],
+      ['⛔ THE NUDGE IS A STATEMENT, NEVER A QUESTION — she is never asked to adjudicate a match',
+        (p) => !p.some((s) => /already got/.test(s) && s.includes('?'))],
+      ['⛔ NO disambiguation is ever put to her', (p) => !p.some((s) => /did you mean|which one|choose one|select one/i.test(s))],
+      ['it tells her the item was KEPT anyway', (p) => hasText(p, 'kept')],
+      ['she has a worded way to take it off again', (p) => hasText(p, 'Take it off')],
+      ['the running count includes what she typed', (p) => hasText(p, 'chosen 1 thing')],
+    ]],
 
   ['MUM S1 (a row the data cannot name)', M({ regulars: REG_NAMELESS }), [
     ['the unnameable row is counted and declared, never blank-rendered', (p) => hasText(p, 'show properly')],
