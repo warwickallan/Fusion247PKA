@@ -123,8 +123,13 @@ const APPS = [
     // never a blank screen.
     views: [
       { key: 'shop', label: 'Shop', blurb: 'Where this week’s shop has got to, what’s changed, and anything waiting on you — the lines that need attention first.' },
-      { key: 'questions', label: 'Questions', blurb: 'Every open decision, in one place — what AsdAIr read, its best guess, and a one-tap way to answer or correct it.' },
-      { key: 'basket', label: 'Basket', blurb: 'The planned basket — every product, its quantity, and WHY that quantity — and, once it’s been built in ASDA, how the real trolley reconciled against the plan.' },
+      // ⛔ WP-B15-42 CHANGED THESE TWO LABELS AND BLURBS AND DELIBERATELY DID NOT CHANGE THEIR KEYS.
+      // Renaming a view key in this registry without sweeping its string consumers is exactly what
+      // silently destroyed every AsdAIr render assertion between f7bf71a and WP-B15-36 —
+      // render-vm-check.mjs matches on `key`, so a rename there is a harness break that presents
+      // itself as a passing run. Labels are free to change; keys are not.
+      { key: 'questions', label: 'Exceptions', blurb: 'The one board for everything unsettled — what AsdAIr read, the part of the photograph it read it from, what it proposes, and a way to answer in place. Answered ones stay here so you can change them.' },
+      { key: 'basket', label: 'The list', blurb: 'This week’s list sorted by brand — brand, product and quantity per line, with where it came from on expansion — plus anything held back, and how the real trolley reconciled once it has been built in ASDA.' },
       { key: 'rules', label: 'Rules', blurb: 'The durable rulebook: the standing rules AsdAIr plans against, the decisions it has been given, and the household catalogue with its aliases. Read-only — this is what the system believes.' },
       { key: 'about', label: 'Diagnostics', blurb: 'What this app does, what it will never do, where its data lives, other shops, and the raw technical detail behind every screen above.', primary: false },
     ],

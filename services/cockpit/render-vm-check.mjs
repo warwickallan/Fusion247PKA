@@ -101,7 +101,42 @@ const load = (f) => runInContext(readFileSync(path.join(PUB, f), 'utf8'), ctx, {
 load('vendor/vue.global.prod.js');
 sb.Vue.createApp = (o) => { captured.push(o); return { mount: () => ({}) }; };
 load('apps.js');
-load('app.js');
+// ⛔ RECURRENCE GUARD — WP-B15-42. The Vue template in app.js is a JS TEMPLATE LITERAL, so a single
+// backtick anywhere inside it (in an HTML comment, in copy, in a field name someone quoted the way
+// they would in a code comment) TERMINATES THE STRING and the whole file stops parsing. Node reports
+// that as `SyntaxError: Unexpected identifier` pointing at a word in the middle of a comment, which
+// says nothing about the cause. It cost two debugging rounds in this WP alone, both self-inflicted.
+//
+// So the parse failure is caught and the LIKELY CAUSE is named. Deliberately advisory, not clever:
+// the file has already failed to parse, so the template's real boundaries cannot be established —
+// this reports every backtick inside an HTML comment, which is where the mistake is always made,
+// and then rethrows the original error unchanged so nothing is hidden.
+try {
+  load('app.js');
+} catch (e) {
+  // ⛔ `e.name`, NOT `e instanceof SyntaxError`. The script is compiled inside a `vm` CONTEXT, which
+  // has its own intrinsics — the SyntaxError it throws is not the host realm's SyntaxError, so
+  // `instanceof` is FALSE and the guard silently did nothing. Found by making the guard fail on
+  // purpose rather than by trusting that it worked, which is the only reason it was found at all.
+  if (e && e.name === 'SyntaxError') {
+    const src = readFileSync(path.join(PUB, 'app.js'), 'utf8').split(/\r?\n/);
+    const hits = [];
+    let inComment = false;
+    src.forEach((line, i) => {
+      if (line.includes('<!--')) inComment = true;
+      if (inComment && line.includes('`')) hits.push('    app.js:' + (i + 1) + '  ' + line.trim().slice(0, 90));
+      if (line.includes('-->')) inComment = false;
+    });
+    if (hits.length) {
+      console.error('RENDER-VM-CHECK — app.js did not parse. LIKELY CAUSE: a backtick inside the Vue');
+      console.error('  template literal. The template is delimited by backticks, so one inside it ends');
+      console.error('  the string. Backticks found inside HTML comments:');
+      hits.forEach((h) => console.error(h));
+      console.error('  Remove them (plain words, not code quotes), then re-run. Original error follows.');
+    }
+  }
+  throw e;
+}
 
 const Vue = sb.Vue;
 const opts = captured[0];
@@ -316,6 +351,69 @@ function strayJsonBlobs(textParts) {
   return out;
 }
 
+// ══ WP-B15-42 — THE BANNED-VOCABULARY DETECTOR ═══════════════════════════════════════════════════
+//
+// WHY THIS IS A DETECTOR AND NOT A SWEEP. Three separate wording rules now bind this UI, and every
+// one of them was previously enforced by looking at the screen once:
+//
+//   1. ⛔ "CORROBORATED", NEVER "VERIFIED" — Warwick, verbatim: "2-OF-3 IS CORROBORATION, NOT
+//      VERIFICATION… Do not let UI, receipts or Veritas call it verified." Three readings by one
+//      model of one photograph are correlated, so agreement is corroboration. This is a TRUTHFULNESS
+//      requirement, not a wording preference: the word asserts a check that was never performed.
+//   2. ⛔ `unknown` is the API's own word for a fact it does not hold, and must never reach a screen
+//      as a value. Vera found this on the Shop screen (WP-B15-36), it was fixed there, and the
+//      IDENTICAL leak was still rendering "#2 · unknown" on Rules two screens away.
+//   3. ⛔ "ZZ (no brand recorded)" is a SORT SENTINEL carried by every held line of the real
+//      reconciled artefact. It exists to sort unbranded lines last. Rendered, Warwick reads a brand
+//      called "ZZ (no brand recorded)".
+//
+// A one-time sweep decays the moment anyone adds a string — which is not a hypothetical here, it is
+// what happened between the Shop fix and the Rules leak IN THE SAME COMMIT. So this runs on EVERY
+// scenario in this file, and `--self-test` carries a mutation per rule proving it still fires.
+//
+// SCOPE, STATED RATHER THAN ASSUMED: Diagnostics ('about') is EXEMPT. That screen exists to show raw
+// technical detail behind a drawer — its whole job is to render the payload as it actually is,
+// `unknown` and all — so a ban there would be a check that fights the feature. Every screen Warwick
+// actually runs his shop from is covered. The exemption is by SCENARIO NAME, so a new primary screen
+// is covered by default and only an explicit rename can opt out.
+// THE ONE SANCTIONED USE, AND IT IS READ OUT OF THE APP RATHER THAN RETYPED HERE. The corroboration
+// caveat is the sentence that DENIES the claim — "…is corroboration, not verification…" — so it
+// necessarily contains the banned word, and it is the most important string on the screen.
+//
+// It is exempted by identity with `ASDAIR_CORROBORATION_CAVEAT` itself, not by a copy of its text.
+// A copy would rot the moment the wording is improved, and the gate would go red on correct code;
+// worse, someone would then relax the pattern instead of the exemption. Reading the constant means
+// the exemption follows the wording automatically and covers exactly one sentence — never a second.
+// (Found by executing this detector: it flagged seven scenarios on my own shipping copy.)
+const VOCAB_EXEMPT = /^ABOUT\b/;
+const SANCTIONED_CAVEAT = typeof bindings.ASDAIR_CORROBORATION_CAVEAT === 'string'
+  ? bindings.ASDAIR_CORROBORATION_CAVEAT : null;
+const BANNED_VOCABULARY = Object.freeze([
+  // Word-boundary matched, and case-insensitive: "Verified", "VERIFIED" and "sort verified" are the
+  // same claim. NOT a substring match — that would fire on nothing real here, but it would also fire
+  // on any future honest word containing these letters, and a detector that cries wolf gets disabled.
+  { rule: 'says VERIFIED where only CORROBORATION exists', re: /\bverif(y|ied|ication|ies)\b/i,
+    allow: (s) => SANCTIONED_CAVEAT !== null && s.trim() === SANCTIONED_CAVEAT },
+  { rule: 'leaks the API word "unknown" as a value', re: /^unknown$/i, whole: true },
+  { rule: 'leaks the "ZZ" brand sort sentinel', re: /\bZZ\b|no brand recorded/i,
+    // "No brand recorded" IS the sanctioned heading for an unbranded run — it is a statement about
+    // the record, not a brand name — so the heading form is allowed and the sentinel form is not.
+    // Distinguished by the ZZ, which no honest rendering carries.
+    allow: (s) => /^No brand recorded$/.test(s.trim()) || /^No brand is recorded for this line\.$/.test(s.trim()) },
+]);
+function bannedVocabulary(name, textParts) {
+  if (VOCAB_EXEMPT.test(name)) return [];
+  const out = [];
+  for (const s of textParts) {
+    for (const b of BANNED_VOCABULARY) {
+      if (b.allow && b.allow(s)) continue;
+      const hit = b.whole ? b.re.test(s.trim()) : b.re.test(s);
+      if (hit) out.push(b.rule + ': "' + s.slice(0, 60) + '"');
+    }
+  }
+  return out;
+}
+
 // A shop that EXISTS but has been read with nothing filled in — the shape a brand-new shop has, and
 // the one most likely to hit an unguarded `.length` or `[0]`.
 const BARE_WS = {
@@ -424,6 +522,92 @@ const WS_LINE_PROV = ws({}, {
 const WS_SKIP_CMD = ws({ human_state: 'NEEDS_WARWICK' },
   { command_names: [...(WS.command_names || []), 'skipThisWeek'] });
 
+// ══ WP-B15-42 FIXTURES ═══════════════════════════════════════════════════════════════════════════
+//
+// SYNTHETIC VALUES, REAL SHAPE. The field names below are taken from the artefact this UI must
+// actually render — services/asdair/pipeline/finalise/out/final-shopping-list.json, produced by
+// WP-B15-37 — and not invented: `brand`, `product`, `quantity`, `quantity_basis`, `quantity_note`,
+// `shoppable`, `held_reason`, `held_detail`, `routed_question`, `list_item_name`, and
+// `provenance_detail.{support, support_of, support_class}`. The VALUES are invented.
+//
+// ⛔ THE FIRST TWO ROWS ARE THE POINT, and they are the two things most likely to ship broken:
+//   * `brand: "ZZ (no brand recorded)"` is a SORT SENTINEL, carried by every held line of the real
+//     artefact. It must never render as a brand name.
+//   * `product: null` is normal on a held line — nothing has been settled — so `list_item_name` is
+//     the only honest title.
+// Both are the same defect class as the API's word `unknown` reaching a product title, which is
+// what Vera caught on WP-B15-36 and what the global vocabulary detector above now bans everywhere.
+const finalLine = (o) => Object.assign({
+  brand: null, product: null, product_id: null, quantity: 1, quantity_basis: 'explicit-on-page',
+  quantity_settled: true, quantity_note: null, provenance: 'PHOTO', disposition: 'resolved',
+  status: 'matched', shoppable: true, held_reason: null, held_detail: null, routed_question: null,
+  list_item_name: null,
+  provenance_detail: { kind: 'PHOTO', line_no: 1, raw_reading: null, support: 3, support_of: 3, support_class: 'unanimous' },
+}, o);
+const FINAL_LIST = {
+  shop_ref: 'SHOP-SYNTHETIC', shop_status: 'NEEDS_DECISION', sorted_by: 'BRAND, then product name',
+  totals: { photo_source_lines: 6, product_count: 6, item_count: 9, shoppable_lines: 4, held_lines: 2 },
+  skipped: [
+    { as_written: 'A SYNTHETIC UNSUPPORTED LINE', support: 1, support_of: 3, disposition: 'skipped',
+      reason: 'seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate' },
+  ],
+  lines: [
+    finalLine({ brand: 'Alpha', product: 'Alpha Synthetic Oat Drink 1L', quantity: 3,
+      quantity_note: null, quantity_basis: 'explicit-on-page',
+      provenance_detail: { kind: 'PHOTO', line_no: 1, raw_reading: '3 ALPHA OAT', support: 3, support_of: 3, support_class: 'unanimous' } }),
+    finalLine({ brand: 'Alpha', product: 'Alpha Synthetic Yoghurt 4pk', quantity: 1,
+      quantity_basis: 'household-default-one',
+      provenance_detail: { kind: 'PHOTO', line_no: 2, raw_reading: 'ALPHA YOG', support: 2, support_of: 3, support_class: 'corroborated' } }),
+    finalLine({ brand: 'Beta', product: 'Beta Synthetic Bread', quantity: 2, provenance: 'REGULARS',
+      provenance_detail: { kind: 'REGULARS', line_no: 3, raw_reading: null, support: 3, support_of: 3, support_class: 'unanimous' } }),
+    finalLine({ brand: null, product: 'A synthetic own-label item', quantity: 1 }),
+    // THE TWO HELD LINES — sentinel brand, null product, routed question, corroboration recorded.
+    finalLine({ brand: 'ZZ (no brand recorded)', product: null, quantity: 1, shoppable: false,
+      status: 'needs_confirmation', disposition: 'unresolved-routed',
+      held_reason: 'awaiting_decision', held_detail: 'the planner left this line as needs_decision',
+      routed_question: 'q_placeholder_1', list_item_name: '1 BAG SYNTHETIC SWEETS',
+      provenance_detail: { kind: 'PHOTO', line_no: 5, raw_reading: '1 BAG SYNTHETIC SWEETS', support: 3, support_of: 3, support_class: 'unanimous' } }),
+    finalLine({ brand: 'ZZ (no brand recorded)', product: null, quantity: 1, quantity_settled: false,
+      shoppable: false, status: 'needs_confirmation', quantity_basis: 'conflicting-observations',
+      quantity_note: 'the runs disagree about the quantity (1 vs 7) and no deterministic rule settles it - routed rather than guessed',
+      held_reason: 'ambiguous', held_detail: null, routed_question: 'q_no_such_question',
+      list_item_name: '1 x 6pts SYNTHETIC MILK',
+      provenance_detail: { kind: 'PHOTO', line_no: 6, raw_reading: '1 x 6pts SYNTHETIC MILK', support: 1, support_of: 3, support_class: 'uncorroborated' } }),
+  ],
+};
+// The declared Brand A-Z order BROKEN — the same brand in two separate runs. The UI must SHOW the
+// breach rather than tidy it away, because the ordering is what makes the shop quick in ASDA.
+const FINAL_LIST_UNSORTED = {
+  ...FINAL_LIST,
+  lines: [FINAL_LIST.lines[0], FINAL_LIST.lines[2], FINAL_LIST.lines[1], FINAL_LIST.lines[3]],
+};
+// The reconciled list arriving on the WORKSPACE payload — one of the two declared carriers.
+const WS_FINAL = ws({ human_state: 'NEEDS_WARWICK' }, { final_list: FINAL_LIST });
+const WS_FINAL_UNSORTED = ws({ human_state: 'NEEDS_WARWICK' }, { final_list: FINAL_LIST_UNSORTED });
+// THE JOIN. A held line carries `routed_question: 'q_placeholder_1'`, and the workspace's own open
+// question carries `question_key: 'q_placeholder_1'`. One board entry, not two.
+const WS_BOARD = ws({ human_state: 'NEEDS_WARWICK' }, {
+  final_list: FINAL_LIST,
+  questions: { ...WS.questions, open_count_display: '1',
+    items: [{ ...WS.questions.items[0],
+      region: { pixel_top: 100, pixel_left: 20, pixel_bottom: 160, pixel_right: 400 } }] },
+});
+// ⛔ AC4 — THE STALE "NEEDS HUMAN" CASE, and it is the whole defect in one fixture. The
+// interpretation line still carries `status: 'needs_confirmation'` — stale, because its routed
+// question has ALREADY been answered and sits in `questions.resolved`. A UI that trusts the line's
+// own status asks Warwick a second time for something he has already decided.
+const WS_STALE = ws({ human_state: 'ASDAIR_WORKING' }, {
+  interpretation: { ...WS.interpretation,
+    lines: WS.interpretation.lines.map((l) => (l.status === 'needs_confirmation'
+      ? { ...l, routed_question: 'q_placeholder_2' } : l)) },
+  questions: { ...WS.questions, open_count_display: '0', items: [] },
+});
+// The API publishing a remember command — the only thing that may enable the durable-knowledge
+// offer. Without it the control is rendered DISABLED and says why; it is never hidden, because
+// Warwick is owed the knowledge that the choice exists.
+const WS_REMEMBER_CMD = ws({ human_state: 'NEEDS_WARWICK' },
+  { command_names: [...(WS.command_names || []), 'rememberDecision'] });
+
 const ASDAIR_PLAN = [
     // ── AC1 · AC2 — the one sentence and the one status, one scenario per state Warwick named ────
     ['SHOP · NEEDS_WARWICK (2 open questions)', 'shop', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
@@ -444,10 +628,21 @@ const ASDAIR_PLAN = [
       // REGRESSION — found by READING the rendered text, not the diff. An unreadable line carries
       // the API's word "unknown" in both name fields, and the title expression printed it as the
       // product's name. "unknown" where a product belongs IS the database view Warwick prohibited.
+      //
+      // ⛔ THIS ASSERTION IS NOW REDUNDANT AND IS KEPT ANYWAY. WP-B15-42 promoted it to a GLOBAL
+      // detector that runs on every scenario in this file (bannedVocabulary), because a per-screen
+      // assertion is exactly how the identical defect survived two screens away on Rules. The local
+      // copy stays as the named regression for the screen it was found on; deleting it would erase
+      // the record of what was actually caught here.
       ['⛔ the word "unknown" is never a product title',
         (p) => !p.some((s) => s.trim() === 'unknown')],
-      ['an unreadable line says so in English instead',
-        (p) => hasText(p, 'AsdAIr couldn’t read this line')],
+      // ⛔ MOVED, NOT DELETED — WP-B15-42, AC2. The Shop screen no longer renders individual
+      // exception lines: there is ONE exception board and it is the Questions screen. This
+      // assertion followed the markup to 'EXCEPTIONS · one coherent board' below. Leaving it here
+      // would have been a check bound to a pane that no longer contains the surface — the failure
+      // mode this file's own SYS comment names, and which passes quietly rather than failing loudly.
+      ['AC2 — the Shop screen ROUTES to the one board instead of rendering a second one',
+        (p) => hasText(p, 'Answer them on one screen, with the photograph beside each.')],
     ]],
     ['SHOP · ASDAIR_WORKING (3 products reconciling)', 'shop', { asdairWs: WS_WORKING, asdairWsErr: null }, {}, [
       ['AC1 — Warwick\'s second example, verbatim in shape',
@@ -494,7 +689,13 @@ const ASDAIR_PLAN = [
     ]],
     // ── AC4 — exception-first. ───────────────────────────────────────────────────────────────────
     ['SHOP · exception-first grouping', 'shop', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
-      ['"needs your attention" leads the list', (p) => hasText(p, 'Needs your attention')],
+      // WP-B15-42: the heading moved from "Needs your attention" (a second board) to "Anything
+      // unsettled" (a summary that routes). The PROPERTY under test is unchanged — the unsettled
+      // things lead — so the assertion is re-keyed to the markup that now carries it rather than
+      // deleted, which would have quietly dropped the coverage.
+      ['the unsettled lines still LEAD the screen', (p) => hasText(p, 'Anything unsettled')],
+      ['⛔ and the Shop screen does NOT render a second exception board',
+        (p) => !hasText(p, 'Type an answer') && !hasText(p, 'Not this week')],
       ['resolved lines are COLLAPSED behind a control, never proofread by default',
         (p) => p.some((s) => /Show the \d+ lines? that are already settled/.test(s))],
     ]],
@@ -514,6 +715,117 @@ const ASDAIR_PLAN = [
         (p) => !hasText(p, 'AsdAIr has no command for this yet')],
     ]],
     ['SHOP · the API publishes a skip command', 'shop', { asdairWs: WS_SKIP_CMD, asdairWsErr: null }],
+
+    // ══ WP-B15-42 ═════════════════════════════════════════════════════════════════════════════
+    // AC5 — THE FINAL LIST, SORTED BY BRAND. "not database order, not provenance order, not
+    // question order". Compact per line, plain-English provenance on expansion, exceptions separated.
+    ['LIST · brand-grouped, from the reconciled artefact', 'basket',
+      { asdairWs: WS_FINAL, asdairPacket: PACKET_NOT_BUILT, asdairPacketErr: null }, {}, [
+        ['AC5 — brands are the grouping, in A-Z runs',
+          (p) => hasText(p, 'Alpha') && hasText(p, 'Beta')],
+        ['AC5 — brand, product and quantity are the compact line',
+          (p) => hasText(p, 'Alpha Synthetic Oat Drink 1L') && hasText(p, '×3')],
+        ['AC5 — totals come from the data, never a hardcoded figure',
+          (p) => hasText(p, '6 products') && hasText(p, '9 items')],
+        ['AC5 — plain-English provenance on expansion, never an enum',
+          (p) => hasText(p, 'no number was written, so one')],
+        ['AC5 — exceptions are CLEARLY SEPARATED from resolved lines',
+          (p) => hasText(p, 'Not on the list yet')],
+        ['AC5 — and they are not answerable twice: the list ROUTES to the one board',
+          (p) => hasText(p, 'Resolve these') && !hasText(p, 'Type an answer')],
+        // ⛔ THE TWO DEFECTS THIS WP EXISTS TO PREVENT ON THIS SCREEN. Both are also covered by the
+        // global vocabulary detector; asserted HERE too because a global ban proves the string is
+        // absent, and these assert the RIGHT thing is present in its place.
+        ['⛔ the ZZ sort sentinel never renders as a brand',
+          (p) => !p.some((s) => /ZZ/.test(s))],
+        ['⛔ a held line with product:null is titled by its raw reading, not by a blank or a null',
+          (p) => hasText(p, '1 BAG SYNTHETIC SWEETS')],
+        ['an unbranded line gets a heading that describes the RECORD, not a brand name',
+          (p) => hasText(p, 'No brand recorded')],
+        // AC6 — Warwick's ruling, on the surface that carries the evidence.
+        ['AC6 — support is reported as CORROBORATION',
+          (p) => hasText(p, 'Corroborated') && hasText(p, 'All 3 readings of the photograph agreed on this line.')],
+        ['AC6 — a 2-of-3 reading says so, and is still corroboration rather than proof',
+          (p) => hasText(p, '2 of 3 readings of the photograph agreed on this line.')],
+        ['AC6 — a single-reading line is NOT corroborated, and says which',
+          (p) => hasText(p, 'Not corroborated') && hasText(p, 'Only 1 of 3 readings saw this line')],
+        ['AC6 — the caveat is on the screen, not just in the code',
+          (p) => hasText(p, 'is corroboration, not verification')],
+      ]],
+    ['LIST · the declared brand order is BROKEN', 'basket',
+      { asdairWs: WS_FINAL_UNSORTED, asdairPacket: PACKET_NOT_BUILT, asdairPacketErr: null }, {}, [
+        ['⛔ the breach is SHOWN, never tidied away by a UI-side re-sort',
+          (p) => hasText(p, 'BRAND ORDER BROKEN')],
+        ['and it says what is wrong in words a person reads',
+          (p) => hasText(p, 'The same brand appears more than once in this list.')],
+      ]],
+    ['LIST · no reconciled list published at all (the honest gap)', 'basket',
+      { asdairWs: WS, asdairPacket: PACKET_NOT_BUILT, asdairPacketErr: null }, {}, [
+        ['⛔ an empty list is the honest answer; a plausible one he might act on is not',
+          (p) => hasText(p, 'No reconciled list has been published for this shop')],
+        ['and it says so rather than rendering an invented line',
+          (p) => hasText(p, 'Nothing on this screen is invented')],
+      ]],
+
+    // AC2/AC3 — ONE COHERENT EXCEPTION BOARD.
+    ['EXCEPTIONS · one coherent board, held lines JOINED to their question', 'questions',
+      { asdairWs: WS_BOARD, asdairWsErr: null }, {}, [
+        ['AC2 — the question and the line it holds up are ONE entry, not two',
+          (p) => hasText(p, 'Is "placeholder juice" the Placeholder Orange Juice 1L you usually get?')
+            && hasText(p, 'Read from the list as “1 BAG SYNTHETIC SWEETS”.')],
+        ['AC2 — WHY it is uncertain, in words',
+          (p) => hasText(p, 'Why it is uncertain: waiting on an answer from you')],
+        ['AC2 — sensible alternatives, one tap each',
+          (p) => hasText(p, '✓ Placeholder Orange Juice 1L')],
+        ['AC2 — answerable in place by free text and by "not this week"',
+          (p) => hasText(p, 'Type an answer') && hasText(p, 'Not this week')],
+        ['AC2 — a joined entry is marked as HELD OUT OF THE BASKET, which is the blocking fact',
+          (p) => hasText(p, 'HELD OUT OF THE BASKET')],
+        ['AC3 — X NEED YOU / Y RESOLVED / Z STILL BLOCKING, at a glance',
+          (p) => hasText(p, 'need you') && hasText(p, 'resolved') && hasText(p, 'still blocking')],
+        ['AC3 — answered questions stay VISIBLE and COLLAPSIBLE, never gone',
+          (p) => hasText(p, 'Resolved') && hasText(p, 'Change this answer')
+            && hasText(p, 'Kept on screen on purpose')],
+        ['AC2 — a held line with NO question routed to it says so instead of offering a dead control',
+          (p) => hasText(p, 'hasn’t routed a question for it')],
+        ['⛔ the ZZ sort sentinel never reaches the board either',
+          (p) => !p.some((s) => /ZZ/.test(s))],
+      ]],
+    // AC2 — the durable-knowledge offer. Both halves: no command, and a published command.
+    ['EXCEPTIONS · remember-this offer with NO command published', 'questions',
+      { asdairWs: WS_BOARD, asdairWsErr: null,
+        asdairRemember: { questionKey: 'q_placeholder_1', answer: 'Synthetic Orange Juice 1L', busy: false, done: null, error: null } }, {}, [
+        ['AC2 — the offer is made, because Warwick is owed the knowledge that the choice exists',
+          (p) => hasText(p, 'Should AsdAIr remember “Synthetic Orange Juice 1L” for future shops?')],
+        ['⛔ and it says plainly that it cannot yet be made durable — never a button that silently discards',
+          (p) => hasText(p, 'AsdAIr publishes no command for this yet')],
+        ['the answer that DID land is still stated as applied',
+          (p) => hasText(p, 'Your answer has been applied to this shop.')],
+      ]],
+    ['EXCEPTIONS · remember-this offer WITH a command published', 'questions',
+      { asdairWs: WS_REMEMBER_CMD, asdairWsErr: null,
+        asdairRemember: { questionKey: 'q_placeholder_1', answer: 'Synthetic Orange Juice 1L', busy: false, done: null, error: null } }, {}, [
+        ['the honest "cannot do this yet" note is GONE once a command exists',
+          (p) => !hasText(p, 'AsdAIr publishes no command for this yet')],
+        ['and the offer still reads as a question, not as a completed action',
+          (p) => hasText(p, 'Remember it') && hasText(p, 'Just this shop')],
+      ]],
+    // ⛔ AC4 — NO STALE "NEEDS HUMAN". The UI half.
+    ['SHOP · a line already answered must NOT still be shown as needing him', 'shop',
+      { asdairWs: WS_STALE, asdairWsErr: null }, {}, [
+        // PRECISION MATTERS HERE, and my first attempt at this assertion was wrong in the way this
+        // file's own comment warns about. The fixture carries TWO attention lines — one stale
+        // (already answered) and one genuinely unreadable — so the correct output is "1 line needs a
+        // decision", not silence. Asserting the ABSENCE of that phrase passed for the wrong reason
+        // when the suppression worked and would have passed again if it stopped. The property under
+        // test is the DROP from 2 to 1, so both halves are pinned.
+        ['⛔ the stale line is not counted: 2 attention lines render as 1',
+          (p) => hasText(p, '1 line needs a decision') && !hasText(p, '2 lines need a decision')],
+        ['the suppression is COUNTED and STATED — a suppression nobody can see is its own kind of lie',
+          (p) => hasText(p, 'not counted above, and nothing is being asked of you twice')],
+        ['and it names how many, so Lane AB/C can see their data half is stale',
+          (p) => hasText(p, '1 further line still carries')],
+      ]],
     // ── The original coverage, with the view keys REPAIRED. ──────────────────────────────────────
     ['SHOP (live shop, committed sample)', 'shop', { asdairWs: WS, asdairWsErr: null }],
     // The two questions checks below are the regression this scenario exists to catch: the fixture
@@ -931,6 +1243,39 @@ if (SELF_TEST) {
     if (strays.length) { caught++; console.log('  caught  ' + 'stray raw JSON outside a drawer'.padEnd(42) + ' -> ' + strays[0].slice(0, 60)); }
     else { missed.push('stray raw JSON outside a drawer'); console.log('  MISSED  stray raw JSON outside a drawer'); }
   }
+  // ── WP-B15-42: THE BANNED-VOCABULARY MUTATIONS ──────────────────────────────────────────────
+  // One per rule, because they are three different rules and a single mutation proving one of them
+  // fires says nothing about the other two. Larry's instruction was explicit: the "verified" ban
+  // must be a harness assertion, not a one-time sweep, "because a sweep decays the moment someone
+  // adds a string". A detector nobody has made fail is not evidence — it is a hope.
+  {
+    const vocabCases = {
+      'vocabulary: a screen calls corroboration VERIFIED':
+        (t) => t.replace(anchor, anchor + '<p>Every line was verified against the photograph.</p>'),
+      'vocabulary: the API word "unknown" reaches a value slot':
+        (t) => t.replace(anchor, anchor + '<p>{{ "unknown" }}</p>'),
+      'vocabulary: the ZZ brand sort sentinel is rendered as a brand':
+        (t) => t.replace(anchor, anchor + '<p>ZZ (no brand recorded)</p>'),
+    };
+    total += Object.keys(vocabCases).length;
+    for (const [name, mutate] of Object.entries(vocabCases)) {
+      setRefs({ asdairWs: WS, asdairWsErr: null });
+      const r = scenario('mutant', 'shop', Vue.compile(mutate(opts.template)));
+      const hits = r.err ? [] : bannedVocabulary(r.name, text(r.vnode));
+      if (hits.length) { caught++; console.log('  caught  ' + name.padEnd(48) + ' -> ' + hits[0].slice(0, 60)); }
+      else { missed.push(name); console.log('  MISSED  ' + name); }
+    }
+    // The control both ways round: the SANCTIONED unbranded heading must NOT be flagged, or the
+    // detector fires on the feature and gets switched off — the same trade the drawer control makes.
+    setRefs({ asdairWs: WS, asdairWsErr: null });
+    const clean = scenario('control', 'shop', Vue.compile(
+      opts.template.replace(anchor, anchor + '<p>No brand recorded</p><p>Corroborated</p>')));
+    const falsePos = clean.err ? [] : bannedVocabulary('SHOP control', text(clean.vnode));
+    console.log(falsePos.length
+      ? '  CONTROL FAILED — the sanctioned unbranded heading is being flagged: ' + falsePos[0]
+      : '  control  sanctioned "No brand recorded" heading and "Corroborated" correctly NOT flagged');
+    if (falsePos.length) missed.push('vocabulary false-positive');
+  }
   // ...and the other half: the SANCTIONED drawer must NOT be flagged, or the check cries wolf and
   // gets ignored. A detector that fires on the feature is as useless as one that misses the bug.
   {
@@ -1001,9 +1346,14 @@ if (SELF_TEST) {
 
   setRefs({ asdairWs: WS, asdairWsErr: null, asdairRules: RULES, asdairRulesErr: null });
   const control = scenarios(Vue.compile(opts.template));
-  const dirty = control.filter((r) => r.err || r.missing.length);
+  // WP-B15-42: the vocabulary detector is part of the control, not only of the mutations. A detector
+  // that fires on the SHIPPING template would make every run red for the wrong reason, and the first
+  // thing anyone does with a permanently-red gate is stop reading it.
+  const dirty = control.filter((r) => r.err || r.missing.length || (!r.err && bannedVocabulary(r.name, text(r.vnode)).length));
   console.log(dirty.length
-    ? '  CONTROL FAILED — unmutated template reports: ' + dirty.map((d) => d.name + (d.err ? ' threw' : ' missing ' + d.missing.join(','))).join(' | ')
+    ? '  CONTROL FAILED — unmutated template reports: ' + dirty.map((d) => d.name
+      + (d.err ? ' threw' : (d.missing.length ? ' missing ' + d.missing.join(',')
+        : ' banned vocabulary: ' + bannedVocabulary(d.name, text(d.vnode))[0]))).join(' | ')
     : '  control  all ' + control.length + ' unmutated scenarios clean (no false positive)');
   // The verdict layer's own control: on the UNMUTATED template every assertion must pass, and there
   // must be some. A mutation harness that reports reds while the control is also red proves nothing.
@@ -1035,13 +1385,16 @@ for (const r of results) {
   const t = text(r.vnode);
   const n = count(r.vnode).el;
   const blob = strayJsonBlobs(t);
+  const vocab = bannedVocabulary(r.name, t);
   const before = ran;
   runChecks(r, sink);
   console.log(String(n).padStart(5) + ' vnodes  ' + String(t.join(' ').length).padStart(6) + ' chars  ' +
     String(ran - before).padStart(3) + ' asserts  ' +
-    (blob.length ? 'RAW-JSON-IN-TEXT:' + blob.length + '  ' : '') + r.name +
+    (blob.length ? 'RAW-JSON-IN-TEXT:' + blob.length + '  ' : '') +
+    (vocab.length ? 'BANNED-VOCABULARY:' + vocab.length + '  ' : '') + r.name +
     (r.missing.length ? '   MISSING BINDINGS: ' + r.missing.join(', ') : ''));
-  if (r.missing.length || blob.length) bad++;
+  for (const v of vocab) console.error('  BANNED VOCABULARY — ' + r.name + ' :: ' + v);
+  if (r.missing.length || blob.length || vocab.length) bad++;
   dump.push('===== ' + r.name + ' =====\n' + t.join('\n'));
 }
 if (DUMP) writeFileSync(DUMP, dump.join('\n\n'), 'utf8');
