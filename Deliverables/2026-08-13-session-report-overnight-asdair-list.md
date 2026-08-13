@@ -574,3 +574,54 @@ ordinary findings **without a `family` field**, so nothing is invented. They are
 directly rather than through Larry's narrative, and every load-bearing claim in §§2, 3, 5 and 6 is
 verifiable against a named file and timestamp. Where only Larry's contemporaneous commit message
 evidences a claim, it is labelled. Where nothing evidences it, it is in §10.*
+
+---
+
+## 12. ADDENDUM — the `--stat` figures Pax could not reach. **Measured by Larry, and labelled his, not Pax's.**
+
+Pax emitted every line-count field as `null` rather than estimating it, and named the reason: that
+dispatch's grant carried no Bash and no git binary, and `.git/logs` holds SHAs, messages and timestamps
+but no diff content. I have a shell. These are the missing numbers.
+
+**Measured 2026-08-13 by `git diff --shortstat`, against the same session range Pax declared**
+(`4e6508d` → `80b5cd3` on `main`; each product branch against its own merge-base). The payload's
+`null`s are left as they are — it has already been written to `session_report.*` under rotation id
+`6c0e97a0-9af3-4be9-8c81-b298055e074a`, and re-running `populate.mjs` would mint a second row rather
+than correct the first. This section is the record.
+
+| Surface | Files | Insertions | Deletions |
+|---|---:|---:|---:|
+| **`main` — the record** | 22 | 5,475 | 28 |
+| ├─ documentation (`*.md`) | 19 | **5,232** | 24 |
+| └─ non-markdown | 3 | 243 | 4 |
+| **Vision + Lane A** (`b15-28-…-v2`) | 121 | 131,859 | 87 |
+| ├─ generated run evidence (`agenticVisionPrototype/runs/*`) | 31 | **105,041** | 0 |
+| └─ source, excluding generated evidence | 85 | **20,479** | 87 |
+| **Cockpit backend** (`b15-25`) | 27 | **3,484** | 27 |
+| **Cockpit UI** (`b15-26`) | 6 | 1,729 | 289 |
+| └─ code only (`.js`/`.mjs`/`.html`/`.css`) | 4 | **1,441** | 289 |
+
+### What these figures change, and what they do not
+
+**They invert the impression left by the commit-count ratio, and that is the useful part.** Pax measured
+`record_to_product_ratio: 1.52` — 35 record commits against 23 product commits — which reads as a session
+that documented itself more often than it built. **By volume it is the other way round: 5,232 documentation
+lines against ~25,404 lines of hand-authored product source across the three branches, a ratio of about
+1 : 4.9.** Documentation dominated commit *frequency*; product dominated commit *content*. Both figures are
+true and neither is the whole picture — which is why the ratio belongs beside the commit count, not
+instead of it.
+
+**105,041 of the vision branch's 131,859 insertions are machine output** — 31 frozen run JSONs from the
+variance, WP-B15-33 and WP-B15-34 arms. That is evidence, deliberately committed so the measurements
+Warwick's rulings rest on can be re-derived rather than believed. **It is not work, and any figure that
+counts it as work is wrong by a factor of five.** The single largest file is a 9,224-line run record.
+
+**⚠️ The limit, stated rather than left implied: line counts are not effort, and I am not offering them as
+effort.** The 20,479-line source figure includes generated fixtures and test scaffolding I have not
+separated out, and says nothing about the eight held lines, the two money defects caught, or the
+positional-field ruling the measurement killed — which is where the session's actual value sits.
+`allocation_rework_pct` and `allocation_waiting_pct` remain **UNESTABLISHED** on purpose; nothing here
+touches them, and Pax's warning against blending denominators stands unchanged.
+
+*Larry, 2026-08-13. Discharges `unestablished` item 1 only. The other seven remain open, including the
+one that matters most — whether the migration-020 item survived the truncated morning-report retry.*
