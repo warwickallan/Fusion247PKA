@@ -30,9 +30,12 @@
 // launch flag would be a runtime dependency bought for a test.
 //
 // USAGE
-//   node services/cockpit/shopping-geometry-check.mjs              # the gate
-//   node services/cockpit/shopping-geometry-check.mjs --self-test  # prove the gate can fail
-//   node services/cockpit/shopping-geometry-check.mjs --json       # the raw measurements
+//   node services/cockpit/shopping-geometry-check.mjs               # the gate
+//   node services/cockpit/shopping-geometry-check.mjs --self-test   # prove the gate can fail
+//   node services/cockpit/shopping-geometry-check.mjs --json        # the raw measurements
+//   node services/cockpit/shopping-geometry-check.mjs --send-cases  # WP-B15-49 AC1: eight server
+//                                                                   # answers, eight rendered
+//                                                                   # outcomes, executed not asserted
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -83,7 +86,12 @@ const FLOOR = {
   text: 22,          // B §5.1 body floor  (E A1 asks 20, E A3 asks 18; B is strictest)
   contrast: 7.0,     // B §5.1 / §11, WCAG 1.4.6 AAA — deliberately not the 4.5 AA floor
 };
-const LARGE = /\b(tick|q-btn|send)\b/;
+// `.again` is the way back out of an outcome state (B §9.3/§9.5). It is held to the LARGE 88px
+// floor rather than the general 72px one because in the state where it appears it is the ONLY
+// control on the screen — B §5.1 puts the primary action in this class, and in that state it is one.
+// `confirm` and `a-add` are primary actions in the state they appear in, and `a-input` must be
+// at least as tall as the control that submits it or she cannot read back what she typed.
+const LARGE = /\b(tick|q-btn|send|again|confirm|a-add|a-input)\b/;
 
 // Her device class, both orientations, plus the two stress cases. Addendum E A20 sets the rig;
 // Addendum A Finding 1 records that the actual device is UNKNOWN and must not be assumed, which is
@@ -135,7 +143,7 @@ const measureInPage = () => {
 
   const rows = q('.row');
   const targets = [];
-  q('.tick, .q-btn, .send, .undo, .add').forEach((e) => { if (vis(e)) targets.push({ cls: (e.className||'').split(' ')[0], w: Math.round(R(e).width), h: Math.round(R(e).height) }); });
+  q('.tick, .q-btn, .send, .undo, .add, .again, .confirm, .take-off, .a-input, .a-add, .a-cancel').forEach((e) => { if (vis(e)) targets.push({ cls: (e.className||'').split(' ')[0], w: Math.round(R(e).width), h: Math.round(R(e).height) }); });
   rows.forEach((e) => targets.push({ cls: 'row', w: Math.round(R(e).width), h: Math.round(R(e).height) }));
 
   // The inert gutter between the row-select area and the FIRST quantity control. Measured
@@ -164,7 +172,7 @@ const measureInPage = () => {
   // same model GL-003 §2b-bis uses, applied to what the browser actually produced.
   const bgOf = (e) => { let n = e; while (n) { const b = cs(n, 'background-color'); if (b && !/rgba\(0, 0, 0, 0\)|transparent/.test(b)) return b; n = n.parentElement; } return 'rgb(255, 255, 255)'; };
   const pairs = [];
-  q('.h-title,.h-say,.r-name,.q-num,.sec,.send,.f-count,.f-why,.banner h2,.banner p,.note,.empty,.undo,.add,.q-btn')
+  q('.h-title,.h-say,.r-name,.q-num,.sec,.send,.f-count,.f-why,.banner h2,.banner p,.note,.n-say,.n-sub,.again,.confirm,.empty,.undo,.add,.q-btn,.take-off,.e-note,.a-label,.a-add,.a-cancel')
     .forEach((e) => { if (vis(e) && e.textContent.trim()) pairs.push({ sel: (e.className||e.tagName).split(' ')[0], fg: cs(e, 'color'), bg: bgOf(e), size: px(e, 'font-size') }); });
 
   // GL-003 §2b-bis and Addendum B §6.5: no opacity on text on this surface, at all.
@@ -200,6 +208,7 @@ const measureInPage = () => {
   const foot = document.querySelector('.foot');
   const candidates = q('.row, .add');
   let coveredAtRest = null, unreachableAtEnd = null, occludedAtRest = [], buriedAtEnd = [], footClipped = 0;
+  let outcomeVisible = null, outcomeWhy = null;
   // ⛔ AND THE REQUIREMENT IS NOT MERELY "NOTHING OVERLAPS". Vera's words: for a technology-phobic
   // 84-year-old the first screen IS the whole product. B §7.1.1 puts the pending banner inside the
   // initial viewport in both orientations, and B §6.1 puts her shopping on the landing screen. So
@@ -260,6 +269,28 @@ const measureInPage = () => {
     const banner = document.querySelector('.banner');
     bannerInInitialViewport = banner ? (R(banner).top >= 0 && R(banner).bottom <= innerHeight) : null;
 
+    const measureOutcome = () => {
+    const strip = document.querySelector('.f-state');
+    if (strip) {
+      const parts = [strip.querySelector('.note')].concat(Array.from(strip.querySelectorAll('button')));
+      outcomeVisible = true;
+      for (const e of parts) {
+        if (!e) { outcomeVisible = false; outcomeWhy = 'the outcome strip has no message or no control'; break; }
+        const r = R(e);
+        const cls = (e.className || '').toString().split(' ')[0];
+        if (r.width === 0 && r.height === 0) { outcomeVisible = false; outcomeWhy = cls + ' is not rendered at all'; break; }
+        if (r.top < 0 || r.bottom > innerHeight) { outcomeVisible = false; outcomeWhy = cls + ' is not wholly on screen without scrolling'; break; }
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (!hit) { outcomeVisible = false; outcomeWhy = cls + ' has NOTHING at its own centre'; break; }
+        if (e !== hit && !e.contains(hit)) {
+          outcomeVisible = false;
+          outcomeWhy = cls + ' resolves to ' + ((hit.className || hit.tagName).toString().split(' ')[0]) + ' at its own centre';
+          break;
+        }
+      }
+    }
+    };
+
     // ══ HIGH-4 — THE THIRD NARROWING, WHICH I DID NOT FLAG AND WHICH DEFANGED THE CHECK ══════════
     //
     // This condition was `covered OR off-screen`. In the same edit that narrowed coveredAtRest I
@@ -280,7 +311,7 @@ const measureInPage = () => {
     // still be below the fold. Box arithmetic asks whether two rectangles intersect; this asks
     // whether her finger reaches the thing she is aiming at, which is the actual requirement.
     scrollTo(0, document.documentElement.scrollHeight);
-    const atEnd = candidates.concat(q('.send, .note, .undo'));
+    const atEnd = candidates.concat(q('.send, .note, .undo, .again, .confirm, .add, .a-input, .a-add'));
     for (const e of atEnd) {
       const r = R(e);
       if (r.width === 0 && r.height === 0) continue;
@@ -293,6 +324,24 @@ const measureInPage = () => {
       if (e !== hit && !e.contains(hit)) buriedAtEnd.push((e.className || e.tagName).toString().split(' ')[0] + ' resolves to ' + ((hit.className || hit.tagName).toString().split(' ')[0]) + ' at its own centre at maximum scroll');
     }
     unreachableAtEnd = buriedAtEnd.length > 0;
+
+    // ⛔ THE CONFIRM AND OUTCOME STATES HAVE A DIFFERENT REQUIREMENT FROM THE LANDING SCREEN, AND IT
+    // IS STRICTER RATHER THAN WEAKER. ⚠️ NARROWING FLAGGED FOR VERA — this file's own history says
+    // an unflagged narrowing is how an assertion quietly stops asserting.
+    // On the screen she ARRIVES at, the product is her shopping, so `firstUsableRowVisible` is the
+    // test. On a screen ANSWERING her — asking her to confirm, or telling her what happened — the
+    // product is the answer and the way onward, so the test is that the WHOLE message AND EVERY
+    // control in it are fully on screen and hit-test to themselves.
+    //
+    // ⛔ AND IT IS MEASURED HERE, AT MAXIMUM SCROLL, NOT AT SCROLL-TOP. That is the fix for a wrong
+    // first attempt which measured at the top and went red at 30 of 70 states. It was asking the
+    // question at a place she is not standing: below 720px of viewport height this surface DROPS
+    // THE FOOTER TO NORMAL FLOW on purpose (the HIGH-1 fix), so on her most likely device the
+    // action is at the end of a scroll — she is already at the bottom when she taps it, and she
+    // never returns to the top to read the answer. Maximum scroll is where the footer's content
+    // lives in BOTH layouts: static footers sit there, and a sticky footer is there too. Measuring
+    // the right property at the wrong scroll position is still a wrong measurement.
+    measureOutcome();
 
     // ⛔ HIGH-3 — THE FOOTER MUST NOT CLIP ITS OWN CONTENTS. `max-height` plus `overflow: hidden`
     // painted 30px of an 88px primary action and ZERO pixels of the post-send message, while every
@@ -357,9 +406,13 @@ const measureInPage = () => {
     horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
     rowCount: rows.length, targets, gutters, oppos, smallest, smallestText, pairs, faded,
     coveredAtRest, unreachableAtEnd, occludedAtRest, buriedAtEnd, footClipped, deadSpaceLive, deadSpaceRowsTested,
-    firstUsableRowVisible, firstWholeRowVisible, bannerInInitialViewport,
+    firstUsableRowVisible, firstWholeRowVisible, bannerInInitialViewport, outcomeVisible, outcomeWhy,
     cockpitWord: /cockpit/i.test(document.body.innerText),
     title: document.title,
+    // The state machine, read off the DOM rather than out of a testing hook the page exports for
+    // this file's benefit. `data-send-state` is on .page and is what CSS keys off too.
+    sendState: (document.querySelector('.page') || {}).getAttribute
+      ? document.querySelector('.page').getAttribute('data-send-state') : null,
   };
 };
 const MEASURE = '(' + measureInPage.toString() + ')()';
@@ -454,12 +507,125 @@ function rootTokens(file) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ══ THE WRITE ROUTE, STUBBED — AND WHY A STUB IS THE RIGHT INSTRUMENT HERE ═══════════════════════
+//
+// This gate measures what SHE SEES. The question it has to answer about the send is "given this
+// answer from the server, what is on her screen" — and the honest way to ask that is to control the
+// answer, exhaustively, including answers a real server would find it hard to be persuaded to give
+// (a body that is HTML, a socket that dies mid-request, a reply that never comes).
+//
+// ⛔ THIS IS NOT A TEST OF KEEL'S ROUTE AND MUST NEVER BE READ AS ONE. It is a test of this page's
+// response to the ROUTE CONTRACT's shapes. The two halves are proven together by Larry, on the real
+// route, and nothing measured here is evidence about what the server actually does.
+//
+// The shapes are route contract v2, copied rather than derived. `matched_by` carries the store's
+// own vocabulary verbatim ('insert' | 'shop_ref' | 'telegram_message' | 'superseded_terminal_ref');
+// the page never branches on it, so these values exist to prove exactly that.
+const SEND_MODES = {
+  // created:true — a shop row was written. THE ONLY MODE THAT MAY PRODUCE THE SENT STATE.
+  created: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: true, matched_by: 'insert' })); },
+  // created:false, recorded_new:true — today's shop is unchanged, but a durable record of what
+  // she changed WAS written and Warwick is told. Contract v3.
+  noted: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, notified: true, matched_by: 'shop_ref' })); },
+  // ⛔ AC7 — RECORDED, AND WARWICK NEVER HEARD. The route deliberately still answers ok:true:
+  // her list is durable the moment it is recorded, and a messaging outage must not turn a saved
+  // shop into an error on her screen. That correct decision is what makes this state reachable.
+  saved: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, notified: false, notify_error: 'notify_failed', matched_by: 'shop_ref' })); },
+  // The other real failure: no Telegram configured at all.
+  notconfigured: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, notified: false, notify_error: 'notify_not_configured', matched_by: 'shop_ref' })); },
+  // Contract violation: recorded, and `notified` absent entirely. Must claim LESS — she is told
+  // he has not heard, because the two errors are not symmetric.
+  nonotified: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: true, matched_by: 'shop_ref' })); },
+  // created:false, recorded_new:false — an identical re-send. Nothing was written at all.
+  unchanged: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, recorded_new: false, matched_by: 'shop_ref' })); },
+  // ⛔ THE CONTRACT VIOLATION CASES. Both fields absent, then `created:false` with `recorded_new`
+  // absent. The page must claim LESS, not more: a missing field is never read as a write, and
+  // it is never read as licence to promise that Warwick was told.
+  nocreated: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, matched_by: 'shop_ref' })); },
+  norecorded: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: true, shop_ref: 'SHOP-2026-08-13', shop_id: 41, created: false, matched_by: 'shop_ref' })); },
+  // 200, ok:false. The status line says fine and the body says no.
+  okfalse: (res) => { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: false, error: 'household_not_found', message: 'I could not find that household.' })); },
+  // 5xx with a well-formed error envelope.
+  refused: (res) => { res.writeHead(500, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ ok: false, error: 'store_unavailable', message: 'The store did not answer.' })); },
+  // 200 carrying HTML — a proxy error page, the classic "it parsed as success" trap.
+  html: (res) => { res.writeHead(200, { 'content-type': 'text/html', connection: 'close' }); res.end('<!doctype html><html><body><h1>502 Bad Gateway</h1></body></html>'); },
+  // The connection dies. fetch() rejects.
+  reject: (res, req) => { req.destroy(); res.destroy(); },
+  // ⛔ NOTHING IS EVER WRITTEN TO THE SOCKET. The page's own timeout is the only thing that ends it.
+  // The socket is REMEMBERED rather than abandoned, and here is why that is not tidiness:
+  // Node answers requests on one keep-alive connection IN ORDER, and the browser reuses that
+  // connection. A request this mode never answers therefore blocks every LATER request on the same
+  // socket — so the case after `timeout` hung for 30s and the run died with "the browser stopped
+  // answering", which looks exactly like the detached-Edge defect this file already guards against
+  // and is nothing of the kind. The instrument was breaking the next measurement, not the surface.
+  timeout: (res, req) => { hungSockets.add(req.socket); },
+};
+/** Free any socket deliberately left hanging, once the case that needed it has been measured. */
+function releaseHungSockets() {
+  for (const s of hungSockets) { try { s.destroy(); } catch { /* already gone */ } }
+  hungSockets.clear();
+}
+let sendMode = 'created';
+let listRequests = 0;
+const listBodies = [];
+const hungSockets = new Set();
+
+// ── THE SENSE-CHECK CONTRACT (WP-B15-50), stubbed ────────────────────────────────────────────────
+// ⛔ ONLY THE FIRST TWO MAY PUT A WORD ON HER SCREEN. `needs_confirmation` and `unmatched_new_item`
+// are accepted in silence — Warwick answers those in his own process, and stopping an 84-year-old
+// to adjudicate a catalogue match is the interrogation this surface must never conduct.
+const CHECK_MODES = {
+  matched: { ok: true, status: 'matched', matched_regular_id: 7, matched_name: 'Cravendale' },
+  possible_duplicate: { ok: true, status: 'possible_duplicate', matched_regular_id: 7, matched_name: 'Cravendale' },
+  needs_confirmation: { ok: true, status: 'needs_confirmation', matched_regular_id: null, matched_name: null },
+  unmatched_new_item: { ok: true, status: 'unmatched_new_item', matched_regular_id: null, matched_name: null },
+  // Not a status — the route itself being away. Handled before the table is consulted.
+  unreachable: null,
+};
+let checkMode = 'unmatched_new_item';
+let checkRequests = 0;
+const checkBodies = [];
+
 const CTX = staticCtx(HERE);
 const srv = http.createServer((req, res) => {
   // The two reads the surface makes, answered from the committed fixture. A measurement rig must be
   // DETERMINISTIC — the same reason render-vm-check.mjs uses fixtures rather than a live capture.
-  if (req.url.startsWith('/api/asdair/rules')) { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(servingLarge ? rulesLarge : rules)); }
-  if (req.url.startsWith('/api/asdair/workspace')) { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(workspace)); }
+  if (req.url.startsWith('/api/asdair/rules')) { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); return res.end(JSON.stringify(servingLarge ? rulesLarge : rules)); }
+  if (req.url.startsWith('/api/asdair/workspace')) { res.writeHead(200, { 'content-type': 'application/json', connection: 'close' }); return res.end(JSON.stringify(workspace)); }
+  // ── THE SENSE-CHECK (WP-B15-50's route, stubbed here) ─────────────────────────────────────────
+  // `checkMode` decides what comes back. `unreachable` is not an afterthought: Warwick's rule is
+  // that a check which cannot be reached must never cost her the item, so the case where this route
+  // is DOWN is a first-class thing to measure, not an edge case.
+  if (req.url.startsWith('/api/asdair/check-item')) {
+    checkRequests++;
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      try { checkBodies.push(JSON.parse(raw)); } catch { checkBodies.push({ UNPARSEABLE: raw }); }
+      if (checkMode === 'unreachable') { hungSockets.add(req.socket); return; }
+      const m = CHECK_MODES[checkMode];
+      if (!m) { res.writeHead(500); return res.end('unknown check mode ' + checkMode); }
+      res.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
+      res.end(JSON.stringify(m));
+    });
+    return undefined;
+  }
+  if (req.url.startsWith('/api/asdair/list')) {
+    // ⛔ COUNTED AND CAPTURED AT THE SERVER, WHICH IS THE ONLY PLACE THESE QUESTIONS CAN HONESTLY BE
+    // ASKED. "Is a second tap impossible" and "did her confirmed date actually travel" are claims
+    // about what LEAVES the page. Asserting either from inside the page — by reading a flag or a
+    // ref the page itself maintains — would be asking the suspect.
+    listRequests++;
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      try { listBodies.push(JSON.parse(raw)); } catch { listBodies.push({ UNPARSEABLE: raw }); }
+      const answer = SEND_MODES[sendMode];
+      if (!answer) { res.writeHead(500); return res.end('unknown send mode ' + sendMode); }
+      answer(res, req);
+    });
+    return undefined;
+  }
   return serveStatic(req, res, CTX);   // the REAL production static path, not a stand-in
 });
 await new Promise((r) => srv.listen(PORT, '127.0.0.1', r));
@@ -490,9 +656,15 @@ sock.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && pending.has(
 // indistinguishable from a gate that is slow, and neither is a result. A stalled call now REJECTS,
 // and the run exits 2 as REQUIRED-BUT-UNAVAILABLE — which is not a pass.
 const CMD_TIMEOUT_MS = 20000;
-const cmd = (method, params = {}) => new Promise((res, rej) => {
+// ⛔ THE OVERRIDE EXISTS FOR EXACTLY ONE CALLER AND IS NOT A GENERAL LOOSENING.
+// driveSend() waits for a real send to settle, and the deliberate timeout case takes the page's own
+// SEND_TIMEOUT_MS (15s) plus polling slack — which is under this ceiling but close enough to it that
+// a slow machine would turn a PASSING measurement into a spurious "the browser stopped answering".
+// Raising CMD_TIMEOUT_MS for every call instead would blunt the stall detector that exists because
+// headless Edge really does detach on this machine (DEFECT-LEDGER D-2026-08-03-11).
+const cmd = (method, params = {}, timeoutMs = CMD_TIMEOUT_MS) => new Promise((res, rej) => {
   const i = ++msgId;
-  const t = setTimeout(() => { pending.delete(i); rej(new Error('CDP ' + method + ' did not answer within ' + CMD_TIMEOUT_MS + 'ms')); }, CMD_TIMEOUT_MS);
+  const t = setTimeout(() => { pending.delete(i); rej(new Error('CDP ' + method + ' did not answer within ' + timeoutMs + 'ms')); }, timeoutMs);
   pending.set(i, (d) => { clearTimeout(t); res(d); });
   sock.send(JSON.stringify({ id: i, method, params }));
 });
@@ -544,30 +716,48 @@ const MUTATIONS = {
   // name out of view without disturbing the tick, which is precisely the layout the pre-amendment
   // condition would have passed.
   'a tappable tick attached to an unreadable name': { css: '.r-name{position:relative !important;top:1200px !important}' },
+  // ── THE TWO ADDED AT WP-B15-49, FOR THE STATES THAT DID NOT EXIST BEFORE IT ───────────────────
+  // ⛔ THESE CAN ONLY FIRE IN AN OUTCOME STATE, AND THAT IS THE POINT. Against the resting screen
+  // they are inert, because `.again` and `.note` are not rendered there. So if the self-test ever
+  // reports either of them caught at ZERO combinations, the run measured only the landing screen —
+  // which is precisely the coverage hole Vera named at Gate 3, made loud instead of implicit.
+  // The way back out of an outcome state, shrunk under the 88px LARGE floor. B §9.3's "full-size".
+  'the way back out of the sent state is shrunk below 88px': { css: '.again{min-height:30px !important}' },
+  // Her outcome sentence pushed under the 7:1 bar. The strip is the ONLY thing on the screen that
+  // tells her what happened, so it is the last text on this surface that may be hard to read.
+  'the outcome message is pushed below 7:1': { css: '.n-say,.n-sub{color:#9fb0c4 !important}' },
+  // Proves the outcome-state assertion that REPLACED the landing assertions can actually fire.
+  // Pushes the strip and its controls off the bottom of the viewport without disturbing anything
+  // else, which is the shape of the defect the tall stacked footer produced at 1280x800.
+  'the answer she needs is pushed off the screen': { css: '.f-state{position:relative !important;top:2000px !important}' },
 };
 
-// ⛔ THE FOOTER-OVERLAP ASSERTION HAS NO MUTATION, AND THAT IS A DELIBERATE, RECORDED DECISION
-// RATHER THAN AN OVERSIGHT. Read this before "fixing" it by adding one.
+// ⛔ THIS BLOCK WAS STALE AND SAID THE OPPOSITE OF THE CODE 150 LINES BELOW IT. REWRITTEN AT
+// WP-B15-49. Vera flagged it at Gate 3; the Work Order cited it as `shopping.js:549-570`, which
+// does not exist — shopping.js is 437 lines and the block was always here, in this file. The
+// finding was right and the citation was wrong, and both are recorded because a reader chasing the
+// wrong file concludes the finding was imaginary.
 //
-// `coveredAtRest` fires only in a narrow geometry: the last control must sit INSIDE the band the
-// stuck footer occupies at scroll-top — not above it, and not below the fold. Every CSS mutation
-// tried either pushed the control below the fold (a taller footer does this, and then nothing
-// overlaps) or tripped a DIFFERENT assertion on the way (shrinking the rows breaks the 72px target
-// floor first). A mutation that goes red for the wrong reason is a VACUOUS catch, and this file
-// exists partly because of exactly that failure elsewhere in the estate.
+// WHAT IT USED TO CLAIM, AND WHY EACH HALF WAS FALSE:
 //
-// So its non-vacuity rests on something better than a synthetic mutation: IT ALREADY CAUGHT A REAL
-// DEFECT IN THIS WORK PACKAGE. Before the portrait clearance was corrected, a headless measurement
-// at 800x1280 reported the "Add something else" control at y=1219 underneath a two-line sticky
-// footer — `lastRowCovered: true`, on the shipping stylesheet. The fix is the `.page-pad` override
-// in the portrait media query, and the assertion has read false at all seven viewports since.
-// That is a control proven by the bug it found, which is the strongest evidence available and is
-// stronger than proof by injected fault.
+//   * That `coveredAtRest`'s non-vacuity "rests on a real defect it already caught" — the portrait
+//     y=1219 overlap. That defence stopped being available the moment the assertion was NARROWED:
+//     `coveredAtRest` is no longer a failure at all, it is reported as `info` (see verdict below,
+//     which says so plainly). A bug caught by the PRE-narrowing form is not evidence about the
+//     post-narrowing one. This is the same error the file warns about elsewhere — a comment that a
+//     reviewer reads INSTEAD of re-deriving the argument.
+//   * That `unreachableAtEnd` "is kept as the guard against exactly that change". It guards
+//     nothing. It is now a derived boolean — `buriedAtEnd.length > 0` — and NOTHING ASSERTS IT.
+//     What is asserted is `buriedAtEnd` itself, element by element, with each entry already worded.
+//     The boolean survives only because `--json` consumers read it.
 //
-// `unreachableAtEnd` is likewise unmutated and is honestly the weaker of the two: with the footer
-// in NORMAL FLOW (sticky, not fixed) the last control is always reachable at maximum scroll, so
-// this can only fire if someone changes the footer to `position: fixed`. It is kept as the guard
-// against exactly that change.
+// WHAT IS ACTUALLY TRUE NOW, which is the thing worth knowing here:
+//   `coveredAtRest` is REPORTED, NEVER FAILED, and deliberately so — once the scope defect was
+//   fixed it fired at nearly every viewport, because overlapping content further down a scrolling
+//   page IS what a sticky footer does. Asserting it would mean "never use a sticky footer", which
+//   B §6.7 requires. The weight is carried instead by four assertions that CAN fail and that all
+//   have mutations proving they do: firstUsableRowVisible, bannerInInitialViewport, buriedAtEnd
+//   and footClipped. Their mutations are in MUTATIONS above, by name.
 
 // ⛔ ONE NAVIGATION PER VIEWPORT, AND THE MUTATIONS SWAP A STYLE ELEMENT IN PLACE.
 // The first version reloaded the page for every mutation at every viewport — 56 navigations — and
@@ -577,12 +767,58 @@ const MUTATIONS = {
 // the contents of ONE injected <style> and clearing it again. `#f247-mutation` is emptied rather
 // than removed, so the clean measurement and the mutated ones differ ONLY by the declaration under
 // test — a mutation that accidentally left state behind would otherwise contaminate the next one.
+/** One fresh load of the surface, with the mutation carrier re-installed.
+ *
+ * ⛔ IT WAITS FOR THE SURFACE, NOT FOR A GUESSED NUMBER OF MILLISECONDS, AND THAT IS A BUG FIX.
+ * This was `await wait(900)`. 900ms is comfortably enough for the 3-row fixture and NOT enough for
+ * the 46-row one, so on the LARGE viewports the driver ran against a page with no `.row` in it yet.
+ * The visible symptom was not "no rows": it was the run dying at a later viewport with "the browser
+ * stopped answering", which is the signature of the detached-Edge defect this file already guards
+ * against — so the instrument's own race looked exactly like a known hardware-ish fault. A fixed
+ * sleep is an assumption about someone else's machine; polling for the thing you need is not. */
+async function gotoPage() {
+  await cmd('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/shopping.html' });
+  // Polled from NODE, one cheap read at a time — see the long note above driveSend for why an
+  // in-page loop is the wrong instrument for measuring elapsed time in a page Chromium may throttle.
+  let until = Date.now() + 15000;
+  let ready = null;
+  let retried = false;
+  for (;;) {
+    ready = await evalIn('(() => (document.querySelector(".row") && document.querySelector(".send")) ? "ready" : "waiting")()');
+    if (ready === 'ready') break;
+    if (Date.now() > until) {
+      // A bare "it never rendered" sent the last investigation looking at the wrong thing twice.
+      // Report what the document ACTUALLY is, so the next reader diagnoses instead of guessing.
+      const why = await evalIn('(() => ({ url: location.href, readyState: document.readyState,'
+        + ' title: document.title, bodyLen: (document.body ? document.body.innerHTML.length : -1),'
+        + ' mount: !!document.getElementById("shop"),'
+        + ' mounted: !!(document.getElementById("shop") && document.getElementById("shop").children.length),'
+        + ' vue: typeof Vue, api: typeof window.FUSION_SHOPPING,'
+        + ' text: (document.body ? document.body.innerText.slice(0, 200) : "") }))()');
+      // ⛔ ONE RETRY, AND IT IS NOT PAPERING OVER A PRODUCT DEFECT. This is the instrument: headless
+      // Edge on this machine occasionally drops a navigation (DEFECT-LEDGER D-2026-08-03-11 is the
+      // documented severe form of the same thing). A dropped navigation makes the RIG report a
+      // surface that never rendered, which is a lie about the product. The retry is bounded to one,
+      // it is announced on stderr so a systematic failure is still visible as a pattern, and the
+      // second failure is fatal with the full document state attached.
+      if (!retried) {
+        retried = true;
+        console.error('  (navigation produced no surface; retrying once — ' + JSON.stringify(why) + ')');
+        await cmd('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/shopping.html' });
+        until = Date.now() + 15000;
+        await wait(300);
+        continue;
+      }
+      throw new Error('the surface never rendered after navigation: ' + JSON.stringify(why));
+    }
+    await wait(100);
+  }
+  await cmd('Runtime.evaluate', { expression: 'if(!document.getElementById("f247-mutation")){const s=document.createElement("style");s.id="f247-mutation";document.head.appendChild(s);}', returnByValue: true });
+}
 async function atViewport(v, fn) {
   servingLarge = !!v.large;   // set BEFORE navigating: the page fetches its list on load
   await cmd('Emulation.setDeviceMetricsOverride', { width: v.w, height: v.h, deviceScaleFactor: 1, mobile: true });
-  await cmd('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/shopping.html' });
-  await wait(900);
-  await cmd('Runtime.evaluate', { expression: 'if(!document.getElementById("f247-mutation")){const s=document.createElement("style");s.id="f247-mutation";document.head.appendChild(s);}', returnByValue: true });
+  await gotoPage();
   return fn();
 }
 /** Apply one mutation, or clear back to the shipping surface when given nothing.
@@ -610,34 +846,93 @@ async function setMutation(mut) {
   }
   await wait(180);
 }
-// ⛔ THE POST-SEND STATE, WHICH THIS GATE HAS NEVER RENDERED UNTIL NOW (Vera, 18b0f98).
+// ⛔ THE POST-SEND STATES, WHICH THIS GATE COULD NOT SEE UNTIL WP-B15-45 AND DID NOT COVER UNTIL
+// WP-B15-49 (Vera, 18b0f98, then AC5).
 // HIGH-3's worst case was not the SEND button — it was the message that REPLACES it. At 640x400 the
 // clipped `.note` painted ZERO pixels: she presses SEND and the screen does not respond at all, and
 // the one message that Addendum B §9.6 and Addendum E criterion 9 make load-bearing is simply not
 // there. A gate that only ever measures the resting state cannot see that, however many viewports
 // it measures it at.
-// Driven through the REAL surface — a real click on a row to choose something, a real click on the
-// primary action — rather than by poking a ref, because the state that matters is the one her taps
-// actually produce. Vue renders asynchronously, so this awaits two animation frames.
-const DRIVE_POST_SEND = `(async () => {
-  const row = document.querySelector('.row');
-  const send = document.querySelector('.send');
-  if (!row || !send) return 'no row or no action';
-  row.click();
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  const s2 = document.querySelector('.send');
-  if (!s2) return 'action vanished after choosing';
-  s2.click();
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  return document.querySelector('.note') ? 'post-send' : 'no note rendered';
-})()`;
-async function drivePostSend() {
-  const r = await cmd('Runtime.evaluate', { expression: DRIVE_POST_SEND, returnByValue: true, awaitPromise: true });
+//
+// ⛔ AND "THE POST-SEND STATE" IS NOW THREE DIFFERENT SCREENS, NOT ONE. Route contract v2 splits
+// `ok:true` into a real write (created:true -> sent) and a no-op (created:false -> already-sent),
+// and a failed send is a third. Each has its own copy, its own tint and its own control, so each
+// has to be RENDERED to be measured. Which one appears is decided by `sendMode` on the stub above.
+//
+// Driven through the REAL surface — a real click on a row, a real click on the primary action —
+// rather than by poking a ref, because the state that matters is the one her taps actually produce.
+// It then POLLS `data-send-state` rather than waiting a fixed number of frames: a send is a network
+// round trip, and the timeout case deliberately takes 15 seconds. A fixed wait would have measured
+// the 'sending' state and called it the outcome.
+// ⛔ AND THE JOURNEY IS NOW THREE TAPS, NOT TWO (Warwick, 2026-08-13). Choose -> SEND -> CONFIRM.
+// The middle screen is an accident guard, so the driver has to go through it exactly as she does;
+// clicking `.confirm` directly without passing `.send` would prove nothing about the guard, and
+// driving it by setting state would prove nothing about the page at all.
+// `stopAt` lets a caller park ON the confirm screen so it can be measured as its own state.
+// ⛔⛔ EVERY WAIT IN THIS DRIVER IS ON NODE'S CLOCK, NOT THE PAGE'S. THAT IS A BUG FIX, NOT A STYLE
+// PREFERENCE, AND IT COST THREE FAILED RUNS TO FIND — SO IT IS WRITTEN DOWN PROPERLY.
+//
+// The first version did its waiting INSIDE the page: `await new Promise(r => setTimeout(r, 100))`
+// in a loop, and `requestAnimationFrame` between clicks. CHROMIUM THROTTLES TIMERS IN A PAGE IT
+// DOES NOT CONSIDER VISIBLE — to roughly one tick per second — and rAF may not fire in such a page
+// at all. So a loop written to take 6 seconds took 60, and a CDP call allowed 30 seconds timed out.
+//
+// The SYMPTOM is what made it expensive. The run died with "the browser stopped answering", which
+// is exactly the signature of DEFECT-LEDGER D-2026-08-03-11 (headless Edge self-relaunching and
+// detaching on this machine) — a known, documented, entirely believable fault that had nothing to
+// do with it. It also MOVED WHEN INSTRUMENTED: adding one stderr line made all eight cases pass,
+// because the extra I/O changed the timing. A heisenbug wearing the costume of a known defect is
+// the worst kind there is.
+//
+// The durable lesson, and it generalises past this file: DO NOT MEASURE TIME WITH A CLOCK THE THING
+// UNDER TEST IS ALLOWED TO SLOW DOWN. The page is now only ever asked to do INSTANTANEOUS things —
+// click this, read that — and every wait between them happens here, in Node, where nothing throttles.
+
+/** One tiny in-page expression, with page-side exceptions surfaced rather than swallowed. */
+async function evalIn(expression, ms = 10000) {
+  const r = await cmd('Runtime.evaluate', { expression, returnByValue: true }, ms);
   if (r.result && r.result.exceptionDetails) {
-    throw new Error('driving the post-send state threw in the page: '
+    throw new Error('page expression threw: '
       + (r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text));
   }
-  return r.result && r.result.result ? r.result.result.value : 'unknown';
+  return r.result && r.result.result ? r.result.result.value : null;
+}
+
+/** The state machine, read off the DOM. */
+const readSendState = () => evalIn('(() => { const p = document.querySelector(".page");'
+  + ' return p ? p.getAttribute("data-send-state") : null; })()');
+
+/** Wait for the surface to leave 'sending'. The page's own timeout is 15s; this allows for it. */
+async function waitSettled(ceilingMs = 22000) {
+  const until = Date.now() + ceilingMs;
+  for (;;) {
+    const st = await readSendState();
+    if (st && st !== 'sending') return st;
+    if (Date.now() > until) return 'still sending after ' + ceilingMs + 'ms';
+    await wait(200);
+  }
+}
+
+/** Choose something, press SEND, read the confirm screen, and (unless parked) confirm. */
+async function driveSend(stopAt) {
+  const started = await evalIn('(() => { const row = document.querySelector(".row");'
+    + ' const send = document.querySelector(".send");'
+    + ' if (!row || !send) return "no row or no action";'
+    + ' if (!row.classList.contains("on")) row.click();'
+    + ' return "chose"; })()');
+  if (started !== 'chose') return started;
+  await wait(150);
+  const pressed = await evalIn('(() => { const s = document.querySelector(".send");'
+    + ' if (!s) return "action vanished after choosing"; s.click(); return "pressed"; })()');
+  if (pressed !== 'pressed') return pressed;
+  await wait(200);
+  const atConfirm = await readSendState();
+  if (atConfirm !== 'confirm') return 'the confirm screen never appeared (state is ' + atConfirm + ')';
+  if (stopAt === 'confirm') return 'confirm';
+  const committed = await evalIn('(() => { const y = document.querySelector(".confirm");'
+    + ' if (!y) return "no confirm control on the confirm screen"; y.click(); return "committed"; })()');
+  if (committed !== 'committed') return committed;
+  return waitSettled();
 }
 async function readMeasurement() {
   const r = await cmd('Runtime.evaluate', { expression: MEASURE, returnByValue: true });
@@ -647,18 +942,100 @@ async function readMeasurement() {
   }
   return (r.result && r.result.result) ? r.result.result.value : { ERROR: 'evaluate failed' };
 }
+// ══ THE MEASURED STATES ══════════════════════════════════════════════════════════════════════════
+// ⛔ AC5, AND VERA'S NON-BLOCKING FINDING FROM GATE 3. Her words: the self-test never renders the
+// post-send state, so "12/12" only ever covered the resting 10 of 20. The honest fix is NOT to add
+// two more mutations — that raises a number without widening what is looked at. It is to render
+// every state this surface can be in and exercise every mutation against every one of them.
+//
+// Three states, each a REAL screen she can reach, each with its own copy, tint and control:
+//   resting       nothing sent yet — the landing screen
+//   sent          created:true, a row was written
+//   already-sent  created:false, accepted and nothing changed (contract v2 Amendment 2)
+//   failed        it did not arrive
+// That is four; `already-sent` and `failed` differ in tint and copy but share a box shape, and both
+// are measured because they are separate screens to HER, which is the only view that counts here.
+//
+// Each non-resting state needs a FRESH LOAD: once the surface is in an outcome state its primary
+// action has been replaced, so a second send cannot be driven from it without first driving the way
+// back — which would measure a different journey from the one she takes.
+const STATES = [
+  { label: 'resting', kind: 'rest' },
+  // Warwick's confirm step is a SCREEN she stands on, with two full-size controls and a date she
+  // has to read. It is measured like any other screen, not treated as a transition.
+  { label: 'the confirm screen', kind: 'send', mode: 'created', stopAt: 'confirm', want: 'confirm' },
+  // The free-text input, open, with one thing already added and its nudge showing. This is the
+  // state that carries the new input, the new label and the new take-off control.
+  { label: 'adding something in her own words', kind: 'add', want: 'idle' },
+  { label: 'after SEND -> sent', kind: 'send', mode: 'created', want: 'sent' },
+  { label: 'after SEND -> already gone, Warwick told', kind: 'send', mode: 'noted', want: 'already-sent-noted' },
+  { label: 'after SEND -> already gone, saved but Warwick NOT told', kind: 'send', mode: 'saved', want: 'already-sent-saved' },
+  { label: 'after SEND -> already gone, nothing changed', kind: 'send', mode: 'unchanged', want: 'already-sent-unchanged' },
+  { label: 'after SEND -> not sent', kind: 'send', mode: 'refused', want: 'failed' },
+];
+
+// Drives the "add something else" journey exactly as she does it: open the control, type, add it,
+// then open it again so the input, the added row, its nudge and the entry control are all on screen
+// together. `matched` is used so the nudge is present and gets measured — it is the only branch of
+// the sense-check that puts a word in front of her.
+// The same node-clock discipline as driveSend. Opens the control, types, adds, waits for the
+// sense-check to have been ANSWERED (which this rig knows, because it is the one answering), then
+// re-opens the entry control so the input, the added row, its nudge and the entry control are all
+// on screen together and can be measured as one state.
+const ADD_TEXT = 'that nice ham';
+async function driveAdd() {
+  const opened = await evalIn('(() => { const a = document.querySelector(".add");'
+    + ' if (!a) return "no add control"; a.click(); return "opened"; })()');
+  if (opened !== 'opened') return opened;
+  await wait(150);
+  const typed = await evalIn('(() => { const i = document.querySelector(".a-input");'
+    + ' if (!i) return "no input appeared"; i.value = ' + JSON.stringify(ADD_TEXT) + ';'
+    + ' i.dispatchEvent(new Event("input", { bubbles: true })); return "typed"; })()');
+  if (typed !== 'typed') return typed;
+  await wait(150);
+  const before = checkRequests;
+  const added = await evalIn('(() => { const g = document.querySelector(".a-add");'
+    + ' if (!g) return "no add-it control"; g.click(); return "added"; })()');
+  if (added !== 'added') return added;
+  // Wait for the check to have reached this server at all — node's clock, max 5s.
+  const until = Date.now() + 5000;
+  while (checkRequests === before && Date.now() < until) await wait(100);
+  // ...then a short settle for the nudge to render, if one is coming. A nudge that never comes
+  // costs 400ms here rather than a six-second in-page poll that Chromium is free to stretch.
+  await wait(400);
+  const reopened = await evalIn('(() => { const a = document.querySelector(".add");'
+    + ' if (a) a.click(); const p = document.querySelector(".page");'
+    + ' return p ? p.getAttribute("data-send-state") : null; })()');
+  await wait(150);
+  return reopened;
+}
+
+/** Put the surface into one state, from a fresh page. Returns what it actually reached. */
+async function enterState(st) {
+  if (st.kind === 'rest') return null;
+  await gotoPage();
+  if (st.kind === 'add') {
+    checkMode = 'matched';   // the one branch that puts a word on her screen, so it gets measured
+    return driveAdd();
+  }
+  sendMode = st.mode;
+  return driveSend(st.stopAt);
+}
+
 async function measure(css) {
   const out = {};
   for (const v of VIEWS) {
     await atViewport(v, async () => {
-      await setMutation(css ? { css } : null);
-      out[v.label] = await readMeasurement();
-      // The same viewport, after she has chosen something and pressed the action. Reported as its
-      // own row so a failure names the state it belongs to.
-      const drove = await drivePostSend();
-      const post = await readMeasurement();
-      post.postSend = drove;
-      out[v.label + '  [after SEND]'] = post;
+      for (const st of STATES) {
+        // The state is entered on a CLEAN surface, then the mutation is applied, then it is
+        // measured. Mutating first could block the very click that reaches the state.
+        const reached = await enterState(st);
+        await setMutation(css ? { css } : null);
+        const m = await readMeasurement();
+        m.stateWanted = st.want || null;
+        m.stateReached = reached;
+        out[st.kind === 'rest' ? v.label : v.label + '  [' + st.label + ']'] = m;
+      }
     });
   }
   return out;
@@ -722,13 +1099,44 @@ function verdict(label, m) {
   for (const b of m.buriedAtEnd) bad.push('AT MAXIMUM SCROLL, WHERE THERE IS NOWHERE FURTHER TO GO: ' + b);
   if (m.footClipped > 0) bad.push('the footer is CLIPPING ITS OWN CONTENTS by ' + m.footClipped + 'px — the primary action or the post-send message is painted short of its layout box, which every box measurement in this file reports as fine (Addendum B §6.7, WCAG 1.4.4/1.4.10)');
   if (m.deadSpaceRowsTested === 0 && m.rowCount > 0) bad.push('the dead-space hit test examined ZERO of ' + m.rowCount + ' rows — it is reporting a pass on something it never looked at');
-  // HIGH-1, VERA. The landing screen is the whole product for this user.
-  if (m.firstUsableRowVisible === false) bad.push('THE LANDING SCREEN CONTAINS NO TAPPABLE ITEM — no item row has a tick that is both on screen and hit-testable at rest (Addendum B §6.1, §9)');
-  if (m.firstUsableRowVisible === true && m.firstWholeRowVisible === false) info.push('an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible');
-  if (m.bannerInInitialViewport === false) bad.push('the pending-question banner is NOT inside the initial viewport (Addendum B §7.1.1)');
-  // In the post-send state the honest message REPLACES the action (B §6.7), so it — not the button —
-  // is the thing that must be fully painted and reachable. `buriedAtEnd` covers `.note` directly.
-  if (m.postSend && m.postSend !== 'post-send') bad.push('the surface could not be driven into the post-send state: ' + m.postSend + ' — so the state Addendum E criterion 9 turns on was NOT measured here');
+  // ⛔ TWO DIFFERENT SCREENS, TWO DIFFERENT REQUIREMENTS. ⚠️ NARROWING FLAGGED FOR VERA, because
+  // this file's own history says an unflagged narrowing is how an assertion quietly stops asserting.
+  //
+  // The LANDING requirements (a tappable item, the pending banner in view) are about the screen she
+  // ARRIVES at, which is what B §6.1 and B §7.1.1 are about. They are asserted on the resting page
+  // and on the page with her free-text input open — every state where she is choosing.
+  //
+  // On the confirm and outcome screens they are NOT asserted, and are REPLACED by something
+  // stricter: the whole message and every control in it must be fully on screen and hit-test to
+  // themselves. That is not a hole — it is a harder bar, and it is the bar that matters when the
+  // screen's whole job is to tell her something and offer her one way onward.
+  const landing = !m.stateWanted || m.stateWanted === 'idle';
+  if (landing) {
+    // HIGH-1, VERA. The landing screen is the whole product for this user.
+    if (m.firstUsableRowVisible === false) bad.push('THE LANDING SCREEN CONTAINS NO TAPPABLE ITEM — no item row has a tick that is both on screen and hit-testable at rest (Addendum B §6.1, §9)');
+    if (m.firstUsableRowVisible === true && m.firstWholeRowVisible === false) info.push('an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible');
+    if (m.bannerInInitialViewport === false) bad.push('the pending-question banner is NOT inside the initial viewport (Addendum B §7.1.1)');
+  } else {
+    if (m.outcomeVisible === null) bad.push('this state should be showing her an outcome or a question and there is NO strip on the page at all — she pressed something and the screen did not answer');
+    if (m.outcomeVisible === false) bad.push('SHE CANNOT SEE THE WHOLE ANSWER WITHOUT SCROLLING: ' + m.outcomeWhy + ' (Addendum B §6.7, §9.3, §9.5)');
+  }
+  // In every outcome state the honest message REPLACES the action (B §6.7), so it — not the button —
+  // is the thing that must be fully painted and reachable. `buriedAtEnd` covers `.note` and `.again`.
+  //
+  // ⛔ THIS ASSERTION IS ALSO THE ONE THAT CATCHES A WRONG STATE, NOT MERELY AN UNREACHED ONE.
+  // If the page rendered 'sent' where the contract says one of the 'already-sent-*' states, or
+  // and she would have been told her list went when nothing was written — Addendum E criterion 9,
+  // and route contract v2's whole reason for existing. Comparing the state the driver REACHED
+  // against the state the mode should have produced is what makes that visible here.
+  if (m.stateWanted && m.stateReached !== m.stateWanted) {
+    bad.push('the surface should be in the "' + m.stateWanted + '" state and is in "' + m.stateReached
+      + '" — either it could not be driven there, or it rendered the WRONG outcome for the server-s answer '
+      + '(route contract v2 Amendment 2; Addendum E criterion 9)');
+  }
+  if (m.stateWanted && m.sendState !== m.stateWanted) {
+    bad.push('the rendered surface reports data-send-state="' + m.sendState + '" while the measured state is "'
+      + m.stateWanted + '" — the DOM and the state machine disagree');
+  }
   // MEDIUM-1, VERA.
   for (const d of m.deadSpaceLive) bad.push('the gap between MINUS and PLUS is NOT dead — a tap there resolves to a live control (' + d + ')');
   if (m.cockpitWord) bad.push('the word "Cockpit" is on her screen (Addendum B §2)');
@@ -747,6 +1155,283 @@ process.on('unhandledRejection', (e) => {
 // Skipped in self-test mode, which does its own clean measurement per viewport — running it here
 // too would double the navigations for no extra evidence, which is what made the first version
 // look hung.
+// ══ AC1 — THE FIVE-CASE TRANSCRIPT. WHAT SHE SEES WHEN THE SERVER MISBEHAVES ═════════════════════
+//
+// ⛔ THE PROPERTY UNDER TEST IS AN IMPOSSIBILITY CLAIM, WHICH IS WHY IT IS EXERCISED RATHER THAN
+// ARGUED. "The sent state is unreachable except when the server wrote a row" cannot be proved by
+// reading send(); it is proved by trying to reach it every way the network can fail and failing.
+//
+// Each case drives a REAL tap on a REAL row and a REAL tap on the action, against a server that
+// answers exactly one way, and records the state the page actually rendered plus the words she
+// would actually read. `expect` is what MUST come out. Anything else exits non-zero.
+if (process.argv.includes('--send-cases')) {
+  const CASES = [
+    { mode: 'reject', expect: 'failed', why: 'the connection is destroyed mid-request' },
+    { mode: 'refused', expect: 'failed', why: 'HTTP 500 with a well-formed ok:false envelope' },
+    { mode: 'okfalse', expect: 'failed', why: 'HTTP 200 whose body says ok:false' },
+    { mode: 'html', expect: 'failed', why: 'HTTP 200 carrying an HTML error page, not JSON' },
+    { mode: 'timeout', expect: 'failed', why: 'no answer ever — the page-s own 15s timeout ends it' },
+    // The two that MAY succeed, included in the same transcript because a claim that five things
+    // cannot reach a state is worthless without showing what does.
+    { mode: 'created', expect: 'sent', why: 'ok:true AND created:true — a row was written' },
+    { mode: 'noted', expect: 'already-sent-noted', why: 'recorded_new:true AND notified:true — recorded, and Warwick actually heard' },
+    { mode: 'saved', expect: 'already-sent-saved', why: 'AC7: recorded_new:true, notified:false — saved, and the message did NOT get through' },
+    { mode: 'notconfigured', expect: 'already-sent-saved', why: 'AC7: notified:false for the other real reason — no messaging configured' },
+    { mode: 'nonotified', expect: 'already-sent-saved', why: 'AC7: recorded_new:true with notified ABSENT — never promise he was told' },
+    { mode: 'unchanged', expect: 'already-sent-unchanged', why: 'created:false, recorded_new:false — an identical re-send, nothing written' },
+    { mode: 'nocreated', expect: 'already-sent-unchanged', why: 'ok:true with created ABSENT — claim less, never more' },
+    { mode: 'norecorded', expect: 'already-sent-unchanged', why: 'created:false with recorded_new ABSENT — never promise Warwick was told' },
+  ];
+  // One representative viewport: this is a state-machine transcript, not a geometry run.
+  await cmd('Emulation.setDeviceMetricsOverride', { width: 1024, height: 600, deviceScaleFactor: 1, mobile: true });
+  console.log('SEND CASES — driven through a real tap on the real surface, one server answer each.\n');
+  let bad = 0;
+  for (const c of CASES) {
+    await gotoPage();
+    sendMode = c.mode;
+    const t0 = Date.now();
+    const reached = await driveSend();
+    const ms = Date.now() - t0;
+    const seen = await cmd('Runtime.evaluate', {
+      expression: '(() => { const n = document.querySelector(".note"); const b = document.querySelector(".again, .send");'
+        + ' return { words: n ? n.innerText.replace(/\\s+/g, " ").trim() : null, control: b ? b.innerText.trim() : null }; })()',
+      returnByValue: true,
+    });
+    const v = (seen.result && seen.result.result && seen.result.result.value) || {};
+    const ok = reached === c.expect;
+    if (!ok) bad++;
+    console.log((ok ? 'ok    ' : 'FAIL  ') + c.mode.padEnd(10) + ' -> ' + String(reached).padEnd(13)
+      + ' (expected ' + c.expect + ', ' + ms + 'ms)');
+    console.log('        because : ' + c.why);
+    console.log('        she sees: ' + (v.words || '(no outcome strip rendered)'));
+    console.log('        her way on: ' + (v.control || '(no control)') + '\n');
+    releaseHungSockets();   // the `timeout` case would otherwise block the case after it
+  }
+  // ══ AC2 — DOUBLE-SEND IS PREVENTED IN STATE, NOT BY HER RESTRAINT ══════════════════════════════
+  // B §6.7: "Double-send is prevented in state, not by her restraint." Both limbs are required and
+  // both are checked here: the AFFORDANCE (aria-disabled, what she can see) and the GUARANTEE (what
+  // actually leaves the page). The mode is `timeout`, so the first send is still in flight for the
+  // whole of the test and every later tap lands on a genuinely busy surface.
+  // ⛔ THE DANGEROUS TAP MOVED ONE SCREEN LATER WHEN WARWICK'S CONFIRM STEP WAS ADDED, AND SO DID
+  // THIS TEST. Hammering `.send` now only opens the confirm screen and posts nothing — worth
+  // knowing, and checked in the CONFIRM block below. The tap that could double-submit is the one on
+  // the COMMIT control while a send is already in flight, so that is what is hammered here.
+  console.log('AC2 — five rapid taps on the commit control while a send is still in flight:');
+  await gotoPage();
+  sendMode = 'timeout';
+  listRequests = 0;
+  await evalIn('(() => { document.querySelector(".row").click(); })()');
+  await wait(150);
+  await evalIn('(() => { document.querySelector(".send").click(); })()');
+  await wait(200);
+  // ⛔ THE FIVE TAPS HAPPEN IN ONE SYNCHRONOUS EXPRESSION, DELIBERATELY. Spacing them over Node's
+  // clock would let the page settle between them and would be testing a slow repeat rather than the
+  // panicky double-tap this guard exists for. Synchronous clicks are the worst case: they all
+  // arrive inside a single task, before any render — exactly the race that a reactive `disabled`
+  // would lose and that the plain `inFlight` closure flag exists to win.
+  await evalIn('(() => { for (let i = 0; i < 5; i++) { const b = document.querySelector(".confirm"); if (b) b.click(); } })()');
+  await wait(600);
+  const d = (await evalIn('(() => { const s = document.querySelector(".send"); const p = document.querySelector(".page");'
+    + ' return { state: p ? p.getAttribute("data-send-state") : null,'
+    + '          confirmGone: !document.querySelector(".confirm"),'
+    + '          buttonPresent: !!s, ariaDisabled: s ? s.getAttribute("aria-disabled") : null }; })()')) || {};
+  const ac2ok = listRequests === 1 && d.state === 'sending' && d.ariaDisabled === 'true'
+    && d.buttonPresent === true && d.confirmGone === true;
+  console.log('        POSTs that actually reached the server : ' + listRequests + '   (must be exactly 1)');
+  console.log('        state after five taps on the commit    : ' + d.state);
+  console.log('        the commit control is gone             : ' + d.confirmGone + '   (nothing left to tap twice)');
+  console.log('        the action is back on screen           : ' + d.buttonPresent + '   (it must not vanish under her finger)');
+  console.log('        ...and marked aria-disabled            : ' + d.ariaDisabled);
+  console.log('        ' + (ac2ok ? 'ok    the guarantee held and the affordance showed it' : 'FAIL  a second send escaped, or the affordance is missing') + '\n');
+  if (!ac2ok) bad++;
+  releaseHungSockets();
+
+  // ══ AC3 — THE WAY BACK, AND WHAT SHE IS TOLD AFTER SHE USES IT ═════════════════════════════════
+  // B §9.3/§9.5: "an 84-year-old who realises she forgot the bread must not be stuck." Driven as a
+  // real journey — send, take the way back, change something — because the thing being proved is
+  // that the page does not claim the CHANGED list was sent.
+  console.log('AC3 — send, then change her mind:');
+  await gotoPage();
+  sendMode = 'created';
+  const first = await driveSend();
+  const backLabel = await evalIn('(() => { const b = document.querySelector(".again");'
+    + ' if (!b) return null; const t = b.innerText.trim(); b.click(); return t; })()');
+  await wait(200);
+  const afterBack = await evalIn('(() => { const p = document.querySelector(".page");'
+    + ' return { afterBack: p ? p.getAttribute("data-send-state") : null,'
+    + '          sendBack: !!document.querySelector(".send") }; })()') || {};
+  // She changes her mind about a DIFFERENT row — the "I forgot the bread" case.
+  await evalIn('(() => { document.querySelectorAll(".row")[1].click(); })()');
+  await wait(200);
+  const after = await evalIn('(() => { const w = document.querySelector(".f-why"); const p = document.querySelector(".page");'
+    + ' return { hint: w ? w.innerText.replace(/\\s+/g, " ").trim() : null,'
+    + '          state: p ? p.getAttribute("data-send-state") : null }; })()') || {};
+  const j = { label: backLabel, afterBack: afterBack.afterBack, sendBack: afterBack.sendBack, hint: after.hint, state: after.state };
+  const ac3ok = first === 'sent' && j.afterBack === 'idle' && j.sendBack === true
+    && j.state === 'idle' && !!j.hint && /changed your list/i.test(j.hint);
+  console.log('        after a real write she is in           : ' + first);
+  console.log('        her way back reads                     : ' + JSON.stringify(j.label));
+  console.log('        tapping it returns the page to         : ' + j.afterBack + '   (action restored: ' + j.sendBack + ')');
+  console.log('        after she then changes a row, she reads: ' + JSON.stringify(j.hint));
+  console.log('        ' + (ac3ok ? 'ok    she is never stuck, and the page never claims the CHANGED list was sent' : 'FAIL  the way back or the changed-list sentence is missing') + '\n');
+  if (!ac3ok) bad++;
+
+  // ══ WARWICK'S CONFIRM STEP — THE ACCIDENT GUARD, AND THE DATE THAT REACHES THE SERVER ══════════
+  // "so she cant submit by accident and also we will then get a date for the actual shop."
+  // Both halves are checked, and the second is checked AT THE SERVER: `list_date` is only real if
+  // it arrives, so the assertion reads the captured request body rather than the page.
+  console.log('CONFIRM — she is asked before anything is sent:');
+  await gotoPage();
+  sendMode = 'created';
+  listRequests = 0; listBodies.length = 0;
+  const atConfirm = await driveSend('confirm');
+  const cshown = await cmd('Runtime.evaluate', {
+    expression: '(() => ({ words: (document.querySelector(".note")||{}).innerText || null,'
+      + ' sendGone: !document.querySelector(".send"),'
+      + ' commit: (document.querySelector(".confirm")||{}).innerText || null,'
+      + ' out: (document.querySelector(".again")||{}).innerText || null }))()',
+    returnByValue: true,
+  });
+  const c = (cshown.result && cshown.result.result && cshown.result.result.value) || {};
+  const postsBeforeConfirming = listRequests;
+  // Five taps at the OLD position of the primary action, which is what an accidental double-tap is.
+  await cmd('Runtime.evaluate', {
+    expression: '(() => { for (let i=0;i<5;i++){ const b=document.querySelector(".send"); if(b) b.click(); } })()',
+    returnByValue: true,
+  });
+  await wait(400);
+  const postsAfterStrayTaps = listRequests;
+  // Now she actually confirms.
+  await cmd('Runtime.evaluate', { expression: '(() => { document.querySelector(".confirm").click(); })()', returnByValue: true });
+  await wait(700);
+  const body = listBodies[0] || {};
+  const expectDate = new Date();
+  const wantDate = expectDate.getFullYear() + '-'
+    + String(expectDate.getMonth() + 1).padStart(2, '0') + '-'
+    + String(expectDate.getDate()).padStart(2, '0');
+  const confirmOk = atConfirm === 'confirm' && c.sendGone === true && postsBeforeConfirming === 0
+    && postsAfterStrayTaps === 0 && listRequests === 1 && body.list_date === wantDate
+    && !Object.prototype.hasOwnProperty.call(body, 'note');
+  console.log('        she is asked                          : ' + JSON.stringify((c.words || '').replace(/\s+/g, ' ').trim()));
+  console.log('        the commit control reads              : ' + JSON.stringify((c.commit || '').trim()) + '   (class .confirm, NOT .send)');
+  console.log('        her way out reads                     : ' + JSON.stringify((c.out || '').trim()));
+  console.log('        no .send element exists on this screen: ' + c.sendGone);
+  console.log('        POSTs before she confirmed            : ' + postsBeforeConfirming + '   (must be 0 — SEND alone sends nothing)');
+  console.log('        POSTs after five stray taps at .send  : ' + postsAfterStrayTaps + '   (must be 0 — the guard is structural)');
+  console.log('        POSTs after she confirmed             : ' + listRequests);
+  console.log('        list_date that reached the server     : ' + JSON.stringify(body.list_date) + '   (expected ' + wantDate + ')');
+  console.log('        `note` key present in the request     : ' + Object.prototype.hasOwnProperty.call(body, 'note') + '   (contract v2 Amendment 3: must be false)');
+  console.log('        ' + (confirmOk ? 'ok    nothing is sent until she says so, and the date she saw is the date that went'
+    : 'FAIL  the confirm step or the date did not behave as specified') + '\n');
+  if (!confirmOk) bad++;
+  releaseHungSockets();
+
+  // ══ THE TWO CROSS-LANE FACTS FROM WP-B15-50, ESTABLISHED BY EXECUTION ══════════════════════════
+  // Both are claims about what LEAVES this page, so both are read off the CAPTURED REQUEST BODY.
+  // Reading the source and reasoning about it is how a confident wrong answer gets given.
+  console.log('CROSS-LANE — what this page actually puts on the wire:');
+  // 1. An empty input box must never produce `extras: ['']`. Keel's route answers 400 to that, and
+  //    it would fail her ENTIRE submission over a nicety she did not even use.
+  const emptyBody = listBodies[0] || {};
+  const hasExtrasKey = Object.prototype.hasOwnProperty.call(emptyBody, 'extras');
+  console.log('        with nothing typed, `extras` key present : ' + hasExtrasKey + '   (contract: omit it entirely)');
+  await gotoPage();
+  checkMode = 'matched';
+  checkRequests = 0; checkBodies.length = 0;
+  listRequests = 0; listBodies.length = 0;
+  // The exact gesture that could produce an empty string: open the box, add nothing, press Add it.
+  await evalIn('(() => { document.querySelector(".add").click(); })()');
+  await wait(150);
+  await evalIn('(() => { const g = document.querySelector(".a-add"); if (g) g.click(); })()');
+  await wait(300);
+  const blankMadeAnExtra = await evalIn('(() => document.querySelectorAll(".extra").length)()');
+  const blankHitTheCheck = checkRequests;
+  // ⛔ THE BLANK ATTEMPT CORRECTLY LEAVES HER INPUT OPEN — addExtra() returns before closing it, so
+  // a mis-tap on "Add it" does not throw away a box she is still using. That is right for her and
+  // it broke this test: `.add` is `v-if="!addOpen"`, so driveAdd() found no entry control and
+  // returned immediately, and the run reported a product failure that was mine. Close it as she
+  // would, with the worded control, then drive the real journey.
+  await evalIn('(() => { const c = document.querySelector(".a-cancel"); if (c) c.click(); })()');
+  await wait(200);
+  await driveAdd();
+  const checkBody = checkBodies[checkBodies.length - 1] || {};
+  sendMode = 'created';
+  await driveSend();
+  const withExtras = listBodies[0] || {};
+  const extrasSent = Array.isArray(withExtras.extras) ? withExtras.extras : null;
+  const noEmptyString = !!extrasSent && extrasSent.every((x) => typeof x === 'string' && x.trim() !== '');
+  const chosenSent = Array.isArray(checkBody.chosen);
+  const crossOk = hasExtrasKey === false && blankMadeAnExtra === 0 && blankHitTheCheck === 0
+    && noEmptyString && chosenSent;
+  console.log('        a blank box produced N extras            : ' + blankMadeAnExtra + '   (must be 0)');
+  console.log('        ...and reached the check route N times   : ' + blankHitTheCheck + '   (must be 0)');
+  console.log('        `extras` as sent                         : ' + JSON.stringify(extrasSent));
+  console.log('        ...contains no empty string              : ' + noEmptyString + '   (an empty string is a 400 that fails her whole send)');
+  console.log('        `chosen` sent to the check route         : ' + JSON.stringify(checkBody.chosen) + '   (without it possible_duplicate is unreachable)');
+  console.log('        ' + (crossOk ? 'ok    a blank box emits nothing, and the check gets what it needs to spot a duplicate'
+    : 'FAIL  this page would trip the 400, or cannot reach possible_duplicate') + '\n');
+  if (!crossOk) bad++;
+  releaseHungSockets();
+
+  // ══ ADD SOMETHING ELSE — AND THE RULE THAT SHE IS NEVER ASKED A QUESTION ═══════════════════════
+  console.log('ADD SOMETHING ELSE — her words, and a nudge that is never an interrogation:');
+  const ADD_CASES = [
+    { mode: 'matched', nudge: true, why: 'she already has it — tell her warmly, KEEP her item' },
+    { mode: 'possible_duplicate', nudge: true, why: 'probably a duplicate — same treatment' },
+    { mode: 'needs_confirmation', nudge: false, why: 'uncertain — accepted in SILENCE, Warwick handles it' },
+    { mode: 'unmatched_new_item', nudge: false, why: 'genuinely new — accepted in silence' },
+    { mode: 'unreachable', nudge: false, why: 'the check route is DOWN — her item is kept anyway' },
+  ];
+  for (const a of ADD_CASES) {
+    await gotoPage();
+    checkMode = a.mode;
+    checkRequests = 0; checkBodies.length = 0;
+    await driveAdd();
+    const seen = await cmd('Runtime.evaluate', {
+      // ⛔ WHAT "SHE IS NEVER ASKED A QUESTION" ACTUALLY FORBIDS, STATED PRECISELY — because the
+      // first version of this assertion tested for a question mark anywhere on the page and went
+      // red on the input's OWN LABEL, "What else would you like?". That label is the feature
+      // Warwick asked for, not a violation of his rule.
+      // The rule is about ADJUDICATION: she must never be asked to resolve a catalogue match. So
+      // what is forbidden is (a) a question mark inside the sense-check's own message to her, and
+      // (b) any disambiguation phrasing anywhere, and (c) any control inside the nudge — a nudge
+      // with a button in it is a choice, whatever its words say.
+      expression: '(() => { const n = document.querySelector(".e-note");'
+        + ' return { item: (document.querySelector(".extra .r-name")||{}).innerText || null,'
+        + ' note: n ? n.innerText : null,'
+        + ' noteAsks: n ? /\\?/.test(n.innerText) : false,'
+        + ' noteHasControl: n ? !!n.querySelector("button, a, input, select, [role=button]") : false,'
+        + ' disambiguation: /did you mean|which one|which did you|choose one|select one|is this the/i.test(document.body.innerText),'
+        + ' count: (document.querySelector(".f-count")||{}).innerText || null }; })()',
+      returnByValue: true,
+    });
+    const g = (seen.result && seen.result.result && seen.result.result.value) || {};
+    const sentText = (checkBodies[0] || {}).text;
+    const kept = g.item === 'that nice ham';
+    const nudgeRight = a.nudge ? !!g.note : !g.note;
+    const wordsIntact = a.mode === 'unreachable' ? true : sentText === 'that nice ham';
+    const notInterrogated = g.noteAsks === false && g.noteHasControl === false && g.disambiguation === false;
+    const ok = kept && nudgeRight && wordsIntact && notInterrogated;
+    if (!ok) bad++;
+    console.log((ok ? 'ok    ' : 'FAIL  ') + a.mode.padEnd(19) + ' -> item kept: ' + kept
+      + ', nudge: ' + (g.note ? 'yes' : 'no') + ' (wanted ' + (a.nudge ? 'yes' : 'no') + ')');
+    console.log('        because : ' + a.why);
+    console.log('        her words as sent to the check       : ' + JSON.stringify(sentText === undefined ? '(route was down)' : sentText));
+    console.log('        she reads                            : ' + JSON.stringify(g.note));
+    console.log('        the nudge asks her something         : ' + g.noteAsks + '   (must be false)');
+    console.log('        the nudge contains a control         : ' + g.noteHasControl + '   (must be false — a choice is an interrogation)');
+    console.log('        disambiguation wording on screen     : ' + g.disambiguation + '   (must be false)');
+    console.log('        the footer now counts                : ' + JSON.stringify((g.count || '').trim()) + '\n');
+    releaseHungSockets();
+  }
+
+  sock.close(); edge.kill(); srv.close();
+  if (bad) { console.error('SEND-CASES FAIL — ' + bad + ' case(s) rendered the wrong outcome.'); process.exit(1); }
+  console.log('SEND-CASES PASS — ' + CASES.length + '/' + CASES.length + ' cases rendered the outcome the server actually justified. '
+    + 'The sent state was reached by exactly ONE of them, and only by the one that wrote a row.');
+  process.exit(0);
+}
+
 const clean = SELF_TEST ? {} : await measure(null);
 if (AS_JSON) { console.log(JSON.stringify(clean, null, 1)); sock.close(); edge.kill(); srv.close(); process.exit(0); }
 
@@ -758,30 +1443,51 @@ if (SELF_TEST) {
   // every viewport rather than at a chosen one. A mutation only has to be caught SOMEWHERE to
   // prove the detector fires; requiring it everywhere would fail honestly-viewport-specific ones
   // (the footer-clearance mutation is exactly that).
+  // ⛔ VIEWPORTS OUTER, STATES MIDDLE, MUTATIONS INNER — AND THE STATE LOOP IS THE WP-B15-49 FIX.
+  // Before it, this loop measured ONLY the resting screen: 12 of 12 mutations caught, across 10 of
+  // the 20 states the gate rendered. Every mutation that can only fire once she has pressed SEND
+  // was therefore unproven, and the number "12/12" concealed that rather than revealing it.
+  // Now every mutation is exercised against every state at every viewport. A mutation only has to
+  // be caught SOMEWHERE to prove the detector fires; requiring it everywhere would fail the
+  // honestly state-specific ones (`.again` does not exist on the landing screen) and the honestly
+  // viewport-specific ones (the footer-clearance mutation).
+  const combos = VIEWS.length * STATES.length;
   for (const v of VIEWS) {
     await atViewport(v, async () => {
-      await setMutation(null);
-      const cleanN = verdict(v.label, await readMeasurement()).bad.length;
-      baseline += cleanN;
-      if (cleanN !== 0) console.error('  CONTROL FAILED at ' + v.label + ' — ' + cleanN + ' failure(s) before any mutation.');
-      for (const n of names) {
-        await setMutation(MUTATIONS[n]);
-        if (verdict(v.label, await readMeasurement()).bad.length > cleanN) hits[n]++;
+      for (const st of STATES) {
+        const reached = await enterState(st);
+        const tag = v.label + (st.kind === 'rest' ? '' : '  [' + st.label + ']');
+        await setMutation(null);
+        const cleanM = await readMeasurement();
+        cleanM.stateWanted = st.want || null;
+        cleanM.stateReached = reached;
+        const cleanN = verdict(tag, cleanM).bad.length;
+        baseline += cleanN;
+        if (cleanN !== 0) console.error('  CONTROL FAILED at ' + tag + ' — ' + cleanN + ' failure(s) before any mutation.');
+        for (const n of names) {
+          await setMutation(MUTATIONS[n]);
+          const mm = await readMeasurement();
+          mm.stateWanted = st.want || null;
+          mm.stateReached = reached;
+          if (verdict(tag, mm).bad.length > cleanN) hits[n]++;
+        }
+        await setMutation(null);
       }
-      await setMutation(null);
     });
   }
   let caught = 0; const missed = [];
   for (const n of names) {
-    if (hits[n] > 0) { caught++; console.log('  caught  ' + n.padEnd(58) + ' -> went red at ' + hits[n] + ' of ' + VIEWS.length + ' viewports'); }
-    else { missed.push(n); console.log('  MISSED  ' + n.padEnd(58) + ' -> red at NO viewport'); }
+    if (hits[n] > 0) { caught++; console.log('  caught  ' + n.padEnd(58) + ' -> went red at ' + hits[n] + ' of ' + combos + ' viewport/state combinations'); }
+    else { missed.push(n); console.log('  MISSED  ' + n.padEnd(58) + ' -> red at NO viewport in ANY state'); }
   }
   console.log(baseline === 0
-    ? '  control  all ' + VIEWS.length + ' viewports clean before mutation (no false positive)'
+    ? '  control  all ' + combos + ' viewport/state combinations clean before mutation (no false positive)'
     : '  CONTROL FAILED — ' + baseline + ' failure(s) on the unmutated surface; the mutations above prove nothing.');
   sock.close(); edge.kill(); srv.close();
   if (missed.length || baseline !== 0) { console.error('SELF-TEST FAIL'); process.exit(1); }
-  console.log('SELF-TEST PASS — ' + caught + '/' + names.length + ' mutations caught, control clean.');
+  console.log('SELF-TEST PASS — ' + caught + '/' + names.length + ' mutations caught, control clean, '
+    + 'across ' + combos + ' viewport/state combinations (' + VIEWS.length + ' viewports x ' + STATES.length + ' states: '
+    + STATES.map((s) => s.label).join(', ') + ').');
   process.exit(0);
 }
 
