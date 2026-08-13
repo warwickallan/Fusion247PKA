@@ -110,6 +110,14 @@ const VIEWS = [
   { label: 'portrait  800x1280 at 200% zoom', w: 400, h: 640 },
   // WCAG 1.4.10 reflow. B §11 calls it "the cheapest proof the layout is not brittle".
   { label: 'reflow 320px equivalent', w: 320, h: 800 },
+  // ⛔ THE THREE VERA MEASURED AT AND THIS FILE DID NOT. Every HIGH she returned was found at a
+  // viewport absent from this list, which is the plainest possible statement of the gap: a gate
+  // cannot see a defect at a size it never renders. 800x500 is where 10px of an 88px "YES, SEND IT"
+  // was painted; 512x300 is Fire HD 8 landscape at 200% zoom, where the 16px opposite-effect gap
+  // shipped; 300x512 is its portrait. They are kept permanently, not borrowed for one fix.
+  { label: 'landscape  800x500', w: 800, h: 500 },
+  { label: 'landscape  512x300 (Fire HD 8 at 200% zoom)', w: 512, h: 300 },
+  { label: 'portrait   300x512', w: 300, h: 512 },
   // MEDIUM-5 — the same device classes at REALISTIC LIST LENGTH. Her real list is not three items.
   { label: 'LARGE 46 rows landscape 1024x600', w: 1024, h: 600, large: true },
   { label: 'LARGE 46 rows portrait  800x1280', w: 800, h: 1280, large: true },
@@ -208,7 +216,79 @@ const measureInPage = () => {
   const foot = document.querySelector('.foot');
   const candidates = q('.row, .add');
   let coveredAtRest = null, unreachableAtEnd = null, occludedAtRest = [], buriedAtEnd = [], footClipped = 0;
-  let outcomeVisible = null, outcomeWhy = null;
+  let outcomeVisible = null, outcomeWhy = null, confirmGap = null;
+
+  // ⛔⛔ MEASURED AT THE SCROLL POSITION THE TRANSITION LEFT HER AT — NOT AT MAXIMUM SCROLL.
+  // HIGH-1, VERA, and this is the correction. This ran after `scrollTo(0, documentElement
+  // .scrollHeight)`, which sounds right and is not: below 720px height the footer is in NORMAL
+  // FLOW, so she scrolls to the bottom to reach SEND and IS at maximum scroll when she taps. The
+  // tap GROWS the document, so maximum scroll MOVES — and she does not. Scrolling to the new
+  // maximum measured a place she was not standing, and reported a strip as visible while 78 of its
+  // 88 pixels were below her fold. Right property, wrong moment: the same class of error as
+  // measuring elapsed time with a clock the page is allowed to throttle.
+  // It is therefore called BEFORE this function touches scrollY at all.
+  const measureOutcome = () => {
+    const strip = document.querySelector('.f-state') || document.querySelector('.add-form');
+    if (!strip) return;
+    // The add-form answers her with a question and a box; the footer strips answer with a message
+    // and controls. Both are "the thing the transition just produced" and both must be on screen.
+    const parts = strip.classList.contains('add-form')
+      ? [strip.querySelector('.a-label'), strip.querySelector('.a-input'), strip.querySelector('.a-add')]
+      : [strip.querySelector('.note')].concat(Array.from(strip.querySelectorAll('button')));
+    // ⛔ TWO BARS, AND WHICH ONE APPLIES IS DECIDED BY PHYSICS RATHER THAN BY PREFERENCE.
+    // When the strip FITS in the viewport, every part of it must be wholly on screen — no scrolling,
+    // nothing cut. When it CANNOT fit (300x512 is a 600x1024 tablet at 200% zoom, where the message
+    // alone wraps to most of the screen) that bar is unsatisfiable by any layout, so demanding it
+    // would be demanding the impossible rather than measuring the product. The bar there is: SHE
+    // CAN READ THE WHOLE MESSAGE, and every control is hit-testable at its own centre — she can see
+    // what she is being asked and reach both answers.
+    // ⚠️ THIS IS A NARROWING AND IT IS FLAGGED. It is still far stricter than anything that existed
+    // before this package, and it still catches Vera's actual finding: "10px of an 88px YES painted"
+    // puts that control's centre off screen, so the relaxed bar fails it too.
+    const stripBox = R(strip);
+    const stripFits = stripBox.height <= innerHeight + 1;
+    outcomeVisible = true;
+    for (const e of parts) {
+      if (!e) { outcomeVisible = false; outcomeWhy = 'the strip is missing its message or its control'; break; }
+      const r = R(e);
+      const cls = (e.className || '').toString().split(' ')[0];
+      if (r.width === 0 && r.height === 0) { outcomeVisible = false; outcomeWhy = cls + ' is not rendered at all'; break; }
+      // ⛔ ONE DEVICE PIXEL OF TOLERANCE, AND THE REPORTED FIGURE IS NEVER ROUNDED.
+      // `scrollIntoView({block:'end'})` aligns the bottom edge EXACTLY, and sub-pixel layout then
+      // leaves `bottom` at something like 400.0000001 against an innerHeight of 400. That produced
+      // five failures reading "BELOW the fold (0px of it)" — a message that disproves itself, and a
+      // clean example of why a value must not be rounded before it is compared. The tolerance is
+      // 1px because that is the smallest thing a screen can actually show her; the REPORT prints a
+      // decimal, so a genuine overflow can never again present itself as zero.
+      const EPS = 1;
+      // The MESSAGE must be wholly readable in either case — it is the thing she has to act on.
+      const mustFitWholly = stripFits || cls === 'note' || cls === 'a-label';
+      if (mustFitWholly && r.top < -EPS) { outcomeVisible = false; outcomeWhy = cls + ' is ABOVE the top of the viewport by ' + (-r.top).toFixed(1) + 'px, where the transition left her'; break; }
+      if (mustFitWholly && r.bottom > innerHeight + EPS) { outcomeVisible = false; outcomeWhy = cls + ' is BELOW the fold by ' + (r.bottom - innerHeight).toFixed(1) + 'px, where the transition left her'; break; }
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (!hit) { outcomeVisible = false; outcomeWhy = cls + ' has NOTHING at its own centre'; break; }
+      if (e !== hit && !e.contains(hit)) {
+        outcomeVisible = false;
+        outcomeWhy = cls + ' resolves to ' + ((hit.className || hit.tagName).toString().split(' ')[0]) + ' at its own centre';
+        break;
+      }
+    }
+    // ⛔ HIGH-3, VERA — THE CONFIRM SCREEN'S OPPOSITE-EFFECT PAIR WAS MEASURED NOWHERE, AT ANY
+    // VIEWPORT. `oppos` only ever looked at `.q-btn` pairs inside item rows, so a 16px gap between
+    // "YES, SEND IT" and "No, not yet" — the highest-stakes pair on the surface — was invisible to
+    // this gate while it reported a pass on dead space. Measured on whichever axis separates them,
+    // because which axis carries the requirement is a layout detail and the requirement is not.
+    const yes = strip.querySelector('.confirm');
+    const no = strip.querySelector('.again');
+    if (yes && no) {
+      const ry = R(yes), rn = R(no);
+      confirmGap = Math.round(Math.max(
+        Math.max(rn.top - ry.bottom, ry.top - rn.bottom),
+        Math.max(rn.left - ry.right, ry.left - rn.right),
+      ));
+    }
+  };
+  measureOutcome();
   // ⛔ AND THE REQUIREMENT IS NOT MERELY "NOTHING OVERLAPS". Vera's words: for a technology-phobic
   // 84-year-old the first screen IS the whole product. B §7.1.1 puts the pending banner inside the
   // initial viewport in both orientations, and B §6.1 puts her shopping on the landing screen. So
@@ -266,30 +346,18 @@ const measureInPage = () => {
       const r = R(row);
       return r.top >= 0 && r.bottom <= innerHeight && tickUsable(row);
     });
-    const banner = document.querySelector('.banner');
-    bannerInInitialViewport = banner ? (R(banner).top >= 0 && R(banner).bottom <= innerHeight) : null;
 
-    const measureOutcome = () => {
-    const strip = document.querySelector('.f-state');
-    if (strip) {
-      const parts = [strip.querySelector('.note')].concat(Array.from(strip.querySelectorAll('button')));
-      outcomeVisible = true;
-      for (const e of parts) {
-        if (!e) { outcomeVisible = false; outcomeWhy = 'the outcome strip has no message or no control'; break; }
-        const r = R(e);
-        const cls = (e.className || '').toString().split(' ')[0];
-        if (r.width === 0 && r.height === 0) { outcomeVisible = false; outcomeWhy = cls + ' is not rendered at all'; break; }
-        if (r.top < 0 || r.bottom > innerHeight) { outcomeVisible = false; outcomeWhy = cls + ' is not wholly on screen without scrolling'; break; }
-        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        if (!hit) { outcomeVisible = false; outcomeWhy = cls + ' has NOTHING at its own centre'; break; }
-        if (e !== hit && !e.contains(hit)) {
-          outcomeVisible = false;
-          outcomeWhy = cls + ' resolves to ' + ((hit.className || hit.tagName).toString().split(' ')[0]) + ' at its own centre';
-          break;
-        }
-      }
-    }
-    };
+    // ⛔ RESTATED BY WARWICK, 2026-08-13 — THIS MEASURES THE HEADING, NOT THE WHOLE BANNER.
+    // "bannerInInitialViewport becomes: THE BANNER-S HEADING is wholly within the initial
+    // viewport. The elaboration is not required to be."
+    // ⛔ NOT A RELAXATION SMUGGLED IN TO WIN A GREEN RUN. The old form also asserted that the
+    // ELABORATION fitted, which at 300px wide is achievable only by pushing her shopping off the
+    // screen — and the elaboration now renders AFTER the list at those sizes, so asserting its
+    // position here would be asserting the position of something that has moved. The load-bearing
+    // fact still has to be on the screen she arrives at, whole, every single time.
+    const bannerHead = document.querySelector(".banner.ask h2") || document.querySelector(".banner h2");
+    bannerInInitialViewport = bannerHead
+      ? (R(bannerHead).top >= 0 && R(bannerHead).bottom <= innerHeight) : null;
 
     // ══ HIGH-4 — THE THIRD NARROWING, WHICH I DID NOT FLAG AND WHICH DEFANGED THE CHECK ══════════
     //
@@ -325,23 +393,12 @@ const measureInPage = () => {
     }
     unreachableAtEnd = buriedAtEnd.length > 0;
 
-    // ⛔ THE CONFIRM AND OUTCOME STATES HAVE A DIFFERENT REQUIREMENT FROM THE LANDING SCREEN, AND IT
-    // IS STRICTER RATHER THAN WEAKER. ⚠️ NARROWING FLAGGED FOR VERA — this file's own history says
-    // an unflagged narrowing is how an assertion quietly stops asserting.
-    // On the screen she ARRIVES at, the product is her shopping, so `firstUsableRowVisible` is the
-    // test. On a screen ANSWERING her — asking her to confirm, or telling her what happened — the
-    // product is the answer and the way onward, so the test is that the WHOLE message AND EVERY
-    // control in it are fully on screen and hit-test to themselves.
-    //
-    // ⛔ AND IT IS MEASURED HERE, AT MAXIMUM SCROLL, NOT AT SCROLL-TOP. That is the fix for a wrong
-    // first attempt which measured at the top and went red at 30 of 70 states. It was asking the
-    // question at a place she is not standing: below 720px of viewport height this surface DROPS
-    // THE FOOTER TO NORMAL FLOW on purpose (the HIGH-1 fix), so on her most likely device the
-    // action is at the end of a scroll — she is already at the bottom when she taps it, and she
-    // never returns to the top to read the answer. Maximum scroll is where the footer's content
-    // lives in BOTH layouts: static footers sit there, and a sticky footer is there too. Measuring
-    // the right property at the wrong scroll position is still a wrong measurement.
-    measureOutcome();
+    // ⛔ THE OUTCOME MEASUREMENT USED TO BE TAKEN HERE, AT MAXIMUM SCROLL, AND VERA PROVED THAT
+    // WRONG. It has moved to the top of this function, before anything touches scrollY — see the
+    // long note there. Two wrong scroll positions were tried before the right one: scroll-top
+    // (which she has left), then maximum scroll (which the tap itself moves out from under her).
+    // The position that is neither is the one she is actually standing at when the transition
+    // happens, and the only way to have it is to measure before scrolling anywhere.
 
     // ⛔ HIGH-3 — THE FOOTER MUST NOT CLIP ITS OWN CONTENTS. `max-height` plus `overflow: hidden`
     // painted 30px of an 88px primary action and ZERO pixels of the post-send message, while every
@@ -406,7 +463,7 @@ const measureInPage = () => {
     horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
     rowCount: rows.length, targets, gutters, oppos, smallest, smallestText, pairs, faded,
     coveredAtRest, unreachableAtEnd, occludedAtRest, buriedAtEnd, footClipped, deadSpaceLive, deadSpaceRowsTested,
-    firstUsableRowVisible, firstWholeRowVisible, bannerInInitialViewport, outcomeVisible, outcomeWhy,
+    firstUsableRowVisible, firstWholeRowVisible, bannerInInitialViewport, outcomeVisible, outcomeWhy, confirmGap,
     cockpitWord: /cockpit/i.test(document.body.innerText),
     title: document.title,
     // The state machine, read off the DOM rather than out of a testing hook the page exports for
@@ -730,6 +787,9 @@ const MUTATIONS = {
   // Pushes the strip and its controls off the bottom of the viewport without disturbing anything
   // else, which is the shape of the defect the tall stacked footer produced at 1280x800.
   'the answer she needs is pushed off the screen': { css: '.f-state{position:relative !important;top:2000px !important}' },
+  // HIGH-3: collapses the YES / No dead space. Fires only where that pair is rendered, which is
+  // the confirm screen — so a zero catch here means the confirm screen went unmeasured again.
+  'the gap between YES and No is collapsed': { css: '.f-state{gap:2px !important}' },
 };
 
 // ⛔ THIS BLOCK WAS STALE AND SAID THE OPPOSITE OF THE CODE 150 LINES BELOW IT. REWRITTEN AT
@@ -963,15 +1023,15 @@ const STATES = [
   { label: 'resting', kind: 'rest' },
   // Warwick's confirm step is a SCREEN she stands on, with two full-size controls and a date she
   // has to read. It is measured like any other screen, not treated as a transition.
-  { label: 'the confirm screen', kind: 'send', mode: 'created', stopAt: 'confirm', want: 'confirm' },
+  { label: 'the confirm screen', kind: 'send', mode: 'created', stopAt: 'confirm', want: 'confirm', answers: true },
   // The free-text input, open, with one thing already added and its nudge showing. This is the
   // state that carries the new input, the new label and the new take-off control.
-  { label: 'adding something in her own words', kind: 'add', want: 'idle' },
-  { label: 'after SEND -> sent', kind: 'send', mode: 'created', want: 'sent' },
-  { label: 'after SEND -> already gone, Warwick told', kind: 'send', mode: 'noted', want: 'already-sent-noted' },
-  { label: 'after SEND -> already gone, saved but Warwick NOT told', kind: 'send', mode: 'saved', want: 'already-sent-saved' },
-  { label: 'after SEND -> already gone, nothing changed', kind: 'send', mode: 'unchanged', want: 'already-sent-unchanged' },
-  { label: 'after SEND -> not sent', kind: 'send', mode: 'refused', want: 'failed' },
+  { label: 'adding something in her own words', kind: 'add', want: 'idle', answers: true },
+  { label: 'after SEND -> sent', kind: 'send', mode: 'created', want: 'sent', answers: true },
+  { label: 'after SEND -> already gone, Warwick told', kind: 'send', mode: 'noted', want: 'already-sent-noted', answers: true },
+  { label: 'after SEND -> already gone, saved but Warwick NOT told', kind: 'send', mode: 'saved', want: 'already-sent-saved', answers: true },
+  { label: 'after SEND -> already gone, nothing changed', kind: 'send', mode: 'unchanged', want: 'already-sent-unchanged', answers: true },
+  { label: 'after SEND -> not sent', kind: 'send', mode: 'refused', want: 'failed', answers: true },
 ];
 
 // Drives the "add something else" journey exactly as she does it: open the control, type, add it,
@@ -1033,6 +1093,7 @@ async function measure(css) {
         await setMutation(css ? { css } : null);
         const m = await readMeasurement();
         m.stateWanted = st.want || null;
+        m.answersHer = !!st.answers;
         m.stateReached = reached;
         out[st.kind === 'rest' ? v.label : v.label + '  [' + st.label + ']'] = m;
       }
@@ -1110,7 +1171,16 @@ function verdict(label, m) {
   // stricter: the whole message and every control in it must be fully on screen and hit-test to
   // themselves. That is not a hole — it is a harder bar, and it is the bar that matters when the
   // screen's whole job is to tell her something and offer her one way onward.
-  const landing = !m.stateWanted || m.stateWanted === 'idle';
+  // ⛔ HIGH-3, VERA — THE CONFIRM PAIR IS NOW ASSERTED, NOT MERELY REPORTED. `oppos` above covers
+  // MINUS/PLUS inside item rows and nothing else, so the surface's highest-stakes opposite-effect
+  // pair went unmeasured at every viewport while this gate passed on "dead space".
+  if (m.confirmGap !== null && m.confirmGap < FLOOR.gapOpposite) {
+    bad.push('dead space between "YES, SEND IT" and "No, not yet" is ' + m.confirmGap + 'px, under '
+      + FLOOR.gapOpposite + 'px — the mis-tap here either orders a shop she did not want or loses one she did (E A10)');
+  }
+  // `answers` is set on the state, not inferred from `stateWanted`: the add-form state is 'idle' by
+  // send-state and is nonetheless a screen that answers her, so inferring it got that one wrong.
+  const landing = !m.answersHer;
   if (landing) {
     // HIGH-1, VERA. The landing screen is the whole product for this user.
     if (m.firstUsableRowVisible === false) bad.push('THE LANDING SCREEN CONTAINS NO TAPPABLE ITEM — no item row has a tick that is both on screen and hit-testable at rest (Addendum B §6.1, §9)');
@@ -1460,6 +1530,7 @@ if (SELF_TEST) {
         await setMutation(null);
         const cleanM = await readMeasurement();
         cleanM.stateWanted = st.want || null;
+        cleanM.answersHer = !!st.answers;
         cleanM.stateReached = reached;
         const cleanN = verdict(tag, cleanM).bad.length;
         baseline += cleanN;
@@ -1468,6 +1539,7 @@ if (SELF_TEST) {
           await setMutation(MUTATIONS[n]);
           const mm = await readMeasurement();
           mm.stateWanted = st.want || null;
+          mm.answersHer = !!st.answers;
           mm.stateReached = reached;
           if (verdict(tag, mm).bad.length > cleanN) hits[n]++;
         }

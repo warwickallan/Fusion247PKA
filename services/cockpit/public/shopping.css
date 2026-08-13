@@ -174,6 +174,16 @@ body {
 /* Calm, informational. --ink on --ok-w = 14.39:1. */
 .banner.done { background: var(--ok-w); border-color: var(--ok); }
 
+/* ⛔ THE ELABORATION, RENDERED AFTER THE LIST ON THE SMALLEST SCREENS (Warwick's ruling, 2026-08-13).
+   Same tint, same rail, same ink as the banner it belongs to, so it reads as the same voice rather
+   than as a second unexplained notice. It carries no heading, because the fact was stated in full at
+   the top of the page and repeating it here would be two demands instead of one.
+   ⛔ IT IS NOT A SECOND BANNER IN THE B §9.1 SENSE. That slot is still the single one at the top,
+   and the ABSENCE of a banner there is still the resting-state signal. This is the tail of that
+   banner, placed where there is room for it — and it exists only when the top of the page has no
+   room, which is exactly when her shopping would otherwise have been pushed off the screen. */
+.banner-more { margin-top: var(--m-gap-row); }
+
 /* ── SECTION HEADING ─────────────────────────────────────────────────────────────────────────────
    B §6.1: a heading in the FLOW of the page. Not navigation, not a tab, not an accordion.
    It cannot collapse, and nothing is ever hidden behind it. */
@@ -436,8 +446,14 @@ body {
 .extra { flex-wrap: wrap; }
 /* Her way to take it off again. Not a small x in a corner: a worded control at the general 72px
    floor, because removing something she asked for should be as plain as adding it. */
+/* ⛔ MEDIUM-1: this is now a SPAN, not a button — the whole row is the control, and a button inside
+   a role=button row is a control inside a control. It keeps its box and its words so the affordance
+   is still visible and still meets the 72px floor; what it no longer does is compete for the tap. */
 .take-off {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: var(--m-target);
   padding: 0 var(--m-pad);
   font-family: inherit;
@@ -658,6 +674,63 @@ body {
   .page-pad { padding-bottom: 320px; }
 }
 
+/* ══ VERY NARROW — THE LANDING SCREEN WINS (Warwick's ruling, 2026-08-13) ═════════════════════════
+   ⛔ NOT ONE WORD OF HER COPY IS SHORTENED HERE, AND THAT IS THE CONSTRAINT RATHER THAN A SIDE
+   EFFECT. At 300px wide the title, the instruction and the pending-question banner between them
+   filled the whole viewport, so she opened her SHOPPING LIST and saw no shopping.
+   Warwick's ruling: the banner's load-bearing first sentence stays in the initial viewport, the
+   elaboration may flow below the fold — "elaboration below the fold is not dishonesty" — and at
+   least one tappable row must be reachable on the landing screen at every viewport measured.
+   ⛔ AND THE OLD PRINCIPLE IS NOT BEING OVERTURNED, IT IS BEING READ CORRECTLY. "Given the choice
+   between a banner that fits and a banner that is honest, the banner is honest" was written when
+   the alternative was TRUNCATING the fact. That is not the choice at 300px, and reading it as
+   though it were is what made this look unresolvable.
+   So what gives is whitespace. Every sentence renders in full; the 22px body floor is untouched.
+   Keyed to WIDTH because 300px wraps every block to three or four times its normal height while
+   the viewport remains tall in pixels — the height-keyed tier below never fires there. */
+@media (max-width: 360px) {
+  body { line-height: 1.3; }
+  .page { padding: 8px; }
+  .head { padding: 0; }
+  .h-title { font-size: 26px; margin-bottom: 4px; }
+  .sec { font-size: 24px; margin: 8px 0 8px; }
+  .banner { padding: 10px; margin-bottom: 8px; border-left-width: 8px; }
+  .banner h2 { font-size: 22px; margin-bottom: 4px; }
+  .row { margin-bottom: 12px; }
+
+  /* ⛔ THE OUTCOME STRIP'S OWN WHITESPACE, AND ONLY ITS WHITESPACE.
+     At 302x516 the `already-sent-saved` state — the one with the longest sentence — came to roughly
+     542px of strip in a 516px viewport, which put "Back to my shopping" past the bottom with
+     nothing at its own centre. She would have read the whole message and had no visible way out.
+     ⛔ THE SENTENCE IS NOT TOUCHED. What gives is padding and leading: the strip's inner padding,
+     the footer's padding, and the space between the two lines. No font size changes, the 22px floor
+     is untouched, and `--m-gap-opposite` is NOT reduced — that gap is HIGH-3's safety requirement
+     and it is the one value here that may never be spent to win pixels. */
+  .foot { padding: 12px; }
+  .f-state .note { padding: 12px; }
+  .n-sub { margin-top: 4px; }
+}
+
+/* ══ EXTREMELY SHORT — THE TITLE GIVES UP ITS PIXELS, AND ONLY THE TITLE ══════════════════════════
+   At 512x300 (Fire HD 8 landscape at 200% zoom) the chrome still ended below y=300 after every
+   whitespace saving, so no item tick reached the screen at all. The one remaining thing that may go
+   is the VISUAL page title — this file already records that "only the page TITLE shrinks, and a
+   title is not something she has to read to act", and the surface names itself in the browser tab
+   and in the instruction beneath it regardless.
+   ⛔ IT IS CLIPPED, NOT DELETED. The h1 stays in the document with its text intact, so the heading
+   structure a screen reader navigates by is unchanged (B §11). Her instruction is untouched and the
+   banner still states its fact in full — what is given up is decoration, not information. */
+@media (max-height: 360px) {
+  .h-title {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .h-say { margin: 0 0 4px; }
+  .banner { padding: 6px; margin-bottom: 6px; }
+  .banner p { line-height: 1.25; }
+  .sec { margin: 4px 0 6px; }
+}
+
 /* ══ WIDE VIEWPORTS — THE OUTCOME FOOTER LAYS OUT SIDEWAYS ═══════════════════════════════════════
    ⛔ THIS IS A FIX FOR A DEFECT THIS PACKAGE INTRODUCED, AND THE GATE IS WHAT FOUND IT.
    The confirm and outcome states replace one 88px action with a two-line message PLUS two full-size
@@ -813,11 +886,26 @@ body {
      between them is `--m-gap-opposite`, this surface's own opposite-effect guarantee, the same
      figure that separates MINUS from PLUS. It is inherited from .f-state's gap, not re-declared.
      Keyed to a width floor too, so a genuinely narrow screen keeps the stack. */
-  .f-state { gap: 16px; }
+  /* ⛔ HIGH-3, VERA — `.f-state { gap: 16px }` USED TO BE HERE AND IS REMOVED ENTIRELY.
+     It squeezed the strip to fit a short screen, and 24px was restored only by the
+     `and (min-width: 600px)` block below — so at height <= 480 AND width < 600 (Fire HD 8 landscape
+     at 200% zoom) "YES, SEND IT" and "No, not yet" sat SIXTEEN PIXELS apart. This file's own words:
+     `--m-gap-opposite` is "a SAFETY REQUIREMENT, not a style value". It is the dead space that makes
+     a mis-tap land on nothing, and this is the highest-stakes opposite-effect pair on the surface —
+     the mis-tap costs her either an order she did not want or the loss of one she did.
+     The height it bought is no longer needed: HIGH-1's scroll-into-view means the strip no longer
+     has to fit inside whatever happens to remain below her finger. What is tightened here now is
+     padding and leading, and neither of those is a safety value. */
   .f-state .note { padding: 12px; }
   .n-sub { margin-top: 4px; }
 }
-@media (max-height: 480px) and (min-width: 600px) {
+/* ⛔ AND THE WIDTH CONDITION IS GONE TOO — it was `and (min-width: 600px)`, and it is precisely what
+   left the narrow-AND-short case stacked, squeezed and 16px apart. At 512x300 a stacked strip
+   cannot fit at any gap: the message plus two 88px controls plus their gaps exceed the whole
+   viewport. So side-by-side is not a preference there, it is the only layout that shows her both
+   controls at full size — and it now inherits the full 24px opposite-effect gap rather than a
+   squeezed one. `min-width: 0` lets the pair share the width instead of overflowing it. */
+@media (max-height: 480px) {
   .f-state { flex-direction: row; align-items: stretch; flex-wrap: wrap; gap: var(--m-gap-opposite); }
   .f-state .note { flex: 1 1 100%; }
   .f-state .confirm, .f-state .again { flex: 1 1 0; width: auto; min-width: 0; }

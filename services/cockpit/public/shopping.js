@@ -207,6 +207,23 @@
   // there is one household and a selector would be a control she can get wrong.
   var HOUSEHOLD = 1;
 
+  // ⛔ ONE SOURCE FOR THE BANNER'S ELABORATION, BECAUSE IT NOW RENDERS AT TWO POINTS.
+  // Warwick's ruling (2026-08-13) puts it after the list on the smallest screens, so the sentence
+  // appears twice in the template. A duplicated literal is two sentences that drift apart; this is
+  // ONE sentence rendered in two places.
+  var ASK_MORE = 'I need to check something with you before I can get your shopping. '
+    + 'I can’t ask you here just yet, so Warwick will sort this one out for you.';
+
+  // ⛔ THE BREAKPOINT AT WHICH THE ELABORATION MOVES IN THE DOM — NOT IN CSS.
+  // Warwick: "render it after the list at <=360px — in the DOM, not by CSS reordering. Visual order
+  // and DOM order agree, 1.3.2 does not arise, and both halves of the ruling are literally true
+  // rather than approximately true."
+  // ⛔ KEYED TO EITHER AXIS, and that is not tidiness. The two failing viewports were 300x512
+  // (narrow) and 512x300 (short). A width-only query fixes one and leaves the other — and the other
+  // is HER DEVICE: Fire HD 8 landscape at 200% zoom, a setting an 84-year-old with poor eyesight
+  // would plausibly choose, opening her shopping list to find no shopping on it.
+  var ELABORATE_BELOW_MQ = '(max-width: 360px), (max-height: 360px)';
+
   // ⛔ HOW LONG SHE WAITS BEFORE BEING TOLD THE TRUTH. Felix's choice, named rather than buried:
   // the Work Order did not settle it. 15s is long enough for a slow household connection to a
   // tailnet host and short enough that a technology-phobic 84-year-old is not left watching a
@@ -293,6 +310,79 @@
       // two can never disagree.
       var confirmDate = ref(null);       // 'YYYY-MM-DD'
       var confirmShown = ref('');        // 'Thursday 13 August'
+
+      // Live, because she rotates the tablet and may change zoom. A one-shot read at load would put
+      // the elaboration in the wrong place for the rest of the session after a single rotation.
+      var elaborateBelow = ref(false);
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        var mq = window.matchMedia(ELABORATE_BELOW_MQ);
+        elaborateBelow.value = !!mq.matches;
+        var onMq = function (e) { elaborateBelow.value = !!e.matches; };
+        // addListener is the deprecated form; Silk's age is not established (Addendum A), so both.
+        if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onMq);
+        else if (typeof mq.addListener === 'function') mq.addListener(onMq);
+      }
+
+      // ══ HIGH-1, VERA — WHEN THE FOOTER GROWS, SHE IS ALREADY AT THE BOTTOM ═══════════════════
+      //
+      // ⛔ THE DEFECT, IN HER WORDS, BECAUSE THE ABSTRACT VERSION IS TOO EASY TO READ PAST.
+      // Below 720px of viewport height this surface drops the footer to NORMAL FLOW on purpose, so
+      // the primary action sits at the END of a scroll. She scrolls to the bottom to reach SEND.
+      // Her tap then GROWS the footer by 72-275px — and because she is already at maximum scroll,
+      // every one of those pixels appears BELOW THE FOLD. Nothing scrolls. Nothing moves. Nothing
+      // tells her. Measured: at 800x500, 10px of an 88px "YES, SEND IT" painted and "No, not yet"
+      // entirely off screen; at 1024x600 — her device, at NO ZOOM — the question itself cut off.
+      // The same applies to "Add something else", which replaces a 110px control with a ~348px form.
+      //
+      // ⛔ AND WHY THE GATE COULD NOT SEE IT, which is the part worth carrying forward.
+      // `outcomeVisible` measured at MAXIMUM SCROLL. She IS at maximum scroll — BEFORE the tap. The
+      // tap grows the document, so maximum scroll MOVES and she does not. The gate then scrolled to
+      // the NEW maximum and measured a place she is not standing. Right property, wrong moment —
+      // the same class as the throttled-timer bug in shopping-geometry-check.mjs, and the second
+      // time in this package that a correct-looking measurement was taken at the wrong instant.
+      //
+      // So every transition that changes what the footer contains brings the new thing INTO VIEW
+      // and moves focus to it. This is not an animation and not a nicety: without it the surface
+      // silently does nothing in response to her most important tap.
+      function revealAfterTransition(containerSel, focusSel, align) {
+        if (typeof document === 'undefined') return;
+        if (!Vue || typeof Vue.nextTick !== 'function') return;
+        // AFTER the re-render, or it would place the OLD layout.
+        Vue.nextTick(function () {
+          var el = document.querySelector(containerSel);
+          if (!el) return;
+          var target = focusSel ? document.querySelector(focusSel) : null;
+          // Focus first, with the browser's own focus-scroll suppressed, then place the element
+          // deliberately — otherwise the two fight and the alignment chosen below is overridden.
+          if (target && typeof target.focus === 'function') {
+            try { target.focus({ preventScroll: true }); } catch (e) {
+              try { target.focus(); } catch (e2) { /* focus is best-effort, placement is not */ }
+            }
+          }
+          // ⛔ ALIGNMENT IS ADAPTIVE, AND BOTTOM-ALIGNING UNCONDITIONALLY WAS WRONG.
+          // `block:'end'` puts the strip's BOTTOM at the viewport's bottom. When the strip is
+          // TALLER than the viewport — which it is at 300x512, a 600x1024 tablet at 200% zoom —
+          // that pushes the message itself off the TOP: measured at 12px to 128px above the fold,
+          // so she would have been shown two buttons and no question. When it cannot all fit, what
+          // she must see first is what she is being asked, so it aligns to the START instead.
+          var chosen = align || 'end';
+          try {
+            var box = el.getBoundingClientRect();
+            var vh = window.innerHeight || 0;
+            if (chosen === 'end' && vh && box.height > vh) chosen = 'start';
+          } catch (e) { /* keep the requested alignment */ }
+          if (typeof el.scrollIntoView === 'function') {
+            try { el.scrollIntoView({ block: chosen }); } catch (e) { el.scrollIntoView(); }
+          }
+        });
+      }
+      // The footer's outcome/confirm strip. Focus goes to the STRIP, which carries tabindex="-1",
+      // and NEVER to the control inside it: focusing "YES, SEND IT" would arm a commit under the
+      // next Enter or Space, which is precisely the accident Warwick's confirm step exists to stop.
+      var revealStrip = function () { revealAfterTransition('.f-state', '.f-state', 'end'); };
+      // Returning to the resting footer. Focusing `.send` IS safe, and only because of the confirm
+      // step: pressing it sends nothing, it opens the question.
+      var revealAction = function () { revealAfterTransition('.foot', '.send', 'end'); };
 
       // ⛔ THE STATE GUARD, AND IT IS DELIBERATELY NOT A REF.
       // AC2, and B §6.4 rule 5's distinction applied to the primary action: "The disabled button is
@@ -461,12 +551,14 @@
         confirmDate.value = localDate(now);
         confirmShown.value = humanDate(now);
         sendState.value = 'confirm';
+        revealStrip();   // HIGH-1: she is at the bottom; the question appears below it
       }
 
       // Her way out of the confirm, and it is a full-size control, not a small one.
       function cancelConfirm() {
         if (sendState.value !== 'confirm') return;
         sendState.value = 'idle';
+        revealAction();
       }
 
       // ⛔ STEP TWO OF TWO — THE ONLY FUNCTION IN THIS FILE THAT POSTS HER LIST.
@@ -524,6 +616,9 @@
           if (timer) { clearTimeout(timer); timer = null; }
           inFlight = false;
           fn();
+          // HIGH-1: every settled outcome replaces the action with a taller strip, and she is still
+          // standing where the action was. One place, so no outcome path can forget it.
+          revealStrip();
         }
 
         // ⛔⛔ THE ONLY WRITER OF THE SENT STATE IN THIS FILE. If you are adding a second one, stop.
@@ -646,8 +741,29 @@
       }
 
       // ── ADD SOMETHING ELSE, IN HER OWN WORDS ─────────────────────────────────────────────────
-      function openAdd() { if (sendState.value === 'sending') return; addOpen.value = true; }
-      function closeAdd() { addOpen.value = false; draft.value = ''; }
+      // HIGH-1: this replaces a 110px control with a ~348px form. At 512x300 and 640x400 the label,
+      // the box and "Add it" all landed ABOVE the top of the viewport. Aligned to `start` rather
+      // than `end` because what she needs to see first is the question and the box, not the buttons.
+      function openAdd() {
+        if (sendState.value === 'sending') return;
+        addOpen.value = true;
+        revealAfterTransition('.add-form', '.a-input', 'start');
+      }
+
+      // ⛔ HER TEXT SURVIVES THIS. HIGH-2, VERA, AND IT WAS THE WORST DEFECT IN THE PACKAGE.
+      // This used to run `draft.value = ''`. "Not now" is a full-size control sitting directly
+      // beside "Add it", so one mis-tap silently destroyed something she had typed by hand — and
+      // reopening the box showed her an empty field with no way back. Addendum B §8.3 rule 8 is
+      // verbatim about it: "Text typed but not added is preserved if she returns within the
+      // session." The draft is now cleared in exactly ONE place: addExtra(), on success, once her
+      // words are safely on the list.
+      // It is also the only destroyed thing on this surface that repeating a gesture cannot
+      // recreate — every other action is undone by doing it again. That asymmetry is why it had to
+      // be the most protected action here rather than the least.
+      function closeAdd() {
+        addOpen.value = false;
+        revealAfterTransition('.add', '.add', 'end');
+      }
 
       // ⛔ HER ITEM IS ADDED FIRST AND CHECKED AFTERWARDS, AND THAT ORDER IS THE REQUIREMENT.
       // Warwick: the check is a sense-check, not a gate. If it is slow, broken, or unreachable, she
@@ -660,10 +776,21 @@
 
         var entry = { id: nextExtraId++, text: text, note: null };
         extras.value = extras.value.concat([entry]);
-        draft.value = '';
+        draft.value = '';          // ⛔ THE ONE PLACE THE DRAFT IS EVER CLEARED — on success only
         addOpen.value = false;
         touched();
         addBusy.value = true;
+        // HIGH-2: every other mutation on this surface records a worded undo and this one did not,
+        // so the undo control on screen still offered to un-tick the last ITEM she ticked — a
+        // second wrong thing, one tap after the first.
+        lastUndo.value = {
+          label: 'Undo — ' + text + ' added to your list',
+          apply: function () {
+            extras.value = extras.value.filter(function (e) { return e.id !== entry.id; });
+            draft.value = text;    // her words go back in the box, not into nothing
+            addOpen.value = true;
+          },
+        };
 
         // ⛔ THE NUDGE IS ATTACHED BY REPLACING THE ARRAY, NEVER BY MUTATING THE ENTRY.
         // `extras` holds plain objects; the reference we captured above is the RAW object, not
@@ -731,9 +858,24 @@
           });
       }
 
+      // HIGH-2: taking away something she typed is the least recoverable action on this surface —
+      // re-tapping cannot bring it back the way re-tapping a row can. So it carries an undo that
+      // restores the entry EXACTLY, nudge and all, at its original position.
       function removeExtra(entry) {
+        var at = extras.value.findIndex
+          ? extras.value.findIndex(function (e) { return e.id === entry.id; })
+          : -1;
+        var kept = { id: entry.id, text: entry.text, note: entry.note };
         extras.value = extras.value.filter(function (e) { return e.id !== entry.id; });
         touched();
+        lastUndo.value = {
+          label: 'Undo — ' + entry.text + ' put back on your list',
+          apply: function () {
+            var next = extras.value.slice();
+            if (at >= 0 && at <= next.length) next.splice(at, 0, kept); else next.push(kept);
+            extras.value = next;
+          },
+        };
       }
 
       // B §9.3: "an 84-year-old who realises she forgot the bread must not be stuck." The way back
@@ -742,6 +884,7 @@
       function reopen() {
         if (sendState.value === 'sending') return;   // never yank the page out from under a live send
         sendState.value = 'idle';
+        revealAction();
       }
 
       // ── LOAD ─────────────────────────────────────────────────────────────────────────────────
@@ -778,6 +921,7 @@
         selected: selected, qty: qty, sendState: sendState, lastUndo: lastUndo,
         sections: sections, skipped: skipped, chosen: chosen, countLabel: countLabel,
         canSend: canSend, askLabel: askLabel,
+        askMore: ASK_MORE, elaborateBelow: elaborateBelow,
         footHint: footHint, sentCountLabel: sentCountLabel, totalCount: totalCount,
         sentCount: sentCount, hasSent: hasSent, changedSinceSent: changedSinceSent,
         confirmShown: confirmShown, confirmDate: confirmDate, confirmCountLabel: confirmCountLabel,
@@ -847,9 +991,14 @@
       // already afraid of breaking it.
       // One sentence, her register, naming the human who will act. B §9.5's rule — it must state
       // that a human knows — applied to a limitation rather than to a failure. Not a screen build.
+      // ⛔ THE HEADING IS THE LOAD-BEARING FACT AND IT NEVER MOVES. Warwick's ruling: it stays in
+      // the initial viewport at every size, whole, never abbreviated and never softened. What may
+      // move is the ELABORATION, and only because the fact is complete without it — a screen reader
+      // hearing "there's a question for you" then her list then the elaboration has lost nothing.
+      // If moving it broke the meaning it was never elaboration, and the ruling would be wrong.
       '  <div v-if="askLabel" class="banner ask" role="status" aria-live="assertive">',
       '    <h2>{{ askLabel }}</h2>',
-      '    <p>I need to check something with you before I can get your shopping. I can’t ask you here just yet, so Warwick will sort this one out for you.</p>',
+      '    <p v-if="!elaborateBelow">{{ askMore }}</p>',
       '  </div>',
 
       // AC2's honest empty state. It says what is true and what she should do, and it never
@@ -927,6 +1076,15 @@
       // she is told the count — she is never shown a blank row and never shown an invented one.
       '  <p v-if="skipped > 0" class="h-say">There are {{ skipped }} more things I couldn’t show properly. I’ve kept them.</p>',
 
+      // ⛔ THE ELABORATION, WHEN THERE IS NOT ROOM FOR IT ABOVE — MOVED IN THE DOM, NOT BY CSS.
+      // Rendered here rather than re-ordered visually, so DOM order and visual order AGREE and
+      // WCAG 1.3.2 never arises. It is the same sentence (ASK_MORE), not a copy of it, and it
+      // carries no heading and no role: the fact was already announced by the banner above, and
+      // announcing it twice would be worse than moving it.
+      '  <div v-if="askLabel && elaborateBelow" class="banner ask banner-more">',
+      '    <p>{{ askMore }}</p>',
+      '  </div>',
+
       // ── THE THINGS SHE TYPED ───────────────────────────────────────────────────────────────────
       // Shown in HER words, exactly as she typed them. Each has its own full-size way to take it
       // off again — B §6.6's undo principle applied to an addition rather than a selection.
@@ -934,12 +1092,32 @@
       // question, never a choice, and never a reason her item is not there.
       '  <div v-if="extras.length > 0">',
       '    <h2 class="sec">Things you’ve added</h2>',
-      '    <div v-for="e in extras" :key="e.id" class="row extra on">',
+      // ⛔ MEDIUM-1, VERA — THE WHOLE ROW IS THE TARGET, BECAUSE THAT IS WHAT THIS SURFACE TEACHES.
+      // It rendered as `row extra on`, pixel-identical to every other row, and had no handler, no
+      // role and no tabindex. Every other row responds to a tap; this one silently refused, which
+      // for a technology-phobic user reads as "I have broken it".
+      // role=BUTTON, not checkbox: the item rows toggle, and a second tap undoes the first — but a
+      // thing she TYPED cannot be re-created by re-tapping, so announcing it as a checkbox would
+      // promise a symmetry that does not exist. The accessible name says exactly what the tap does.
+      // ⛔ "Take it off" IS NOW PRESENTATIONAL — a span, not a button. A real button inside a
+      // role=button row is a control inside a control; `.tick` is presentational for the same reason.
+      // Removal is recoverable: removeExtra() records a worded undo that puts it back where it was.
+      '    <div',
+      '      v-for="e in extras"',
+      '      :key="e.id"',
+      '      class="row extra on"',
+      '      role="button"',
+      '      :aria-label="\'Take \' + e.text + \' off your list\'"',
+      '      tabindex="0"',
+      '      @click="removeExtra(e)"',
+      '      @keydown.enter.prevent="removeExtra(e)"',
+      '      @keydown.space.prevent="removeExtra(e)"',
+      '    >',
       '      <div class="r-body">',
       '        <span class="tick" aria-hidden="true">✓</span>',
       '        <span class="r-name">{{ e.text }}</span>',
       '      </div>',
-      '      <button type="button" class="take-off" :aria-label="\'Take \' + e.text + \' off your list\'" @click="removeExtra(e)">Take it off</button>',
+      '      <span class="take-off" aria-hidden="true">Take it off</span>',
       '      <p v-if="e.note" class="e-note" role="status">{{ e.note }}</p>',
       '    </div>',
       '  </div>',
@@ -988,7 +1166,7 @@
       // Affordance and guarantee, the same pairing as B §6.4 rule 5 and AC2.
       // The way out is rendered LAST, so it is the control nearest to where her finger already was:
       // if the footer's growth does put something under a descending finger, it must be the safe one.
-      '    <div v-if="sendState === \'confirm\'" class="f-state">',
+      '    <div v-if="sendState === \'confirm\'" class="f-state" tabindex="-1">',
       '      <div class="note" role="status">',
       '        <strong class="n-say">Send your shopping list for {{ confirmShown }}?</strong>',
       '        <span class="n-sub">{{ confirmCountLabel }} Nothing has been sent yet.</span>',
@@ -997,7 +1175,7 @@
       '      <button type="button" class="again" @click="cancelConfirm()">No, not yet</button>',
       '    </div>',
 
-      '    <div v-else-if="sendState === \'sent\'" class="f-state">',
+      '    <div v-else-if="sendState === \'sent\'" class="f-state" tabindex="-1">',
       '      <div class="note done" role="status">',
       '        <strong class="n-say">Sent — thank you. I’m getting your shopping ready.</strong>',
       '        <span class="n-sub">{{ sentCountLabel }} They’re still ticked on your list, and you can change them.</span>',
@@ -1019,10 +1197,17 @@
       // only on `recorded_new === true`, and the notification that makes it true is WP-B15-50's
       // acceptance criterion. If that ever stops firing, THIS SENTENCE BECOMES A LIE and the fix
       // belongs there, not here — do not soften the words to cover a broken notification.
-      '    <div v-else-if="sendState === \'already-sent-noted\'" class="f-state">',
+      '    <div v-else-if="sendState === \'already-sent-noted\'" class="f-state" tabindex="-1">',
       '      <div class="note" role="alert">',
-      '        <strong class="n-say">Today’s list has already gone.</strong>',
-      '        <span class="n-sub">I’ve told Warwick what you changed, and he’ll sort it out for you. Nothing you’ve chosen has been lost.</span>',
+      // ⛔ MEDIUM-4, VERA — THE HEADLINE LEADS WITH THE REASSURING FACT, AND THE THREE DIFFER.
+      // All three of these states used to open with the SAME 26px/800 line, "Today's list has
+      // already gone" — the largest, boldest thing on screen was the one piece of news that is not
+      // reassuring, and it was identical across three different truths. The reassurance sat
+      // underneath at 22px/400. Vera's point is that the sentence order was right and the VISUAL
+      // order undid it. So each headline is now the true reassuring fact for THAT outcome, and the
+      // thing she cannot change is the qualifier beneath it.
+      '        <strong class="n-say">Warwick has been told.</strong>',
+      '        <span class="n-sub">Today’s list had already gone, so I couldn’t change it — but I’ve saved what you changed and he’ll sort it out for you. Nothing you’ve chosen has been lost.</span>',
       '      </div>',
       '      <button type="button" class="again" @click="reopen()">Back to my shopping</button>',
       '    </div>',
@@ -1037,20 +1222,26 @@
       // is a thing she should ever read; both are in the console for Larry.
       // ⛔ AND IT MUST NOT CONTAIN THE WORDS "told Warwick" — render-vm-check asserts that no state
       // but the notified one makes that promise, and this is the state most likely to break it.
-      '    <div v-else-if="sendState === \'already-sent-saved\'" class="f-state">',
+      '    <div v-else-if="sendState === \'already-sent-saved\'" class="f-state" tabindex="-1">',
       '      <div class="note" role="alert">',
-      '        <strong class="n-say">Today’s list has already gone.</strong>',
-      '        <span class="n-sub">I’ve saved what you changed and nothing you’ve chosen has been lost. Warwick hasn’t heard about it yet, so do mention it to him when you see him.</span>',
+      // MEDIUM-4: leads with the fact she most needs — her words are safe. Vera said she would ship
+      // the sub-line as written; it is the headline above it that had to change.
+      '        <strong class="n-say">I’ve saved what you changed.</strong>',
+      '        <span class="n-sub">Today’s list had already gone, so I couldn’t change it, and nothing you’ve chosen has been lost. Warwick hasn’t heard about it yet, so do mention it to him when you see him.</span>',
       '      </div>',
       '      <button type="button" class="again" @click="reopen()">Back to my shopping</button>',
       '    </div>',
 
       // She had already sent today and this submission changed NOTHING — an identical re-send.
       // No promise is made here, because none was earned: no row was written and nobody was told.
-      '    <div v-else-if="sendState === \'already-sent-unchanged\'" class="f-state">',
+      '    <div v-else-if="sendState === \'already-sent-unchanged\'" class="f-state" tabindex="-1">',
       '      <div class="note" role="alert">',
-      '        <strong class="n-say">Today’s list has already gone.</strong>',
-      '        <span class="n-sub">Nothing has changed, and nothing you’ve chosen has been lost.</span>',
+      // MEDIUM-4: `recorded_new:false` means her submission matched what had already gone, so the
+      // genuinely reassuring — and literally true — fact is that everything she wants is on it.
+      // ⛔ NOT "on its way" or any similar phrasing: that would be a claim about the shop's progress
+      // which nothing in the response supports, and NO_SUCCESS_LANGUAGE would rightly catch it.
+      '        <strong class="n-say">Everything you’ve chosen is already on today’s list.</strong>',
+      '        <span class="n-sub">It went earlier and nothing has changed. Nothing you’ve chosen has been lost.</span>',
       '      </div>',
       '      <button type="button" class="again" @click="reopen()">Back to my shopping</button>',
       '    </div>',
@@ -1061,7 +1252,7 @@
       // here that a machine string could travel through. The detail is in the console.
       // B §9.6 requires the full-size "Try again" beside the thing that failed; AC4 gave the copy
       // and not the control, and a message with no way forward is the stranding §9.5 forbids.
-      '    <div v-else-if="sendState === \'failed\'" class="f-state">',
+      '    <div v-else-if="sendState === \'failed\'" class="f-state" tabindex="-1">',
       '      <div class="note stop" role="alert">',
       '        <strong class="n-say">I couldn’t send your list just now.</strong>',
       '        <span class="n-sub">Nothing has been lost — your choices are still here.</span>',

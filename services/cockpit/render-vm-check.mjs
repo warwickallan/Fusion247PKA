@@ -1601,7 +1601,7 @@ const MUM_PLAN = [
       ['it says what actually happened to today-s list', (p) => hasText(p, 'already gone')],
       ['⛔ NO success or thank-you language — NOTHING was written to today-s shop', NO_SUCCESS_LANGUAGE],
       ['⛔ it does NOT tell her the list was sent', (p) => !p.some((s) => /^Sent/.test(s.trim()))],
-      ['it makes the promise the server earned: a human has been told', (p) => hasText(p, 'told Warwick')],
+      ['it makes the promise the server earned: a human has been told', (p) => hasText(p, 'Warwick has been told')],
       ['nothing she chose has been lost', (p) => hasText(p, 'has been lost')],
       ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', actionNotTappable],
       ['she is not stranded — there is a worded route back (B §9.5)', (p) => hasText(p, 'Back to my shopping')],
@@ -1634,8 +1634,8 @@ const MUM_PLAN = [
   //    one of those sentences would have been a promise nobody had kept.
   ['MUM S4 (already gone today — and nothing at all changed)',
     M({ selected: { 11: true }, sendState: 'already-sent-unchanged' }), [
-      ['it says what actually happened to today-s list', (p) => hasText(p, 'already gone')],
-      ['it says plainly that nothing changed', (p) => hasText(p, 'Nothing has changed')],
+      ['MEDIUM-4: the headline is the reassuring fact — everything she wants IS on the list that went', (p) => hasText(p, 'already on today')],
+      ['it says plainly that nothing changed', (p) => hasText(p, 'nothing has changed')],
       ['⛔ NO success or thank-you language — nothing was written', NO_SUCCESS_LANGUAGE],
       ['⛔⛔ IT DOES NOT PROMISE WARWICK WAS TOLD — no record was written, so no promise is earned',
         NO_TOLD_WARWICK_PROMISE],
