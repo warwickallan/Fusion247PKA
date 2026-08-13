@@ -56,7 +56,7 @@
 
 import { estimateUsdCost, visionAgenticTurn } from '../../../obsidiwikai/src/core/models.mjs';
 import { normalizeResponsesUsage } from './agenticLoop.js';
-import { buildLineSchema, buildTextFormat, buildProductIdEnum } from './lineSchema.js';
+import { buildLineSchema, buildTextFormat, buildProductIdEnum, ASK_FOR_BAND_POSITION } from './lineSchema.js';
 import { similarity, MATCH_FLOOR } from './sevenWayScore.js';
 import { verbatimOf, leadingMarkOf, NEEDS_HUMAN } from './groundLines.js';
 import { absolutePosition, POSITION_TOLERANCE_PITCH_FRACTION } from './visualEvidenceGate.js';
@@ -261,16 +261,17 @@ function recordLeadingMarkDisagreement(kept, other) {
  * than re-derived.
  */
 export function buildBandPrompt({
-  candidateBlock, bandNo, bandCount, withPosition = true,
+  candidateBlock, bandNo, bandCount, withPosition = ASK_FOR_BAND_POSITION,
 }) {
-  // ── WP-B15-34 AC1: THE ONE SWITCH ──────────────────────────────────────
+  // ── WP-B15-34 AC1: THE ONE SWITCH, NOW DEFAULTING OFF ──────────────────
   // Rule 2b below is the ONLY prompt text the positional field adds. With
   // `withPosition: false` this prompt returns to its `54e1743` bytes - the
-  // commit that scored 39/39 three times - so an A/B on this flag is a
-  // controlled comparison of the field and nothing else.
+  // commit that scored 39/39 three times.
   //
-  // ⛔ MEASUREMENT SWITCH, NEVER A RUNTIME TUNING KNOB. Nothing on the
-  //    production path passes `false`; only `runs/ac1-position-ab.mjs` does.
+  // The default is now OFF because the controlled comparison measured the
+  // field costing 1.08 lines per band call (p = 0.0127). The reasoning, the
+  // numbers and the standing reason not to flip it back live in ONE place:
+  // `lineSchema.js` § ASK_FOR_BAND_POSITION. Do not restate them here.
   const rule2b = withPosition ? `
 
 2b. SAY WHERE THE LINE PHYSICALLY SITS, in band_position_pct. Look at where the ink actually is in THIS crop and give the position of the START of the line as a whole number from 0 to 100, measured along the direction you are reading the lines: 0 is hard against the beginning edge of this crop, 100 is hard against the far edge. This is OBSERVATION, exactly as leading_mark is TRANSCRIPTION. Read it off the image. Do NOT derive it from the order of your answer, do NOT space your values out evenly to look tidy, and do NOT nudge two values apart to make them look distinct. If you genuinely cannot place a line in this crop, return null - that is honest and it costs nothing. This value says nothing about what the line is or how many to buy, and it is never used to accept a line.` : '';
@@ -334,7 +335,7 @@ function parseLines(outputText) {
  */
 export async function inspectBandsIndividually({
   bandRegions, bandImageUrls, candidates = [], callModel = visionAgenticTurn,
-  withPosition = true,
+  withPosition = ASK_FOR_BAND_POSITION,
 } = {}) {
   if (!Array.isArray(bandRegions) || bandRegions.length === 0) {
     throw new Error('inspectBandsIndividually: bandRegions is required and must be non-empty');

@@ -156,25 +156,74 @@ export function buildProductIdEnum(candidates = []) {
   return [...ids, ...ESCAPE_VALUES];
 }
 
+// =====================================================================
+// WP-B15-34 AC1 - THE POSITIONAL FIELD LOSES. MEASURED, NOT ARGUED.
+//
+// ⛔ WARWICK'S RULE, QUOTED, AND IT IS WHAT THIS CONSTANT EXECUTES:
+//    "If the field costs detection, the field loses - 39/39 is the decisive
+//     product number and no gate is worth trading for it."
+//
+// THE CONTROLLED COMPARISON (runs/*-ac1-position-ab.json, 12 pairs, ONE crop
+// rendered once and sent to both arms, arms proven byte-exact against their
+// reference commits before any gateway call):
+//
+//   lines returned per band call   ON 6.25   OFF 7.33   (-14.8%)
+//   two-sided permutation test     p = 0.0127
+//   neighbour-JOIN readings        ON 6/12   OFF 3/12   (roughly doubled)
+//   page-25 detection              ON 11/12  OFF 12/12  (Fisher p = 0.50)
+//
+// ── READ THE TWO TESTS TOGETHER, BECAUSE ONE OF THEM IS A TRAP ──────────
+// The single-line test is the UNDERPOWERED one: a 1-in-39 event cannot be
+// resolved at n=12, and its p = 0.50 says only "not demonstrated", never "no
+// effect". The LINE-COUNT test is the powerful one, and it is decisive: asking
+// for a position costs a whole line per band call.
+//
+// The mechanism is visible in the readings themselves. With the field ON the
+// model returns "CALGON • SUPERGLUE" - two adjacent page lines JOINED into one
+// answer - at twice the rate. Being asked "where does this line sit?" appears
+// to push it towards describing a REGION of ink rather than enumerating the
+// lines in it. That is exactly how page 25 was lost in WP-B15-33: the artefact
+// shows it merged into its neighbour in one run and absent in another - TWO
+// mechanisms, not the one the Work Order assumed.
+//
+// ── AND IT WAS NOT BUYING ANYTHING (AC2) ────────────────────────────────
+// Measured over the three WP-B15-33 artefacts, positional precision does NOT
+// separate phantoms from real lines: invention rate 5.7% in the best-resolved
+// bands against 1.5% in the worst, and BOTH "TRESemme conditioner" phantoms
+// were granted PHOTO from the best-resolved band in the whole dataset.
+//
+// So the field costs detection and buys no discrimination. Both findings point
+// the same way and the rule decides it.
+//
+// ⛔ THE GATE IS NOT DELETED, AND THIS IS DELIBERATE. With no position in the
+//    contract, `applyVisualEvidenceGate` reports NOT_ASSESSED for every line
+//    and withholds nothing - the path it already had for every pre-WP-B15-33
+//    artefact, and the honest state AC2 explicitly authorises: "if calibration
+//    cannot separate the phantoms from real lines, say so and set the gate to
+//    not-assessed rather than ship an outage." NOT_ASSESSED is not a pass, and
+//    nothing may render it as one.
+//
+//    Flipping this constant to `true` restores the field and its calibrated
+//    gate in one place, with the measurement above as the standing reason not
+//    to without new evidence.
+// =====================================================================
+
+/** Whether the model is asked for `band_position_pct`. WP-B15-34 AC1: no. */
+export const ASK_FOR_BAND_POSITION = false;
+
 /**
  * The strict JSON schema for the loop's final answer.
  *
  * @param {object} args
  * @param {Array<{id: string|number}>} [args.candidates] - the supplied candidate set.
  * @param {number[]} args.regionNos - every region the application supplied this turn.
- * @param {boolean} [args.withPosition=true] - WP-B15-34 AC1. When false, the
- *   `band_position_pct` property is neither offered nor required, and the
- *   schema returns to its `54e1743` shape byte-for-byte.
- *
- *   ⛔ THIS IS A MEASUREMENT SWITCH, NEVER A RUNTIME TUNING KNOB. It exists so
- *   the field's effect on DETECTION can be settled by a controlled comparison
- *   instead of argued about: WP-B15-33 lost page 25 twice, and the field was
- *   the only change to what the model was asked. Default `true` preserves the
- *   WP-B15-33 contract exactly, and nothing on the production path passes
- *   `false` - only `runs/ac1-position-ab.mjs` does.
+ * @param {boolean} [args.withPosition=ASK_FOR_BAND_POSITION] - WP-B15-34 AC1.
+ *   When false, the `band_position_pct` property is neither offered nor
+ *   required, and the schema returns to its `54e1743` shape byte-for-byte.
+ *   The default is now `false` - see `ASK_FOR_BAND_POSITION`.
  * @returns {object} a JSON Schema object.
  */
-export function buildLineSchema({ candidates = [], regionNos, withPosition = true } = {}) {
+export function buildLineSchema({ candidates = [], regionNos, withPosition = ASK_FOR_BAND_POSITION } = {}) {
   if (!Array.isArray(regionNos) || regionNos.length === 0) {
     throw new Error('buildLineSchema: regionNos is required and must be non-empty');
   }

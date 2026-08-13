@@ -57,7 +57,9 @@ import { prepareImage, readExifOrientation } from '../imagePrep.js';
 import { buildAgenticPrompt } from './buildAgenticPrompt.js';
 import { runAgenticVisionLoop, DEFAULT_MAX_TOOL_CALL_ROUNDS } from './agenticLoop.js';
 import { REQUEST_CROP_TOOL } from './tools.js';
-import { buildLineSchema, buildTextFormat, buildProductIdEnum } from './lineSchema.js';
+import {
+  buildLineSchema, buildTextFormat, buildProductIdEnum, ASK_FOR_BAND_POSITION,
+} from './lineSchema.js';
 import { groundLines } from './groundLines.js';
 import { loadGroundTruth, scoreSevenWay, formatSevenWay } from './sevenWayScore.js';
 import {
@@ -485,7 +487,7 @@ export async function renderBand(sharp, buf, region, upscale) {
  */
 export async function runBandArm({
   imagePath, catalogueItems = [], bandCount = DEFAULT_BAND_COUNT, upscale = 1, callModel,
-  withPosition = true,
+  withPosition = ASK_FOR_BAND_POSITION,
 }) {
   const sharp = (await import('sharp')).default;
   const { toDataUrl } = await import('../imageRender.js');

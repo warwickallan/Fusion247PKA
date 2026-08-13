@@ -16,7 +16,8 @@ import {
   applyVisualEvidenceGate, measureBandPrecision, positionClusters, bandCapacity,
   PROVENANCE, MIN_POSITIONED_FOR_DEGENERACY, POSITION_TOLERANCE_PITCH_FRACTION,
 } from './visualEvidenceGate.js';
-import { clearResolvedNeedsHuman } from './bandInspection.js';
+import { clearResolvedNeedsHuman, buildBandPrompt } from './bandInspection.js';
+import { buildLineSchema, ASK_FOR_BAND_POSITION } from './lineSchema.js';
 import { NEEDS_HUMAN } from './groundLines.js';
 
 // The real photograph's measured geometry, so the proofs run against the
@@ -45,6 +46,47 @@ const line = (over = {}) => ({
 
 const gate = (lines) => applyVisualEvidenceGate({
   lines, regions: REGIONS, axis: AXIS, linePitch: PITCH,
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// AC1 - THE FIELD LOST, AND THE DEFAULT IS WHAT SHIPS
+// ═══════════════════════════════════════════════════════════════════════
+
+test('AC1: the model is NOT asked for a position by default - the field lost the comparison', () => {
+  assert.equal(ASK_FOR_BAND_POSITION, false);
+  // The DEFAULT path, taken exactly as production takes it. Asserting the
+  // constant alone would pass while a caller still defaulted the other way.
+  const schema = buildLineSchema({ candidates: [{ id: 1 }], regionNos: [2] });
+  assert.ok(!('band_position_pct' in schema.properties.lines.items.properties));
+  assert.ok(!schema.properties.lines.items.required.includes('band_position_pct'));
+  const prompt = buildBandPrompt({ candidateBlock: '- 1: X', bandNo: 1, bandCount: 7 });
+  assert.ok(!prompt.includes('band_position_pct'), 'rule 2b must not reach the model on the default path');
+});
+
+test('AC1 MUTATION: the switch still WORKS - this is a decision, not a deletion', () => {
+  const schema = buildLineSchema({ candidates: [{ id: 1 }], regionNos: [2], withPosition: true });
+  assert.ok(
+    'band_position_pct' in schema.properties.lines.items.properties,
+    'MUTATION DID NOT BITE - the field cannot be restored, so the default is not a decision that can be revisited',
+  );
+  const prompt = buildBandPrompt({ candidateBlock: '- 1: X', bandNo: 1, bandCount: 7, withPosition: true });
+  assert.ok(prompt.includes('band_position_pct'));
+});
+
+test('AC1/AC2: with no position asked, the gate NOT_ASSESSES and withholds NOTHING', () => {
+  // The honest state AC2 authorises. NOT_ASSESSED is not a pass, and the gate
+  // must say so rather than report a clean run it never graded.
+  const out = gate([
+    line({ source_region: 2 }),
+    line({ source_region: 2 }),
+    line({ source_region: 3 }),
+  ]);
+  assert.equal(out.counts.applicable, false);
+  assert.equal(out.counts.withheld, 0, 'no positions asked for means no line may be withheld for lacking one');
+  assert.equal(out.counts.notAssessed, 3);
+  assert.ok(out.lines.every((l) => l.provenance_eligible === PROVENANCE.NOT_ASSESSED));
+  assert.ok(out.counts.applicabilityNote.includes('NOT APPLICABLE'));
+  assert.ok(out.lines.every((l) => l.needs_human === false), 'a gate that did not run asks Warwick nothing');
 });
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -423,7 +423,13 @@ test('AC5 PIN: source_region stays closed to the regions the application actuall
 });
 
 test('AC5 PIN: source truth stays SEPARATE from catalogue identity - as_written is unconstrained', () => {
-  const props = buildLineSchema({ candidates: [{ id: '7' }], regionNos: [2] }).properties.lines.items.properties;
+  // WP-B15-34 AC1 flipped the DEFAULT to not ask for a position at all, so
+  // this proof now names the configuration it always meant. The assertions are
+  // unchanged: they describe the field's shape WHEN IT IS ASKED FOR, and that
+  // property must keep holding for as long as the switch exists.
+  const props = buildLineSchema({
+    candidates: [{ id: '7' }], regionNos: [2], withPosition: true,
+  }).properties.lines.items.properties;
   assert.equal(props.as_written.type, 'string');
   assert.equal(props.as_written.enum, undefined);
   assert.equal(props.band_position_pct.enum, undefined, 'the position is an observation, not a closed choice');
