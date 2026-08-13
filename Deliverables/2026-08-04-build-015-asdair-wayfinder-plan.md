@@ -2325,6 +2325,43 @@ guard test byte-compares a CRLF-converted `.md`. Non-blocking, no product effect
 must be stated as "green in the authoring worktree; 1 CRLF-sensitive failure on a fresh Windows checkout."**
 Now AC5 of Lane G.
 
+#### 🔵 LANE G ROUTE DECISION — **ROUTE B.** Larry's, taken not escalated. *The known photograph cannot prove this.*
+
+**Keel's read-back found AC1 and AC4 MUTUALLY UNSATISFIABLE, and it was right.** The known photograph
+carries **only PHOTO lines** — `separately_justified_additions: 0`, `REGULARS/RULE/WARWICK` all zero. So a
+production run over that fixture has **nothing of the other three kinds to write**. Making it produce them
+means making the planner emit additions, which **moves the very numbers AC4 reserves to Larry.**
+*Manufacturing the three kinds from that photograph would be exactly the contamination `finalList.js`
+refuses, and would corrupt the one artefact this phase rests on.*
+
+**Keel also proved BOTH production entry points unable to satisfy AC1 as written:**
+`finalise/produceFinalList.mjs` runs the production modules over the **in-memory fake** and opens no pool,
+and injects `modelLines` so `deps.interpretPhoto` never runs — it writes **no** provenance at all.
+`deps.js realInterpretPhoto` does write PHOTO, but needs a live gateway call (`network: none`) and the real
+photograph under the private surface (`private_surface: none`). **Neither was reachable.**
+
+**ADOPTED — ROUTE B:** wire the three kinds at **`runPipeline.js planWithDecisions`**, the single place
+`planBasket` → `applyRulebook` → `applyDecisionsToPlan` already run, and prove with a **SECOND,
+purpose-built production run** exercising all three origins against real Postgres, rows read back **by kind,
+scoped to shop ids that run creates**. **The 39-line artefact is RE-PROVEN UNCHANGED, never regenerated** —
+AC4 satisfied by leaving it alone.
+
+**Route C rejected on Warwick's own clause**, and the reasoning is recorded so it is not re-proposed:
+closing F1 by correcting the record is legitimate under the receipt's own trigger, but his standing clause is
+*"required provenance survives through the actual production path rather than merely existing in schemas or
+tests."* **Correcting the record instead of building the path would satisfy Veritas and not satisfy him.**
+Route A rejected for Keel's reason — Veritas has already ruled capability evidence is not the acceptance.
+
+**AC0 was wrong and is corrected:** `asdair_rw` **cannot CREATE SCHEMA**, which `applyThrowawaySchema`
+requires, so the DB-gated file **fails hard rather than skipping** — the order's own "zero skipped" figure
+was unreachable with what it declared. Owner connection now declared. *Keel refused to treat its own probe
+as a grant, which is the correct instinct.*
+
+**Two facts Keel established that strengthen AC2:** `shop_line_provenance_region_iff_photo` is a
+**BICONDITIONAL** check (`provenance='PHOTO'` ⟺ `source_region_id IS NOT NULL`), so with the composite FK the
+database already enforces both directions. And the shared cluster now holds **98 shops** and
+**PHOTO 9 / WARWICK 5 / REGULARS 62** rows from other lanes — scoping to own-run shop ids is mandatory.
+
 ### 🟢 MUM'S COCKPIT — the deferred phase is IN SCOPE. **Warwick corrected Larry mid-turn, and he was right.**
 
 Larry was about to author Mum's view from scratch. **A deferred phase already specifies it in five
