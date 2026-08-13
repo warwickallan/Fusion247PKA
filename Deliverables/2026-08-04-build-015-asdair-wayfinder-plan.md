@@ -2416,10 +2416,16 @@ and AC5's class says so on every line: one reading corroborates nothing.*
 | 6 | Mum's Cockpit openable on the Fire tablet | **WITH VERA** — 404 until the branch reaches the live checkout |
 | 7 | demonstrated as a working journey, not inferred | **MET, with the credential-line qualifier** |
 
-**⚠️ WORKTREE PROVISIONING, and Larry's to fix:** `services/asdair/shop`, `skill` and `interpret` have **no
-`node_modules` in `C:/Fusion247PKA-visionloop2`** — the production path dies on `Cannot find module 'pg'`.
-**Keel refused to `npm install` outside its declared surface and used `NODE_PATH` instead — no filesystem
-write at all.** The worktree still needs provisioning properly.
+**✅ WORKTREE PROVISIONING — FIXED BY LARRY.** `services/asdair/shop`, `skill` and `interpret` had **no
+`node_modules` in `C:/Fusion247PKA-visionloop2`**, so the production path died on `Cannot find module 'pg'`.
+**Keel refused to `npm install` outside its declared surface and used `NODE_PATH` instead — writing nothing.**
+Correct refusal, and the provisioning was Larry's. `npm install --offline` in all three (14 packages each,
+no network), `pg` verified to resolve in each.
+
+**Proven by execution, not by assertion: `runLaneJ.mjs` now runs cleanly WITHOUT the `NODE_PATH` workaround**
+— shop **111**, and the **THIRD consecutive identical run** (108, 109, 111): 8 regions · PHOTO 40 ·
+REGULARS 12 · **40/40 citing their own** · 34 handoff lines · 3 held · sort verified · **halts at 3 open
+questions by design**. *`vision_calls: 0` on the replay path, as it should be — the gateway is not touched.*
 
 **MEDIUM, structural and correct:** *the journey cannot produce a complete basket without a human.* Any
 acceptance wanting four provenance kinds or an unheld handoff **needs an answered question in scope.**
