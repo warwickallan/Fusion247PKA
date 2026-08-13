@@ -118,51 +118,54 @@ operational_handoff: none
 under WP-B15-48 right now. Your job is to connect to it **without giving up the property that comment was
 protecting.** The success state must remain unreachable by any route except the server saying so.
 
-## THE ROUTE CONTRACT — **AMENDED v2, 2026-08-13.** Frozen, and byte-identical in the other lane's order.
+## THE ROUTE CONTRACT — **v3, 2026-08-13. FINAL.** Frozen, and byte-identical in every lane's order.
 
-> **⚠️ v2 SUPERSEDES v1 IN PLACE. If you read v1 before this edit, re-read this block — three things changed.**
-> Keel's read-back established that v1 instructed the UI to tell Mum her list was sent at the exact moment
-> nothing whatsoever happened. That is the failure the contract existed to prevent, and it was mine.
+> **⚠️ v3 SUPERSEDES v2 IN PLACE, which superseded v1.** v2 fixed the defect that told Mum her list was
+> sent when nothing had happened. **v3 fixes the one v2 left behind: v2 could not tell "nothing happened
+> at all" apart from "I recorded what you sent, but it will not change today's shop."** Keel established
+> both by execution on the live route, and both were his catch, not review's.
 
 ```
 Cockpit (tailnet)   POST /api/asdair/list
    proxies to →     POST http://127.0.0.1:8710/asdair/list
 
 request  { "household": 1,
-           "items": [ { "id": "<regulars.id_display>", "name": "<the name SHE was shown>", "qty": 1..20 } ] }
+           "list_date": "YYYY-MM-DD",        <- the date SHE confirmed. Becomes the shop's date.
+           "items":  [ { "id": "<regulars.id_display>", "name": "<the name SHE was shown>", "qty": 1..20 } ],
+           "extras": [ "<her exact words>", ... ]      <- omit the key entirely when empty
+         }
 
 200      { "ok": true, "shop_ref": "...", "shop_id": <n>,
-           "created": true|false,
-           "matched_by": "insert"|"shop_ref"|"telegram_message"|"superseded_terminal_ref" }
+           "created":      true|false,     <- a NEW shop row was written
+           "recorded_new": true|false,     <- THIS submission left a durable ledger row
+           "matched_by":   "insert"|"shop_ref"|"telegram_message"|"superseded_terminal_ref" }
 
 4xx/5xx  { "ok": false, "error": "<machine_code>", "message": "<ONE plain sentence>" }
 ```
 
-**AMENDMENT 1 — `matched_by` carries the STORE'S OWN vocabulary, passed through VERBATIM.** v1 invented
-`"created"|"shop_ref"|"inbound"`; `shopStore.createOrResumeShop` actually returns
-`'insert' | 'telegram_message' | 'shop_ref'` and can also return `superseded_terminal_ref`. **Build no
-translation layer** — a renamed enum is a place for the two sides to drift, and the invented word `inbound`
-described nothing. `telegram_message` is **structurally unreachable from the Cockpit** (both Telegram keys
-are null on every submission Mum makes); it stays in the type because the store can return it, and its
-appearance would be a real bug worth seeing rather than a case worth hiding.
+**Additional keys MAY appear** (`duplicate`, `source_id`, `items`, `superseded_terminal_ref`). **The UI reads
+only the keys named above** and must not break when others are present.
 
-**AMENDMENT 2 — `ok:true` ALONE NEVER LICENSES THE WORD "SENT". This is the load-bearing one.**
+**THE THREE OUTCOMES, AND THE UI MUST RENDER THEM AS THREE — this is the whole point of the contract.**
 
-- `created:true`  → a shop row was written. **The sent state is permitted.**
-- `created:false` → the day's shop already existed and **this submission changed NOTHING durable.**
-  **The UI MUST render this DIFFERENTLY from a successful send** — in substance: *"Today's list has already
-  gone. This didn't change it."* **It must NOT say her list was sent, and it must NOT claim her change
-  landed.**
+| `created` | `recorded_new` | What actually happened | What she is told, in substance |
+|---|---|---|---|
+| `true` | `true` | A shop was created from her list | **"Sent."** The sent state. |
+| `false` | `true` | Today's shop already existed. **Her changed list IS durably recorded, but it does NOT alter today's shop.** | **"Today's list has already gone. I've told Warwick what you changed."** |
+| `false` | `false` | Today's shop already existed and this submission was **identical** — nothing was written at all | **"Today's list has already gone. Nothing has changed."** |
 
-*Why: `receiveList` is idempotent on `(household_id, shop_ref)` and `shop_ref` is `'SHOP-' + date`. A second
-submission the same day resumes the existing shop and writes nothing — no shop row, no command row, no
-event. v1's sentence "her UI may only say the list was sent when `ok:true`" was satisfied by exactly that
-no-op. Addendum E criterion 9 names this precise defect: "any answer that changes the display but not the
-durable record."*
+**⛔ `ok:true` ALONE NEVER LICENSES THE WORD "SENT". Only `created:true` does.** *Why: `receiveList` is
+idempotent on `(household_id, shop_ref)` and `shop_ref` derives from the date, so a same-day resubmission
+resumes rather than creates. Addendum E criterion 9 names the defect this prevents — "any answer that
+changes the display but not the durable record."*
 
-**AMENDMENT 3 — `note` is REMOVED from the request.** S2 (add something else in her own words) is not built
-and its control is deliberately disabled, so there is no UI that can produce free text. An always-empty
-field would be a small lie about a capability that does not exist. **Send no `note` key at all.**
+**⛔ ROW 2 IS NOT A CONSOLATION MESSAGE. IT IS A PROMISE THAT MUST BE KEPT.** If the UI says Warwick was
+told, **the ShopperBot notification MUST actually fire on `recorded_new:true`** — not only on first
+submission. A page that claims he was told when he was not is the same defect one layer up.
+
+**⛔ MUM IS NEVER ASKED A QUESTION.** Warwick, 2026-08-13: *"I will deal with any questions and such through
+my existing process."* No disambiguation, no candidate list, no "which did you mean" ever reaches her
+screen. Ambiguity and genuinely-new items go through and are answered downstream in Warwick's own flow.
 
 ## Acceptance criteria
 

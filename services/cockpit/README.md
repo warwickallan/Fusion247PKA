@@ -72,6 +72,40 @@ explicitly not to reopen the Fire/Tailscale architecture. The HTTP route removes
 makes the cause moot rather than answered. *Verification from a second tailnet client was NOT possible:
 Tailscale SSH is not enabled on `fusion247-core`, the only shell-capable peer.*
 
+### 🔴 THE ASDAIR API ON 8710 HAS NO SUPERVISOR. **Established by execution, 2026-08-13. If it dies, nothing brings it back.**
+
+**The `MyPKA-Local-Services-Live` scheduled task restores the Cockpit on 8090 — it came back in ~1 second.
+It does NOT restore `services/asdair/cockpit-api` on 8710.** Proven: the task was run immediately after
+that process was stopped, and 8710 stayed **down across ten consecutive health checks** until it was
+started by hand.
+
+**Consequence, stated plainly: Mum's Cockpit page keeps loading while its backend is gone.** The page is
+static and served by 8090; every AsdAIr call it makes proxies to 8710. **A dead 8710 is a silently
+half-working product, not an obvious outage.**
+
+**Restart it by hand like this** — note the **embedded quotes**, which are load-bearing because
+`.env keys` contains a space and an unquoted argument makes Node read `C:\.fusion247\.env` and exit:
+
+```powershell
+Start-Process -FilePath 'C:\Program Files\nodejs\node.exe' -WindowStyle Hidden `
+  -WorkingDirectory 'C:\Fusion247PKA\services\asdair\cockpit-api' `
+  -ArgumentList '--env-file="C:\.fusion247\.env keys\shopper.env.txt"',
+                '--env-file="C:\.fusion247\asdair.env"',
+                '"C:\Fusion247PKA\services\asdair\cockpit-api\server.js"'
+```
+
+**`server.js` is loaded once at startup — a merge does not reach the running process.** On 2026-08-13 the
+write route was merged, the Cockpit was restarted, and `POST /api/asdair/list` still answered **404**
+because the *upstream* service on 8710 was untouched. **Restart BOTH, and verify through the Cockpit, not
+against the service directly:**
+
+```sh
+curl -s http://127.0.0.1:8710/asdair/health          # expect read_only:false and receiveList present
+curl -s -X POST -H 'content-type: application/json' \
+     -d '{"household":1,"items":[]}' \
+     http://127.0.0.1:8090/api/asdair/list           # expect 400 list_empty — proves the whole chain, writes nothing
+```
+
 ## Endpoints
 - `GET /api/state` — attention (open+deferred), outputs, ingested, wins, builds
 - `POST /api/decide` — `{id, decision: accept|decline|defer|reopen, intent?, args?}`
