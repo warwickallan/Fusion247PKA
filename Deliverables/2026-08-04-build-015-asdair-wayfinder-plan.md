@@ -2366,6 +2366,64 @@ integrity). **Disposable now matches live exactly: 109 rows, zero fixtures, zero
 
 **Work did not stop for this.** Felix is fixing two HIGH findings on Mum's Cockpit; Lane J's runner continues.
 
+## ⭐ THE JOURNEY RAN. **Lane J `0e3ecf3`. One command, real photograph, real Terra reading, real Postgres, to a brand-sorted browser handoff.**
+
+> **The qualifier, in Keel's words and required in every restatement: *the chain is continuous and crosses ONE
+> process boundary, at the credential line, because no other crossing is lawful.***
+
+**Ran twice — shops 108 and 109 — identical figures both times.**
+
+| | |
+|---|---|
+| `region_plan_sha256` | **matches the capture** |
+| replay | **3/3 captured calls consumed, in order** |
+| pipeline steps | `act:transcribe → act:interpret → act:plan → wait:answers (halt)` |
+| regions persisted | **8** |
+| provenance by kind | **PHOTO 40 · REGULARS 12** |
+| PHOTO citing **its own** regions | **40 of 40** |
+| PHOTO row model | **`gpt-5.6-terra` / `grounded-v6-lasttime-identity-scoping`** |
+| handoff | **34 lines · 3 held · 46 units** · sort `brand_az_then_product_az` **declared AND verified** |
+| pack identity | `Richmond 12 … 319g` → **`required_quantity: 1`** |
+| corroboration | one reading → **every observation `single-reading`**; nothing labelled corroborated, unanimous or verified |
+
+**⭐ THE REPLAY NEVER HAD TO THROW.** This run's own follow-up decision, computed from the replayed
+first-pass answer, asked for regions **`[5]` then `[6]` — exactly what the capture asked.** *That is the
+strongest available evidence that the chain is continuous rather than bridged.*
+
+**⭐ AND IT REFUSED TO FABRICATE THE ONE THING THAT WOULD HAVE COMPLETED THE TABLE.** AC2 wanted four
+provenance kinds; it delivered two, and said why. **RULE** needs a second gateway call (`network: none` —
+declined loudly, twice, recorded). **WARWICK** is *definitionally downstream of a human decision*, and the
+run **halted at `wait:answers` with 3 open questions** — *"Which product is 1 bag ASDA plain toffee?"*, *"4
+pack butter"*, *"1 box ASDA fruit lolly ice box"*. **Keel's words: *"I could have reached four kinds by
+answering those questions myself. That would have invented the human decision — the exact fabrication AC1
+exists to forbid."* The halt is the product working.**
+
+**Against the frozen 47/47 · 39 products / 53 items, this run gives 34 lines / 46 units. It differs, nothing
+was touched to move it, and it came from ONE live reading rather than three.** *That is the honest number,
+and AC5's class says so on every line: one reading corroborates nothing.*
+
+**Suite: `1113 / 1113 pass / 0 fail / 0 SKIPPED`.** First-party secret scan exit 0.
+
+### Warwick's seven acceptance clauses, measured against this run
+
+| # | Clause | State |
+|---|---|---|
+| 1 | Mum's list enters via the production ingestion path | **PARTIAL** — real modules, real Terra reading; the **live Telegram trigger** is not exercised |
+| 2 | PHOTO truth complete, **no catalogue/history masquerading** | **MET** — 40/40 cite this run's own regions; DB biconditional + composite FK enforce it |
+| 3 | duplicates, quantities, catalogue identity | **MET** — pack size stays identity |
+| 4 | provenance survives the **actual production path** | **PARTIAL** — PHOTO + REGULARS real; **RULE and WARWICK structurally gated**, not defective |
+| 5 | reaches the browser stage | **MET** — 34-line brand-sorted handoff |
+| 6 | Mum's Cockpit openable on the Fire tablet | **WITH VERA** — 404 until the branch reaches the live checkout |
+| 7 | demonstrated as a working journey, not inferred | **MET, with the credential-line qualifier** |
+
+**⚠️ WORKTREE PROVISIONING, and Larry's to fix:** `services/asdair/shop`, `skill` and `interpret` have **no
+`node_modules` in `C:/Fusion247PKA-visionloop2`** — the production path dies on `Cannot find module 'pg'`.
+**Keel refused to `npm install` outside its declared surface and used `NODE_PATH` instead — no filesystem
+write at all.** The worktree still needs provisioning properly.
+
+**MEDIUM, structural and correct:** *the journey cannot produce a complete basket without a human.* Any
+acceptance wanting four provenance kinds or an unheld handoff **needs an answered question in scope.**
+
 ## ⟦PHASE SCOPE — INGESTION END-TO-END + MUM'S COCKPIT⟧ Warwick, 2026-08-13. **His destination, quoted.**
 
 > *"The entire AsdAIr input-ingestion journey is working correctly end-to-end and reaches the browser
