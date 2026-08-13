@@ -1,0 +1,1958 @@
+{
+  "artefact_version": "1.0.0",
+  "work_order": "WO-2026-08-13-04 (WP-B15-37)",
+  "generated_from": "the three FINAL frozen vision runs of the real photograph; vision PARKED at 54c3b0b",
+  "produced_by": "services/asdair/pipeline/runPipeline.js and the production modules it calls, over the offline durable store",
+  "not_a_live_run": "No live database write, no browser, no trolley, no checkout, no slot, no order. PRODUCT CAPABILITY EVIDENCE, not acceptance.",
+  "shop_ref": "SHOP-2026-08-13",
+  "shop_status": "NEEDS_DECISION",
+  "sorted_by": "BRAND, then product name",
+  "packet_sort_contract": "brand_az_then_product_az",
+  "packet_sort_contract_declared": true,
+  "packet_sort_contract_verified": true,
+  "provenance_counts": {
+    "PHOTO": 39,
+    "REGULARS": 0,
+    "RULE": 0,
+    "WARWICK": 0
+  },
+  "totals": {
+    "photo_source_lines": 39,
+    "separately_justified_additions": 0,
+    "explicit_skips": 8,
+    "product_count": 39,
+    "item_count": 53,
+    "shoppable_lines": 31,
+    "held_lines": 8,
+    "routed_lines": 8
+  },
+  "provenance_arithmetic": {
+    "statement": "photo source truth + separately justified additions - explicit skips = final shopping plan",
+    "photo": 39,
+    "additions": 0,
+    "skips": 8,
+    "final_plan": 39,
+    "reconciles": true
+  },
+  "packet_fingerprint": "sha256:46c430501cd01afdbede5ab9cb7d65f73c092a5abca2c1d0ebd995a0b1066dd2",
+  "instructions_version": 2,
+  "lines": [
+    {
+      "brand": "Always",
+      "product": "Always Discreet Incontinence Pads Women Normal 39 Count",
+      "product_id": 51,
+      "category": "Pads",
+      "asda_product_id": "9302469",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 26,
+        "raw_reading": "2 PKTS. ALWAYS DESCREET PANTY LINERS normal.",
+        "source_region_id": 4,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "51"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "known brand + variant",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Always Discreet Incontinence Pads Women Normal 39 Count"
+    },
+    {
+      "brand": "ASDA",
+      "product": "ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets",
+      "product_id": 107,
+      "category": "Hayfever Allergy",
+      "asda_product_id": "7417854",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 2,
+        "raw_reading": "1 PKT. ASDA HAYFEVER TABS.",
+        "source_region_id": 6,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "107"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets"
+    },
+    {
+      "brand": "ASDA",
+      "product": "ASDA Crispy Skin-On Fries 750g",
+      "product_id": 7,
+      "category": "Frozen Chips Fries",
+      "asda_product_id": "6966614",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 31,
+        "raw_reading": "2 CHIPS. WITH SKINS ON.",
+        "source_region_id": 8,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "7"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "ASDA Crispy Skin-On Fries 750g"
+    },
+    {
+      "brand": "ASDA",
+      "product": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "product_id": 57,
+      "category": "Paracetamol",
+      "asda_product_id": null,
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 28,
+        "raw_reading": "2 PKTS. ASDA PARACETAMOL.",
+        "source_region_id": 6,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "57"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "known brand + variant",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "ASDA Paracetamol 500mg Capsules 16 Capsules"
+    },
+    {
+      "brand": "ASDA",
+      "product": "ASDA Shortbread Fingers 210g",
+      "product_id": 16,
+      "category": "Shortbread Biscuits",
+      "asda_product_id": "421000",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 13,
+        "raw_reading": "2 PKTS. ASDA SHORTBREAD FINGERS",
+        "source_region_id": 8,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "16"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "ASDA Shortbread Fingers 210g"
+    },
+    {
+      "brand": "ASDA",
+      "product": "ASDA Sliced Ham on the Bone 400g",
+      "product_id": 117,
+      "category": "Ham & Pork Slices",
+      "asda_product_id": "7604423",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 7,
+        "raw_reading": "1 PKT. HAM ON THE BONE",
+        "source_region_id": 7,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "117"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "ASDA Sliced Ham on the Bone 400g"
+    },
+    {
+      "brand": "Batchelors",
+      "product": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g",
+      "product_id": 14,
+      "category": "Pasta Sauce",
+      "asda_product_id": "6456641",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 11,
+        "raw_reading": "1 BATCHELORS PASTA 'N' CHEESE (LEEK and HAM)",
+        "source_region_id": 6,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "14"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g"
+    },
+    {
+      "brand": "Bloo",
+      "product": "Bloo Spa Moments Toilet Rim Block - Vitality 50g",
+      "product_id": 87,
+      "category": "Toilet Cleaners Rimblocks Gels",
+      "asda_product_id": null,
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 35,
+        "raw_reading": "1 BLOO TOILET RIM",
+        "source_region_id": 3,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "87"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "known brand + variant",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Bloo Spa Moments Toilet Rim Block - Vitality 50g"
+    },
+    {
+      "brand": "Calgon",
+      "product": "Calgon washing machine cleaner tablets limescale protection 15 tablets",
+      "product_id": 37,
+      "category": "Washing Machine Cleaners Limescale Protection",
+      "asda_product_id": "2174822",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 22,
+        "raw_reading": "1 CALGON",
+        "source_region_id": 2,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 2,
+        "support_of": 3,
+        "support_class": "corroborated",
+        "seen_in_runs": [
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "37"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "exact alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Calgon washing machine cleaner tablets limescale protection 15 tablets"
+    },
+    {
+      "brand": "Cravendale",
+      "product": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+      "product_id": 4,
+      "category": "Semi Skimmed Milk",
+      "asda_product_id": "489747",
+      "substitutes_allowed": false,
+      "quantity": 4,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        4
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 23,
+        "raw_reading": "4 x 4pts. ARLA SEMI SKIMMED MILK",
+        "source_region_id": 8,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 1,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "4"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer"
+    },
+    {
+      "brand": "Dettol",
+      "product": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
+      "product_id": 119,
+      "category": "Bleach & Disinfectants",
+      "asda_product_id": "9060220",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 8,
+        "raw_reading": "1 CAN DETTOL SPRAY.",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "119"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "exact alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml"
+    },
+    {
+      "brand": "Dreamies",
+      "product": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
+      "product_id": 12,
+      "category": "Cat Biscuit Treats",
+      "asda_product_id": "6325769",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 9,
+        "raw_reading": "1 DREAMIES CHEESE",
+        "source_region_id": 2,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "12"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "exact alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g"
+    },
+    {
+      "brand": "Exceptional",
+      "product": "Exceptional by ASDA Creamy Mashed Potato 400g",
+      "product_id": 72,
+      "category": "Prepared Vegetables",
+      "asda_product_id": null,
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 32,
+        "raw_reading": "1 MASHED POTATO",
+        "source_region_id": 7,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 2,
+        "support_of": 3,
+        "support_class": "corroborated",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "72"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "known brand + variant",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Exceptional by ASDA Creamy Mashed Potato 400g"
+    },
+    {
+      "brand": "Febreze",
+      "product": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
+      "product_id": 44,
+      "category": "Febreze",
+      "asda_product_id": null,
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 24,
+        "raw_reading": "1 FEBREZE AIR MIST VANILLA",
+        "source_region_id": 3,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "44"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "known brand + variant",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Febreze Air Freshener Sun-Kissed Vanilla 185ML"
+    },
+    {
+      "brand": "Gourmet",
+      "product": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
+      "product_id": 1,
+      "category": "Premium Wet Cat Food",
+      "asda_product_id": "4996753",
+      "substitutes_allowed": false,
+      "quantity": 3,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        3
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 1,
+        "raw_reading": "3 GOURMET CAT FOOD • FISH •",
+        "source_region_id": 2,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "1"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g"
+    },
+    {
+      "brand": "Kleenex",
+      "product": "Kleenex Original Tissues - Twin Pack",
+      "product_id": 13,
+      "category": "View All Cough Cold Flu",
+      "asda_product_id": "7151000",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 10,
+        "raw_reading": "1 2 pack. KLEENEX TISSUES.",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "13"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Kleenex Original Tissues - Twin Pack"
+    },
+    {
+      "brand": "Loctite",
+      "product": "Loctite Super Glue Original 3g",
+      "product_id": 116,
+      "category": "Glues, Tapes & Adhesives",
+      "asda_product_id": "6755212",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "household-default-one",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 6,
+        "raw_reading": "LOCTITE SUPERGLUE",
+        "source_region_id": 2,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "116"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "exact alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Loctite Super Glue Original 3g"
+    },
+    {
+      "brand": "Lucozade",
+      "product": "Lucozade Sport Drink Orange 4 x 500ml",
+      "product_id": 3,
+      "category": "Sports Drinks",
+      "asda_product_id": "4801401",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 19,
+        "raw_reading": "2 4 pk. LUCOZADE ORANGE SPORT.",
+        "source_region_id": 4,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "3"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Lucozade Sport Drink Orange 4 x 500ml"
+    },
+    {
+      "brand": "Lurpak",
+      "product": "Lurpak Slightly Salted Butter 200g",
+      "product_id": 89,
+      "category": "Block Butter",
+      "asda_product_id": "7731768",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "household-default-one",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 37,
+        "raw_reading": "1 LURPAK BUTTER.",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "89"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "exact alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Lurpak Slightly Salted Butter 200g"
+    },
+    {
+      "brand": "Princes",
+      "product": "Princes Lean Corned Beef 200g",
+      "product_id": 9,
+      "category": "Cold Meats Corned Beef",
+      "asda_product_id": "391036",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "household-default-one",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 38,
+        "raw_reading": "1 PRINCES LEAN CORNED BEEF",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "9"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Princes Lean Corned Beef 200g"
+    },
+    {
+      "brand": "Richmond",
+      "product": "Richmond 12 Skinless Pork Sausages 319g",
+      "product_id": 85,
+      "category": "Sausages",
+      "asda_product_id": "1141046",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "pack-identity-not-quantity",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": true,
+      "pack_identity_refused_evidence": 16,
+      "quantity_note": "the page's unmarked leading \"16\" is the pack count of \"Richmond 12 Skinless Pork Sausages 319g\", not a purchase quantity - asking for 1 pack",
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 34,
+        "raw_reading": "1 6 RICHMOND SKINLESS PORK SAUSAGES",
+        "source_region_id": 7,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "85"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Richmond 12 Skinless Pork Sausages 319g"
+    },
+    {
+      "brand": "Rustlers",
+      "product": "Rustlers All Day Breakfast Sausage Muffin 155g",
+      "product_id": 23,
+      "category": "Microwaveable Snacks",
+      "asda_product_id": "6185988",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 16,
+        "raw_reading": "2 RUSTLERS SAUSAGE MUFFINS.",
+        "source_region_id": 6,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "23"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "known brand + variant",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Rustlers All Day Breakfast Sausage Muffin 155g"
+    },
+    {
+      "brand": "The",
+      "product": "The BAKERY at ASDA Sultana & Cherry Cake",
+      "product_id": 28,
+      "category": "Loaf Cakes",
+      "asda_product_id": "5233810",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 18,
+        "raw_reading": "1 SULTANA & CHERRY CAKE",
+        "source_region_id": 6,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "28"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "exact alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "The BAKERY at ASDA Sultana & Cherry Cake"
+    },
+    {
+      "brand": "Twix",
+      "product": "Twix Chocolate & Caramel Ice Cream 4pk",
+      "product_id": 114,
+      "category": "Ice Cream",
+      "asda_product_id": "7725445",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 4,
+        "raw_reading": "2 PKTS. TWIX ICECREAM BARS",
+        "source_region_id": 7,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "114"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Twix Chocolate & Caramel Ice Cream 4pk"
+    },
+    {
+      "brand": "Twix",
+      "product": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
+      "product_id": 115,
+      "category": "Multipack Biscuits",
+      "asda_product_id": "9107788",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 5,
+        "raw_reading": "1 PKT. TWIX CHOC BISCUIT BARS",
+        "source_region_id": 7,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "115"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g"
+    },
+    {
+      "brand": "Vanish",
+      "product": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
+      "product_id": 56,
+      "category": "Stain Remover For Whites",
+      "asda_product_id": "6016740",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 27,
+        "raw_reading": "1 VANISH OXI PINK",
+        "source_region_id": 3,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "56"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Vanish Oxi Action Laundry Stain Remover Powder, 450g"
+    },
+    {
+      "brand": "Walkers",
+      "product": "Walkers Cheese & Onion Multipack Crisps 6x25g",
+      "product_id": 6,
+      "category": "Small Multipack Crisps 4 8 Packs",
+      "asda_product_id": "5017321",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 30,
+        "raw_reading": "1 6PK CHEESE ONION CRISPS",
+        "source_region_id": 7,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "6"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Walkers Cheese & Onion Multipack Crisps 6x25g"
+    },
+    {
+      "brand": "Warburtons",
+      "product": "Warburtons Danish Lighter White Bread 400g",
+      "product_id": 88,
+      "category": "Small Bread Loaves",
+      "asda_product_id": "139863",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "household-default-one",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 36,
+        "raw_reading": "1 WARBURTONS DANISH WHITE SLICED BREAD",
+        "source_region_id": 8,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "88"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Warburtons Danish Lighter White Bread 400g"
+    },
+    {
+      "brand": "Weetabix",
+      "product": "Weetabix Protein 24 pack cereal",
+      "product_id": 26,
+      "category": "Wheat Biscuits Mini Wheats",
+      "asda_product_id": "5324639",
+      "substitutes_allowed": false,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 17,
+        "raw_reading": "1 PKT. WEETABIX PROTEIN",
+        "source_region_id": 6,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "26"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Weetabix Protein 24 pack cereal"
+    },
+    {
+      "brand": "Yazoo",
+      "product": "Yazoo Chocolate Milk Drink 400ml",
+      "product_id": 15,
+      "category": "Milk Drinks",
+      "asda_product_id": "5277567",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 12,
+        "raw_reading": "2 4 pk. YAZOO CHOCOLATE milk shake",
+        "source_region_id": 4,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "15"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Yazoo Chocolate Milk Drink 400ml"
+    },
+    {
+      "brand": "Yazoo",
+      "product": "Yazoo Strawberry Milk Drink 400ml",
+      "product_id": 59,
+      "category": "Milk Drinks",
+      "asda_product_id": "5277569",
+      "substitutes_allowed": false,
+      "quantity": 2,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        2
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 29,
+        "raw_reading": "2 4 pk. YAZOO STRAWBERRY milk shake",
+        "source_region_id": 4,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 1,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "59"
+        ]
+      },
+      "disposition": "resolved",
+      "status": "matched",
+      "match_basis": "approximate alias",
+      "shoppable": true,
+      "held_reason": null,
+      "held_detail": null,
+      "routed_question": null,
+      "list_item_name": "Yazoo Strawberry Milk Drink 400ml"
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 21,
+        "raw_reading": "1 BAG ASDA PLAIN TOFFEE'S",
+        "source_region_id": 8,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "33"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "needs_confirmation",
+      "match_basis": "known brand + variant",
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "q1111427e",
+      "list_item_name": "1 BAG ASDA PLAIN TOFFEE'S"
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 39,
+        "raw_reading": "1 BOX...",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 2,
+        "support_of": 3,
+        "support_class": "corroborated",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": []
+      },
+      "disposition": "unresolved-routed",
+      "status": "unmatched_new_item",
+      "match_basis": null,
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "q9df0aac2",
+      "list_item_name": "1 BOX..."
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "household-default-one",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 3,
+        "raw_reading": "1 DOUBLE GLOUSTER CHEESE.",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "11"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "unmatched_new_item",
+      "match_basis": null,
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "qd58a3517",
+      "list_item_name": "1 DOUBLE GLOUSTER CHEESE."
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 20,
+        "raw_reading": "1 FEBREEZE FABRIC SPRAY.",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "30"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "unmatched_new_item",
+      "match_basis": null,
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "q1ad0403b",
+      "list_item_name": "1 FEBREEZE FABRIC SPRAY."
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "household-default-one",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 25,
+        "raw_reading": "1 LENOR O",
+        "source_region_id": 2,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "5"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "needs_confirmation",
+      "match_basis": "approximate alias (held: model confidence 0.57 below 0.6)",
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "q3c8c9aa3",
+      "list_item_name": "1 LENOR O"
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "household-default-one",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 14,
+        "raw_reading": "1 PK. BIRDS EYE QUARTER POUNDERS.",
+        "source_region_id": 5,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": true,
+        "identity_candidates": [
+          "118",
+          "19"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "needs_confirmation",
+      "match_basis": "approximate alias (held: model confidence 0 below 0.6)",
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "q5b2152b2",
+      "list_item_name": "1 PK. BIRDS EYE QUARTER POUNDERS."
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        1
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 33,
+        "raw_reading": "1 PKT. ROAST BEEF",
+        "source_region_id": 7,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": true,
+        "identity_candidates": [
+          "80",
+          "81"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "needs_confirmation",
+      "match_basis": "known brand + variant (held: model confidence 0 below 0.6)",
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "qda9105d2",
+      "list_item_name": "1 PKT. ROAST BEEF"
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 1,
+      "quantity_basis": "conflicting-observations",
+      "quantity_settled": false,
+      "quantity_candidates": [
+        1,
+        7
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": "the runs disagree about the quantity (1 vs 7) and no deterministic rule settles it - routed rather than guessed",
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 15,
+        "raw_reading": "1 x 6pts. ASDA SEMI SKIMMED MILK",
+        "source_region_id": 8,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 0,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "2"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "needs_confirmation",
+      "match_basis": "approximate alias (held: model confidence 0 below 0.6)",
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "qeffe8da8",
+      "list_item_name": "1 x 6pts. ASDA SEMI SKIMMED MILK"
+    }
+  ],
+  "additions": [],
+  "skipped": [
+    {
+      "as_written": "HASHBROWN POTATO",
+      "identity_key": "id:24",
+      "proposed_product_id": "24",
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-19-40"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    },
+    {
+      "as_written": "1 TROP. SMOOTH ORANGE",
+      "identity_key": "id:47",
+      "proposed_product_id": "47",
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-25-29"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    },
+    {
+      "as_written": "BATCHELORS PASTA 'N CHEESE",
+      "identity_key": "id:75",
+      "proposed_product_id": "75",
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-25-29"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    },
+    {
+      "as_written": "2 4 pk. LUCOZADE RASPBERRY SPORT.",
+      "identity_key": "id:8",
+      "proposed_product_id": "8",
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-25-29"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    },
+    {
+      "as_written": "1 BOX ASDA FRUIT LOLLY ICE B...",
+      "identity_key": "text:asda fruit lolly ice b",
+      "proposed_product_id": null,
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-22-40"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    },
+    {
+      "as_written": "1 HASHED POTATO",
+      "identity_key": "text:hashed potato",
+      "proposed_product_id": null,
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-25-29"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    },
+    {
+      "as_written": "1 PKT. STRAWBERRY CAKE",
+      "identity_key": "text:strawberry cake",
+      "proposed_product_id": null,
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-25-29"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    },
+    {
+      "as_written": "1 VANN... 5 A DAY PROM...",
+      "identity_key": "text:vann 5 a day prom",
+      "proposed_product_id": null,
+      "support": 1,
+      "support_of": 3,
+      "seen_in_runs": [
+        "00-19-40"
+      ],
+      "disposition": "skipped",
+      "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line",
+      "routed_to": "cockpit review queue"
+    }
+  ],
+  "reconciliation_summary": {
+    "runs": [
+      "00-19-40",
+      "00-22-40",
+      "00-25-29"
+    ],
+    "observations": 47,
+    "counts": {
+      "unanimous": 36,
+      "corroborated": 3,
+      "uncorroborated": 8
+    },
+    "duplicate_observations_collapsed": {
+      "00-19-40": 2,
+      "00-22-40": 2,
+      "00-25-29": 2
+    }
+  }
+}

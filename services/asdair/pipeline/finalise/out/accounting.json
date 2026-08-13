@@ -1,0 +1,509 @@
+{
+  "work_order": "WO-2026-08-13-04 (WP-B15-37) AC1",
+  "statement": "every reconciled photo observation ends in exactly one of resolved / skipped / unresolved-routed",
+  "observed": 47,
+  "accounted": 47,
+  "established": 39,
+  "unsupported": 8,
+  "resolved": 31,
+  "skipped": 8,
+  "routed": 8,
+  "missing": [],
+  "duplicated": [],
+  "closes": true,
+  "byKey": {
+    "id:1": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 1,
+          "status": "matched",
+          "product": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:107": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 2,
+          "status": "matched",
+          "product": "ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:11": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 3,
+          "status": "unmatched_new_item",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:114": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 4,
+          "status": "matched",
+          "product": "Twix Chocolate & Caramel Ice Cream 4pk",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:115": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 5,
+          "status": "matched",
+          "product": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:116": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 6,
+          "status": "matched",
+          "product": "Loctite Super Glue Original 3g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:117": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 7,
+          "status": "matched",
+          "product": "ASDA Sliced Ham on the Bone 400g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:119": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 8,
+          "status": "matched",
+          "product": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:12": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 9,
+          "status": "matched",
+          "product": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:13": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 10,
+          "status": "matched",
+          "product": "Kleenex Original Tissues - Twin Pack",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:14": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 11,
+          "status": "matched",
+          "product": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:15": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 12,
+          "status": "matched",
+          "product": "Yazoo Chocolate Milk Drink 400ml",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:16": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 13,
+          "status": "matched",
+          "product": "ASDA Shortbread Fingers 210g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:19": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 14,
+          "status": "needs_confirmation",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:2": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 15,
+          "status": "needs_confirmation",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:23": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 16,
+          "status": "matched",
+          "product": "Rustlers All Day Breakfast Sausage Muffin 155g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:26": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 17,
+          "status": "matched",
+          "product": "Weetabix Protein 24 pack cereal",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:28": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 18,
+          "status": "matched",
+          "product": "The BAKERY at ASDA Sultana & Cherry Cake",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:3": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 19,
+          "status": "matched",
+          "product": "Lucozade Sport Drink Orange 4 x 500ml",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:30": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 20,
+          "status": "unmatched_new_item",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:33": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 21,
+          "status": "needs_confirmation",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:37": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 22,
+          "status": "matched",
+          "product": "Calgon washing machine cleaner tablets limescale protection 15 tablets",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:4": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 23,
+          "status": "matched",
+          "product": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:44": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 24,
+          "status": "matched",
+          "product": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:5": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 25,
+          "status": "needs_confirmation",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:51": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 26,
+          "status": "matched",
+          "product": "Always Discreet Incontinence Pads Women Normal 39 Count",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:56": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 27,
+          "status": "matched",
+          "product": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:57": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 28,
+          "status": "matched",
+          "product": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:59": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 29,
+          "status": "matched",
+          "product": "Yazoo Strawberry Milk Drink 400ml",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:6": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 30,
+          "status": "matched",
+          "product": "Walkers Cheese & Onion Multipack Crisps 6x25g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:7": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 31,
+          "status": "matched",
+          "product": "ASDA Crispy Skin-On Fries 750g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:72": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 32,
+          "status": "matched",
+          "product": "Exceptional by ASDA Creamy Mashed Potato 400g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:80": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 33,
+          "status": "needs_confirmation",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:85": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 34,
+          "status": "matched",
+          "product": "Richmond 12 Skinless Pork Sausages 319g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:87": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 35,
+          "status": "matched",
+          "product": "Bloo Spa Moments Toilet Rim Block - Vitality 50g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:88": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 36,
+          "status": "matched",
+          "product": "Warburtons Danish Lighter White Bread 400g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:89": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 37,
+          "status": "matched",
+          "product": "Lurpak Slightly Salted Butter 200g",
+          "held_reason": null
+        }
+      }
+    ],
+    "id:9": [
+      {
+        "fate": "resolved",
+        "detail": {
+          "line_no": 38,
+          "status": "matched",
+          "product": "Princes Lean Corned Beef 200g",
+          "held_reason": null
+        }
+      }
+    ],
+    "text:1 box": [
+      {
+        "fate": "unresolved-routed",
+        "detail": {
+          "line_no": 39,
+          "status": "unmatched_new_item",
+          "product": null,
+          "held_reason": "awaiting_decision"
+        }
+      }
+    ],
+    "id:24": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ],
+    "id:47": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ],
+    "id:75": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ],
+    "id:8": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ],
+    "text:asda fruit lolly ice b": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ],
+    "text:hashed potato": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ],
+    "text:strawberry cake": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ],
+    "text:vann 5 a day prom": [
+      {
+        "fate": "skipped",
+        "detail": {
+          "reason": "seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate, indistinguishable here from an invented line"
+        }
+      }
+    ]
+  }
+}
