@@ -371,6 +371,96 @@ body {
 }
 .add small { display: block; margin-top: 8px; font-size: var(--m-text-body); font-weight: 400; }
 
+/* ── HER OWN WORDS — the input, opened in place ──────────────────────────────────────────────────
+   Warwick, 2026-08-13: "Add something else doesnt work? If anything is added here it needs to sense
+   check against existing regulars." The control is now real.
+   Laid out as a stack at full width so nothing is a small target and the reading order is the doing
+   order: what am I being asked · where I type · the thing that does it · the way out. */
+.add-form {
+  margin: 32px 0 0;
+  padding: var(--m-pad);
+  background: var(--panel);
+  border: 3px solid var(--ink);
+  border-radius: var(--m-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-gap-opposite);
+}
+/* A REAL <label for>, not a placeholder. Placeholder text disappears the moment she starts typing,
+   which is precisely when someone unsure of the question needs it (WCAG 3.3.2). */
+.a-label { font-size: var(--m-text-name); font-weight: 700; color: var(--ink); }
+.a-input {
+  /* Comfortably over the 72px any-control floor, and the text inside is at the product-name size —
+     she has to be able to read back what she typed, on a tablet, at arm's length. */
+  min-height: var(--m-target-lg);
+  padding: 0 var(--m-pad);
+  font-family: inherit;
+  font-size: var(--m-text-name);
+  color: var(--ink);                    /* --ink on --panel = 16.40:1 */
+  background: var(--panel);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+}
+/* The primary action of this little form. Same treatment as the page's primary action so the
+   affordance is learned once and reused. */
+.a-add {
+  min-height: var(--m-target-lg);
+  font-family: inherit;
+  font-size: var(--m-text-action);
+  font-weight: 700;
+  color: var(--ink);                    /* --ink on --ok-w = 14.39:1 */
+  background: var(--ok-w);
+  border: 4px solid var(--ok);
+  border-radius: var(--m-radius);
+  cursor: pointer;
+}
+/* Same no-fade rule as every other disabled control here: recessed surface and a muted TOKEN,
+   never opacity (GL-003 §2b-bis, Addendum B §6.5). --ink2 on --panel2 = 7.08:1, still over the bar. */
+.a-add[aria-disabled="true"] { color: var(--ink2); background: var(--panel2); border-color: var(--hair); cursor: default; }
+.a-cancel {
+  min-height: var(--m-target);
+  font-family: inherit;
+  font-size: var(--m-text-body);
+  font-weight: 700;
+  color: var(--ink);                    /* --ink on --panel2 = 15.55:1 */
+  background: var(--panel2);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+/* A thing she typed, shown back to her EXACTLY as she typed it. It reuses .row so it sits in the
+   list at the same height, the same target size and the same rhythm as everything else — it is not
+   a lesser kind of item. `.on` is applied in the template because an added thing is, by definition,
+   chosen; the four selected signals (tick, fill, rail, border) therefore all apply unchanged. */
+.extra { flex-wrap: wrap; }
+/* Her way to take it off again. Not a small x in a corner: a worded control at the general 72px
+   floor, because removing something she asked for should be as plain as adding it. */
+.take-off {
+  flex: 0 0 auto;
+  min-height: var(--m-target);
+  padding: 0 var(--m-pad);
+  font-family: inherit;
+  font-size: var(--m-text-body);
+  font-weight: 700;
+  color: var(--ink);                    /* --ink on --panel2 = 15.55:1 */
+  background: var(--panel2);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  cursor: pointer;
+}
+/* ⛔ THE NUDGE, AND IT IS A SENTENCE — NEVER A QUESTION AND NEVER A CHOICE.
+   Warwick: "I will deal with any questions and such through my existing process." So this tells her
+   warmly that she already has the thing and that HER ITEM HAS BEEN KEPT ANYWAY. It carries no
+   control, offers no candidate list and asks nothing. On --ok-w (the row is selected) --ink is
+   14.39:1. It sits at full width under the item so it reads as being about that item. */
+.e-note {
+  flex: 1 1 100%;
+  margin: var(--m-gap-opposite) 0 0;
+  font-size: var(--m-text-body);
+  color: var(--ink);
+}
+
 /* ── FOOTER ──────────────────────────────────────────────────────────────────────────────────────
    B §6.7: sticky to the bottom so it is reachable without scrolling to the end, but it must NOT
    overlap the last row — the scroll container carries bottom padding equal to the footer height
@@ -446,16 +536,86 @@ body {
 
 /* ── HONEST STATES ───────────────────────────────────────────────────────────────────────────────
    B §9.6: errors are visible and recoverable, never silent, and the UI NEVER claims something was
-   sent when it was not. .note is the calm plain-words strip that replaces the primary action. */
+   sent when it was not. .note is the calm plain-words strip that REPLACES the primary action
+   (B §6.7: "after sending, it is replaced by the sent state, not left tappable").
+
+   ⛔ THREE TINTS, THREE DIFFERENT TRUTHS, AND THE DIFFERENCE IS NOT DECORATION.
+     .note.done  --ok-w   a shop row was written                      (created:true)
+     .note       --warn-w accepted, but NOTHING durable changed       (created:false, contract v2)
+     .note.stop  --stop-w it did not arrive at all
+   The middle one takes the plain default deliberately. It is not a success and must never be
+   tinted like one; it is also not a fault of hers, so it is not tinted like a failure either.
+   Tint is REINFORCEMENT in all three cases — the sentence carries the meaning (WCAG 1.4.1, B §5.1),
+   which is why each strip leads with a <strong> line rather than relying on a colour she may not
+   distinguish. All three survive greyscale because the words differ, not the hue. */
+.f-state {
+  /* The whole footer row, stacked. Deliberately NOT side-by-side: an outcome message and the one
+     control that follows from it read top-to-bottom in every orientation, at the same size, in the
+     same order. Predictability is worth more here than density.
+     The sending state does NOT use this class — see the template comment; its action must stay a
+     direct child of .foot so the box does not move when she taps it. */
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--m-gap-opposite);
+}
 .note {
   flex: 1 1 100%;
   padding: var(--m-pad);
   font-size: var(--m-text-body);
   color: var(--ink);
-  background: var(--warn-w);            /* 14.06:1 */
+  background: var(--warn-w);            /* --ink on --warn-w = 14.06:1 */
   border: 2px solid var(--warn);
-  border-left-width: 10px;
+  border-left-width: 10px;              /* the rail — position/weight, readable in greyscale */
   border-radius: var(--m-radius);
+}
+/* A row was genuinely written. The ONLY strip that may read as success. */
+.note.done { background: var(--ok-w); border-color: var(--ok); }      /* --ink on --ok-w = 14.39:1 */
+/* It did not arrive. Not her fault, and the copy says so. */
+.note.stop { background: var(--stop-w); border-color: var(--stop); }  /* --ink on --stop-w = 13.52:1 */
+
+/* The headline sentence of a strip. Heading-sized because it is the one line she must read, and
+   the sub-line qualifies it rather than repeating it. Both clear the 22px body floor. */
+.n-say { display: block; font-size: var(--m-text-heading); font-weight: 800; color: var(--ink); }
+.n-sub { display: block; margin-top: 8px; font-size: var(--m-text-body); color: var(--ink); }
+
+/* ⛔ THE COMMIT CONTROL ON THE CONFIRM SCREEN. Warwick's accident guard.
+   It is `.confirm` and NOT `.send` on purpose: in the confirm state no `.send` exists on the page,
+   so a repeat tap aimed at the primary action cannot reach the thing that actually commits her
+   list. Styled as the primary action because in that state it IS the primary action — she should
+   not have to learn a second visual language to answer a question about her own shopping. */
+.confirm {
+  min-height: var(--m-target-lg);
+  width: 100%;
+  padding: 0 40px;
+  font-family: inherit;
+  font-size: var(--m-text-action);
+  font-weight: 700;
+  color: var(--ink);                    /* --ink on --ok-w = 14.39:1 */
+  background: var(--ok-w);
+  border: 4px solid var(--ok);
+  border-radius: var(--m-radius);
+  cursor: pointer;
+}
+
+/* ⛔ THE WAY BACK — B §9.5, "an 84-year-old who realises she forgot the bread must not be stuck."
+   FULL SIZE, and held to the 88px LARGE floor rather than the 72px general one, because it is the
+   only control on the screen in the state it appears in. shopping-geometry-check.mjs asserts it at
+   88 (`.again` is in that gate's LARGE pattern) so this cannot quietly shrink.
+   Same no-fade rule as every other control on this surface: surface and token carry the state. */
+.again {
+  min-height: var(--m-target-lg);
+  width: 100%;
+  padding: 0 var(--m-pad);
+  font-family: inherit;
+  font-size: var(--m-text-action);
+  font-weight: 700;
+  color: var(--ink);                    /* --ink on --panel2 = 15.55:1 */
+  background: var(--panel2);
+  border: 3px solid var(--ink);
+  border-radius: var(--m-radius);
+  cursor: pointer;
 }
 .empty {
   padding: 40px var(--m-pad);
@@ -488,6 +648,7 @@ body {
   .q { width: 100%; justify-content: flex-end; margin-top: var(--m-gap-opposite); }
   .foot { justify-content: stretch; }
   .send { width: 100%; }
+  /* Narrow: the outcome strip and its controls stack, full width. This is the .f-state default. */
 
   /* The portrait clearance. Worst case is a three-line footer:
        20*2 padding + 33 count + 24 gap + 72 undo + 24 gap + 88 action = 281px, + 24 clearance = 305.
@@ -495,6 +656,26 @@ body {
      space at the end of a scroll, and the failure mode of too little is a control she cannot
      reach. Those are not symmetric costs. */
   .page-pad { padding-bottom: 320px; }
+}
+
+/* ══ WIDE VIEWPORTS — THE OUTCOME FOOTER LAYS OUT SIDEWAYS ═══════════════════════════════════════
+   ⛔ THIS IS A FIX FOR A DEFECT THIS PACKAGE INTRODUCED, AND THE GATE IS WHAT FOUND IT.
+   The confirm and outcome states replace one 88px action with a two-line message PLUS two full-size
+   controls. Stacked, that is a ~364px footer. At 1280x800 the footer is STICKY (the short-viewport
+   rule below only drops it to static at or under 720px of height), so it covered every item row:
+   `firstUsableRowVisible` went false at four of the six states, on the tallest landscape device
+   class. Exactly the HIGH-1 failure Vera found, re-created by new states rather than by new CSS.
+
+   Above 860px there is width to spend instead of height, so the message takes the free space and
+   the controls sit beside it. That is ~180px rather than ~364px and the list stays visible behind
+   the question she is being asked.
+   The 24px between the two controls is `--m-gap-opposite`, the token named for exactly this: YES
+   and No are opposite-effect controls and E A10 requires dead space between them. It is inherited
+   from .f-state's own gap rather than declared again. */
+@media (min-width: 861px) {
+  .f-state { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .f-state .note { flex: 1 1 320px; }
+  .f-state .confirm, .f-state .again { flex: 0 0 auto; width: auto; min-width: 260px; }
 }
 
 /* ══ SHORT VIEWPORTS — HIGH-1, VERA ══════════════════════════════════════════════════════════════
@@ -613,4 +794,31 @@ body {
   .banner { padding: 8px; margin-bottom: 6px; }
   .banner h2 { font-size: 22px; }
   .row { margin-bottom: 12px; }
+
+  /* ⛔ THE CONFIRM SCREEN DID NOT FIT AT 200% ZOOM, AND THE GATE IS WHAT CAUGHT IT.
+     Measured at 640x400 — a 1280x800 tablet at 200% browser zoom, and the tier Addendum A says
+     actually reaches her — the stacked confirm strip came to roughly 444px in a 400px viewport:
+     footer padding 40 + note 148 + two 88px controls + two 24px gaps. The footer is STATIC at this
+     height (the HIGH-1 fix above), so at maximum scroll she would have seen the two buttons and a
+     QUESTION CUT OFF AT THE TOP — being asked to confirm a date she cannot read. That is worse
+     than any of the states it was added to improve.
+
+     Two savings, in the order they cost her least:
+     1. tighter gaps and padding — no text shrinks, nothing is hidden, the 22px floor is untouched;
+     2. the two controls sit SIDE BY SIDE rather than stacked, which is worth 112px on its own.
+
+     ⚠️ SIDE BY SIDE IS A REAL TRADE AND IS RECORDED AS ONE. Stacked is safer for poor coordination,
+     and it stays stacked everywhere there is room. Here the alternative is not "stacked and
+     comfortable", it is "she cannot see what she is agreeing to" — so the controls move. The 24px
+     between them is `--m-gap-opposite`, this surface's own opposite-effect guarantee, the same
+     figure that separates MINUS from PLUS. It is inherited from .f-state's gap, not re-declared.
+     Keyed to a width floor too, so a genuinely narrow screen keeps the stack. */
+  .f-state { gap: 16px; }
+  .f-state .note { padding: 12px; }
+  .n-sub { margin-top: 4px; }
+}
+@media (max-height: 480px) and (min-width: 600px) {
+  .f-state { flex-direction: row; align-items: stretch; flex-wrap: wrap; gap: var(--m-gap-opposite); }
+  .f-state .note { flex: 1 1 100%; }
+  .f-state .confirm, .f-state .again { flex: 1 1 0; width: auto; min-width: 0; }
 }
