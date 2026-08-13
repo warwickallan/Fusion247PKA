@@ -2334,6 +2334,36 @@ actually travel.** *The capture artefact `vision-run-2026-08-13T12-41-13-420Z.js
 and is therefore SUPERSEDED — it is retained only as the evidence that found the defect, and must not be used
 as the journey's input.*
 
+### ✅ THE TERRA CAPTURE — `vision-run-2026-08-13T13-07-12-670Z.json`, branch head `d671c15`
+
+`interpreter_model: gpt-5.6-terra` · `prompt_version: grounded-v6-lasttime-identity-scoping` ·
+**3 vision calls · $0.187308** · `photo_sha256` verified · **`region_plan_sha256` matches the literal Keel
+pinned offline** — the plan Larry ran is the plan Keel computed. Follow-ups: `[5]` then `[6]`, one region
+each. **Terra needed 3 calls where mini needed 5** — fewer re-inspections, consistent with the better model,
+though one run of each is not a measurement.
+
+**The mini artefact is renamed `SUPERSEDED-…` and must NEVER be used as input.** Retained only as the
+evidence that found the defect.
+
+**⚠️ HOW THE DIVERGENCE HID, and it is the durable lesson: the frozen prototype runs DO NOT RECORD WHICH
+MODEL PRODUCED THEM.** A configuration divergence could therefore sit underneath a settled ruling with
+nothing in the record contradicting itself. *Larry has asked Keel to make the runner refuse any artefact
+whose `interpreter_model` is not `gpt-5.6-terra` — same class as the photo-hash assertion, and it would make
+this defect unrepeatable.*
+
+### ⚠️ THE "DUPLICATE CATALOGUE" WAS LARRY'S CONTAMINATION, NOT LIVE'S
+
+Keel reported near-duplicate identities on the disposable target (Ariel at ids 4 **and** 36; Richmond at 3,
+85, 63) and correctly flagged that it would shape AC3's routed/resolved split. **Checked at source: LIVE has
+109 regulars and 109 DISTINCT normalised names — no duplicates at all.**
+
+**The cause was Larry's.** Four invented fixture rows seeded earlier occupied ids 3–6, and the real
+catalogue was copied in with `on conflict (id) do nothing` — so **four REAL products were rejected and the
+inventions sat in their place: Lucozade Sport, CRAVENDALE MILK, the real Lenor, and Walkers crisps.**
+*Cravendale is precisely the milk the BOB ruling turns on.* **Corrected by overwriting ids 3–6 in place with
+the live rows** (delete was blocked by `shop_line` FKs, and in-place update preserves referential
+integrity). **Disposable now matches live exactly: 109 rows, zero fixtures, zero duplicates.**
+
 **Work did not stop for this.** Felix is fixing two HIGH findings on Mum's Cockpit; Lane J's runner continues.
 
 ## ⟦PHASE SCOPE — INGESTION END-TO-END + MUM'S COCKPIT⟧ Warwick, 2026-08-13. **His destination, quoted.**
