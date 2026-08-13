@@ -2421,6 +2421,38 @@ down; the service now warns loudly and every submission reports `notify_not_conf
 > NOT.** Sending a Telegram message to a guessed destination is an outward action, and a wrong guess sends
 > Warwick's shopping to a stranger. **One line from Warwick settles it either way.**
 
+### 📱 DEVICE EVIDENCE — **CORRECTED 2026-08-13 ON WARWICK'S INSTRUCTION. Larry had erased a real result.**
+
+> **Warwick, verbatim:** *"It is NOT true that 'nothing has been in front of Silk or her tablet.' Warwick has
+> already opened Mum's live Cockpit successfully in Silk on the actual Fire HD 8 over Tailscale and reported
+> that the interface looked good… Preserve the earlier Fire/Silk success as genuine device evidence rather
+> than erasing it because the surface has subsequently changed."*
+
+**✅ ESTABLISHED ON THE REAL DEVICE, and it stands:** **Warwick opened Mum's live Cockpit in Silk on the
+actual Fire HD 8, over Tailscale, and the interface looked good.** That is a real result on the real
+browser on the real hardware — the only class of evidence no gate in this estate can produce.
+
+**⛔ HOW LARRY GOT THIS WRONG, recorded because the mechanism recurs.** Felix's and Vera's gates each
+correctly state *"Chromium at her viewport sizes — NOT Silk, and NOT her tablet"* — a true statement about
+**what those instruments measured.** Larry generalised it into *"nothing has been in front of Silk or her
+tablet"*, which is a claim about the **product's history** and was false. **A measurement's scope caveat is
+not a fact about the product.** *Same family as "state what was PROVEN, not what it implies" — and this
+time it deleted Warwick's own successful test from the record.*
+
+**What genuinely remains unproven ON THE REAL FIRE** — Warwick's own list, and it is narrower and more
+useful than the sentence it replaces:
+
+1. **the current/final post-Felix surface** (the confirm screen, the four outcomes, the split banner);
+2. **the newly completed add / sense-check / confirm / SEND behaviour**;
+3. **one genuine submission**;
+4. **the real ShopperBot notification**;
+5. **the remaining multi-day MUM acceptance criteria** (Addendum E §0.2 rule 4 — three unassisted sessions
+   on three different days).
+
+**The soft keyboard sits inside item 2 and is the sharpest unknown:** `openAdd()` focuses `.a-input`, and
+Silk's keyboard can take 40–50 % of the viewport — roughly 150 px left at 512×300 for a ~348 px form.
+**Headless Chromium cannot reproduce it; only her tablet settles it.**
+
 ### ⚠️ WHAT IS NOT PROVEN, STATED AS PLAINLY AS THE BUILDERS STATED IT
 
 - **The real Telegram send has NEVER been exercised. `BUILT-NOT-VERIFIED`.** Every proof used an injected
@@ -2429,7 +2461,7 @@ down; the service now warns loudly and every submission reports `notify_not_conf
 - **No real submission has been made.** The end-to-end proof needs **one real action from Mum on the tablet**,
   which is the single exact action Warwick pre-authorised asking for. **No shop has been fabricated in live
   data to tick a box.**
-- **Everything measured is Chromium, NOT Silk, NOT her tablet** — the geometry gate says so in its own output.
+- **The GATES measure Chromium at her viewport sizes, not Silk and not her tablet** — they say so in their own output. ⛔ **That is a scope caveat about the instruments, NOT a claim that the product has never been on her device. See the DEVICE EVIDENCE block above: Warwick opened it in Silk on the real Fire HD 8 and it looked good.**
 - **Neither Vera nor Veritas has gated any of this.** Both builders' returns are explicitly labelled
   *builder self-test evidence — NOT independent review*, and that labelling is respected here.
 - **`render-check.mjs` still carries the false-green hole** — it loads whatever answers the URL, which is how
