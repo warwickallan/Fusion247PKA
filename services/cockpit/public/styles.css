@@ -73,13 +73,29 @@ button { font-family:inherit; }
 .app-status { display:flex; align-items:center; gap:10px; padding:12px 15px; margin-bottom:14px; background:var(--panel);
   border:1px solid var(--hair); border-left:4px solid var(--park); border-radius:13px; font-size:13px; color:var(--ink2); line-height:1.45; }
 .app-status.up { border-left-color:var(--ok); } .app-status.down { border-left-color:var(--warn); }
+/* BUILD-015 B15-26 — the six-state Shop banner (asdairStatus.tone) reuses this SAME rail-plus-dot
+   language, mirroring .up/.down exactly. All four already measure PASS at the 3:1 non-text floor
+   (GL-003 §2b "Non-text" table) — no new contrast work, only wiring the tone class that was
+   already being computed to a rule that renders it. */
+.app-status.amber { border-left-color:var(--warn); } .app-status.blue { border-left-color:var(--accent); }
+.app-status.green { border-left-color:var(--ok); } .app-status.red { border-left-color:var(--stop); }
 .app-status .as-dot { flex:0 0 auto; width:9px; height:9px; border-radius:50%; background:var(--park); }
 .app-status.up .as-dot { background:var(--ok); } .app-status.down .as-dot { background:var(--warn); }
+.app-status.amber .as-dot { background:var(--warn); } .app-status.blue .as-dot { background:var(--accent); }
+.app-status.green .as-dot { background:var(--ok); } .app-status.red .as-dot { background:var(--stop); }
 .app-status .as-body { flex:1; min-width:0; } .app-status b { color:var(--ink); }
 .app-status .act { flex:0 0 auto; }
 
 .app-nav { display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px; border-bottom:1px solid var(--hair); scrollbar-width:thin; }
-.app-nav-btn { flex:0 0 auto; background:none; border:1px solid transparent; border-radius:9px; padding:10px 15px; font-size:13px;
+/* WP-B15-36, AC7 residual 1 — Vera measured this shared tab switcher at 39px high (10+10 padding on
+   a 13px/650 label), which clears WCAG 2.2 SC 2.5.8's real 24x24 floor but misses her stricter 44px
+   bar. Closed GLOBALLY rather than scoped to AsdAIr, and that is the deliberate call: `.app-back`
+   and `.app-cog` in the SAME header are already 44x44, so scoping would have left one row of
+   controls at two different target sizes for no reason a user could see. The visual delta is 5px of
+   height on one tab strip; the alternative — a fourth scoped exception to a shared primitive — is
+   the pattern the D-1…D-10 note above warns is how a global token stops being trusted. */
+.app-nav-btn { flex:0 0 auto; display:inline-flex; align-items:center; min-height:44px;
+  background:none; border:1px solid transparent; border-radius:9px; padding:10px 15px; font-size:13px;
   font-weight:650; color:var(--ink2); cursor:pointer; }
 .app-nav-btn:hover { border-color:var(--hair); }
 .app-nav-btn.on { background:var(--accent-w); color:var(--accent-ink); }
@@ -95,6 +111,165 @@ button { font-family:inherit; }
    used by .item/.status-line (GL-003 §4 observed progression). */
 .asdair-view { margin-top:2px; }
 .asdair-photo { display:block; max-width:100%; border-radius:13px; border:1px solid var(--hair); background:var(--panel2); margin-bottom:8px; }
+
+/* BUILD-015 B15-26 — the small thumbnail entry point to the photo (AC5: shown small, never
+   dominating by default; the full auto-rotated photo is one tap away in the action sheet). Same
+   --hair/--panel2 vocabulary as .asdair-photo above, just smaller and inline. */
+.asdair-photo-thumb { display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  background:none; border:1px solid var(--hair); border-radius:13px; padding:6px 10px; cursor:pointer; }
+.asdair-photo-thumb:hover, .asdair-photo-thumb:focus-visible { border-color:var(--accent); }
+.asdair-photo-thumb:disabled { cursor:default; opacity:.7; }
+.asdair-photo-sm { display:block; width:56px; height:56px; object-fit:cover; border-radius:9px; background:var(--panel2); flex:0 0 auto; }
+
+/* The exception/all segmented filter (Shop screen). Reuses .act as its base — this is styling ON
+   TOP of .act, the same "on" language .app-nav-btn.on and .app-cog.on already use. */
+.as-seg { display:flex; gap:6px; margin:2px 0 12px; }
+.as-seg .act.on { background:var(--accent-w); color:var(--accent-ink); border-color:var(--accent); }
+
+/* A candidate choice — a REAL product name, so body font, never .as-tag's mono (GL-003 §3: mono
+   means "measurement or machine string", which a product name is not). Same pill shape as .as-tag
+   for visual family, different type. */
+.as-choice { display:inline-flex; align-items:center; min-height:44px; font-size:12.5px; font-weight:650; color:var(--ink); background:var(--panel2);
+  border:1px solid var(--hair); padding:5px 12px; border-radius:20px; cursor:pointer; overflow-wrap:anywhere; }
+.as-choice:hover, .as-choice:focus-visible { border-color:var(--accent); }
+.as-choice:disabled { cursor:default; opacity:.6; }
+
+/* ── WP-B15-36 (WO-2026-08-13-03) — the human-readable Shop ─────────────────────────────────────
+   LAYOUT AND TYPE ONLY. NOT ONE NEW COLOUR TOKEN. Every text-on-surface pairing below is a GL-003
+   §2b pairing that is ALREADY MEASURED and PASSES in both schemes.
+   ⚠️ THE SURFACES BELOW WERE ESTABLISHED BY MEASURING THE RENDERED PAGE, not by reading the markup:
+   headless Edge, both `preferredColorScheme` settings, getComputedStyle on each rule, resolved
+   backdrop walked up the tree. The first version of this comment named `--panel` for .as-answer and
+   .as-compact-why; the browser says the real backdrops are `--bg` and `--panel2`. Both still PASS —
+   but a contrast figure quoted against a surface the element does not sit on is exactly the class
+   of wrong number GL-003 §2d warns about, so the measured values are what is recorded:
+     .as-answer          --ink       on --bg       14.48 / 15.57
+     .as-answer-unknown  --ink2      on --bg        6.59 /  8.34
+     .as-note            --ink2      on --bg        6.59 /  8.34   (pre-existing rule, re-confirmed)
+     .as-fault           --ink2      on --stop-w    6.16 /  7.02
+     .as-flash           --ink2      on --ok-w      6.55 /  6.30
+     .as-compact-name    --ink       on --panel2   15.55 / 12.65
+     .as-compact-why     --ink2      on --panel2    7.08 /  6.78
+     .as-link            --accent-ink on --bg       6.80 / 10.94
+   ⛔ No `opacity` on any text rule here — GL-003 §2b-bis: "opacity is a contrast operation, not a
+   styling flourish", and D-17/D-18 are open precisely because a passing token was then faded. */
+
+/* AC1 — THE ONE SENTENCE that answers "why isn't my basket ready?". It is deliberately the largest
+   text on the Shop screen after the status word: Warwick must never have to infer this from several
+   counters. 19px sits on the observed scale (GL-003 §3) between the sheet title and .read h2, and is
+   NORMAL text at that size, so it is held to the 4.5:1 bar, not the 3:1 large-text relaxation —
+   --ink at 16.40/13.76 clears it with room to spare. */
+.as-answer { margin:10px 2px 14px; font-size:19px; font-weight:650; line-height:1.35; color:var(--ink); letter-spacing:-.01em; }
+.as-answer-sm { font-size:15px; font-weight:600; margin:6px 2px 10px; }
+/* No canonical state to answer from. --ink2 is the muted-but-readable token (GL-003 §2a); --ink3
+   would be a defect here, this is text a user must read. */
+.as-answer-unknown { color:var(--ink2); font-weight:600; }
+
+/* A genuine disagreement inside AsdAIr's own data, named as a FAULT — never two numbers left for
+   Warwick to reconcile. Uses the --stop-w tint with --ink2 words, the pairing D-15 established;
+   --stop as text on its own tint is 4.14 in light and is NOT used here. */
+.as-fault { margin:0 2px 12px; padding:9px 12px; border-radius:9px; background:var(--stop-w);
+  border-left:4px solid var(--stop); color:var(--ink2); font-size:13px; line-height:1.45; }
+/* "Your answer landed, and here is what remains." Same construction, --ok-w tint + --ink2 words —
+   the D-14 pairing, not --ok as text. */
+.as-flash { margin:0 2px 12px; padding:9px 12px; border-radius:9px; background:var(--ok-w);
+  border-left:4px solid var(--ok); color:var(--ink2); font-size:13px; line-height:1.45; }
+
+/* AC5 — the per-line photo crop. The frame takes the region's own aspect; the full photograph is
+   positioned inside it by percentages computed in app.js (asdairCropImgStyle). --hair border and
+   --panel2 backdrop, the same vocabulary .asdair-photo already uses. */
+/* NOTE THE inset box-shadow WHERE A BORDER WOULD BE THE OBVIOUS CHOICE, and it is not decoration.
+   MEASURED IN A REAL BROWSER: with `border:1px`, the percentage width/height on the image resolve
+   against the CONTENT box while `aspect-ratio` sizes the BORDER box, so the horizontal and vertical
+   scales came out 0.735 and 0.722 — the crop was silently squashed by ~1.7% on one axis. A shadow
+   is outside layout, so content box == border box and both scales are identical. Same --hair
+   hairline on screen, exact geometry underneath. */
+.as-crop { position:relative; overflow:hidden; width:100%; max-width:340px; margin:8px 0 4px;
+  box-shadow:inset 0 0 0 1px var(--hair); border-radius:9px; background:var(--panel2); }
+.as-crop img { position:absolute; max-width:none; display:block; }
+/* A backend-rendered crop is already the right pixels — it fills the frame rather than being placed. */
+.as-crop .as-crop-whole { position:static; width:100%; height:auto; }
+
+/* A resolved line, compact. One row, name then why, inside the collapsed "already sorted" drawer. */
+.as-compact { display:flex; align-items:baseline; gap:8px; width:100%; text-align:left; min-height:44px;
+  background:none; border:none; border-bottom:1px solid var(--hair); padding:6px 2px; cursor:pointer; font:inherit; }
+.as-compact:last-child { border-bottom:none; }
+.as-compact-name { flex:1 1 auto; min-width:0; font-size:13px; font-weight:650; color:var(--ink); overflow-wrap:anywhere; }
+.as-compact-why { flex:0 0 auto; font-size:11.5px; color:var(--ink2); }
+
+/* ══ WP-B15-42 — the exception board, the brand-grouped list, the durable-knowledge offer ═════════
+   Every colour below is an existing GL-003 token. No token was added and no value was changed, so
+   every contrast figure in GL-003 §2b still holds for this file without re-measurement. The three
+   text-on-tint pairings used here are all in that table already:
+     --ink2 on --warn-w   6.40 / 6.16   PASS   (.as-tally-cell.warn)
+     --ink2 on --ok-w     6.55 / 6.30   PASS   (.as-tally-cell.ok, .as-remember)
+     --ink2 on --stop-w   6.16 / 7.02   PASS   (.as-tally-cell.block)
+   ⛔ NO `opacity` ANYWHERE IN THIS BLOCK. GL-003 §2b-bis: opacity is a contrast operation, and
+   D-17/D-18 are open precisely because faded text stopped clearing the floor. A state that needs
+   de-emphasis here gets --ink2, which is the muted-text token, never a fade on top of one. */
+
+/* AC3 — X NEED YOU / Y RESOLVED / Z STILL BLOCKING, at a glance and always on screen. Three equal
+   cells so the eye lands on the number; the WORD under each number is what carries the meaning, so
+   the tint is reinforcement and never the signal (GL-003: "no state is signalled by colour alone"). */
+.as-tally { display:flex; gap:6px; margin:2px 2px 12px; }
+.as-tally-cell { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center;
+  gap:1px; padding:9px 6px; border-radius:13px; background:var(--panel2); color:var(--ink2);
+  border:1px solid var(--hair); }
+.as-tally-cell b { font-family:var(--mono); font-size:22px; font-weight:700; line-height:1.1; color:var(--ink); }
+.as-tally-cell span { font-size:11px; font-weight:650; text-align:center; }
+.as-tally-cell.warn { background:var(--warn-w); border-color:var(--warn); }
+.as-tally-cell.ok { background:var(--ok-w); border-color:var(--ok); }
+.as-tally-cell.block { background:var(--stop-w); border-color:var(--stop); }
+
+/* AC5 — one line of the brand-grouped list. <details>/<summary> so the compact row IS the control:
+   native disclosure semantics, keyboard-operable and announced as expandable with no ARIA of our
+   own and no hand-rolled toggle state. 44px min-height is the touch target, unscoped. */
+.as-line { border-bottom:1px solid var(--hair); }
+.as-line:last-of-type { border-bottom:none; }
+.as-line-sum { display:flex; align-items:baseline; gap:10px; min-height:44px; padding:7px 2px;
+  cursor:pointer; list-style:none; }
+.as-line-sum::-webkit-details-marker { display:none; }
+.as-line-sum:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:9px; }
+.as-line-name { flex:1 1 auto; min-width:0; font-size:14px; font-weight:650; color:var(--ink); overflow-wrap:anywhere; }
+/* The quantity is a MEASUREMENT, so it is mono — GL-003 §3: mono means "this is a measurement or a
+   machine string", a semantic signal in this system rather than decoration. */
+.as-line-qty { flex:0 0 auto; font-family:var(--mono); font-size:13px; font-weight:700; color:var(--ink); }
+/* An unset quantity is not a zero and must not look like one. --ink2 is the muted-text token; it
+   clears AA on every surface in both schemes (worst case 6.16). */
+.as-line-qty-unk { font-size:11px; font-weight:600; color:var(--ink2); }
+/* VERA V-2 — the disclosure affordance that was missing. Colour and size are INHERITED from the
+   shared .chev rule rather than restated, so this row cannot drift away from the six other row
+   types that use the same glyph. ROTATION RATHER THAN A SECOND GLYPH: one mark points right when
+   closed and down when open, so the affordance and its state are the same object. No transition is
+   declared — the change is instant, so there is no motion to honour prefers-reduced-motion for. */
+.as-line-chev { flex:0 0 auto; line-height:1; }
+details[open] > .as-line-sum > .as-line-chev { transform:rotate(90deg); }
+.as-line-body { padding:2px 2px 10px; }
+
+/* AC2 — the durable-knowledge offer. --ok-w tint with --ink2 body (6.55 / 6.30) and --ink on the
+   question itself (14.39 / 11.77, the strongest text pairing in the system). */
+.as-remember { margin:0 2px 12px; padding:11px 12px; border-radius:13px; background:var(--ok-w);
+  border:1px solid var(--ok); }
+.as-remember-q { margin:0 0 6px; font-size:14px; font-weight:650; color:var(--ink); }
+.as-remember .as-note { color:var(--ink2); }
+
+/* An inline text control inside a sentence ("View the whole photograph"). A real button, so it is
+   keyboard-reachable and announced as an action, wearing the link colour --accent-ink already uses
+   for text (6.64+ in both schemes; --accent is for MARKS, not small text). */
+.as-link { background:none; border:none; padding:0; font:inherit; font-weight:650;
+  color:var(--accent-ink); text-decoration:underline; cursor:pointer; }
+
+/* The two focus-trap sentinels either side of the AsdAIr sheet (AC7 residual 2). They must be
+   FOCUSABLE, so they are not display:none and not visibility:hidden — but they must never occupy
+   space or be seen. */
+.as-trap { position:fixed; width:1px; height:1px; opacity:0; pointer-events:none; }
+
+/* Text/number inputs in the AsdAIr action sheet — the only form fields this app has. Matches .act's
+   radius and border vocabulary so a sheet with a button and an input reads as one family. */
+.asdair-input { display:block; width:100%; font:inherit; font-size:14px; color:var(--ink);
+  background:var(--panel2); border:1px solid var(--hair); border-radius:9px; padding:9px 12px;
+  margin:4px 0 12px; }
+.asdair-input:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
 
 /* ── AsdAIr readable Details + Rules ─────────────────────────────────────────────────────────────
    LAYOUT ONLY. Not one new colour token, and every text-on-surface pairing below is one GL-003 §2b
@@ -282,12 +457,36 @@ button { font-family:inherit; }
   min-width:44px; min-height:44px; padding:0; margin:0 2px 0 -6px; font-size:22px; line-height:1; border-radius:10px; }
 .apps-pane .app-back:hover { background:var(--panel2); }
 
+/* The settings/cog icon (AC1 — reaches Diagnostics/About/History, never a competing tab). Same
+   44x44 touch-target treatment as .app-back above, pushed to the far end of the flex header. The
+   ".on" state (currently viewing that non-primary screen) borrows the SAME --accent-w/--accent-ink
+   pairing .app-nav-btn.on already uses elsewhere on this page — one "currently here" language, not
+   a second one invented for this control. */
+.app-cog { display:inline-flex; align-items:center; justify-content:center;
+  min-width:44px; min-height:44px; padding:0; margin-left:auto; font-size:18px; line-height:1; border-radius:10px; }
+.app-cog.on { background:var(--accent-w); color:var(--accent-ink); border-color:var(--accent); }
+
 /* Visible focus for every control in this area — including .back and .act, which are reused
    primitives that these rules had NOT covered. Programmatic focus on the heading stays ringless
    (:focus-visible still applies if a keyboard ever lands there). */
 .tile:focus-visible, .app-nav-btn:focus-visible, .crumb:focus-visible,
-.apps-pane .back:focus-visible, .apps-pane .act:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* BUILD-015 B15-26, MEDIUM 1 — .back de-scoped from .apps-pane: the AsdAIr action sheet's own
+   .back button (and the generic detail sheet's) render as SIBLINGS of .apps-pane, not inside it, so
+   the scoped rule never matched them and both fell back to the bare browser ring. .act stays scoped
+   here deliberately — .asdair-sheet .act below carries the sheet's own copy of the same ring so a
+   global .act change (touching every screen in the app) isn't needed for this WP. */
+.back:focus-visible, .apps-pane .act:focus-visible, .asdair-sheet .act:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 #app-workspace-h:focus:not(:focus-visible) { outline:none; }
+#app-workspace-h:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* WP-B15-36, AC7 residual 3 — the ring for focus WE moved. Vera recorded that Chromium's
+   :focus-visible heuristic does not reliably fire for scripted focus, which could leave a keyboard
+   user with no indicator after a level transition or on opening the sheet. `focusSel()` in app.js
+   now adds `.kb-focus` itself and removes it on blur, so the indicator no longer depends on a
+   heuristic no one here controls. Deliberately the SAME declaration as the :focus-visible rules
+   above — one ring, one token (--accent, 4.37 light / 8.57 dark on --bg, over the 3:1 non-text
+   floor per GL-003 §2b), never a second focus language. */
+.kb-focus { outline:2px solid var(--accent); outline-offset:2px; }
 
 /* ---- Sections / items ---- */
 .pane { animation:fade .18s ease; } @keyframes fade { from{opacity:0;transform:translateY(4px);} to{opacity:1;} }
@@ -342,6 +541,11 @@ button { font-family:inherit; }
 .i-act { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .act { font-weight:650; font-size:12.5px; padding:7px 12px; border-radius:9px; border:1px solid var(--hair); background:var(--panel2); color:var(--ink); cursor:pointer; }
 .act:hover { border-color:var(--accent); } .act:disabled { opacity:.5; }
+/* BUILD-015 B15-26, HIGH 2 — the shared .act primitive has no min-height, and Vera's SOP-005 bar is
+   stricter than the WCAG 24x24 floor .act already clears. Scoped to AsdAIr's own screens and its
+   action sheet rather than changed globally, which would resize every accept/decline/defer button
+   across Home/Ideas/Outputs/System — a visual change well outside this WP's surface. */
+.asdair-view .act, .asdair-sheet .act { min-height:44px; }
 /* D-11, the worst pairing in the system: #fff on --ok was 3.49 light / 2.00 dark on the PRIMARY
    confirm button. Both routes were measured, not estimated:
      keep the solid fill, per-scheme ink  → --ink on --ok 4.70 light, --bg on --ok 9.18 dark

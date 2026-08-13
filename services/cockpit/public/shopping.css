@@ -1,0 +1,616 @@
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════
+   THIS WEEK'S SHOPPING — the household-facing surface. Addendum B is the specification.
+
+   ⛔ GL-003 POSITION, STATED ONCE AND IN FULL, BECAUSE IT IS THE REASON THIS FILE MAY EXIST.
+
+   GL-003 §Scope: "If a second surface is built, it either adopts these tokens or GL-003 is extended
+   to carry two themes; it does not fork silently." THIS FILE TAKES THE ADOPT BRANCH.
+
+   * COLOUR: every colour below is a GL-003 §2a token, at its GL-003 light-mode value, under its
+     GL-003 name. NO TOKEN IS INVENTED, NO TOKEN VALUE IS CHANGED, and no colour literal appears
+     outside the :root block. Re-declared here rather than imported because /styles.css is in the
+     service worker's SHELL and sharing it would serve this surface a cached operator stylesheet
+     (see shopping.html). If GL-003's :root ever changes, THIS BLOCK IS STALE — that is the cost of
+     the duplication and it is recorded rather than hidden. contrast-check.mjs reads styles.css, so
+     it will not catch drift here; the guard is this comment and the figures written beside every
+     pairing below.
+
+   * TYPE (GL-003 §3) and SPACE (GL-003 §4) are `<unset>` — no tokens exist to adopt. GL-003's own
+     instruction for an <unset> section is flagged fallback mode, so the `--m-*` custom properties
+     below are SURFACE-LOCAL and are deliberately NOT named like GL-003 tokens. They are the
+     concrete G-5/G-6 promotion candidates from Addendum B §13, sitting where Iris can read them.
+
+   ⛔ DARK MODE IS NOT DEFINED, ON PURPOSE. The scheme is pinned light (shopping.html explains why).
+   Every contrast figure quoted below is therefore a LIGHT figure and never has to survive the
+   light/dark reversal GL-003 §2b warns about. Adding a dark block without re-measuring would
+   silently invalidate every number in this file.
+
+   ⛔ NO `opacity` ON TEXT ANYWHERE IN THIS FILE. GL-003 §2b-bis, Iris's D-17 rule, 2026-08-13:
+   "opacity on text expresses STATE. It never expresses HIERARCHY." Addendum B §6.5 goes further for
+   this surface — on a screen built for poor eyesight, fading is never the answer. Hierarchy here is
+   carried by token, size and weight, all of which are priced in GL-003 §2b. Disabled controls are
+   signalled by a recessed surface and a muted TOKEN, never by a fade.
+
+   CONTRAST BAR: >= 7:1 for all text (Addendum B §5.1 / §11, AAA 1.4.6 — not the 4.5 AA floor).
+   Figures in comments are GL-003 §2b light-mode values.
+   ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* GL-003 §2a tokens, light values, verbatim. */
+  --bg: #eef1f5;
+  --panel: #fff;
+  --panel2: #f7f9fc;
+  --ink: #16202e;
+  --ink2: #47566b;
+  --hair: #e2e7ee;
+  --accent-ink: #0a5c64;
+  --ok: #1f9d57;
+  --ok-w: #e4f4ea;
+  --warn: #b26a12;
+  --warn-w: #f8ecda;
+  --stop: #c1453c;
+  --stop-w: #f8e5e3;
+  /* ⛔ --ink3 is DELIBERATELY ABSENT. Addendum B §13 G-3: it is sub-4.5:1 on every surface in light
+     mode, and this surface has no legitimate use for a decorative-only ink. Excluded from the theme
+     entirely rather than left available to be reached for. --park and --accent are absent for the
+     same reason in reverse: --park is 4.74 and --accent 4.95 as non-text, both under this surface's
+     4.5 bar only in dark, but neither has a job here and an unused token is a token someone uses. */
+
+  /* GL-003 §3 typography: FAMILIES adopted (system-native, no webfont). The stack is copied from
+     GL-003 §3 exactly. No `--mono` — mono means "this is a machine string" in this system, and
+     nothing on this surface is a machine string. The quantity numeral uses tabular figures from the
+     system face instead (see .q-num), which gives fixed-width digits without a second family. */
+  --m-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* SURFACE-LOCAL TYPE SCALE — GL-003 §3 type tokens are <unset>; flagged fallback mode.
+     Every value is an Addendum B §5.1 / §6.3 REQUIREMENT, not a preference. The operator cockpit's
+     live scale runs from 9px; that scale is a third of this floor and is why these cannot inherit. */
+  --m-text-body: 22px;      /* B §5.1 body floor */
+  --m-text-name: 28px;      /* B §6.3 product name */
+  --m-text-action: 26px;    /* B §5.1 primary action label */
+  --m-text-heading: 26px;   /* B §6.2 section heading */
+  --m-text-qty: 44px;       /* B §6.3 quantity numeral */
+  --m-text-title: 40px;     /* B §6.2 page title */
+
+  /* SURFACE-LOCAL SPACING — GL-003 §4 is <unset>; flagged fallback mode.
+     --m-gap-opposite is a SAFETY REQUIREMENT, not a style value: it is the dead space that makes a
+     mis-tap land on nothing. Addendum E A10 words the rule better than Addendum B §5.1 did — see
+     the gutter note on .row below. */
+  --m-gap-opposite: 24px;   /* E A10: between controls of OPPOSITE effect */
+  --m-gap-row: 20px;        /* B §6.3 vertical gap between rows */
+  --m-pad: 20px;
+
+  /* SURFACE-LOCAL TARGETS — B §5.1. Floors, not targets to design down to.
+     WCAG 2.2 AA asks 24x24 and AAA asks 44x44; both are calibrated for an average adult finger. */
+  --m-target: 72px;         /* any control */
+  --m-target-lg: 88px;      /* select, minus, plus, primary action */
+  --m-row-min: 120px;       /* B §6.3 row height */
+  --m-radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  /* ⛔ Addendum A Finding 3 flags 100vh as a known Chromium hazard: it resolves to the LARGE
+     viewport and is clipped by collapsing browser chrome, which puts a bottom bar below the fold.
+     Silk is Chromium, so the standard behaviour applies. Progressive fallback: a browser that does
+     not know dvh keeps the vh value, one that does overrides it.
+     The primary action is NOT pinned in a vh-sized bar — it is a sticky footer in normal document
+     flow with real bottom padding on the scroll container, which is the shape Addendum A
+     recommends precisely because it does not depend on either unit being right. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Silk honours this for web content; the OS font-size setting does NOT reach web content
+     (Addendum A Finding 4). The layout is built to survive 200% zoom regardless, which is stricter
+     and does not depend on which mechanism she used. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);                    /* --ink on --bg = 14.48:1 */
+  font-family: var(--m-font);
+  font-size: var(--m-text-body);
+  line-height: 1.5;
+  /* No text is ever smaller than the body floor. There is no "small print" role on this surface —
+     Addendum E A3: small text does not merely read badly, it teaches her the screen is not for her. */
+}
+
+/* ── MOTION ──────────────────────────────────────────────────────────────────────────────────────
+   B §11: nothing beyond a <=150ms state transition, and nothing that moves on its own (WCAG 2.2.2).
+   No transition is applied to POSITION or SIZE anywhere in this file — a target that moves while a
+   finger is descending on it is the compounding failure Addendum E A19 names. Colour only. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* ── FOCUS ───────────────────────────────────────────────────────────────────────────────────────
+   B §5.1 / §11: 3px ring, >=4.5:1 against BOTH the control and the page, 2px offset.
+   Token: --accent-ink. GL-003 §2b: 7.70:1 on --panel and 6.80:1 on --bg — clears 4.5 on both.
+   ⛔ NOT --accent, which is 4.37:1 on --bg and fails the bar in light mode. GL-003 §2a records no
+   --focus token at all (Addendum B §13 G-4); this reaches for an existing ink that measures, rather
+   than inventing one.
+   :focus-visible AND :focus — the device is touch-only, but a Bluetooth keyboard or a switch device
+   must work (B §5.1), and a browser that does not implement :focus-visible must still show a ring. */
+:where(button, [role="checkbox"], a, textarea, input):focus { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+:where(button, [role="checkbox"], a, textarea, input):focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+
+/* ── PAGE FRAME ──────────────────────────────────────────────────────────────────────────────── */
+.page { max-width: 1280px; margin: 0 auto; padding: var(--m-pad); }
+
+.head { padding: var(--m-pad) 0 8px; }
+.h-title {
+  font-size: var(--m-text-title);
+  font-weight: 700;
+  letter-spacing: -.02em;               /* GL-003 §3: headings tighten tracking */
+  margin: 0 0 12px;
+  color: var(--ink);                    /* 14.48:1 on --bg */
+}
+.h-say { margin: 0; font-size: var(--m-text-body); color: var(--ink); }
+.h-when { margin: 8px 0 0; font-size: var(--m-text-body); color: var(--ink); }
+
+/* ── BANNER ──────────────────────────────────────────────────────────────────────────────────────
+   B §7.1 and §9: ONE slot, at the very top, inside the initial viewport in both orientations.
+   Nothing else may ever occupy it — the ABSENCE of a banner is itself the resting-state signal
+   (B §9.1) and that is only safe while the banner is unmissable when present.
+   State is carried by WORD + TINT + RAIL. Never by colour alone (WCAG 1.4.1), and never by an
+   emoji: GL-003 §5 records that emoji cannot be recoloured and therefore cannot carry state
+   (Addendum B §13 G-8). The heading text IS the signal. */
+.banner {
+  border-radius: var(--m-radius);
+  padding: var(--m-pad);
+  margin: 0 0 var(--m-pad);
+  border: 2px solid var(--hair);
+  border-left-width: 10px;              /* the rail. Position/weight, readable in greyscale. */
+}
+.banner h2 { margin: 0 0 8px; font-size: var(--m-text-heading); font-weight: 800; color: var(--ink); }
+.banner p { margin: 0; font-size: var(--m-text-body); color: var(--ink); }
+
+/* A question is waiting. --ink on --warn-w = 14.06:1. Rail --warn on --warn-w is non-text. */
+.banner.ask { background: var(--warn-w); border-color: var(--warn); }
+/* Something is wrong. --ink on --stop-w = 13.52:1. B §9.5: it must state that a human knows. */
+.banner.stop { background: var(--stop-w); border-color: var(--stop); }
+/* Calm, informational. --ink on --ok-w = 14.39:1. */
+.banner.done { background: var(--ok-w); border-color: var(--ok); }
+
+/* ── SECTION HEADING ─────────────────────────────────────────────────────────────────────────────
+   B §6.1: a heading in the FLOW of the page. Not navigation, not a tab, not an accordion.
+   It cannot collapse, and nothing is ever hidden behind it. */
+.sec {
+  font-size: var(--m-text-heading);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ink);                    /* 14.48:1 on --bg */
+  margin: 32px 0 var(--m-gap-row);
+}
+
+/* ── THE ITEM ROW ────────────────────────────────────────────────────────────────────────────────
+   B §6.3 anatomy:  [select 88] <-- 24px inert gutter --> [- 88] [qty 72] [+ 88]
+
+   ⛔ THE GUTTER IS THE RESOLUTION OF A CONTRADICTION IN THE SPECIFICATION, recorded here because it
+   narrows a rule rather than implementing one. Addendum B §5.1 requires "24px of dead space between
+   any two independently-actionable controls", and B §6.3 requires the WHOLE ROW to be the select
+   target. Both cannot hold: if the row is a target, it is contiguous with the -/+ controls inside
+   it by construction. Addendum E A10 words the same rule correctly — ">=24px between any two
+   controls with OPPOSITE effect" — and that is what is built.
+   The reasoning, which is what decided it: a mis-tap from row-select onto + costs one visible,
+   reversible unit. A mis-tap between - and + is the one that must never happen, so that is the pair
+   that gets guaranteed dead space. The gutter below gives the same guarantee between the row body
+   and the first quantity control.
+
+   ⛔ THIS PARAGRAPH USED TO END "(the quantity display sits between them and is inert)". THAT WAS
+   FALSE AS BUILT, and Vera caught it at the WP-B15-45 gate. `.q-num` supplied the 72px of DISTANCE
+   and none of the DEADNESS: it sits inside the row, the row is the select target, so a tap landing
+   between MINUS and PLUS bubbled to the row and toggled it. On an item she had already chosen, a
+   near-miss on MINUS REMOVED IT.
+   The declaration that makes the sentence true is `pointer-events: none` on `.q-num` (below). The
+   lesson is the one this whole surface keeps re-learning: a justification written in a comment is
+   not a control, and geometric separation is not inertness. The gate now HIT-TESTS that midpoint
+   rather than measuring the gap. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--m-gap-opposite);
+  width: 100%;
+  min-height: var(--m-row-min);
+  margin: 0 0 var(--m-gap-row);
+  padding: 16px var(--m-pad);
+  background: var(--panel);
+  border: 2px solid var(--hair);
+  border-left: 8px solid transparent;   /* the rail slot, always present so selection cannot reflow */
+  border-radius: var(--m-radius);
+  text-align: left;
+  font-family: inherit;
+  color: var(--ink);                    /* 16.40:1 on --panel */
+  /* Colour only — never size or position. See the motion note above. */
+  transition: background-color 120ms linear, border-color 120ms linear;
+}
+
+/* ⛔ SELECTED: FOUR SIMULTANEOUS SIGNALS, ALL REQUIRED (B §6.5). Selection must be unmistakable
+   from across the room and must survive greyscale, so no single one of these carries it alone:
+     1. a solid tick inside the select control          (shape)     — .tick, below
+     2. a tinted row fill                                (colour)    — --ok-w
+     3. a thick 8px leading rail                         (position)  — border-left
+     4. a heavier row border                             (edge)      — border-color
+   Plus the footer count changes and aria-checked flips.
+   --ink on --ok-w = 14.39:1, the strongest text pairing in GL-003 in light mode.
+   The --ok rail is 3.49:1 on --panel — over the WCAG 1.4.11 3:1 non-text floor but UNDER Addendum
+   B §5.1's stricter 4.5 bar for a state indicator. It is REINFORCEMENT here, never load-bearing:
+   three other signals carry the state. Recorded as a real gap for Iris rather than rounded away. */
+.row.on { background: var(--ok-w); border-color: var(--ok); border-left-color: var(--ok); }
+
+.r-body {
+  flex: 1 1 auto;
+  min-width: 0;                         /* lets the name WRAP rather than overflow */
+  display: flex;
+  align-items: center;
+  gap: var(--m-pad);
+}
+
+/* The select control. B §6.3: a checkbox in semantics, never a switch — "on/off" is a harder
+   concept than "ticked". 88x88. Unselected is an OUTLINED circle; selected is a filled shape with a
+   solid tick glyph. The glyph is a text character in the system face, not an emoji and not an icon
+   family: GL-003 §5 forbids introducing a vector icon language into a cockpit-adjacent deliverable,
+   and emoji cannot be recoloured. */
+.tick {
+  flex: 0 0 auto;
+  width: var(--m-target-lg);
+  height: var(--m-target-lg);
+  border: 4px solid var(--ink);         /* 16.40:1 on --panel as a boundary */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46px;
+  line-height: 1;
+  color: transparent;
+}
+.row.on .tick { background: var(--ok-w); color: var(--ink); }
+
+/* B §6.3: >=28px, weight 700, plain household English, and NEVER truncated with an ellipsis —
+   it wraps to a second line and the row grows. There is no text-overflow rule in this file. */
+.r-name {
+  font-size: var(--m-text-name);
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: break-word;
+}
+
+/* The quantity cluster. Kept out of the row's select target: B §6.3 requires the -/+ controls to
+   stop event propagation, which shopping.js does. */
+/* ⛔ MEDIUM-1, VERA — AND IT TOOK THREE ATTEMPTS, EACH CAUGHT BY THE GATE, WHICH IS THE ARGUMENT
+   FOR HIT-TESTING RATHER THAN MEASURING DISTANCE. A geometric check would have read 72px and
+   reported success at every one of these stages:
+     1. `.q-num` inert            -> the hit moved up to `.q`, which still bubbled   ("q -> row")
+     2. `.q` also inert           -> the hit fell THROUGH to the row underneath      ("row -> row")
+        `pointer-events: none` makes an element transparent to taps; it does not make the space
+        dead, because the row behind it is still a target. Transparency is the opposite of what
+        was wanted.
+     3. `.q` SWALLOWS the tap     -> dead, and provably so.
+   The cluster stops propagation without doing anything. A tap there reaches `.q`, goes no further,
+   and changes nothing.
+   ⚠️ This is a div that consumes a click, which looks like the "no div with a click handler" rule
+   in B §11. It is not one: that rule forbids a div ACTING AS A CONTROL — no role, no tabindex, no
+   accessible name, nothing to announce and nothing to activate. This div is the opposite; its
+   entire job is to be the place where a mis-tap safely dies. */
+.q { flex: 0 0 auto; display: flex; align-items: center; gap: 0; }
+
+/* ⛔ `flex: 0 0 auto` IS A SAFETY DECLARATION, NOT TIDINESS — AND IT IS HERE BECAUSE MEASURING
+   CAUGHT IT. A flex item's default is `flex-shrink: 1`, so `width: 88px` is a PREFERENCE that the
+   browser is free to compress when the row runs out of room. A headless render at a 320px-equivalent
+   width measured these buttons at 82x88 — under the 88px floor Addendum B §5.1 sets, on the two
+   controls that most need it. Nothing in the stylesheet said so; the declared width still read 88px.
+   That is the whole reason §5.1 calls these floors rather than targets: a floor that shrinks under
+   pressure is not a floor. shopping-geometry-check.mjs now asserts the RENDERED box, so this cannot
+   silently come back. */
+.q-btn, .q-num { flex: 0 0 auto; }
+
+.q-btn {
+  width: var(--m-target-lg);
+  height: var(--m-target-lg);
+  font-size: 44px;                      /* B §6.3: thick glyph, >=36px stroke-visible */
+  font-weight: 700;
+  line-height: 1;
+  font-family: inherit;
+  color: var(--ink);                    /* 15.55:1 on --panel2 */
+  background: var(--panel2);
+  /* Bordered so the hit area is VISIBLE, not implied (B §6.3). */
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+/* ⛔ DISABLED IS A SURFACE-AND-TOKEN CHANGE, NEVER A FADE.
+   B §6.4 rule 2: at quantity 1 the minus is visibly unavailable, aria-disabled, and does not
+   respond to taps at all — and it is NOT HIDDEN, because a control that disappears shifts the
+   layout and moves + under her finger.
+   The obvious implementation is `opacity:.5`. It is forbidden here twice over: GL-003 §2b-bis
+   (Iris, D-17) says opacity on text expresses state, never hierarchy — and unavailability of a
+   control is hierarchy, not state — and Addendum B §6.5 bans opacity as a signal on this surface
+   outright. So: recessed surface, muted TOKEN, lighter border. --ink2 on --panel2 = 7.08:1, which
+   still clears this surface's 7:1 text bar. Both states are legible; they differ by weight of ink,
+   which is exactly the mechanism GL-003 §2b-bis prescribes and which §2b can price. */
+.q-btn[aria-disabled="true"] {
+  color: var(--ink2);
+  border-color: var(--hair);
+  cursor: default;
+}
+
+/* B §6.3: fixed-width box so the row does not reflow as the number changes. Tabular figures give
+   fixed-width digits from the system face without introducing --mono, which in this design system
+   means "this is a machine string". Never an editable input on this row. */
+.q-num {
+  width: var(--m-target);
+  text-align: center;
+  font-size: var(--m-text-qty);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  color: var(--ink);
+}
+
+/* ── ADD SOMETHING ELSE — the entry control only; S2 itself is NOT built tonight ────────────────
+   B §8.1: a single unmistakable full-width control at the END of the list. Never a small + in a
+   corner, never a floating action button, never in a menu. */
+.add {
+  display: block;
+  width: 100%;
+  min-height: 110px;
+  margin: 32px 0 0;
+  padding: var(--m-pad);
+  text-align: left;
+  font-family: inherit;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--panel);
+  border: 3px dashed var(--ink);
+  border-radius: var(--m-radius);
+  cursor: pointer;
+}
+.add small { display: block; margin-top: 8px; font-size: var(--m-text-body); font-weight: 400; }
+
+/* ── FOOTER ──────────────────────────────────────────────────────────────────────────────────────
+   B §6.7: sticky to the bottom so it is reachable without scrolling to the end, but it must NOT
+   overlap the last row — the scroll container carries bottom padding equal to the footer height
+   plus 24px (see .page-pad). Sticky in normal document flow, NOT a vh-pinned bar (Addendum A §3).
+   ONE primary action. No secondary action shares this footer: not "save draft", not "clear",
+   not "settings". */
+.foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--m-gap-opposite);
+  flex-wrap: wrap;
+  padding: var(--m-pad);
+  margin-top: var(--m-pad);
+  background: var(--panel);
+  border: 2px solid var(--hair);
+  border-radius: var(--m-radius);
+}
+/* ⛔ THE SCROLL CLEARANCE, AND WHY IT IS WRITTEN AS ARITHMETIC RATHER THAN A ROUND NUMBER.
+   Addendum B §6.7 requires that the sticky footer "must not overlap the last row (the scroll
+   container gets bottom padding equal to the footer height plus 24px)". A sticky footer is in
+   normal flow, so the ONLY thing keeping the last control reachable is this padding.
+
+   Landscape — the footer is one line:  20*2 padding + 88 action + 24 clearance = 152px.
+   That is what the value below computes, and a headless render at 1280x800 and 1024x600 confirms
+   no overlap.
+
+   ⛔ IT IS NOT ENOUGH IN PORTRAIT, and a browser measurement is what proved it: at 800x1280 the
+   "Add something else" control rendered at y=1219 UNDERNEATH a footer that had wrapped to two
+   lines. The declared padding was correct arithmetic for a footer whose height I had assumed.
+   Below 860px the footer stacks — count, then the session undo once it exists, then the full-width
+   action — so the worst case is three lines, not one. See the portrait override at the foot of
+   this file. The lesson is the general one: padding computed against an ASSUMED height of a
+   wrapping element is a guess, and it fails in exactly the orientation nobody checked. */
+.page-pad { padding-bottom: calc(var(--m-target-lg) + var(--m-pad) * 2 + var(--m-gap-opposite)); }
+
+.f-count { font-size: 24px; font-weight: 700; color: var(--ink); }
+
+.send {
+  min-height: var(--m-target-lg);
+  padding: 0 40px;
+  font-family: inherit;
+  font-size: var(--m-text-action);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--ok-w);              /* --ink on --ok-w = 14.39:1 */
+  border: 4px solid var(--ok);
+  border-radius: var(--m-radius);
+  cursor: pointer;
+}
+/* B §6.7: when nothing is chosen it is DISABLED and visibly so, with the reason stated beside it.
+   It must not be hidden, and it must not be tappable-then-scolding. Same no-fade rule as .q-btn. */
+.send[aria-disabled="true"] { color: var(--ink2); background: var(--panel2); border-color: var(--hair); cursor: default; }
+.f-why { font-size: var(--m-text-body); color: var(--ink); }
+
+/* B §6.6: the session undo. Shows in WORDS what it will undo. Addendum E A12 requires >=30s; this
+   is persistent for the whole session, which exceeds both that and Addendum B §5.1's 20s.
+   (The 20 vs 30 disagreement between the two documents is real and is recorded in the return.) */
+.undo {
+  min-height: var(--m-target);
+  padding: 0 var(--m-pad);
+  font-family: inherit;
+  font-size: var(--m-text-body);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--panel2);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+/* ── HONEST STATES ───────────────────────────────────────────────────────────────────────────────
+   B §9.6: errors are visible and recoverable, never silent, and the UI NEVER claims something was
+   sent when it was not. .note is the calm plain-words strip that replaces the primary action. */
+.note {
+  flex: 1 1 100%;
+  padding: var(--m-pad);
+  font-size: var(--m-text-body);
+  color: var(--ink);
+  background: var(--warn-w);            /* 14.06:1 */
+  border: 2px solid var(--warn);
+  border-left-width: 10px;
+  border-radius: var(--m-radius);
+}
+.empty {
+  padding: 40px var(--m-pad);
+  font-size: 26px;
+  color: var(--ink);                    /* never a muted ink: this IS the whole content */
+  background: var(--panel);
+  border: 2px solid var(--hair);
+  border-radius: var(--m-radius);
+}
+
+/* Visually hidden but available to assistive technology. Used only for live-region announcements —
+   never to hide anything she needs to see. */
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ── PORTRAIT ────────────────────────────────────────────────────────────────────────────────────
+   B §6.2: portrait uses the IDENTICAL row anatomy; only the -/+ cluster wraps onto a second line,
+   right-aligned, still at full target size. THE ROW NEVER BECOMES A COMPACT VARIANT — no size,
+   weight, target or spacing value changes below, only the wrap.
+   Addendum B §3 / E A15: both orientations are first-class and nothing may be reachable only in
+   landscape. Keyed to width so it also covers 200% zoom, which narrows the effective viewport the
+   same way rotating does — one rule, both cases. */
+@media (max-width: 860px) {
+  .row { flex-wrap: wrap; }
+  .r-body { flex: 1 1 100%; }
+  /* The quantity cluster wraps to its own line, right-aligned, AT FULL TARGET SIZE. The row does
+     not become a compact variant: no size, target or spacing value changes here.
+     The vertical gap re-creates the inert gutter that the horizontal flex gap provides in
+     landscape, so the row-select area and the first quantity control are never contiguous in
+     either orientation. Measured, not assumed — see shopping-geometry-check.mjs. */
+  .q { width: 100%; justify-content: flex-end; margin-top: var(--m-gap-opposite); }
+  .foot { justify-content: stretch; }
+  .send { width: 100%; }
+
+  /* The portrait clearance. Worst case is a three-line footer:
+       20*2 padding + 33 count + 24 gap + 72 undo + 24 gap + 88 action = 281px, + 24 clearance = 305.
+     320px is that with headroom, because the honest failure mode of too much is a little dead
+     space at the end of a scroll, and the failure mode of too little is a control she cannot
+     reach. Those are not symmetric costs. */
+  .page-pad { padding-bottom: 320px; }
+}
+
+/* ══ SHORT VIEWPORTS — HIGH-1, VERA ══════════════════════════════════════════════════════════════
+   ⛔ THE FOOTER'S HEIGHT WAS UNBOUNDED AND IT ATE AN UNBOUNDED SHARE OF A SHORT VIEWPORT.
+
+   What was actually shipping, measured:
+     * 1024x600 — FIRE HD 8 CLASS, her likely device — with a question pending: the banner pushed
+       row 0 behind a 192px footer. `elementFromPoint` at row 0's tick returned `.f-count`.
+       THE LANDING SCREEN CONTAINED NO TAPPABLE ITEM AT ALL.
+     * 640x400 (200% zoom): the footer was 249px of 400 — 62% of the screen. No item visible, the
+       instruction clipped mid-phrase, and the pending banner not even in the initial viewport.
+
+   Nothing was permanently unreachable, and that is exactly why it survived the first gate: the
+   assertion asked "can she eventually get there" when the question that matters for a
+   technology-phobic 84-year-old is "what is on the screen when she arrives". For her the first
+   screen IS the product, and in the highest-priority state it had no shopping on it.
+
+   THE RULE THIS ENFORCES: one full item row AND the banner survive in the initial viewport, always.
+   Breaks B §7.1.1, B §9, E A4 and WCAG 1.4.4 otherwise.
+
+   THE FIX, and why this shape rather than a smaller footer.
+   Below 720px of viewport height the sticky footer is DROPPED TO NORMAL FLOW. A sticky bar is a
+   trade — it buys "the action is always reachable" and pays in permanently-occluded screen — and
+   that trade only makes sense when there is screen to spare. At 600px, and certainly at 400px,
+   there is not: no footer small enough to fit also carries an 88px action, and shrinking the action
+   would break the target floor that exists for her hands. So on a short screen the list wins the
+   viewport and the action sits at the end of a short scroll, which is the one motion Addendum B
+   §6.1 says this design leans on and the one she already knows.
+   The header and banner are tightened at the same time, because at 400px the header alone was a
+   third of the screen. Nothing drops below a reading floor: the smallest text here is 24px, still
+   above the 22px body floor and well above Addendum E A3's 18px absolute floor. Only the page
+   TITLE shrinks, and a title is not something she has to read to act.
+
+   ⚠️ Keyed to HEIGHT, deliberately. The portrait block above is keyed to width and catches a
+   narrow screen; this one catches a SHORT screen, and 1024x600 is short without being narrow —
+   which is why the width-keyed rules never fired on the device most likely to be hers. */
+/* ⚠️ Keyed to height OR to a very narrow width. A 320px-wide viewport is not short in pixels, but
+   every block on the page wraps to three or four times its normal height there, so the footer ends
+   up consuming the same ruinous share of the screen. Height is the honest predicate for her real
+   device; width catches the WCAG 1.4.10 reflow case, which failed for identical reasons. */
+@media (max-height: 720px), (max-width: 520px) {
+  /* ⛔ THERE IS NO `max-height` HERE, AND THAT ABSENCE IS THE FIX FOR HIGH-3 (Vera, `18b0f98`).
+     This block briefly carried `max-height: 40vh; overflow: hidden` with the comment "a hard
+     ceiling as well as the flow change: if a future state adds a third line to this footer, it
+     must not be able to reclaim the screen it just gave back."
+     THE COMMENT DESCRIBED A DANGER THAT `position: static` HAD ALREADY REMOVED. A static footer
+     cannot reclaim the viewport — it is in flow, so extra height extends the SCROLL, it does not
+     overlay anything. The ceiling defended against sticky behaviour on a footer that is no longer
+     sticky, and it was never measured.
+     What it actually did, at maximum scroll where there is nowhere further to go:
+       640x400   `.send` clipped 58 of 88px — 30px painted, centre hit-test returns NOTHING.
+                 After SEND, `.note` clipped 143px — ZERO painted pixels, unreachable.
+       400x640   `.send` an 81px sliver, under this surface's own 88px floor.
+       320x800   post-send message clipped 146px.
+     So she presses SEND at 200% zoom and the screen does not respond, and the one message that
+     B §9.6 and Addendum E criterion 9 make load-bearing renders nothing at all.
+     If a ceiling is ever genuinely wanted it must be `overflow-y: auto` — but a nested scroll
+     region inside a page that already scrolls is worse for her than a longer page, so the honest
+     answer is no ceiling. */
+  .foot { position: static; }
+  /* With the footer in flow there is nothing to clear, so the reserved space goes back to the list.
+     Leaving 320px here would have put a third of a short screen of blank padding under her list. */
+  .page-pad { padding-bottom: var(--m-pad); }
+
+  .page { padding: 12px; }
+  .head { padding: 8px 0 4px; }
+  .h-title { font-size: 30px; margin-bottom: 6px; }
+  .sec { margin: 14px 0 12px; }
+  .banner { padding: 14px; margin-bottom: 12px; border-left-width: 8px; }
+  .banner h2 { font-size: 24px; margin-bottom: 4px; }
+}
+
+/* ── VERY SHORT: 200% ZOOM TERRITORY ─────────────────────────────────────────────────────────────
+   400px of usable height, which is 1280x800 or 800x1280 at 200% browser zoom (WCAG 1.4.4, E A4).
+   The arithmetic is brutal and worth writing down, because it is what forced a second tier:
+     row (120, a floor that cannot move) + banner + header + section heading must fit in 400.
+   HIGH-2 made this HARDER, and that is an honest trade rather than a regression: telling her that
+   Warwick will sort the question out is a second sentence, and at this width it wraps to three
+   lines. The banner grew by roughly 45px in exactly the state where space is scarcest. Given the
+   choice between a banner that fits and a banner that is honest, the banner is honest and every
+   other block gives up its slack instead.
+   Nothing here crosses a reading floor. The smallest text on this surface remains 22px — Addendum
+   B §5.1's body floor, above Addendum E A1's 20px and well above A3's 18px absolute floor. What
+   shrinks is the page TITLE and the whitespace, neither of which she has to read in order to act. */
+@media (max-height: 480px) {
+  /* ⛔ THE ROW UNWRAPS AGAIN HERE, WHICH LOOKS LIKE IT CONTRADICTS THE PORTRAIT RULE ABOVE AND DOES
+     NOT. The portrait rule wraps the quantity cluster onto its own line because there is not enough
+     WIDTH; that costs 140px of HEIGHT per row (260px instead of 120px), which is free when the
+     screen is 1280px tall and ruinous when it is 400px.
+     Measured at 640x400: header 115 + banner 160 + heading 36 = 311px, then a 260px row — so the
+     first row ended at y=595 in a 400px viewport and she arrived at a screen with no usable item on
+     it. Unwrapped, the same row is 120px.
+     Both rules are "give up the scarcer axis". Below 480px of height the scarcer axis is height. */
+  .row { flex-wrap: nowrap; }
+  .r-body { flex: 1 1 auto; }
+  .q { width: auto; margin-top: 0; }
+
+  /* Tighter leading, not smaller text. The floor is unchanged at 22px; what is reclaimed is the
+     space BETWEEN lines, which costs legibility far less than shrinking the glyphs would. */
+  body { line-height: 1.3; }
+
+  /* ⛔ THESE ARE MEASURED VALUES, NOT ROUND ONES, AND THE MARGIN IS DELIBERATE.
+     At 640x400 (a 1280x800 tablet at 200% zoom) with a question pending, the first row's TICK was
+     landing at y=403 in a 400px viewport — three pixels below the fold, which reads to her as a
+     screen with no shopping on it. The chrome above the row gives up ~20px between them here, which
+     puts the tick at ~385 with 11px of slack. (Measured 11, not the "~15" this comment first
+     claimed — Vera, `18b0f98`. A slack figure that is wrong in the generous direction is spent
+     twice: once by me and once by the next reader who believes it.)
+     Slack is the point. Two defects in this package were knife-edge arithmetic that was correct
+     for the case I had in mind and wrong for the one I had not measured, so a value that only
+     just fits is treated as a value that does not. */
+  .page { padding: 8px; }
+  .h-title { font-size: 26px; margin-bottom: 4px; }
+  .head { padding: 0; }
+  .sec { font-size: 24px; margin: 4px 0 4px; }
+  .banner { padding: 8px; margin-bottom: 6px; }
+  .banner h2 { font-size: 22px; }
+  .row { margin-bottom: 12px; }
+}

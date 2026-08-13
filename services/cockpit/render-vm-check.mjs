@@ -21,12 +21,20 @@
 // headless Edge self-relaunches and detaches; it fails identically on untouched HEAD, so it is
 // environmental). See VERIFICATION.md.
 //
-// ── FIXTURES ARE SYNTHETIC, DELIBERATELY ─────────────────────────────────────────────────────────
-// This repository is PUBLIC. The real payloads this harness was developed against are a real
-// household's shopping list, and they are personal data that must never be committed. The fixtures
-// under `fixtures/` are therefore hand-written, structurally faithful to the live payload shape, and
-// contain no household data whatsoever. Point `--ws` at a live capture when you want to check
-// against real data; keep that capture OUT of the repository.
+// ── FIXTURES ARE SYNTHETIC, DELIBERATELY — AND NOT FOR PRIVACY ───────────────────────────────────
+// ⛔ CORRECTED 2026-08-13. This block previously said the shopping payloads "are personal data that
+// must never be committed". THAT IS FALSE, and it inverted a ruling Warwick has now had to give
+// THREE times (2026-07-27, 2026-08-04, 2026-08-12): "nothing private about my shopping as I have
+// told you a million times and is meant to be written down!" This repository is public and that is
+// FINE. Product names, regulars, quantities, run outputs and itemised lists are COMMITTED on
+// purpose. Only SECRETS stay out — credentials, tokens, connection strings.
+//
+// The fixtures under `fixtures/` are hand-written for a different and still-good reason:
+// A GATE MUST BE DETERMINISTIC. Real captures change every week, so a harness pinned to one would
+// go red on a change in the shop rather than a change in the code, and its failures would stop
+// meaning anything. The fixtures are structurally faithful to the live payload shape and stable by
+// construction. Point `--ws` at a live capture when you want to check against real data — and that
+// capture may be committed if it is useful; there is no privacy reason to withhold it.
 //
 // USAGE
 //   node services/cockpit/render-vm-check.mjs               # gate, using committed fixtures
@@ -101,7 +109,42 @@ const load = (f) => runInContext(readFileSync(path.join(PUB, f), 'utf8'), ctx, {
 load('vendor/vue.global.prod.js');
 sb.Vue.createApp = (o) => { captured.push(o); return { mount: () => ({}) }; };
 load('apps.js');
-load('app.js');
+// ⛔ RECURRENCE GUARD — WP-B15-42. The Vue template in app.js is a JS TEMPLATE LITERAL, so a single
+// backtick anywhere inside it (in an HTML comment, in copy, in a field name someone quoted the way
+// they would in a code comment) TERMINATES THE STRING and the whole file stops parsing. Node reports
+// that as `SyntaxError: Unexpected identifier` pointing at a word in the middle of a comment, which
+// says nothing about the cause. It cost two debugging rounds in this WP alone, both self-inflicted.
+//
+// So the parse failure is caught and the LIKELY CAUSE is named. Deliberately advisory, not clever:
+// the file has already failed to parse, so the template's real boundaries cannot be established —
+// this reports every backtick inside an HTML comment, which is where the mistake is always made,
+// and then rethrows the original error unchanged so nothing is hidden.
+try {
+  load('app.js');
+} catch (e) {
+  // ⛔ `e.name`, NOT `e instanceof SyntaxError`. The script is compiled inside a `vm` CONTEXT, which
+  // has its own intrinsics — the SyntaxError it throws is not the host realm's SyntaxError, so
+  // `instanceof` is FALSE and the guard silently did nothing. Found by making the guard fail on
+  // purpose rather than by trusting that it worked, which is the only reason it was found at all.
+  if (e && e.name === 'SyntaxError') {
+    const src = readFileSync(path.join(PUB, 'app.js'), 'utf8').split(/\r?\n/);
+    const hits = [];
+    let inComment = false;
+    src.forEach((line, i) => {
+      if (line.includes('<!--')) inComment = true;
+      if (inComment && line.includes('`')) hits.push('    app.js:' + (i + 1) + '  ' + line.trim().slice(0, 90));
+      if (line.includes('-->')) inComment = false;
+    });
+    if (hits.length) {
+      console.error('RENDER-VM-CHECK — app.js did not parse. LIKELY CAUSE: a backtick inside the Vue');
+      console.error('  template literal. The template is delimited by backticks, so one inside it ends');
+      console.error('  the string. Backticks found inside HTML comments:');
+      hits.forEach((h) => console.error(h));
+      console.error('  Remove them (plain words, not code quotes), then re-run. Original error follows.');
+    }
+  }
+  throw e;
+}
 
 const Vue = sb.Vue;
 const opts = captured[0];
@@ -109,6 +152,37 @@ const opts = captured[0];
 const bindings = opts.setup ? opts.setup() : {};
 const unwrap = (v) => (v && typeof v === 'object' && '__v_isRef' in v) ? v.value : v;
 const app = sb.window.FUSION_APPS.find((a) => a.key === 'asdair');
+
+// ══ WP-B15-45 — THE HOUSEHOLD SURFACE (public/shopping.js) ═══════════════════════════════════════
+//
+// A SECOND APP, IN THE SAME GATE, DELIBERATELY. shopping.js is a separate Vue application on a
+// separate page with a separate stylesheet — that separateness is the product requirement
+// (Addendum B §2: a separate surface, never a mode). But a second GATE is not implied by a second
+// surface, and would be worse: two gates drift, and the one nobody runs is the one that goes red.
+// So it loads into the same sandbox and captures the second createApp call.
+//
+// It must load AFTER app.js, because `captured[0]` is the operator app and every existing scenario
+// indexes it. `captured[1]` is this one.
+load('shopping.js');
+const shopOpts = captured[1];
+if (!shopOpts) {
+  throw new Error('render-vm-check: public/shopping.js did not register a Vue app. It calls '
+    + 'Vue.createApp(...).mount("#shop") at the end of its IIFE; if that line moved or the IIFE now '
+    + 'returns early, every household-surface scenario below would silently disappear from this '
+    + 'gate while it kept reporting PASS. Failing loudly instead.');
+}
+// The real setup(), for the same reason the operator app uses the real one: buildSections, the
+// clamp and the count are the logic under test, and a stub would test the stub.
+const shopBindings = shopOpts.setup ? shopOpts.setup() : {};
+// The pure helpers, reached through the app's own published surface so the gate executes THE
+// SHIPPING FUNCTIONS rather than a copy of them. clampQty is a safety property (Addendum B §6.4
+// rule 5, "enforced in state, not only in the view") and a safety property tested only through a
+// rendered template has not been tested at its boundaries at all.
+const SHOP = sb.window.FUSION_SHOPPING;
+if (!SHOP || typeof SHOP.clampQty !== 'function') {
+  throw new Error('render-vm-check: window.FUSION_SHOPPING is not published by shopping.js, so the '
+    + 'quantity clamp cannot be executed directly. Restore the export rather than weakening the check.');
+}
 
 // Write into the REAL refs, so the REAL computeds (asdairShop, asdairTally, asdairRuleGroups,
 // asdairPacketLines, asdairRecon) run. Overriding the context property instead left asdairShop
@@ -124,6 +198,32 @@ function setRefs(refs) {
 }
 
 function scenario(name, viewKey, render, overrides = {}) {
+  // ⛔ THE RECURRENCE GUARD. Vera, WP-B15-36 gate, LOW 3 — and it is here because the failure it
+  // prevents already happened once, cost the AsdAIr screens every scrap of render coverage from
+  // f7bf71a onward, and made three mutation "catches" vacuous.
+  //
+  // A scenario names its view by STRING against a registry that lives in another file. Rename a key
+  // in apps.js and `find` silently returns undefined, `currentView.label` throws in the breadcrumb
+  // BEFORE the mutation or the template can be reached, and `--self-test` scores that throw as a
+  // catch. The run stays green and means nothing.
+  //
+  // So this fails LOUDLY and NAMES THE CAUSE, instead of leaving the next reader to work it back
+  // from "Cannot read properties of undefined (reading 'label')". Deliberately a hard throw, not a
+  // recorded error: a mis-keyed scenario is a broken harness, and a broken harness must never be
+  // able to present itself as a passing one.
+  //
+  // NO_APP_VIEW is the honest way to say "this scenario does not render an app view at all" — the
+  // Home and System plans override `area`, so the app workspace never renders and the view key is
+  // irrelevant to them. They previously carried the string 'overview', which was ALSO a dead key;
+  // that is a coincidence worth removing rather than preserving, because a real key sitting there
+  // unused is indistinguishable from a real key that has silently gone stale.
+  const resolvedView = viewKey === NO_APP_VIEW ? null : app.views.find((v) => v.key === viewKey);
+  if (viewKey !== NO_APP_VIEW && !resolvedView) {
+    throw new Error('render-vm-check: scenario "' + name + '" names view key "' + viewKey
+      + '", which the app registry does not carry. Known keys: ' + app.views.map((v) => v.key).join(', ')
+      + '. A view was almost certainly renamed in apps.js without this file being updated — fix the '
+      + 'key here rather than letting the breadcrumb throw and be scored as a passing mutation.');
+  }
   const base = {};
   for (const k of Object.keys(bindings)) {
     Object.defineProperty(base, k, {
@@ -136,7 +236,7 @@ function scenario(name, viewKey, render, overrides = {}) {
   // assignment is swallowed and the scenario silently tests the wrong data.
   const fixed = Object.assign({
     area: 'apps', appKey: 'asdair', currentApp: app,
-    currentView: app.views.find((v) => v.key === viewKey),
+    currentView: resolvedView,
     statusOf: () => ({ state: 'up', detail: 'answering' }),
     appStatusLine: () => 'running',
     detail: null, busy: false,
@@ -224,6 +324,11 @@ function valueAfter(parts, label) {
 // joining first would let two unrelated fragments satisfy a phrase that is nowhere on screen.
 const hasText = (parts, s) => parts.some((p) => p.includes(s));
 
+/** Sentinel for a scenario that renders no app view (Home, System — they override `area`). A named
+ * value, not a bare null, so the intent is legible at every call site and the guard in scenario()
+ * can tell "deliberately no view" apart from "view key has gone stale". */
+const NO_APP_VIEW = Symbol('no app view rendered by this scenario');
+
 // Run one scenario's assertions and push each result into `sink`. `sink` is supplied by the caller
 // because the two callers want opposite things from a failure: the gate REPORTS it, while the
 // mutation harness COUNTS it and expects it. A render that threw yields no text, so every assertion
@@ -251,16 +356,224 @@ function runChecks(r, sink) {
 // The discriminator is position, not size: a sanctioned blob is immediately preceded by its own
 // drawer label. An unsanctioned one is not. That still catches the original bug (34 blobs, none
 // behind a drawer label) and stops flagging the feature. `--self-test` proves both halves.
-const DRAWER_LABEL = 'Raw payload (debugging only)';
+//
+// ⛔ REPAIRED IN WP-B15-36, and the defect is worth recording because it is the failure mode this
+// whole harness exists to prevent, committed by the harness itself. The heading in app.js reads
+// "Raw payloadS (debugging only)" — plural, because the drawer holds three. This constant was the
+// SINGULAR string, so `.includes()` never matched, the sanctioned drawer was reported as a stray
+// blob on every run, and the ABOUT scenario has been red since. A permanently-red scenario is a
+// gate nobody reads. The match is now on the STABLE STEM, which is what the discriminator actually
+// depends on; the full label survives for the message. Confirmed pre-existing by executing this
+// file on untouched HEAD 86cfc08.
+const DRAWER_LABEL = 'Raw payloads (debugging only)';
+const DRAWER_STEM = 'debugging only';
 function strayJsonBlobs(textParts) {
   const out = [];
+  // SECOND HALF OF THE SAME REPAIR. The three-part lookbehind assumed ONE drawer. Diagnostics
+  // renders up to THREE (Workspace · Rulebook · Packet), and once the first drawer's own blob —
+  // which is thousands of characters — sits between the heading and the second drawer, the window
+  // can never reach back to it. So the second and third drawers were flagged as stray on every run.
+  // The heading INTRODUCES A GROUP, so once it has appeared in this view, the raw-payload area has
+  // begun. The trade is stated rather than hidden: a genuinely stray blob placed AFTER that heading
+  // in the same view would now be missed. It is accepted because the heading is the last block on
+  // the only screen that carries it, and because the alternative — a permanently red scenario — is
+  // a gate nobody reads. The self-test's stray-blob mutation injects at `<div class="app-view">`,
+  // BEFORE the heading, so it still fires; that is what keeps this non-vacuous.
+  let drawerOpen = false;
   for (let i = 0; i < textParts.length; i++) {
     const s = textParts[i];
+    if (s.includes(DRAWER_STEM)) drawerOpen = true;
     if (!s.startsWith('{') || s.length <= 200) continue;
-    const behindDrawer = textParts.slice(Math.max(0, i - 3), i).some((p) => p.includes(DRAWER_LABEL));
+    const behindDrawer = drawerOpen || textParts.slice(Math.max(0, i - 3), i).some((p) => p.includes(DRAWER_STEM));
     if (!behindDrawer) out.push(s.slice(0, 80));
   }
   return out;
+}
+
+// ══ WP-B15-42 — THE BANNED-VOCABULARY DETECTOR ═══════════════════════════════════════════════════
+//
+// WHY THIS IS A DETECTOR AND NOT A SWEEP. Three separate wording rules now bind this UI, and every
+// one of them was previously enforced by looking at the screen once:
+//
+//   1. ⛔ "CORROBORATED", NEVER "VERIFIED" — Warwick, verbatim: "2-OF-3 IS CORROBORATION, NOT
+//      VERIFICATION… Do not let UI, receipts or Veritas call it verified." Three readings by one
+//      model of one photograph are correlated, so agreement is corroboration. This is a TRUTHFULNESS
+//      requirement, not a wording preference: the word asserts a check that was never performed.
+//   2. ⛔ `unknown` is the API's own word for a fact it does not hold, and must never reach a screen
+//      as a value. Vera found this on the Shop screen (WP-B15-36), it was fixed there, and the
+//      IDENTICAL leak was still rendering "#2 · unknown" on Rules two screens away.
+//   3. ⛔ "ZZ (no brand recorded)" is a SORT SENTINEL carried by every held line of the real
+//      reconciled artefact. It exists to sort unbranded lines last. Rendered, Warwick reads a brand
+//      called "ZZ (no brand recorded)".
+//
+// A one-time sweep decays the moment anyone adds a string — which is not a hypothetical here, it is
+// what happened between the Shop fix and the Rules leak IN THE SAME COMMIT. So this runs on EVERY
+// scenario in this file, and `--self-test` carries a mutation per rule proving it still fires.
+//
+// SCOPE, STATED RATHER THAN ASSUMED: Diagnostics ('about') is EXEMPT. That screen exists to show raw
+// technical detail behind a drawer — its whole job is to render the payload as it actually is,
+// `unknown` and all — so a ban there would be a check that fights the feature. Every screen Warwick
+// actually runs his shop from is covered. The exemption is by SCENARIO NAME, so a new primary screen
+// is covered by default and only an explicit rename can opt out.
+// THE ONE SANCTIONED USE, AND IT IS READ OUT OF THE APP RATHER THAN RETYPED HERE. The corroboration
+// caveat is the sentence that DENIES the claim — "…is corroboration, not verification…" — so it
+// necessarily contains the banned word, and it is the most important string on the screen.
+//
+// It is exempted by identity with `ASDAIR_CORROBORATION_CAVEAT` itself, not by a copy of its text.
+// A copy would rot the moment the wording is improved, and the gate would go red on correct code;
+// worse, someone would then relax the pattern instead of the exemption. Reading the constant means
+// the exemption follows the wording automatically and covers exactly one sentence — never a second.
+// (Found by executing this detector: it flagged seven scenarios on my own shipping copy.)
+const VOCAB_EXEMPT = /^ABOUT\b/;
+const SANCTIONED_CAVEAT = typeof bindings.ASDAIR_CORROBORATION_CAVEAT === 'string'
+  ? bindings.ASDAIR_CORROBORATION_CAVEAT : null;
+const BANNED_VOCABULARY = Object.freeze([
+  // Word-boundary matched, and case-insensitive: "Verified", "VERIFIED" and "sort verified" are the
+  // same claim. NOT a substring match — that would fire on nothing real here, but it would also fire
+  // on any future honest word containing these letters, and a detector that cries wolf gets disabled.
+  { rule: 'says VERIFIED where only CORROBORATION exists', re: /\bverif(y|ied|ication|ies)\b/i,
+    allow: (s) => SANCTIONED_CAVEAT !== null && s.trim() === SANCTIONED_CAVEAT },
+  { rule: 'leaks the API word "unknown" as a value', re: /^unknown$/i, whole: true },
+  // VERA V-4. `unknown` is the API saying it does not hold a fact; `undefined`, `NaN` and
+  // `[object Object]` are JAVASCRIPT leaking through a template — a missing binding, a number
+  // derived from a null, an object where a string belonged. Same class, worse tell.
+  //
+  // ⛔ NOT WHOLE-NODE MATCHED, AND THAT IS A DELIBERATE DEPARTURE FROM THE RECOMMENDATION. The rule
+  // was recommended as `/^(undefined|NaN|\[object Object\])$/` with a whole-node match. Implemented
+  // that way it went GREEN — and the very leak it was recommended for was live in an executed
+  // scenario at the time. The node reads "undefined/undefined", because Vue renders each
+  // interpolation into the SAME text node as the literal "/" between them. A whole-node match can
+  // never see that, and it is the normal shape: a leaked value almost always has punctuation, a
+  // unit or a sibling field beside it.
+  //
+  // Word-matched instead. Safe against false positives because no product copy in this cockpit
+  // contains these tokens — absence is said as "unknown", "not established" or "not confirmed" —
+  // and `--self-test` mutates through a REAL undefined property to prove it still fires.
+  { rule: 'leaks a raw JavaScript value (undefined / NaN / [object Object])',
+    re: /\b(undefined|NaN)\b|\[object Object\]/ },
+  { rule: 'leaks the "ZZ" brand sort sentinel', re: /\bZZ\b|no brand recorded/i,
+    // "No brand recorded" IS the sanctioned heading for an unbranded run — it is a statement about
+    // the record, not a brand name — so the heading form is allowed and the sentinel form is not.
+    // Distinguished by the ZZ, which no honest rendering carries.
+    allow: (s) => /^No brand recorded$/.test(s.trim()) || /^No brand is recorded for this line\.$/.test(s.trim()) },
+]);
+function bannedVocabulary(name, textParts) {
+  if (VOCAB_EXEMPT.test(name)) return [];
+  const out = [];
+  for (const s of textParts) {
+    for (const b of BANNED_VOCABULARY) {
+      if (b.allow && b.allow(s)) continue;
+      const hit = b.whole ? b.re.test(s.trim()) : b.re.test(s);
+      if (hit) out.push(b.rule + ': "' + s.slice(0, 60) + '"');
+    }
+  }
+  return out;
+}
+
+// ══ WP-B15-45 — THE BUILDER-VOCABULARY DETECTOR FOR THE HOUSEHOLD SURFACE ════════════════════════
+//
+// AC3, and Addendum B §10.2, which lists the banned words. The requirement was explicitly that this
+// be a HARNESS ASSERTION rather than a sweep of the screen — "so the rule travels instead of being
+// fixed at one site". The estate already has the evidence for why: between the Shop fix and the
+// Rules leak in WP-B15-42, the IDENTICAL leak was re-introduced two screens away IN THE SAME COMMIT.
+// A sweep decays the moment anyone adds a string.
+//
+// This runs IN ADDITION to bannedVocabulary above, not instead of it — that one bans dishonest and
+// leaked-machine words everywhere, and everything it bans is also wrong here. This one bans the
+// OPERATOR'S VOCABULARY, which is legitimate on Warwick's surface and never on hers.
+//
+// ⛔ "run" IS DELIBERATELY NOT BANNED, AND THE OMISSION IS THE INTERESTING PART.
+// Addendum B §10.2 lists it. But Addendum B's OWN sanctioned copy, in §7.4 and §9.4, is "They've
+// run out of the usual eggs" and "I couldn't find 'nice ham'". A /\brun\b/ rule fires on the
+// feature — it would go red on the correct wording of the most human sentence on the surface. That
+// is the exact trade the ZZ and drawer exemptions above are written about: a detector that cries
+// wolf gets switched off, and then it is protecting nothing. The word is banned as a NOUN in the
+// operator sense ("the run", "run id") by the status-enum rule below; the verb is left alone.
+// Recorded here rather than silently dropped, because a rule missing from a list looks like an
+// oversight and this one is a decision.
+//
+// Every other §10.2 word is here, word-boundary matched and case-insensitive. None of them collides
+// with any sentence in Addendum B §10's sanctioned copy — checked line by line against §10.3's
+// replacement table, not assumed.
+const MUM_VOCABULARY = Object.freeze([
+  // The headline. Addendum B §2: "'Cockpit' is a builder's word — it must not appear on her screen."
+  { rule: 'the word COCKPIT reaches her screen', re: /\bcockpits?\b/i },
+  // She never learns the system has a name, let alone what it is (Addendum B §1).
+  { rule: 'names the system to her (AsdAIr / Fusion247)', re: /\basda[i1]r\b|\bfusion\s?247\b/i },
+  // Catalogue identity. Addendum B §8.2: "She never sees, types or chooses a catalogue identity."
+  { rule: 'leaks catalogue identity vocabulary',
+    re: /\bcatalogues?\b|\bSKUs?\b|\bproduct[ _-]?ids?\b|\bregulars?\b|\bfavourite[ _-]?ids?\b|\basda[ _-]?(reference|product)\b|\baliase?s?\b/i },
+  // Retail plumbing. She is CHOOSING, not shopping — Addendum B §10.3 removes "add to basket"
+  // entirely rather than translating it.
+  { rule: 'leaks retail-operator vocabulary', re: /\bbaskets?\b|\bcheckouts?\b|\bslots?\b|\bsubmits?\b|\bsubmitted\b/i },
+  // Machine plumbing.
+  { rule: 'leaks machine vocabulary',
+    re: /\bAPIs?\b|\bendpoints?\b|\bpayloads?\b|\btokens?\b|\bsessions?\b|\bsync(ed|ing)?\b|\bpars(e|ed|ing)\b|\bpersist(ed|ing|ence)?\b|\bqueues?\b|\bJSON\b|\bnull\b/i },
+  // Status enums and pipeline state. This is where "run" is banned in its operator sense, and it is
+  // why the verb does not need to be.
+  { rule: 'leaks a status enum or pipeline state',
+    re: /\bneeds[_ ]decision\b|\bhuman[_ ]state\b|\bplan[_ ]status\b|\bunclassified\b|\bexcluded\b|\bresolv(e|ed|ing)\b|\bcandidates?\b|\b(shop|job|run)[_ ]?id\b|\bjobs?\b/i },
+  // Addendum B §10.2 bans "any status code, service name, or SHA". A bare hex string of 7+ is the
+  // shape of both a commit and an ASDA product id — and a product id on her screen is precisely the
+  // §8.2 defect, so a hit here is a true positive either way.
+  { rule: 'leaks a SHA or a bare numeric/hex identifier', re: /\b[0-9a-f]{7,40}\b/i },
+]);
+function mumVocabulary(textParts) {
+  const out = [];
+  for (const s of textParts) {
+    for (const b of MUM_VOCABULARY) {
+      if (b.re.test(s)) out.push(b.rule + ': "' + s.slice(0, 60) + '"');
+    }
+  }
+  return out;
+}
+
+// Render one household-surface scenario. Mirrors scenario() above — including the Proxy `has` trap,
+// which is the load-bearing mechanism and must not be weakened for the second app — but takes plain
+// ref values instead of a view key, because this surface has no view registry: it is one page.
+//
+// `pure: true` renders nothing and is how a check EXECUTES a shipping function directly rather than
+// inferring its behaviour from a screen. text(null) is [], so such a scenario's checks simply
+// ignore the rendered parts. The quantity clamp is tested that way because Addendum B §6.4 rule 5
+// makes it a STATE guarantee, and a boundary proven only by tapping a rendered button is a boundary
+// nobody has actually reached.
+function mumScenario(name, refs, render, opts2 = {}) {
+  for (const [k, v] of Object.entries(refs || {})) {
+    const b = shopBindings[k];
+    if (!b || typeof b !== 'object' || !('value' in b)) {
+      throw new Error('render-vm-check: household scenario "' + name + '" writes "' + k + '", which '
+        + 'shopping.js setup() does not return as a writable ref. Known: '
+        + Object.keys(shopBindings).join(', ') + '. Fix the name here rather than letting the '
+        + 'scenario silently test default state — that is how coverage disappears while staying green.');
+    }
+    b.value = v;
+  }
+  if (opts2.pure) return { name, vnode: null, err: null, missing: [], mum: true };
+  const base = {};
+  for (const k of Object.keys(shopBindings)) {
+    Object.defineProperty(base, k, {
+      enumerable: true, configurable: true,
+      get() { return unwrap(shopBindings[k]); },
+      set() {},
+    });
+  }
+  const missing = new Set();
+  const proxy = new Proxy(base, {
+    has: (t, k) => !(typeof k === 'string' && (k.startsWith('_') || k.startsWith('$')))
+      // Vue's `with(_ctx)` would otherwise swallow the `v-for` scope variables the compiled render
+      // function declares in its own closure. Same reason the operator trap excludes _ and $.
+      ,
+    get(t, k) {
+      if (k === Symbol.unscopables) return undefined;
+      if (k in t) return t[k];
+      if (typeof k === 'string' && k in sb) return sb[k];
+      if (typeof k === 'string' && !k.startsWith('_') && !k.startsWith('$')) missing.add(k);
+      return undefined;
+    },
+  });
+  let vnode = null, err = null;
+  try { vnode = render.call(proxy, proxy, {}); } catch (e) { err = e; }
+  return { name, vnode, err, missing: [...missing], mum: true };
 }
 
 // A shop that EXISTS but has been read with nothing filled in — the shape a brand-new shop has, and
@@ -302,14 +615,445 @@ const PACKET_BAD_SORT = {
   packet: { ...PACKET.packet, sort_verified: false, sort_first_break_display: '2' },
 };
 
+// ── WP-B15-36 FIXTURES — the converged Cockpit UI ───────────────────────────────────────────────
+//
+// ⛔ FIRST, THE DEFECT THESE REPAIR, because it is the reason every assertion below is new rather
+// than adjusted. Until this WP, the two AsdAIr scenarios named their views 'overview' and 'details'.
+// B15-26 RENAMED those keys to 'shop' and 'questions' (apps.js) and did not update this file. So
+// `app.views.find(v => v.key === viewKey)` returned `undefined`, `currentView.label` threw in the
+// breadcrumb, and EVERY AsdAIr scenario died before rendering a single node — carrying four
+// assertions down with it. Established by execution, not inference: the identical four failures
+// reproduce on untouched HEAD 86cfc08 with this WP's changes stashed.
+// The consequence is worth stating plainly: the AsdAIr Shop and Questions screens have had NO
+// executed render coverage since f7bf71a, and a green run of this harness did not mean what it
+// looked like it meant.
+//
+// SECOND, WHAT THE FIXTURES BELOW ARE FOR. `WS` (the committed sample) carries NO canonical state
+// field, NO provenance block and NO regions — which is exactly the "backend has not landed it yet"
+// case, and it stays as its own scenario because rendering an HONEST GAP is a requirement, not a
+// degraded mode. The fixtures here add the cases the converged backend will produce.
+//
+// Every value is synthetic. Field names are taken from the real contract, never invented:
+// `human_state` from migration 020 §5, the PHOTO/REGULARS/RULE/WARWICK vocabulary from that same
+// migration's shop_line_provenance CHECK, and the four pixel bounds from shop_image_region.
+const ws = (shopPatch, patch = {}) => ({
+  ...WS, ...patch, shop: { ...WS.shop, ...shopPatch },
+});
+const PROVENANCE = {
+  source_read_status_display: 'photograph read', source_lines_display: '39',
+  reconciled_products_display: '41',
+  photo_display: '39', regulars_display: '4', rules_display: '1', warwick_display: '2', skipped_display: '3',
+  final_products_display: '43', final_items_display: '61',
+};
+// NEEDS_WARWICK with two open questions: the exact case Warwick's first example names.
+const WS_NEEDS = ws({ human_state: 'NEEDS_WARWICK' }, {
+  provenance: PROVENANCE,
+  questions: { ...WS.questions, open_count_display: '2',
+    items: [
+      { ...WS.questions.items[0],
+        // The four pixel bounds, per shop_image_region. This is the whole crop seam.
+        region: { pixel_top: 100, pixel_left: 20, pixel_bottom: 160, pixel_right: 400 } },
+      { ...WS.questions.items[0], id: 9, question_key: 'q_placeholder_9',
+        question_text_display: 'A second placeholder question with no recorded region.', region: null },
+    ] },
+});
+// ASDAIR_WORKING with open lines: Warwick's second example, verbatim in shape.
+const WS_WORKING = ws({ human_state: 'ASDAIR_WORKING',
+  lines_summary: { total_display: '5', resolved_display: '2', open_display: '3' } },
+  { questions: { ...WS.questions, open_count_display: '0', items: [] } });
+// READY_FOR_WARWICK: Warwick's third example.
+const WS_READY = ws({ human_state: 'READY_FOR_WARWICK' },
+  { questions: { ...WS.questions, open_count_display: '0', items: [] } });
+// FAILED, from the basket half: Warwick's fourth example.
+const WS_FAILED = ws({ human_state: 'FAILED',
+  failure: { ...(WS.shop.failure || {}), failed_from_display: 'WAITING_FOR_BROWSER' } },
+  { questions: { ...WS.questions, open_count_display: '0', items: [] } });
+// THE CONTRADICTION. State says nothing needs him; two questions are still open. A naive UI shows
+// "Nothing needs you" beside a 2 and lets Warwick work it out. This must be named as a FAULT.
+const WS_CONTRADICT = ws({ human_state: 'ASDAIR_WORKING' },
+  { questions: { ...WS.questions, open_count_display: '2' } });
+// THE SEAM, both older shapes. Neither may regress to "Status unknown".
+const WS_SEAM_CANONICAL = ws({ canonical_state: 'READY_FOR_WARWICK' });
+const WS_SEAM_COCKPIT = ws({ cockpit_state: 'READY_FOR_WARWICK' });
+// Per-line provenance with NO summary block — the 'lines' counting route.
+const WS_LINE_PROV = ws({}, {
+  interpretation: { ...WS.interpretation,
+    lines: WS.interpretation.lines.map((l, i) => ({ ...l, provenance: ['PHOTO', 'REGULARS', 'RULE', 'WARWICK', 'PHOTO'][i % 5] })) },
+});
+// The API publishing a skip command — the only thing that may un-grey "Not this week" on a line.
+const WS_SKIP_CMD = ws({ human_state: 'NEEDS_WARWICK' },
+  { command_names: [...(WS.command_names || []), 'skipThisWeek'] });
+
+// ══ WP-B15-42 FIXTURES ═══════════════════════════════════════════════════════════════════════════
+//
+// SYNTHETIC VALUES, REAL SHAPE. The field names below are taken from the artefact this UI must
+// actually render — services/asdair/pipeline/finalise/out/final-shopping-list.json, produced by
+// WP-B15-37 — and not invented: `brand`, `product`, `quantity`, `quantity_basis`, `quantity_note`,
+// `shoppable`, `held_reason`, `held_detail`, `routed_question`, `list_item_name`, and
+// `provenance_detail.{support, support_of, support_class}`. The VALUES are invented.
+//
+// ⛔ THE FIRST TWO ROWS ARE THE POINT, and they are the two things most likely to ship broken:
+//   * `brand: "ZZ (no brand recorded)"` is a SORT SENTINEL, carried by every held line of the real
+//     artefact. It must never render as a brand name.
+//   * `product: null` is normal on a held line — nothing has been settled — so `list_item_name` is
+//     the only honest title.
+// Both are the same defect class as the API's word `unknown` reaching a product title, which is
+// what Vera caught on WP-B15-36 and what the global vocabulary detector above now bans everywhere.
+const finalLine = (o) => Object.assign({
+  brand: null, product: null, product_id: null, quantity: 1, quantity_basis: 'explicit-on-page',
+  quantity_settled: true, quantity_note: null, provenance: 'PHOTO', disposition: 'resolved',
+  status: 'matched', shoppable: true, held_reason: null, held_detail: null, routed_question: null,
+  list_item_name: null,
+  provenance_detail: { kind: 'PHOTO', line_no: 1, raw_reading: null, support: 3, support_of: 3, support_class: 'unanimous' },
+}, o);
+const FINAL_LIST = {
+  shop_ref: 'SHOP-SYNTHETIC', shop_status: 'NEEDS_DECISION', sorted_by: 'BRAND, then product name',
+  totals: { photo_source_lines: 6, product_count: 6, item_count: 9, shoppable_lines: 4, held_lines: 2 },
+  skipped: [
+    { as_written: 'A SYNTHETIC UNSUPPORTED LINE', support: 1, support_of: 3, disposition: 'skipped',
+      reason: 'seen by only 1 of 3 independent readings of the same photograph - an unsupported photo candidate' },
+  ],
+  lines: [
+    finalLine({ brand: 'Alpha', product: 'Alpha Synthetic Oat Drink 1L', quantity: 3,
+      quantity_note: null, quantity_basis: 'explicit-on-page',
+      provenance_detail: { kind: 'PHOTO', line_no: 1, raw_reading: '3 ALPHA OAT', support: 3, support_of: 3, support_class: 'unanimous' } }),
+    finalLine({ brand: 'Alpha', product: 'Alpha Synthetic Yoghurt 4pk', quantity: 1,
+      quantity_basis: 'household-default-one',
+      provenance_detail: { kind: 'PHOTO', line_no: 2, raw_reading: 'ALPHA YOG', support: 2, support_of: 3, support_class: 'corroborated' } }),
+    finalLine({ brand: 'Beta', product: 'Beta Synthetic Bread', quantity: 2, provenance: 'REGULARS',
+      provenance_detail: { kind: 'REGULARS', line_no: 3, raw_reading: null, support: 3, support_of: 3, support_class: 'unanimous' } }),
+    finalLine({ brand: null, product: 'A synthetic own-label item', quantity: 1 }),
+    // THE TWO HELD LINES — sentinel brand, null product, routed question, corroboration recorded.
+    finalLine({ brand: 'ZZ (no brand recorded)', product: null, quantity: 1, shoppable: false,
+      status: 'needs_confirmation', disposition: 'unresolved-routed',
+      held_reason: 'awaiting_decision', held_detail: 'the planner left this line as needs_decision',
+      routed_question: 'q_placeholder_1', list_item_name: '1 BAG SYNTHETIC SWEETS',
+      provenance_detail: { kind: 'PHOTO', line_no: 5, raw_reading: '1 BAG SYNTHETIC SWEETS', support: 3, support_of: 3, support_class: 'unanimous' } }),
+    finalLine({ brand: 'ZZ (no brand recorded)', product: null, quantity: 1, quantity_settled: false,
+      shoppable: false, status: 'needs_confirmation', quantity_basis: 'conflicting-observations',
+      quantity_note: 'the runs disagree about the quantity (1 vs 7) and no deterministic rule settles it - routed rather than guessed',
+      held_reason: 'ambiguous', held_detail: null, routed_question: 'q_no_such_question',
+      list_item_name: '1 x 6pts SYNTHETIC MILK',
+      provenance_detail: { kind: 'PHOTO', line_no: 6, raw_reading: '1 x 6pts SYNTHETIC MILK', support: 1, support_of: 3, support_class: 'uncorroborated' } }),
+  ],
+};
+// The declared Brand A-Z order BROKEN — the same brand in two separate runs. The UI must SHOW the
+// breach rather than tidy it away, because the ordering is what makes the shop quick in ASDA.
+const FINAL_LIST_UNSORTED = {
+  ...FINAL_LIST,
+  lines: [FINAL_LIST.lines[0], FINAL_LIST.lines[2], FINAL_LIST.lines[1], FINAL_LIST.lines[3]],
+};
+// The reconciled list arriving on the WORKSPACE payload — one of the two declared carriers.
+const WS_FINAL = ws({ human_state: 'NEEDS_WARWICK' }, { final_list: FINAL_LIST });
+const WS_FINAL_UNSORTED = ws({ human_state: 'NEEDS_WARWICK' }, { final_list: FINAL_LIST_UNSORTED });
+// THE JOIN. A held line carries `routed_question: 'q_placeholder_1'`, and the workspace's own open
+// question carries `question_key: 'q_placeholder_1'`. One board entry, not two.
+const WS_BOARD = ws({ human_state: 'NEEDS_WARWICK' }, {
+  final_list: FINAL_LIST,
+  questions: { ...WS.questions, open_count_display: '1',
+    items: [{ ...WS.questions.items[0],
+      region: { pixel_top: 100, pixel_left: 20, pixel_bottom: 160, pixel_right: 400 } }] },
+});
+// ⛔ AC4 — THE STALE "NEEDS HUMAN" CASE, and it is the whole defect in one fixture. The
+// interpretation line still carries `status: 'needs_confirmation'` — stale, because its routed
+// question has ALREADY been answered and sits in `questions.resolved`. A UI that trusts the line's
+// own status asks Warwick a second time for something he has already decided.
+const WS_STALE = ws({ human_state: 'ASDAIR_WORKING' }, {
+  interpretation: { ...WS.interpretation,
+    lines: WS.interpretation.lines.map((l) => (l.status === 'needs_confirmation'
+      ? { ...l, routed_question: 'q_placeholder_2' } : l)) },
+  questions: { ...WS.questions, open_count_display: '0', items: [] },
+});
+// ⭐ THE SAME JOIN, SPELLED THE OTHER WAY. The reconciled artefact writes `routed_question`; Lane C
+// additionally carries the identifier as `question_key` on held workspace lines. They are the same
+// `shop_question.question_key` under two names, so the board must join on either — accepting only
+// one would make the join depend on which producer happened to write the row.
+const WS_BOARD_QKEY = ws({ human_state: 'NEEDS_WARWICK' }, {
+  final_list: { ...FINAL_LIST,
+    lines: FINAL_LIST.lines.map((l) => (l.routed_question === 'q_placeholder_1'
+      ? { ...l, routed_question: null, question_key: 'q_placeholder_1' } : l)) },
+  questions: { ...WS.questions, open_count_display: '1', items: [WS.questions.items[0]] },
+});
+// The API publishing a remember command — the only thing that may enable the durable-knowledge
+// offer. Without it the control is rendered DISABLED and says why; it is never hidden, because
+// Warwick is owed the knowledge that the choice exists.
+const WS_REMEMBER_CMD = ws({ human_state: 'NEEDS_WARWICK' },
+  { command_names: [...(WS.command_names || []), 'rememberDecision'] });
+
 const ASDAIR_PLAN = [
-    ['OVERVIEW (live shop)', 'overview', { asdairWs: WS, asdairWsErr: null }],
+    // ── AC1 · AC2 — the one sentence and the one status, one scenario per state Warwick named ────
+    ['SHOP · NEEDS_WARWICK (2 open questions)', 'shop', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s own sentence, verbatim in shape', (p) => hasText(p, '2 decisions still need you.')],
+      ['AC2 — the one canonical status label is rendered', (p) => hasText(p, 'Needs you')],
+      ['AC2 — the SERVICE availability band stands down, so there is no second status indicator',
+        (p) => !hasText(p, 'running')],
+      ['AC3 — Warwick\'s summary equation, assembled from real terms',
+        (p) => hasText(p, '39 from the photograph + 4 from Regulars − 3 skipped = 43 products / 61 items')],
+      ['AC3 — all four origins plus SKIPPED stay VISIBLY DISTINCT, never one blob',
+        (p) => hasText(p, 'From the photograph') && hasText(p, 'Added from your Regulars')
+          && hasText(p, 'From household rules') && hasText(p, 'You decided this week')
+          && hasText(p, 'Skipped this week')],
+      ['no raw canonical state token leaks onto the primary screen', (p) => !hasText(p, 'NEEDS_WARWICK')],
+      ['no internal pipeline stage name leaks onto the primary screen', (p) => !hasText(p, 'PROCESSING')],
+      ['no shop reference leaks onto the primary screen', (p) => !hasText(p, 'SHOP-2026-01-01')],
+      ['no match-basis internal leaks onto the primary screen', (p) => !hasText(p, 'exact alias match')],
+      // REGRESSION — found by READING the rendered text, not the diff. An unreadable line carries
+      // the API's word "unknown" in both name fields, and the title expression printed it as the
+      // product's name. "unknown" where a product belongs IS the database view Warwick prohibited.
+      //
+      // ⛔ THIS ASSERTION IS NOW REDUNDANT AND IS KEPT ANYWAY. WP-B15-42 promoted it to a GLOBAL
+      // detector that runs on every scenario in this file (bannedVocabulary), because a per-screen
+      // assertion is exactly how the identical defect survived two screens away on Rules. The local
+      // copy stays as the named regression for the screen it was found on; deleting it would erase
+      // the record of what was actually caught here.
+      ['⛔ the word "unknown" is never a product title',
+        (p) => !p.some((s) => s.trim() === 'unknown')],
+      // ⛔ MOVED, NOT DELETED — WP-B15-42, AC2. The Shop screen no longer renders individual
+      // exception lines: there is ONE exception board and it is the Questions screen. This
+      // assertion followed the markup to 'EXCEPTIONS · one coherent board' below. Leaving it here
+      // would have been a check bound to a pane that no longer contains the surface — the failure
+      // mode this file's own SYS comment names, and which passes quietly rather than failing loudly.
+      ['AC2 — the Shop screen ROUTES to the one board instead of rendering a second one',
+        (p) => hasText(p, 'Answer them on one screen, with the photograph beside each.')],
+    ]],
+    ['SHOP · ASDAIR_WORKING (3 products reconciling)', 'shop', { asdairWs: WS_WORKING, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s second example, verbatim in shape',
+        (p) => hasText(p, 'Nothing needs you. AsdAIr is reconciling 3 products.')],
+      ['AC2 — one status label', (p) => hasText(p, 'AsdAIr is working')],
+    ]],
+    ['SHOP · READY_FOR_WARWICK', 'shop', { asdairWs: WS_READY, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s third example, verbatim',
+        (p) => hasText(p, 'Everything is resolved. Ready to build the ASDA basket.')],
+      ['AC2 — one status label', (p) => hasText(p, 'Ready for you')],
+    ]],
+    ['SHOP · FAILED (from the basket half)', 'shop', { asdairWs: WS_FAILED, asdairWsErr: null }, {}, [
+      ['AC1 — Warwick\'s fourth example, verbatim',
+        (p) => hasText(p, 'Basket build failed. Nothing was ordered.')],
+    ]],
+    // ── The thing Warwick must NEVER be asked to do himself ───────────────────────────────────────
+    ['SHOP · state and counts CONTRADICT each other', 'shop', { asdairWs: WS_CONTRADICT, asdairWsErr: null }, {}, [
+      ['the disagreement is named as a FAULT, in words',
+        (p) => hasText(p, 'That is a fault in AsdAIr, not something for you to resolve.')],
+      ['and Warwick is never left holding two bare numbers to reconcile',
+        (p) => hasText(p, 'AsdAIr says nothing needs you, but still has 2 open questions')],
+    ]],
+    // ── The seam. Both older field names must still render, or integration silently blanks. ───────
+    ['SHOP · seam: only shop.canonical_state present', 'shop', { asdairWs: WS_SEAM_CANONICAL, asdairWsErr: null }, {}, [
+      ['reads the backend branch\'s CURRENT field name', (p) => hasText(p, 'Ready for you')],
+      ['and answers the question from it', (p) => hasText(p, 'Everything is resolved. Ready to build the ASDA basket.')],
+    ]],
+    ['SHOP · seam: only shop.cockpit_state present (the B15-26 placeholder)', 'shop', { asdairWs: WS_SEAM_COCKPIT, asdairWsErr: null }, {}, [
+      ['an older backend still renders rather than regressing to unknown', (p) => hasText(p, 'Ready for you')],
+    ]],
+    // ── AC3 fallback routes. A gap is NAMED; it is never filled with a zero. ──────────────────────
+    ['SHOP · provenance counted from the lines themselves', 'shop', { asdairWs: WS_LINE_PROV, asdairWsErr: null }, {}, [
+      ['the route is stated on screen, not silently assumed',
+        (p) => hasText(p, 'Counted from the lines themselves')],
+      ['origins are still shown one by one', (p) => hasText(p, 'Added from your Regulars')],
+    ]],
+    ['SHOP · no canonical state and no provenance at all (the honest gap)', 'shop', { asdairWs: WS, asdairWsErr: null }, {}, [
+      ['⛔ nothing is invented — the missing answer is said, not guessed',
+        (p) => hasText(p, 'AsdAIr hasn’t reported one overall status for this shop yet')],
+      ['⛔ the five origin rows are BLANK, not filled with zeros',
+        (p) => hasText(p, 'AsdAIr isn’t yet reporting where each product came from')],
+      ['a per-origin row says so for itself too',
+        (p) => hasText(p, 'AsdAIr isn’t reporting this count yet, so nothing is claimed for it.')],
+    ]],
+    // ── AC4 — exception-first. ───────────────────────────────────────────────────────────────────
+    ['SHOP · exception-first grouping', 'shop', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      // WP-B15-42: the heading moved from "Needs your attention" (a second board) to "Anything
+      // unsettled" (a summary that routes). The PROPERTY under test is unchanged — the unsettled
+      // things lead — so the assertion is re-keyed to the markup that now carries it rather than
+      // deleted, which would have quietly dropped the coverage.
+      ['the unsettled lines still LEAD the screen', (p) => hasText(p, 'Anything unsettled')],
+      ['⛔ and the Shop screen does NOT render a second exception board',
+        (p) => !hasText(p, 'Type an answer') && !hasText(p, 'Not this week')],
+      ['resolved lines are COLLAPSED behind a control, never proofread by default',
+        (p) => p.some((s) => /Show the \d+ lines? that are already settled/.test(s))],
+    ]],
+    // ── AC5 — the question board. ────────────────────────────────────────────────────────────────
+    ['QUESTIONS · crop, and the honest absence of one', 'questions', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      ['a question with no recorded region SAYS so rather than showing a fabricated crop',
+        (p) => hasText(p, 'AsdAIr hasn’t recorded which part of the photograph this line came from')],
+      // ⛔ RE-CUT AFTER VERA V-1 (HIGH), NOT DELETED. This asserted that the Shop screen's exact
+      // sentence — "2 decisions still need you.", counting OPEN QUESTIONS — also leads this screen,
+      // on the reasoning that one sentence in two places cannot tell two stories. That reasoning was
+      // wrong, and this assertion was actively holding the defect in place: this screen's tally
+      // counts a DIFFERENT population (questions plus unrouted held lines), so copying the
+      // question-count sentence here guaranteed a contradiction the moment the two populations
+      // differed. It did, by one, 49px apart, at 375px.
+      //
+      // The VALUE survives — two figures on one screen must not disagree — and is now expressed
+      // correctly: the headline is derived from the same population as the tally beneath it. In THIS
+      // fixture there are no held lines, so board and questions coincide and the figure is still 2;
+      // the 'one coherent board' scenario carries the case where they differ.
+      ['the headline is derived from THIS screen population, and agrees with its own tally',
+        (p) => hasText(p, '2 things still need you.') && valueAfter(p, 'Needs you') === '2'],
+      ['an answered question can be CHANGED', (p) => hasText(p, 'Change this answer')],
+      ['applied-to-this-shop vs remembered-for-future is stated, never inferred',
+        (p) => hasText(p, 'Applied to this shop.') || hasText(p, 'Remembered for future shops')],
+    ]],
+    // ── The command surface gate: a control with no command behind it is never dressed as working ─
+    ['QUESTIONS · no skip command published', 'questions', { asdairWs: WS_NEEDS, asdairWsErr: null }, {}, [
+      ['the API publishes no skip-a-line command in this fixture',
+        (p) => !hasText(p, 'AsdAIr has no command for this yet')],
+    ]],
+    ['SHOP · the API publishes a skip command', 'shop', { asdairWs: WS_SKIP_CMD, asdairWsErr: null }],
+
+    // ══ WP-B15-42 ═════════════════════════════════════════════════════════════════════════════
+    // AC5 — THE FINAL LIST, SORTED BY BRAND. "not database order, not provenance order, not
+    // question order". Compact per line, plain-English provenance on expansion, exceptions separated.
+    ['LIST · brand-grouped, from the reconciled artefact', 'basket',
+      { asdairWs: WS_FINAL, asdairPacket: PACKET_NOT_BUILT, asdairPacketErr: null }, {}, [
+        ['AC5 — brands are the grouping, in A-Z runs',
+          (p) => hasText(p, 'Alpha') && hasText(p, 'Beta')],
+        ['AC5 — brand, product and quantity are the compact line',
+          (p) => hasText(p, 'Alpha Synthetic Oat Drink 1L') && hasText(p, '×3')],
+        ['AC5 — totals come from the data, never a hardcoded figure',
+          (p) => hasText(p, '6 products') && hasText(p, '9 items')],
+        ['AC5 — plain-English provenance on expansion, never an enum',
+          (p) => hasText(p, 'no number was written, so one')],
+        ['AC5 — exceptions are CLEARLY SEPARATED from resolved lines',
+          (p) => hasText(p, 'Not on the list yet')],
+        ['AC5 — and they are not answerable twice: the list ROUTES to the one board',
+          (p) => hasText(p, 'Resolve these') && !hasText(p, 'Type an answer')],
+        // ⛔ THE TWO DEFECTS THIS WP EXISTS TO PREVENT ON THIS SCREEN. Both are also covered by the
+        // global vocabulary detector; asserted HERE too because a global ban proves the string is
+        // absent, and these assert the RIGHT thing is present in its place.
+        ['⛔ the ZZ sort sentinel never renders as a brand',
+          (p) => !p.some((s) => /ZZ/.test(s))],
+        ['⛔ a held line with product:null is titled by its raw reading, not by a blank or a null',
+          (p) => hasText(p, '1 BAG SYNTHETIC SWEETS')],
+        ['an unbranded line gets a heading that describes the RECORD, not a brand name',
+          (p) => hasText(p, 'No brand recorded')],
+        // ⛔ VERA V-2 — every disclosure row carries the cockpit's affordance glyph. Counted, not
+        // spot-checked: one chev per list row, or the marker has gone missing from some of them
+        // again. The rendered text is the only place a vnode-level check can see this glyph.
+        ['⛔ V-2 — every brand-list row carries the .chev affordance, not a bare invisible summary',
+          (p) => p.filter((s) => s.trim() === '›').length >= 4],
+        // AC6 — Warwick's ruling, on the surface that carries the evidence.
+        ['AC6 — support is reported as CORROBORATION',
+          (p) => hasText(p, 'Corroborated') && hasText(p, 'All 3 readings of the photograph agreed on this line.')],
+        ['AC6 — a 2-of-3 reading says so, and is still corroboration rather than proof',
+          (p) => hasText(p, '2 of 3 readings of the photograph agreed on this line.')],
+        ['AC6 — a single-reading line is NOT corroborated, and says which',
+          (p) => hasText(p, 'Not corroborated') && hasText(p, 'Only 1 of 3 readings saw this line')],
+        ['AC6 — the caveat is on the screen, not just in the code',
+          (p) => hasText(p, 'is corroboration, not verification')],
+      ]],
+    ['LIST · the declared brand order is BROKEN', 'basket',
+      { asdairWs: WS_FINAL_UNSORTED, asdairPacket: PACKET_NOT_BUILT, asdairPacketErr: null }, {}, [
+        ['⛔ the breach is SHOWN, never tidied away by a UI-side re-sort',
+          (p) => hasText(p, 'BRAND ORDER BROKEN')],
+        ['and it says what is wrong in words a person reads',
+          (p) => hasText(p, 'The same brand appears more than once in this list.')],
+      ]],
+    ['LIST · no reconciled list published at all (the honest gap)', 'basket',
+      { asdairWs: WS, asdairPacket: PACKET_NOT_BUILT, asdairPacketErr: null }, {}, [
+        ['⛔ an empty list is the honest answer; a plausible one he might act on is not',
+          (p) => hasText(p, 'No reconciled list has been published for this shop')],
+        ['and it says so rather than rendering an invented line',
+          (p) => hasText(p, 'Nothing on this screen is invented')],
+      ]],
+
+    // AC2/AC3 — ONE COHERENT EXCEPTION BOARD.
+    ['EXCEPTIONS · one coherent board, held lines JOINED to their question', 'questions',
+      { asdairWs: WS_BOARD, asdairWsErr: null }, {}, [
+        ['AC2 — the question and the line it holds up are ONE entry, not two',
+          (p) => hasText(p, 'Is "placeholder juice" the Placeholder Orange Juice 1L you usually get?')
+            && hasText(p, 'Read from the list as “1 BAG SYNTHETIC SWEETS”.')],
+        ['AC2 — WHY it is uncertain, in words',
+          (p) => hasText(p, 'Why it is uncertain: waiting on an answer from you')],
+        ['AC2 — sensible alternatives, one tap each',
+          (p) => hasText(p, '✓ Placeholder Orange Juice 1L')],
+        ['AC2 — answerable in place by free text and by "not this week"',
+          (p) => hasText(p, 'Type an answer') && hasText(p, 'Not this week')],
+        ['AC2 — a joined entry is marked as HELD OUT OF THE BASKET, which is the blocking fact',
+          (p) => hasText(p, 'HELD OUT OF THE BASKET')],
+        ['AC3 — X NEED YOU / Y RESOLVED / Z STILL BLOCKING, at a glance',
+          (p) => hasText(p, 'need you') && hasText(p, 'resolved') && hasText(p, 'still blocking')],
+        // ⛔ VERA V-1 (HIGH), AND THE FIXTURE REPRODUCES IT EXACTLY. 1 open question + 1 unjoined
+        // held line: the OLD headline counted questions and said "1 decision still needs you.",
+        // 49px above a tally counting the board and reading "2". Two populations, one screen, on
+        // the board built to stop precisely that. Three halves are pinned — the headline agrees
+        // with the tally, the stale phrasing is GONE, and the difference from the Shop screen is
+        // named rather than hidden.
+        ['⛔ V-1 — the headline agrees with the tally it sits 49px above',
+          (p) => hasText(p, '2 things still need you.') && valueAfter(p, 'Needs you') === '2'],
+        ['⛔ V-1 — the open-question sentence no longer leads this board',
+          (p) => !hasText(p, '1 decision still needs you.')],
+        ['V-1 — and it NAMES why this figure differs from the Shop screen instead of hiding it',
+          (p) => hasText(p, '1 question to answer, and 1 line AsdAIr held back without asking about it.')],
+        // ⛔ VERA V-2 — the affordance glyph. AC5's provenance-on-expansion sits behind this control,
+        // and it shipped with no visible marker at any breakpoint (SUMMARY_COUNT=4, WITH_VISIBLE=0).
+        ['AC3 — answered questions stay VISIBLE and COLLAPSIBLE, never gone',
+          (p) => hasText(p, 'Resolved') && hasText(p, 'Change this answer')
+            && hasText(p, 'Kept on screen on purpose')],
+        ['AC2 — a held line with NO question routed to it says so instead of offering a dead control',
+          (p) => hasText(p, 'hasn’t routed a question for it')],
+        ['⛔ the ZZ sort sentinel never reaches the board either',
+          (p) => !p.some((s) => /ZZ/.test(s))],
+      ]],
+    ['EXCEPTIONS · the join spelled question_key instead of routed_question', 'questions',
+      { asdairWs: WS_BOARD_QKEY, asdairWsErr: null }, {}, [
+        ['the SAME identifier under the other name still joins line to question',
+          (p) => hasText(p, 'Read from the list as “1 BAG SYNTHETIC SWEETS”.')],
+        // ⛔ THIS ASSERTION TOOK THREE ATTEMPTS AND BOTH FAILURES ARE WORTH RECORDING, because each
+        // is a way of passing for the wrong reason:
+        //   1. "HELD OUT OF THE BASKET is present" stayed GREEN under a broken join — a failed join
+        //      makes an unjoined held entry carrying the same eyebrow. Vacuous.
+        //   2. "the unjoined sentence is ABSENT" went RED on correct code — this fixture also has a
+        //      second, legitimately unjoined held line, so that sentence is on screen either way.
+        //      A whole-screen text check cannot see WHICH row carried it.
+        // What discriminates is the COUNT. Joined: one question entry (carrying its line) plus one
+        // unjoined held = 2. Broken: one question entry plus TWO unjoined held = 3. The join is the
+        // only thing that moves that number.
+        ['⛔ and the join COLLAPSES line into question — 2 entries need him, not 3',
+          (p) => valueAfter(p, 'Needs you') === '2'],
+      ]],
+    // AC2 — the durable-knowledge offer. Both halves: no command, and a published command.
+    ['EXCEPTIONS · remember-this offer with NO command published', 'questions',
+      { asdairWs: WS_BOARD, asdairWsErr: null,
+        asdairRemember: { questionKey: 'q_placeholder_1', answer: 'Synthetic Orange Juice 1L', busy: false, done: null, error: null } }, {}, [
+        ['AC2 — the offer is made, because Warwick is owed the knowledge that the choice exists',
+          (p) => hasText(p, 'Should AsdAIr remember “Synthetic Orange Juice 1L” for future shops?')],
+        ['⛔ and it says plainly that it cannot yet be made durable — never a button that silently discards',
+          (p) => hasText(p, 'AsdAIr publishes no command for this yet')],
+        ['the answer that DID land is still stated as applied',
+          (p) => hasText(p, 'Your answer has been applied to this shop.')],
+      ]],
+    ['EXCEPTIONS · remember-this offer WITH a command published', 'questions',
+      { asdairWs: WS_REMEMBER_CMD, asdairWsErr: null,
+        asdairRemember: { questionKey: 'q_placeholder_1', answer: 'Synthetic Orange Juice 1L', busy: false, done: null, error: null } }, {}, [
+        ['the honest "cannot do this yet" note is GONE once a command exists',
+          (p) => !hasText(p, 'AsdAIr publishes no command for this yet')],
+        ['and the offer still reads as a question, not as a completed action',
+          (p) => hasText(p, 'Remember it') && hasText(p, 'Just this shop')],
+      ]],
+    // ⛔ AC4 — NO STALE "NEEDS HUMAN". The UI half.
+    ['SHOP · a line already answered must NOT still be shown as needing him', 'shop',
+      { asdairWs: WS_STALE, asdairWsErr: null }, {}, [
+        // PRECISION MATTERS HERE, and my first attempt at this assertion was wrong in the way this
+        // file's own comment warns about. The fixture carries TWO attention lines — one stale
+        // (already answered) and one genuinely unreadable — so the correct output is "1 line needs a
+        // decision", not silence. Asserting the ABSENCE of that phrase passed for the wrong reason
+        // when the suppression worked and would have passed again if it stopped. The property under
+        // test is the DROP from 2 to 1, so both halves are pinned.
+        ['⛔ the stale line is not counted: 2 attention lines render as 1',
+          (p) => hasText(p, '1 line needs a decision') && !hasText(p, '2 lines need a decision')],
+        ['the suppression is COUNTED and STATED — a suppression nobody can see is its own kind of lie',
+          (p) => hasText(p, 'not counted above, and nothing is being asked of you twice')],
+        ['and it names how many, so Lane AB/C can see their data half is stale',
+          (p) => hasText(p, '1 further line still carries')],
+      ]],
+    // ── The original coverage, with the view keys REPAIRED. ──────────────────────────────────────
+    ['SHOP (live shop, committed sample)', 'shop', { asdairWs: WS, asdairWsErr: null }],
     // The two questions checks below are the regression this scenario exists to catch: the fixture
     // used to carry field names (question_display, answered_display...) that DO NOT EXIST on the
     // real assembleWorkspace.js payload, so a real drift in the template's field names would have
     // rendered "unknown" everywhere and passed silently — the harness could not see it because the
     // fixture was already wrong in the same way. It is now keyed field-for-field to the real payload.
-    ['DETAILS (live shop)', 'details', { asdairWs: WS, asdairWsErr: null }, {}, [
+    ['QUESTIONS (live shop)', 'questions', { asdairWs: WS, asdairWsErr: null }, {}, [
       ['still-open question renders its real text, not a raw id',
         (p) => hasText(p, 'Is "placeholder juice" the Placeholder Orange Juice 1L you usually get?')],
       ['a RESOLVED question shows Warwick\'s own answer verbatim',
@@ -322,11 +1066,12 @@ const ASDAIR_PLAN = [
       // toISOString() instant right beside "You said: ..." / "-> Resolved to ...". The checked-in
       // fixture is now honest about the real formatter's output (see assembleWorkspace.js's
       // humanWhen()), so this assertion is a genuine render-layer guard, not one the fixture masks.
-      ['no raw ISO timestamp anywhere in the Details view (a machine instant is never primary content)',
+      ['no raw ISO timestamp anywhere in the Questions view (a machine instant is never primary content)',
         (p) => !p.some((s) => /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s))],
     ]],
-    ['DETAILS (shop present, every section empty)', 'details', { asdairWs: BARE_WS, asdairWsErr: null }],
-    ['DETAILS (service down)', 'details', { asdairWs: null, asdairWsErr: 'service down' }],
+    ['QUESTIONS (shop present, every section empty)', 'questions', { asdairWs: BARE_WS, asdairWsErr: null }],
+    ['SHOP (shop present, every section empty)', 'shop', { asdairWs: BARE_WS, asdairWsErr: null }],
+    ['QUESTIONS (service down)', 'questions', { asdairWs: null, asdairWsErr: 'service down' }],
     ['RULES (live rulebook)', 'rules', { asdairRules: RULES, asdairRulesErr: null }],
     ['RULES (read failed)', 'rules', { asdairRules: null, asdairRulesErr: 'not answering' }],
     ['RULES (empty rulebook)', 'rules', { asdairRules: EMPTY_RULES, asdairRulesErr: null }],
@@ -484,7 +1229,7 @@ const CAP_QUIET = {
 };
 
 const HOME_PLAN = [
-  ['HOME (a prevention is in doubt)', 'overview', CAP_ATTN, { area: 'home' }, [
+  ['HOME (a prevention is in doubt)', NO_APP_VIEW, CAP_ATTN, { area: 'home' }, [
     ['the attention card names the count in plain language',
       (p) => hasText(p, '1 prevention needs attention')],
     ['it names the actual family, not a slug',
@@ -496,7 +1241,7 @@ const HOME_PLAN = [
     ['Recent activity carries the CAPAE event, not just ingestion',
       (p) => hasText(p, 'Recent activity') && hasText(p, 'Prevention challenged')],
   ]],
-  ['HOME (nothing in doubt — the card must stay quiet)', 'overview', CAP_QUIET, { area: 'home' }, [
+  ['HOME (nothing in doubt — the card must stay quiet)', NO_APP_VIEW, CAP_QUIET, { area: 'home' }, [
     ['⭐ no attention card at all when nothing needs attention',
       (p) => !hasText(p, 'needs attention') && !hasText(p, 'System →')],
     ['but the pane still renders',
@@ -507,7 +1252,7 @@ const HOME_PLAN = [
 const SYSTEM_PLAN = [
   // AC1 ① — two reports, most recent first. The ordering holds, so the ORDER WRONG branch must NOT
   // fire; a banner that appears on correct data is as bad as one that never appears on wrong data.
-  ['SYSTEM (two rotation reports, most recent first)', 'overview',
+  ['SYSTEM (two rotation reports, most recent first)', NO_APP_VIEW,
     rrRefs([RR_RECENT, RR_OLDER]), SYS, [
       ['the group count is the number of reports read', (p) => valueAfter(p, 'Session / Rotation Reports') === '2'],
       ['the plural sentence states they were read and are shown in the supplied order',
@@ -527,7 +1272,7 @@ const SYSTEM_PLAN = [
   // AC1 ② — the SAME two reports supplied in the wrong order. The cockpit never re-sorts; a declared
   // order that is not the actual order is a PRODUCER defect and is surfaced, and this branch was
   // rendered by no scenario at all before now.
-  ['SYSTEM (reports supplied OUT of order)', 'overview',
+  ['SYSTEM (reports supplied OUT of order)', NO_APP_VIEW,
     rrRefs([RR_OLDER, RR_RECENT]), SYS, [
       ['the order break is surfaced rather than silently re-sorted', (p) => hasText(p, 'ORDER WRONG')],
       ['the banner names the exact position the order first breaks',
@@ -538,7 +1283,7 @@ const SYSTEM_PLAN = [
 
   // AC1 ③ + ④ + AC2 — THE DECIDING SCENARIO. Each assertion binds to ONE field, and the unknown and
   // the zero it is paired against sit in the same block.
-  ['SYSTEM (an unknown field beside a genuine measured zero)', 'overview',
+  ['SYSTEM (an unknown field beside a genuine measured zero)', NO_APP_VIEW,
     rrRefs([RR_UNKNOWN_AND_ZERO]), SYS, [
       ['an unestablished elapsed time renders as words, NOT as 0',
         (p) => valueAfter(p, 'Elapsed') === 'not established'],
@@ -579,7 +1324,7 @@ const SYSTEM_PLAN = [
 
   // Every container null. The degenerate card must stay honest field by field, and — the part that
   // was once actually wrong — must NOT print a total over nothing.
-  ['SYSTEM (a report whose every field and container is null)', 'overview',
+  ['SYSTEM (a report whose every field and container is null)', NO_APP_VIEW,
     rrRefs([RR_ALL_NULL]), SYS, [
       ['the singular sentence is used for a single report',
         (p) => hasText(p, 'rotation report was') && !hasText(p, 'rotation reports were')],
@@ -611,7 +1356,7 @@ const SYSTEM_PLAN = [
 
   // AC1 ⑤ — read, and there are none. A MEASURED ZERO at the list level, and the one rung most
   // easily confused with the two either side of it.
-  ['SYSTEM (reports read and there are none — a measured zero)', 'overview',
+  ['SYSTEM (reports read and there are none — a measured zero)', NO_APP_VIEW,
     rrRefs([]), SYS, [
       ['the empty state says they were READ and there are none',
         (p) => hasText(p, 'The reports were read and there are none recorded yet.')],
@@ -622,7 +1367,7 @@ const SYSTEM_PLAN = [
 
   // Not asked yet. "We have not looked" is not "there are none", and this rung exists to keep those
   // two sentences apart.
-  ['SYSTEM (the reports have not been asked for yet)', 'overview',
+  ['SYSTEM (the reports have not been asked for yet)', NO_APP_VIEW,
     rrRefs(null, { requested: false }), SYS, [
       ['the surface says it has not asked yet',
         (p) => hasText(p, 'The rotation reports have not been read yet.')],
@@ -632,7 +1377,7 @@ const SYSTEM_PLAN = [
 
   // In flight. Leads the chain on rrLoading alone so a RE-read announces too, and the already-read
   // cards stay on screen under it rather than blanking.
-  ['SYSTEM (a read is in flight over already-read reports)', 'overview',
+  ['SYSTEM (a read is in flight over already-read reports)', NO_APP_VIEW,
     rrRefs([RR_RECENT], { loading: true }), SYS, [
       ['the in-flight state is announced', (p) => hasText(p, 'Reading the rotation reports…')],
       ['the already-read card is NOT blanked while the re-read runs', (p) => hasText(p, 'aaaaaaa')],
@@ -641,7 +1386,7 @@ const SYSTEM_PLAN = [
 
   // AC1 ⑥ — the database read failed. Two separate properties: the failure is stated truthfully, AND
   // it is CONTAINED — "failure to load historical reports must not break the rest of the System tab".
-  ['SYSTEM (the database read FAILED)', 'overview',
+  ['SYSTEM (the database read FAILED)', NO_APP_VIEW,
     rrRefs(null, { err: 'the database is not answering' }), SYS, [
       ['the failure is stated as a failure', (p) => hasText(p, 'COULD NOT BE READ')],
       ['and it is explicitly NOT reported as an absence of reports',
@@ -675,6 +1420,137 @@ function scenarios(render) {
   return renderPlan(ASDAIR_PLAN, render).concat(renderPlan(SYSTEM_PLAN, render)).concat(renderPlan(HOME_PLAN, render));
 }
 
+// ══ WP-B15-45 — THE HOUSEHOLD SURFACE PLAN ═══════════════════════════════════════════════════════
+//
+// Driven by the SAME committed fixture the operator scenarios use, so the two surfaces cannot
+// disagree about the shape of a regular. The items are structurally faithful to GET /asdair/rules
+// and every value is invented (see the fixture header).
+const REG = (RULES.regulars && Array.isArray(RULES.regulars.items)) ? RULES.regulars.items : [];
+// A row the data layer cannot name in any form. Not hypothetical: householdName() returns null when
+// there is neither an alias nor a name, and the surface must then omit the row and SAY SO rather
+// than render a blank one or invent a name for it.
+const REG_NAMELESS = REG.concat([{ id_display: '99', aka: [], name_display: '', high_level_category_display: 'Chilled', typical_qty_display: '1', active: true }]);
+const REST = { regulars: REG, loaded: true, loadFailed: false, openQuestions: 0, selected: {}, qty: {}, sendState: 'idle', lastUndo: null };
+const M = (over) => Object.assign({}, REST, over);
+
+// Every quantity that reaches the screen is a bare integer text node; a product name never is, and
+// a count renders as a whole sentence. So this is the rendered-side half of the Addendum B §6.4
+// guarantee — the state-side half is executed directly in the clamp scenario below.
+const noSubMinimumQty = (p) => !p.some((s) => /^-?\d+$/.test(s) && Number(s) < 1);
+
+const MUM_PLAN = [
+  ['MUM S1 (her list, nothing pending)', M({}), [
+    ['the household list renders real items from the fixture', (p) => p.some((s) => /oat drink/i.test(s))],
+    ['a section heading renders', (p) => hasText(p, 'Chilled') || hasText(p, 'Food cupboard')],
+    ['⛔ NO banner occupies the slot when nothing is pending (B §9.1)', (p) => !hasText(p, 'question for you')],
+    ['the zero state is a sentence, not a number', (p) => hasText(p, 'chosen anything yet')],
+    // ⛔ EXACT-NODE MATCH, NOT `hasText`. Since MEDIUM-2 the header instruction also contains the
+    // string "SEND MY SHOPPING LIST" — naming the control by its words is the whole point of that
+    // fix — so a substring search anywhere on the page would pass while the BUTTON was missing.
+    // The button is its own text node; the instruction is a sentence containing it.
+    ['the primary action is present and worded in her language', (p) => p.some((x) => x.trim() === 'SEND MY SHOPPING LIST')],
+    // ⛔ MEDIUM-2, VERA — a defect inherited from Addendum B §6.2's wireframe, not introduced here.
+    // "Press the green button" is wrong at the one moment she reads it: on arrival, with nothing
+    // chosen, B §6.7 requires that button to be visibly DISABLED, and it renders grey. Colour may
+    // never be the sole carrier of meaning (WCAG 1.4.1); the control is named by its words.
+    ['⛔ the instruction names the action by its WORDS, never by its colour',
+      (p) => p.some((s) => /press SEND MY SHOPPING LIST/.test(s)) && !p.some((s) => /green button/i.test(s))],
+    ['the disabled primary action states its reason beside it (B §6.7)', (p) => hasText(p, 'Tap some things first')],
+    ['⛔ no quantity below the floor of 1 reaches the screen', noSubMinimumQty],
+    ['⛔ the word COCKPIT never renders', (p) => !p.some((s) => /cockpit/i.test(s))],
+  ]],
+
+  ['MUM S1 (one question is waiting)', M({ openQuestions: 1 }), [
+    ['the pending banner is present, in words and not a badge (B §7.1)', (p) => hasText(p, 'question for you')],
+    // ⛔ HIGH-2, VERA. The banner asked her for something, offered no control to give it, and did
+    // not say so — S3 being out of scope is correct, but silence in front of a demand is not.
+    // Every other unbuilt affordance on this page states its own limit; this one now does too.
+    ['⛔ the banner STATES that she cannot answer here yet, rather than asking silently',
+      (p) => hasText(p, 'can’t ask you here just yet')],
+    ['⛔ and it names the human who will act, so she is not left holding it (B §9.5)',
+      (p) => p.some((s) => /Warwick will sort this one out/.test(s))],
+    ['⛔ the banner carries NO dismiss control (B §7.1.2)', (p) => !p.some((s) => /^(×|x|close|dismiss|ok|got it)$/i.test(s.trim()))],
+    ['her list is still fully present beneath it', (p) => p.some((s) => /oat drink/i.test(s))],
+  ]],
+
+  ['MUM S1 (two questions are waiting)', M({ openQuestions: 2 }), [
+    ['the count is stated plainly rather than pluralised wrongly', (p) => hasText(p, '2 questions for you')],
+  ]],
+
+  ['MUM S1 (she has chosen things)', M({ selected: { 11: true, 12: true }, qty: { 11: 3 } }), [
+    ['the running count reflects what she chose', (p) => hasText(p, 'chosen 2 things')],
+    ['the changed quantity renders', (p) => p.includes('3')],
+    ['⛔ still no quantity below 1 anywhere', noSubMinimumQty],
+    ['the primary action no longer shows the empty-state reason', (p) => !hasText(p, 'Tap some things first')],
+  ]],
+
+  // AC2. The most important negative assertion on this surface: when the data cannot be read the
+  // screen says so in her words and shows NOTHING ELSE. A screen of invented groceries is worse
+  // than a blank one, because Warwick would believe it.
+  ['MUM S1 (the list cannot be read)', M({ regulars: [], loadFailed: true }), [
+    ['it says so plainly and reassures her nothing is lost', (p) => hasText(p, 'see your shopping list at the moment')],
+    ['⛔ NOT ONE invented item name appears', (p) => !p.some((s) => /oat drink|cheese|juice/i.test(s))],
+    ['⛔ no technical error, code or service name (B §9.5)', (p) => !p.some((s) => /error|failed|500|503|fetch|http/i.test(s))],
+  ]],
+
+  ['MUM S1 (nothing on her list yet)', M({ regulars: [] }), [
+    ['the empty state is a plain sentence', (p) => hasText(p, 'nothing on your list yet')],
+    ['⛔ it is NOT presented as a failure', (p) => !hasText(p, 'see your shopping list at the moment')],
+  ]],
+
+  // ⛔ THE HONEST SEND. This scenario is the one that proves the surface does not lie about the half
+  // that is not built. Addendum B §9.6: "The UI never claims something was sent when it was not."
+  ['MUM S1 (she has pressed the send button)', M({ selected: { 11: true }, sendState: 'not-connected' }), [
+    ['it states plainly that the sending part is not finished', (p) => hasText(p, 'that part isn')],
+    ['it states that nothing was sent and nothing was lost', (p) => hasText(p, 'Nothing has been sent')],
+    ['⛔ it NEVER renders a success or thank-you state', (p) => !p.some((s) => /thank you|on its way|all done|getting your shopping ready/i.test(s))],
+    // Same precision, and this is the direction that actually bit: the absence check went RED on a
+    // correct surface the moment the instruction started naming the button. A negative assertion
+    // scoped to the whole page is only as good as the copy never mentioning the thing.
+    ['⛔ the primary action is REPLACED, not left tappable (B §6.7)', (p) => !p.some((x) => x.trim() === 'SEND MY SHOPPING LIST')],
+    ['her list is still visible and unlost', (p) => p.some((s) => /oat drink/i.test(s))],
+  ]],
+
+  ['MUM S1 (a row the data cannot name)', M({ regulars: REG_NAMELESS }), [
+    ['the unnameable row is counted and declared, never blank-rendered', (p) => hasText(p, 'show properly')],
+    ['⛔ no empty-string name is rendered as a product', (p) => !p.some((s) => s.trim() === '')],
+  ]],
+
+  // ── EXECUTED DIRECTLY, NOT RENDERED ────────────────────────────────────────────────────────────
+  // Addendum B §6.4 rule 5 makes the clamp a STATE guarantee: "so a repeated-event, double-fire or
+  // race can never produce 0 or a negative. The disabled button is the affordance; the clamp is the
+  // guarantee. Both are required." A boundary proven only by tapping a rendered button has not been
+  // reached at all — so this calls the shipping function through the app's own published surface.
+  // Addendum E A4 asks for exactly this pairing: adversarial tapping AND a state-level test.
+  ['MUM (the quantity clamp, executed not rendered)', {}, [
+    ['zero clamps up to the floor of 1', () => SHOP.clampQty(0) === 1],
+    ['⛔ a negative can never survive the update', () => SHOP.clampQty(-1) === 1 && SHOP.clampQty(-9999) === 1],
+    ['the floor itself is stable', () => SHOP.clampQty(1) === 1],
+    ['the cap holds at 20', () => SHOP.clampQty(20) === 20 && SHOP.clampQty(21) === 20 && SHOP.clampQty(9999) === 20],
+    ['a normal value passes through', () => SHOP.clampQty(3) === 3],
+    ['⛔ a non-number resolves to the floor, never to NaN or 0', () => SHOP.clampQty(NaN) === 1 && SHOP.clampQty(undefined) === 1 && SHOP.clampQty(null) === 1 && SHOP.clampQty('nonsense') === 1],
+    ['a numeric string from the API is accepted', () => SHOP.clampQty('3') === 3],
+    ['a fractional value cannot land between whole items', () => SHOP.clampQty(2.4) === 2 && SHOP.clampQty(0.4) === 1],
+  ], { pure: true }],
+
+  // The naming fallback Larry approved, executed rather than described — and the third assertion is
+  // the one that matters: no name in, NOTHING invented out.
+  ['MUM (the naming fallback, executed not rendered)', {}, [
+    ['her own words are preferred over the retailer string', () => SHOP.householdName({ aka: ['oat milk'], name_display: 'Example Brand Oat Drink 1L' }) === 'Oat milk'],
+    ['the retailer string is the fallback when she has no word for it', () => SHOP.householdName({ aka: [], name_display: 'Example Brand Oat Drink 1L' }) === 'Example Brand Oat Drink 1L'],
+    ['⛔ with neither, it returns nothing rather than inventing a name', () => SHOP.householdName({ aka: [], name_display: '' }) === null && SHOP.householdName(null) === null],
+    ['⛔ the API word "unknown" never becomes a section heading', () => SHOP.sectionLabel({ high_level_category_display: 'unknown' }) === SHOP.OTHER && SHOP.sectionLabel({}) === SHOP.OTHER],
+  ], { pure: true }],
+];
+
+function mumScenarios(shopRender) {
+  return MUM_PLAN.map(([name, refs, checks, opts2]) => {
+    const r = mumScenario(name, refs, shopRender, opts2 || {});
+    r.checks = checks || null;
+    return r;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // MUTATION TEST — the `has` trap is the mechanism; prove it still catches.
 // A harness whose detector has silently stopped detecting looks exactly like a clean run.
@@ -694,7 +1570,13 @@ if (SELF_TEST) {
   const missed = [];
   for (const [name, mutate] of Object.entries(cases)) {
     setRefs({ asdairWs: WS, asdairWsErr: null });
-    const r = scenario('mutant', 'details', Vue.compile(mutate(opts.template)));
+    // ⛔ 'shop', NOT the stale 'details'. WP-B15-36: with a view key the registry no longer carries,
+    // `currentView` was undefined and the BREADCRUMB threw before any mutation could be reached — so
+    // all three of these reported "caught -> threw: Cannot read properties of undefined (reading
+    // 'label')" on untouched HEAD. Every one was VACUOUS: the has-trap detector this block exists to
+    // prove was never exercised. A mutation test that passes for the wrong reason is worse than
+    // none, because it gets quoted as evidence.
+    const r = scenario('mutant', 'shop', Vue.compile(mutate(opts.template)));
     const hit = r.err || r.missing.length;
     if (hit) { caught++; console.log('  caught  ' + name.padEnd(42) + ' -> ' + (r.err ? 'threw: ' + r.err.message.slice(0, 60) : 'missing: ' + r.missing.join(', '))); }
     else { missed.push(name); console.log('  MISSED  ' + name); }
@@ -705,16 +1587,58 @@ if (SELF_TEST) {
   {
     setRefs({ asdairWs: WS, asdairWsErr: null });
     const mutated = opts.template.replace(anchor, anchor + '<p>{{ JSON.stringify(asdairWs) }}</p>');
-    const r = scenario('mutant', 'details', Vue.compile(mutated));
+    // 'shop' for the same reason as above: on HEAD this scenario THREW, `strays` was forced to [],
+    // and the mutation was reported MISSED every run. Fixing the key is what makes it a real test.
+    const r = scenario('mutant', 'shop', Vue.compile(mutated));
     const strays = r.err ? [] : strayJsonBlobs(text(r.vnode));
     if (strays.length) { caught++; console.log('  caught  ' + 'stray raw JSON outside a drawer'.padEnd(42) + ' -> ' + strays[0].slice(0, 60)); }
     else { missed.push('stray raw JSON outside a drawer'); console.log('  MISSED  stray raw JSON outside a drawer'); }
+  }
+  // ── WP-B15-42: THE BANNED-VOCABULARY MUTATIONS ──────────────────────────────────────────────
+  // One per rule, because they are three different rules and a single mutation proving one of them
+  // fires says nothing about the other two. Larry's instruction was explicit: the "verified" ban
+  // must be a harness assertion, not a one-time sweep, "because a sweep decays the moment someone
+  // adds a string". A detector nobody has made fail is not evidence — it is a hope.
+  {
+    const vocabCases = {
+      'vocabulary: a screen calls corroboration VERIFIED':
+        (t) => t.replace(anchor, anchor + '<p>Every line was verified against the photograph.</p>'),
+      'vocabulary: the API word "unknown" reaches a value slot':
+        (t) => t.replace(anchor, anchor + '<p>{{ "unknown" }}</p>'),
+      'vocabulary: the ZZ brand sort sentinel is rendered as a brand':
+        (t) => t.replace(anchor, anchor + '<p>ZZ (no brand recorded)</p>'),
+      // VERA V-4. Mutated through a REAL undefined property, and CONCATENATED — which is how the
+      // live leak actually rendered ("undefined/undefined"). A bare `{{ undefined }}` is useless as
+      // a mutation: Vue renders it as an empty string, so it proves nothing. Found by running it.
+      'vocabulary: a raw JavaScript undefined reaches the screen':
+        (t) => t.replace(anchor, anchor + '<p>WO first pass {{ currentApp.noSuchField + "/" + currentApp.noSuchField }}</p>'),
+    };
+    total += Object.keys(vocabCases).length;
+    for (const [name, mutate] of Object.entries(vocabCases)) {
+      setRefs({ asdairWs: WS, asdairWsErr: null });
+      const r = scenario('mutant', 'shop', Vue.compile(mutate(opts.template)));
+      const hits = r.err ? [] : bannedVocabulary(r.name, text(r.vnode));
+      if (hits.length) { caught++; console.log('  caught  ' + name.padEnd(48) + ' -> ' + hits[0].slice(0, 60)); }
+      else { missed.push(name); console.log('  MISSED  ' + name); }
+    }
+    // The control both ways round: the SANCTIONED unbranded heading must NOT be flagged, or the
+    // detector fires on the feature and gets switched off — the same trade the drawer control makes.
+    setRefs({ asdairWs: WS, asdairWsErr: null });
+    const clean = scenario('control', 'shop', Vue.compile(
+      opts.template.replace(anchor, anchor + '<p>No brand recorded</p><p>Corroborated</p>')));
+    const falsePos = clean.err ? [] : bannedVocabulary('SHOP control', text(clean.vnode));
+    console.log(falsePos.length
+      ? '  CONTROL FAILED — the sanctioned unbranded heading is being flagged: ' + falsePos[0]
+      : '  control  sanctioned "No brand recorded" heading and "Corroborated" correctly NOT flagged');
+    if (falsePos.length) missed.push('vocabulary false-positive');
   }
   // ...and the other half: the SANCTIONED drawer must NOT be flagged, or the check cries wolf and
   // gets ignored. A detector that fires on the feature is as useless as one that misses the bug.
   {
     setRefs({ asdairWs: WS, asdairWsErr: null });
-    const r = scenario('control', 'details', Vue.compile(opts.template));
+    // 'about' — the drawer lives in Diagnostics, so that is the only view where this control is
+    // testing anything at all. ('details' threw; before that it named a view without the drawer.)
+    const r = scenario('control', 'about', Vue.compile(opts.template));
     const strays = strayJsonBlobs(text(r.vnode));
     console.log(strays.length
       ? '  CONTROL FAILED — the sanctioned "' + DRAWER_LABEL + '" drawer is being flagged as stray'
@@ -776,11 +1700,73 @@ if (SELF_TEST) {
     else { missed.push(name); console.log('  MISSED  ' + name.padEnd(48) + ' -> 0 of ' + n + ' assertions red' + seen); }
   }
 
+  // ── WP-B15-45: THE HOUSEHOLD BUILDER-VOCABULARY MUTATIONS ───────────────────────────────────
+  //
+  // One per rule in MUM_VOCABULARY, for the reason the WP-B15-42 block states and which applies
+  // with more force here: a detector nobody has made fail is not evidence, it is a hope. AC3 asked
+  // specifically that "Cockpit" and a status enum be injected and the harness shown to go red —
+  // that is mutations 1 and 6 below. The other five are here because a ban that is only proven for
+  // the word someone thought to test is a ban on that word, not on the vocabulary.
+  //
+  // Every mutation is IN MEMORY. public/shopping.js is never written, not even temporarily.
+  {
+    const mumAnchor = '<div class="page page-pad">';
+    if (!shopOpts.template.includes(mumAnchor)) {
+      console.error('SELF-TEST FAIL — the household template anchor is missing; rewrite the mutations.');
+      process.exit(1);
+    }
+    const mumCases = {
+      'household: the word COCKPIT reaches her screen':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Back to the Cockpit</p>'),
+      'household: the system names itself to her':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>AsdAIr is getting your shopping ready</p>'),
+      'household: catalogue identity vocabulary leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Choose a regular from the catalogue</p>'),
+      'household: retail-operator vocabulary leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Added to your basket</p>'),
+      'household: machine vocabulary leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>The API endpoint did not answer</p>'),
+      'household: a status enum leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>needs_decision</p>'),
+      'household: a SHA or bare identifier leaks':
+        (t) => t.replace(mumAnchor, mumAnchor + '<p>Build 3b2a574f</p>'),
+    };
+    total += Object.keys(mumCases).length;
+    for (const [name, mutate] of Object.entries(mumCases)) {
+      const r = mumScenario('mutant', M({}), Vue.compile(mutate(shopOpts.template)));
+      const hits = r.err ? [] : mumVocabulary(text(r.vnode));
+      if (hits.length) { caught++; console.log('  caught  ' + name.padEnd(48) + ' -> ' + hits[0].slice(0, 60)); }
+      else { missed.push(name); console.log('  MISSED  ' + name); }
+    }
+    // The control both ways round, and it is not a formality: Addendum B §7.4 and §9.4 sanction
+    // "They've run out of the usual eggs", which is why /\brun\b/ is deliberately absent from
+    // MUM_VOCABULARY. If someone adds it back, this control goes red BEFORE the gate does, and the
+    // message says which sentence it broke rather than leaving the next reader to find out.
+    const cleanMum = mumScenario('control', M({}), Vue.compile(shopOpts.template.replace(
+      mumAnchor, mumAnchor + '<p>They have run out of the usual eggs, so I have left them out.</p>')));
+    const mumFalsePos = cleanMum.err ? [] : mumVocabulary(text(cleanMum.vnode));
+    console.log(mumFalsePos.length
+      ? '  CONTROL FAILED — sanctioned household copy is being flagged: ' + mumFalsePos[0]
+      : '  control  sanctioned "run out of" copy correctly NOT flagged');
+    if (mumFalsePos.length) missed.push('household vocabulary false-positive');
+  }
+
   setRefs({ asdairWs: WS, asdairWsErr: null, asdairRules: RULES, asdairRulesErr: null });
-  const control = scenarios(Vue.compile(opts.template));
-  const dirty = control.filter((r) => r.err || r.missing.length);
+  const control = scenarios(Vue.compile(opts.template))
+    .concat(mumScenarios(Vue.compile(shopOpts.template)));
+  // WP-B15-42: the vocabulary detector is part of the control, not only of the mutations. A detector
+  // that fires on the SHIPPING template would make every run red for the wrong reason, and the first
+  // thing anyone does with a permanently-red gate is stop reading it.
+  // Both detectors, on whichever surface each scenario belongs to — the same pairing the gate uses.
+  // A control that ran only the operator rules would leave the household ban unproven against false
+  // positives, which is the half that actually decides whether a detector survives contact.
+  const allVocab = (r) => (r.err ? [] : bannedVocabulary(r.name, text(r.vnode))
+    .concat(r.mum ? mumVocabulary(text(r.vnode)) : []));
+  const dirty = control.filter((r) => r.err || r.missing.length || allVocab(r).length);
   console.log(dirty.length
-    ? '  CONTROL FAILED — unmutated template reports: ' + dirty.map((d) => d.name + (d.err ? ' threw' : ' missing ' + d.missing.join(','))).join(' | ')
+    ? '  CONTROL FAILED — unmutated template reports: ' + dirty.map((d) => d.name
+      + (d.err ? ' threw' : (d.missing.length ? ' missing ' + d.missing.join(',')
+        : ' banned vocabulary: ' + allVocab(d)[0]))).join(' | ')
     : '  control  all ' + control.length + ' unmutated scenarios clean (no false positive)');
   // The verdict layer's own control: on the UNMUTATED template every assertion must pass, and there
   // must be some. A mutation harness that reports reds while the control is also red proves nothing.
@@ -797,7 +1783,7 @@ if (SELF_TEST) {
 
 const render = Vue.compile(opts.template);
 setRefs({ asdairWs: WS, asdairWsErr: null, asdairRules: RULES, asdairRulesErr: null });
-const results = scenarios(render);
+const results = scenarios(render).concat(mumScenarios(Vue.compile(shopOpts.template)));
 
 let bad = 0, ran = 0, failed = 0;
 const sink = (name, pass, why) => {
@@ -812,13 +1798,19 @@ for (const r of results) {
   const t = text(r.vnode);
   const n = count(r.vnode).el;
   const blob = strayJsonBlobs(t);
+  // Both detectors on the household surface: the estate-wide honesty rules AND the operator-
+  // vocabulary ban that is specific to her screen. Warwick's screens run only the first, because
+  // status enums and service names are exactly what his surface exists to show him.
+  const vocab = bannedVocabulary(r.name, t).concat(r.mum ? mumVocabulary(t) : []);
   const before = ran;
   runChecks(r, sink);
   console.log(String(n).padStart(5) + ' vnodes  ' + String(t.join(' ').length).padStart(6) + ' chars  ' +
     String(ran - before).padStart(3) + ' asserts  ' +
-    (blob.length ? 'RAW-JSON-IN-TEXT:' + blob.length + '  ' : '') + r.name +
+    (blob.length ? 'RAW-JSON-IN-TEXT:' + blob.length + '  ' : '') +
+    (vocab.length ? 'BANNED-VOCABULARY:' + vocab.length + '  ' : '') + r.name +
     (r.missing.length ? '   MISSING BINDINGS: ' + r.missing.join(', ') : ''));
-  if (r.missing.length || blob.length) bad++;
+  for (const v of vocab) console.error('  BANNED VOCABULARY — ' + r.name + ' :: ' + v);
+  if (r.missing.length || blob.length || vocab.length) bad++;
   dump.push('===== ' + r.name + ' =====\n' + t.join('\n'));
 }
 if (DUMP) writeFileSync(DUMP, dump.join('\n\n'), 'utf8');
