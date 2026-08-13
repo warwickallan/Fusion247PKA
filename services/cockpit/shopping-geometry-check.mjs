@@ -108,7 +108,25 @@ const VIEWS = [
   { label: 'LARGE 46 rows at 200% zoom 640x400', w: 640, h: 400, large: true },
 ];
 
-const MEASURE = `(() => {
+// ⛔ MEASURE IS A REAL FUNCTION THAT IS STRINGIFIED, NOT A TEMPLATE LITERAL. THIS IS THE FIX FOR A
+// TRAP THAT BIT FOUR TIMES IN ONE PACKAGE, and the fourth time proved the guard I had written for
+// it was itself useless.
+//
+// As a template literal, a single backtick anywhere inside — including inside a COMMENT quoting a
+// CSS selector or a JS expression the way anyone naturally would — terminated the string. Node
+// then reported a SyntaxError or ReferenceError pointing at an unrelated word several lines away
+// ("Unexpected identifier 'q'", "count is not defined", "Unexpected identifier 'covered'").
+//
+// I first responded by adding a runtime guard that checked MEASURE for a backtick. THAT GUARD CAN
+// NEVER FIRE: a stray backtick is a PARSE error, so the module never loads and no runtime check in
+// it ever executes. It was a control that looked like a control and could not work — the same
+// class of defect as everything else this file has caught, committed by me while writing the file
+// whose job is to catch that class.
+//
+// Written as a function, the problem does not exist to be guarded: comments may contain whatever
+// they need to, the syntax is checked by the parser like any other code, and `toString()` gives
+// the browser exactly these bytes.
+const measureInPage = () => {
   const q = (s) => Array.from(document.querySelectorAll(s));
   const cs = (e, p) => getComputedStyle(e).getPropertyValue(p);
   const px = (e, p) => parseFloat(cs(e, p));
@@ -144,7 +162,7 @@ const MEASURE = `(() => {
 
   // Composited colour pairs, resolved by walking up for the first non-transparent backdrop — the
   // same model GL-003 §2b-bis uses, applied to what the browser actually produced.
-  const bgOf = (e) => { let n = e; while (n) { const b = cs(n, 'background-color'); if (b && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(b)) return b; n = n.parentElement; } return 'rgb(255, 255, 255)'; };
+  const bgOf = (e) => { let n = e; while (n) { const b = cs(n, 'background-color'); if (b && !/rgba\(0, 0, 0, 0\)|transparent/.test(b)) return b; n = n.parentElement; } return 'rgb(255, 255, 255)'; };
   const pairs = [];
   q('.h-title,.h-say,.r-name,.q-num,.sec,.send,.f-count,.f-why,.banner h2,.banner p,.note,.empty,.undo,.add,.q-btn')
     .forEach((e) => { if (vis(e) && e.textContent.trim()) pairs.push({ sel: (e.className||e.tagName).split(' ')[0], fg: cs(e, 'color'), bg: bgOf(e), size: px(e, 'font-size') }); });
@@ -181,7 +199,7 @@ const MEASURE = `(() => {
   // coverage. Now every row AND the add control are tested, and the worst case is reported.
   const foot = document.querySelector('.foot');
   const candidates = q('.row, .add');
-  let coveredAtRest = null, unreachableAtEnd = null, occludedAtRest = [];
+  let coveredAtRest = null, unreachableAtEnd = null, occludedAtRest = [], buriedAtEnd = [], footClipped = 0;
   // ⛔ AND THE REQUIREMENT IS NOT MERELY "NOTHING OVERLAPS". Vera's words: for a technology-phobic
   // 84-year-old the first screen IS the whole product. B §7.1.1 puts the pending banner inside the
   // initial viewport in both orientations, and B §6.1 puts her shopping on the landing screen. So
@@ -216,11 +234,21 @@ const MEASURE = `(() => {
     // ⚠️ NARROWING FLAGGED FOR VERA: she wrote "one full item row". This asserts the tick rather
     // than the whole box, and reports the strict figure beside it so the difference is visible
     // rather than quietly resolved.
+    // ⛔ NARROWING-2 AMENDMENT (Vera, 18b0f98). "She can see and use her shopping" is TWO VERBS,
+    // and this assertion originally tested only the second. A tick that is visible and hit-testable
+    // while the product NAME sits below the fold would have passed — giving her a tappable control
+    // attached to nothing she can read. It happens to hold by layout coincidence at all ten
+    // viewports today; coincidence is not construction, so the name is now part of the condition
+    // and the hole is closed before a layout change can find it.
     const rowsAtRest = q('.row');
     const tickUsable = (row) => {
       const tick = row.querySelector('.tick'); if (!tick) return false;
       const rt = R(tick);
       if (rt.top < 0 || rt.bottom > innerHeight) return false;    // the thing she taps must be ON SCREEN
+      const name = row.querySelector('.r-name');                  // ...and so must the thing she reads
+      if (!name) return false;
+      const rn = R(name);
+      if (rn.top < 0 || rn.bottom > innerHeight) return false;
       const hit = document.elementFromPoint(rt.left + rt.width / 2, rt.top + rt.height / 2);
       return !!(hit && row.contains(hit));                        // and the tap must land on THIS row
     };
@@ -232,12 +260,50 @@ const MEASURE = `(() => {
     const banner = document.querySelector('.banner');
     bannerInInitialViewport = banner ? (R(banner).top >= 0 && R(banner).bottom <= innerHeight) : null;
 
+    // ══ HIGH-4 — THE THIRD NARROWING, WHICH I DID NOT FLAG AND WHICH DEFANGED THE CHECK ══════════
+    //
+    // This condition was `covered OR off-screen`. In the same edit that narrowed coveredAtRest I
+    // also changed it to `covered AND off-screen`, and said nothing about it. Those two limbs are
+    // very nearly MUTUALLY EXCLUSIVE: a control buried under a bottom-pinned footer is INSIDE the
+    // viewport, so the off-screen limb is false and the whole condition can never fire.
+    //
+    // Vera reinstated the genuine defect shape (`.foot{position:fixed;height:520px}` with
+    // `.page-pad{padding-bottom:0}`) at 800x1280 — the exact viewport where the original version of
+    // this gate found it. `.add` and the last row were both buried, elementFromPoint returned
+    // `.foot`, and the post-narrowing gate went red on NOTHING. The pre-narrowing one would have
+    // gone red on both. The hole was specifically TALL PORTRAIT, where the top of the page is fine
+    // and the bottom is buried, so firstUsableRowVisible does not see it either.
+    //
+    // Restored as HIT-TESTING rather than as the old OR, because that is strictly better and it is
+    // what Vera asked for: at maximum scroll — where there is nowhere further to go — every control
+    // that is ON SCREEN must resolve elementFromPoint at its own centre to ITSELF, and nothing may
+    // still be below the fold. Box arithmetic asks whether two rectangles intersect; this asks
+    // whether her finger reaches the thing she is aiming at, which is the actual requirement.
     scrollTo(0, document.documentElement.scrollHeight);
-    const rfEnd = rf0();
-    unreachableAtEnd = candidates.some((e) => {
+    const atEnd = candidates.concat(q('.send, .note, .undo'));
+    for (const e of atEnd) {
       const r = R(e);
-      return (r.bottom > rfEnd.top && r.top < rfEnd.bottom) && r.top >= innerHeight;
-    });
+      if (r.width === 0 && r.height === 0) continue;
+      if (r.bottom <= 0) continue;                       // scrolled above the fold: reachable by scrolling UP
+      if (r.top >= innerHeight) { buriedAtEnd.push((e.className || e.tagName).toString().split(' ')[0] + ' is still below the fold at maximum scroll'); continue; }
+      const cx = r.left + r.width / 2;
+      const cy = Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 1);
+      const hit = document.elementFromPoint(cx, cy);
+      if (!hit) { buriedAtEnd.push((e.className || e.tagName).toString().split(' ')[0] + ' has NOTHING at its own centre at maximum scroll (clipped away)'); continue; }
+      if (e !== hit && !e.contains(hit)) buriedAtEnd.push((e.className || e.tagName).toString().split(' ')[0] + ' resolves to ' + ((hit.className || hit.tagName).toString().split(' ')[0]) + ' at its own centre at maximum scroll');
+    }
+    unreachableAtEnd = buriedAtEnd.length > 0;
+
+    // ⛔ HIGH-3 — THE FOOTER MUST NOT CLIP ITS OWN CONTENTS. `max-height` plus `overflow: hidden`
+    // painted 30px of an 88px primary action and ZERO pixels of the post-send message, while every
+    // box-based measurement in this file happily reported 88px — because getBoundingClientRect
+    // returns the LAYOUT BOX, which an ancestor's overflow does not change.
+    // Vera's naming of the class is the durable part: flex-shrink (declared 88, rendered 82),
+    // D-17 opacity (declared 5.02, rendered 3.91), and now clipping (box 88, painted 30). Three
+    // instances in one package of "the box passes, the render does not".
+    footClipped = foot.scrollHeight > foot.clientHeight
+      ? foot.scrollHeight - foot.clientHeight : 0;
+
     scrollTo(0, y0);
   }
 
@@ -259,14 +325,24 @@ const MEASURE = `(() => {
   // gate records whether it arrived. dispatchEvent is synchronous, so this needs no waiting.
   // In the PASSING case nothing mutates, because nothing reaches a handler. In the failing case the
   // row may toggle — which does not matter, because the run is already red.
+  // ⛔ THE ROW IS SCROLLED INTO VIEW FIRST, and the count of rows actually exercised is REPORTED.
+  // Vera, 18b0f98: this ran on ZERO rows at 640x400, 400x640 and 320x800, because `elementFromPoint`
+  // returns null for a point outside the viewport and the early return skipped every row whose
+  // midpoint was below the fold. The self-test's honest "9 of 10 viewports" was the symptom — the
+  // one viewport where the mutation could not be caught was the one where nothing was tested.
+  // A check that silently examines nothing is the same failure as a scope that excludes the defect.
   const deadSpaceLive = [];
+  let deadSpaceRowsTested = 0;
+  const yDead = scrollY;
   q('.row').forEach((row, i) => {
     const b = row.querySelectorAll('.q-btn');
     if (b.length < 2) return;
+    row.scrollIntoView({ block: 'center' });
     const r0 = R(b[0]), r1 = R(b[1]);
     const midX = (r0.right + r1.left) / 2, midY = (r0.top + r0.bottom) / 2;
     const hit = document.elementFromPoint(midX, midY);
     if (!hit) return;
+    deadSpaceRowsTested++;
     let reached = false;
     const spy = () => { reached = true; };
     row.addEventListener('click', spy);
@@ -274,34 +350,21 @@ const MEASURE = `(() => {
     row.removeEventListener('click', spy);
     if (reached) deadSpaceLive.push('row ' + i + ': a tap between MINUS and PLUS reached the row toggle via ' + (hit.className || hit.tagName));
   });
+  scrollTo(0, yDead);
 
   return {
     viewport: { w: innerWidth, h: innerHeight },
     horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
     rowCount: rows.length, targets, gutters, oppos, smallest, smallestText, pairs, faded,
-    coveredAtRest, unreachableAtEnd, occludedAtRest, deadSpaceLive,
+    coveredAtRest, unreachableAtEnd, occludedAtRest, buriedAtEnd, footClipped, deadSpaceLive, deadSpaceRowsTested,
     firstUsableRowVisible, firstWholeRowVisible, bannerInInitialViewport,
     cockpitWord: /cockpit/i.test(document.body.innerText),
     title: document.title,
   };
-})()`;
+};
+const MEASURE = '(' + measureInPage.toString() + ')()';
 
 
-// ⛔ RECURRENCE GUARD — MEASURE IS A TEMPLATE LITERAL, SO A BACKTICK ANYWHERE INSIDE IT ENDS THE
-// STRING. Including inside a comment. Including inside a comment quoting a CSS selector the way you
-// would in code. This bit three times while writing this file, and each time Node reported it as a
-// SyntaxError or a ReferenceError pointing at an unrelated word several lines away
-// ("Unexpected identifier 'q'", "count is not defined"), which says nothing about the cause.
-// render-vm-check.mjs carries the same guard for app.js's Vue template for the same reason, and
-// that one was written after the identical mistake cost two debugging rounds on WP-B15-42.
-// A self-inflicted trap that recurs is a missing control, not carelessness.
-if (MEASURE.includes('`')) {
-  console.error('SHOPPING-GEOMETRY-CHECK — MEASURE contains a backtick, which terminates its own');
-  console.error('  template literal. Use double quotes inside it, including in comments. This is a');
-  console.error('  guard rather than a diagnosis after the fact: by the time Node parses it, the');
-  console.error('  error it reports points somewhere else entirely.');
-  process.exit(1);
-}
 
 // WCAG 2.x relative luminance — the §2d method, applied to the RENDERED rgb() the browser resolved.
 const lin = (v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
@@ -338,7 +401,23 @@ function rootTokens(file) {
 {
   const theirs = rootTokens(path.join(HERE, 'public', 'styles.css'));
   const ours = rootTokens(path.join(HERE, 'public', 'shopping.css'));
+  // ⛔ THE EXPECTED SET IS PINNED, NOT COUNTED AT RUNTIME (Vera, 18b0f98). Comparing only the
+  // INTERSECTION means a GL-003 rename silently shrinks it — shared drops 13 to 12, `drift` stays
+  // 0, and nothing goes red while this surface quietly stops tracking a token that moved. The
+  // literal below is the control; it lives here, outside both stylesheets, so neither file can
+  // move it by being edited.
+  const EXPECTED_SHARED = Object.freeze(['--bg', '--panel', '--panel2', '--ink', '--ink2', '--hair',
+    '--accent-ink', '--ok', '--ok-w', '--warn', '--warn-w', '--stop', '--stop-w']);
   const shared = Object.keys(ours).filter((k) => k in theirs);
+  const missing = EXPECTED_SHARED.filter((k) => !shared.includes(k));
+  const unexpected = shared.filter((k) => !EXPECTED_SHARED.includes(k));
+  if (missing.length || unexpected.length) {
+    console.error('SHOPPING-GEOMETRY-CHECK FAIL — the set of tokens shared with GL-003 has CHANGED, '
+      + 'which a drift check comparing only the intersection cannot see:');
+    for (const k of missing) console.error('        ⛔ ' + k + ' is no longer shared — renamed or removed in styles.css, so this surface has silently stopped tracking it');
+    for (const k of unexpected) console.error('        ⛔ ' + k + ' is newly shared and is not in the pinned list — add it deliberately, having measured it');
+    process.exit(1);
+  }
   const drift = shared.filter((k) => ours[k] !== theirs[k]);
   if (shared.length === 0) {
     console.error('SHOPPING-GEOMETRY-CHECK — token parity found ZERO shared tokens, which means the '
@@ -355,7 +434,7 @@ function rootTokens(file) {
       + 're-measure BOTH schemes and update GL-003 §2b before touching this surface.');
     process.exit(1);
   }
-  console.log('token parity  ' + shared.length + ' shared GL-003 token(s) byte-identical in shopping.css '
+  console.log('token parity  ' + shared.length + '/' + EXPECTED_SHARED.length + ' pinned GL-003 token(s) byte-identical in shopping.css '
     + '(--ink3, --park and --accent deliberately excluded from this surface)');
 }
 
@@ -452,6 +531,19 @@ const MUTATIONS = {
   // MINUS and PLUS falls through to the row and toggles it. This is the mutation that would have
   // caught the original bug, and it is the second of the two failed fixes.
   'the gap between MINUS and PLUS is live again': { css: '.q{pointer-events:none !important}' },
+  // ── THE THREE ADDED AT VERA'S 18b0f98 GATE ───────────────────────────────────────────────────
+  // HIGH-3, reinstated EXACTLY as it shipped. This is the declaration I added as a "defensive
+  // ceiling" and never measured; it painted 30px of an 88px action and zero pixels of the post-send
+  // message while every box measurement in this file reported 88px.
+  'the footer clips its own contents (the 18b0f98 regression)': { css: '.foot{max-height:40vh !important;overflow:hidden !important}' },
+  // HIGH-4, in the shape Vera used to prove the narrowed assertion had stopped asserting: a
+  // bottom-pinned footer burying the last controls INSIDE the viewport, which the `covered AND
+  // off-screen` form could never see because the off-screen limb is false by construction.
+  'the last controls are buried under a pinned footer': { css: '.foot{position:fixed !important;bottom:0;left:0;right:0;height:520px !important}.page-pad{padding-bottom:0 !important}' },
+  // The narrowing-2 amendment: a tick she can tap attached to a name she cannot read. Moves the
+  // name out of view without disturbing the tick, which is precisely the layout the pre-amendment
+  // condition would have passed.
+  'a tappable tick attached to an unreadable name': { css: '.r-name{position:relative !important;top:1200px !important}' },
 };
 
 // ⛔ THE FOOTER-OVERLAP ASSERTION HAS NO MUTATION, AND THAT IS A DELIBERATE, RECORDED DECISION
@@ -518,6 +610,35 @@ async function setMutation(mut) {
   }
   await wait(180);
 }
+// ⛔ THE POST-SEND STATE, WHICH THIS GATE HAS NEVER RENDERED UNTIL NOW (Vera, 18b0f98).
+// HIGH-3's worst case was not the SEND button — it was the message that REPLACES it. At 640x400 the
+// clipped `.note` painted ZERO pixels: she presses SEND and the screen does not respond at all, and
+// the one message that Addendum B §9.6 and Addendum E criterion 9 make load-bearing is simply not
+// there. A gate that only ever measures the resting state cannot see that, however many viewports
+// it measures it at.
+// Driven through the REAL surface — a real click on a row to choose something, a real click on the
+// primary action — rather than by poking a ref, because the state that matters is the one her taps
+// actually produce. Vue renders asynchronously, so this awaits two animation frames.
+const DRIVE_POST_SEND = `(async () => {
+  const row = document.querySelector('.row');
+  const send = document.querySelector('.send');
+  if (!row || !send) return 'no row or no action';
+  row.click();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const s2 = document.querySelector('.send');
+  if (!s2) return 'action vanished after choosing';
+  s2.click();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return document.querySelector('.note') ? 'post-send' : 'no note rendered';
+})()`;
+async function drivePostSend() {
+  const r = await cmd('Runtime.evaluate', { expression: DRIVE_POST_SEND, returnByValue: true, awaitPromise: true });
+  if (r.result && r.result.exceptionDetails) {
+    throw new Error('driving the post-send state threw in the page: '
+      + (r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text));
+  }
+  return r.result && r.result.result ? r.result.result.value : 'unknown';
+}
 async function readMeasurement() {
   const r = await cmd('Runtime.evaluate', { expression: MEASURE, returnByValue: true });
   if (r.result && r.result.exceptionDetails) {
@@ -529,7 +650,16 @@ async function readMeasurement() {
 async function measure(css) {
   const out = {};
   for (const v of VIEWS) {
-    out[v.label] = await atViewport(v, async () => { await setMutation(css ? { css } : null); return readMeasurement(); });
+    await atViewport(v, async () => {
+      await setMutation(css ? { css } : null);
+      out[v.label] = await readMeasurement();
+      // The same viewport, after she has chosen something and pressed the action. Reported as its
+      // own row so a failure names the state it belongs to.
+      const drove = await drivePostSend();
+      const post = await readMeasurement();
+      post.postSend = drove;
+      out[v.label + '  [after SEND]'] = post;
+    });
   }
   return out;
 }
@@ -547,31 +677,58 @@ function verdict(label, m) {
   for (const g of m.gutters) if (g < FLOOR.gapOpposite) bad.push('dead space between the row-select area and the first quantity control is ' + g + 'px, under ' + FLOOR.gapOpposite + 'px');
   for (const g of m.oppos) if (g < FLOOR.gapOpposite) bad.push('dead space between MINUS and PLUS is ' + g + 'px, under ' + FLOOR.gapOpposite + 'px — that is the mis-tap that must never happen');
   if (m.smallest < FLOOR.text) bad.push('smallest rendered text is ' + m.smallest + 'px ("' + m.smallestText + '"), under the ' + FLOOR.text + 'px floor');
+  // ⛔ THE INSTRUMENT MUST REPORT ITSELF BROKEN RATHER THAN REPORT DEFECTS.
+  // Converting MEASURE from a template literal to a stringified function left the backdrop-walk
+  // regex over-escaped, so it stopped recognising "rgba(0, 0, 0, 0)" and returned TRANSPARENT as if
+  // it were a real background. Every pairing then measured 1.28:1 and the run produced 804
+  // "contrast violations" on a surface that had not changed. Loud, but pointed at the wrong thing —
+  // and a reader could have spent an evening restyling a perfectly good page.
+  // A transparent backdrop is not a colour a person can see text against; it is the walk failing.
+  const transparent = m.pairs.filter((p) => /rgba\(0, 0, 0, 0\)|transparent/.test(p.bg));
+  if (transparent.length) {
+    bad.push('THE CONTRAST INSTRUMENT IS BROKEN, NOT THE SURFACE — the backdrop walk returned a '
+      + 'transparent background for ' + transparent.length + ' of ' + m.pairs.length + ' pairings '
+      + '(e.g. "' + transparent[0].sel + '"). Fix bgOf before reading any figure from this run.');
+    return { bad, info };
+  }
   for (const p of m.pairs) {
     const r = ratio(p.fg, p.bg);
     if (r < FLOOR.contrast) bad.push('"' + p.sel + '" at ' + p.size + 'px renders ' + r.toFixed(2) + ':1, under the ' + FLOOR.contrast + ':1 bar');
   }
   for (const f of m.faded) bad.push('opacity ' + f.o + ' on text ("' + f.cls + '") — forbidden on this surface by GL-003 §2b-bis and Addendum B §6.5');
   if (m.horizontalOverflow) bad.push('the page scrolls horizontally (WCAG 1.4.10)');
-  // ⛔ `coveredAtRest` IS REPORTED, NOT FAILED, AND THIS IS A DELIBERATE NARROWING OF ONE OF VERA'S
-  // OBSERVATIONS — flagged in the return rather than made quietly.
+  // ⛔ `coveredAtRest` IS REPORTED, NOT FAILED — a narrowing Vera reviewed and ACCEPTED as argued.
+  // Once the scope defect was fixed it fired at nearly every viewport, including ones where the
+  // landing screen is perfectly usable, because OVERLAPPING CONTENT FURTHER DOWN THE PAGE IS WHAT A
+  // STICKY FOOTER IS. Asserting it would mean "never use a sticky footer", which B §6.7 requires.
   //
-  // Once the scope defect was fixed, this fired at nearly every viewport, including ones where the
-  // landing screen is perfectly usable. That is because OVERLAPPING CONTENT FURTHER DOWN THE PAGE
-  // IS WHAT A STICKY FOOTER IS. Asserting it as a defect would mean "never use a sticky footer",
-  // which contradicts B §6.7, which requires one.
+  // ⛔ THIS COMMENT PREVIOUSLY DEFENDED ITS NON-VACUITY ON THE REAL BUG IT ONCE CAUGHT, AND CLAIMED
+  // `unreachableAtEnd` GUARDED THE REST. BOTH HALVES WERE FALSE AT 18b0f98, and Vera caught it:
+  // an assertion that no longer asserts cannot be justified by a bug it caught before it was
+  // narrowed, and `unreachableAtEnd` had been quietly changed from `covered OR off-screen` to
+  // `covered AND off-screen` — two near mutually-exclusive limbs — so it guarded nothing.
+  // A stale comment defending a defanged check is worse than no comment: it is the thing a reviewer
+  // reads INSTEAD of re-deriving the argument.
   //
-  // The two things that are genuinely wrong, and which are asserted as failures below, are the two
-  // Vera actually described: the landing screen having no tappable item, and the banner falling
-  // outside the initial viewport. Those are properties of the FIRST SCREEN, which for this user is
-  // the whole product. The count is kept in the output because it is how the occlusion arithmetic
-  // is read at a glance, and it is what changes most visibly at 46 rows.
+  // What actually carries the weight now, all of them asserted as failures below:
+  //   * firstUsableRowVisible  — the landing screen has an item she can read AND tap
+  //   * bannerInInitialViewport — a pending question is on the screen she arrives at
+  //   * buriedAtEnd            — at MAXIMUM scroll, every on-screen control hit-tests to itself
+  //   * footClipped            — the footer paints its own contents in full
+  // The occlusion count stays in the output because it is how the arithmetic is read at a glance,
+  // and it is what changes most visibly at 46 rows.
   if (m.coveredAtRest === true) info.push(m.occludedAtRest.length + ' control(s) behind the sticky footer at rest [' + m.occludedAtRest.join(', ') + '] — expected for a sticky footer; the landing-screen assertions below are what decide it');
-  if (m.unreachableAtEnd === true) bad.push('after scrolling to the very end a control is STILL covered and off-screen — she can never reach it');
+  // HIGH-4 restored, and HIGH-3.
+  for (const b of m.buriedAtEnd) bad.push('AT MAXIMUM SCROLL, WHERE THERE IS NOWHERE FURTHER TO GO: ' + b);
+  if (m.footClipped > 0) bad.push('the footer is CLIPPING ITS OWN CONTENTS by ' + m.footClipped + 'px — the primary action or the post-send message is painted short of its layout box, which every box measurement in this file reports as fine (Addendum B §6.7, WCAG 1.4.4/1.4.10)');
+  if (m.deadSpaceRowsTested === 0 && m.rowCount > 0) bad.push('the dead-space hit test examined ZERO of ' + m.rowCount + ' rows — it is reporting a pass on something it never looked at');
   // HIGH-1, VERA. The landing screen is the whole product for this user.
   if (m.firstUsableRowVisible === false) bad.push('THE LANDING SCREEN CONTAINS NO TAPPABLE ITEM — no item row has a tick that is both on screen and hit-testable at rest (Addendum B §6.1, §9)');
   if (m.firstUsableRowVisible === true && m.firstWholeRowVisible === false) info.push('an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible');
   if (m.bannerInInitialViewport === false) bad.push('the pending-question banner is NOT inside the initial viewport (Addendum B §7.1.1)');
+  // In the post-send state the honest message REPLACES the action (B §6.7), so it — not the button —
+  // is the thing that must be fully painted and reachable. `buriedAtEnd` covers `.note` directly.
+  if (m.postSend && m.postSend !== 'post-send') bad.push('the surface could not be driven into the post-send state: ' + m.postSend + ' — so the state Addendum E criterion 9 turns on was NOT measured here');
   // MEDIUM-1, VERA.
   for (const d of m.deadSpaceLive) bad.push('the gap between MINUS and PLUS is NOT dead — a tap there resolves to a live control (' + d + ')');
   if (m.cockpitWord) bad.push('the word "Cockpit" is on her screen (Addendum B §2)');

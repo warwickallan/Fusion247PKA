@@ -122,34 +122,74 @@ rounded away:** `--ok` is 3.49 in light and `--park` is 3.42 in dark. Both clear
 and §6.5's four simultaneous selection signals mean no rail is load-bearing alone — but the number
 is not met, and that is Iris's to resolve.
 
-## The backtick, three times
+## Round two — the fix that became the regression
 
-`MEASURE` is a template literal. A backtick anywhere inside it — **including inside a comment
-quoting a CSS selector** — ends the string, and Node reports it as a `SyntaxError` or
-`ReferenceError` pointing at an unrelated word several lines away. It cost three debugging rounds
-here, having already cost two on WP-B15-42 in `app.js`.
+Vera failed the remediation commit. Two HIGHs, and **the first was introduced by my own HIGH-1 fix.**
 
-There is now a guard in `shopping-geometry-check.mjs` that refuses to run if `MEASURE` contains one,
-mirroring the guard `render-vm-check.mjs` already carries. **A self-inflicted trap that recurs is a
-missing control, not carelessness.**
+**I added `max-height: 40vh; overflow: hidden` to the footer as a "defensive ceiling" and never
+measured it.** Its own comment said it stopped a future third line "reclaiming the screen" — but
+`position: static`, three lines above, had already made that impossible: **a static footer is in
+flow, so extra height extends the scroll; it cannot overlay anything.** The ceiling defended against
+sticky behaviour on a footer that was no longer sticky, and it clipped the primary action to 30
+painted pixels of 88 and the post-send message to **zero**.
 
-## What the next agent should know
+**She presses SEND at 200% zoom and nothing happens.** That is the one message Addendum B §9.6 and
+Addendum E criterion 9 make load-bearing.
 
-- **The write path does not exist.** Every write lives in `services/asdair/cockpit-api`. Her
-  selections live only in the tab, and the send action says so plainly rather than faking success.
-  Anyone "finishing" this must start there, not in the UI.
-- **The naming gap is confirmed, not theoretical.** `asdair.regulars.name` is retailer-shaped; `aka`
-  is a matching term, not a curated display name, and is absent on some rows. **Addendum E criterion
-  2 cannot pass** until a curated `display_name` column exists. That is backend work.
-- **All fourteen Addendum E MUM criteria are HOLD**, by construction. They need Mum.
-- **The geometry gate measures Chromium, not Silk, and not her tablet.** Addendum A's five device
-  checks are unrun — above all the **Tailscale power-cycle test**, the only finding with genuine
-  product-failure potential.
-- **Run the gates sequentially.** `nav-check` binds 8099 and the geometry check binds 8124/9333.
-- `provenance-check` fails identically at untouched HEAD `111c8cd` — pre-existing, proven by stash.
+**And my gate reported `min-target=88px` on a 30px button**, because `getBoundingClientRect()`
+returns the **layout box, which an ancestor's `overflow: hidden` does not change.** Vera named it
+the third instance of one class in a single package:
+
+| mechanism | declared | rendered |
+|---|---|---|
+| `flex-shrink` | 88px | 82px |
+| D-17 `opacity` | 5.02:1 | 3.91:1 |
+| clipping | box 88px | **painted 30px** |
+
+**The box passes; the render does not.** This log's own central lesson, committed a third time by
+the person writing it down.
+
+## The narrowing I did not know I had made
+
+I flagged two narrowings and shipped a **third silently**: `unreachableAtEnd` went from
+`covered **OR** off-screen` to `covered **AND** off-screen`. Those limbs are near mutually
+exclusive — **a control buried under a bottom-pinned footer is inside the viewport**, so the
+off-screen limb is false and the condition could never fire. Vera reinstated the genuine defect at
+800x1280 and the gate went red on **nothing**.
+
+Worse, the comment above it still defended the pair's non-vacuity **on a bug caught before the
+narrowing**. *A stale comment defending a defanged check is worse than no comment: it is what a
+reviewer reads instead of re-deriving the argument.*
+
+**Changing a boolean condition inside an edit about something else is a separate change and needs
+saying out loud.** Both narrowings I announced were accepted. The one I did not announce broke the
+check.
+
+## Two instruments that lied, and one guard that could never fire
+
+- **My backtick guard could never fire.** A stray backtick is a *parse* error, so the module never
+  loads and no runtime check inside it executes. It was a control that looked like a control. Fixed
+  properly: `MEASURE` is now a real function passed through `toString()`, so the trap no longer
+  exists to be guarded.
+- **That conversion then broke the backdrop walk.** A regex escaped for a template literal (`\(`)
+  is wrong as ordinary source (`\(`), so it stopped matching `rgba(0, 0, 0, 0)` and returned
+  *transparent* as though it were a real background. Every pairing measured 1.28:1 and the run
+  produced **804 contrast violations on a surface that had not changed**. Loud, but pointing at the
+  wrong thing — a reader could have spent an evening restyling a perfectly good page. There is now a
+  sanity assertion: a transparent backdrop means **the instrument is broken, not the surface**.
+- **The dead-space hit test was examining zero rows** at three viewports, because `elementFromPoint`
+  returns null outside the viewport and the early return skipped every row below the fold. The
+  honest "caught at 9 of 10 viewports" in the self-test was the symptom. Rows are scrolled into view
+  first, and the number actually tested is now asserted to be non-zero.
 
 ## Candidate for graduation
 
-The four instances above are one rule: **a stated property needs an executable assertion, and the
-assertion must measure behaviour rather than declaration.** If it recurs on another surface, it
-should graduate out of this log into SOP-003.
+Everything above is one rule with two halves:
+
+1. **A stated property needs an executable assertion, and the assertion must measure behaviour
+   rather than declaration.**
+2. **The instrument must be able to report itself broken** — and a control that cannot fire is not a
+   control, whether it is a mutation that cannot fire, a boolean whose limbs exclude one another, or
+   a guard that runs after the error it guards.
+
+If this recurs on another surface it should graduate out of this log into SOP-003.

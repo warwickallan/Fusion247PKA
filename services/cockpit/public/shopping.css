@@ -536,13 +536,25 @@ body {
    up consuming the same ruinous share of the screen. Height is the honest predicate for her real
    device; width catches the WCAG 1.4.10 reflow case, which failed for identical reasons. */
 @media (max-height: 720px), (max-width: 520px) {
-  .foot {
-    position: static;
-    /* A hard ceiling as well as the flow change: if a future state adds a third line to this
-       footer, it must not be able to reclaim the screen it just gave back. */
-    max-height: 40vh;
-    overflow: hidden;
-  }
+  /* ⛔ THERE IS NO `max-height` HERE, AND THAT ABSENCE IS THE FIX FOR HIGH-3 (Vera, `18b0f98`).
+     This block briefly carried `max-height: 40vh; overflow: hidden` with the comment "a hard
+     ceiling as well as the flow change: if a future state adds a third line to this footer, it
+     must not be able to reclaim the screen it just gave back."
+     THE COMMENT DESCRIBED A DANGER THAT `position: static` HAD ALREADY REMOVED. A static footer
+     cannot reclaim the viewport — it is in flow, so extra height extends the SCROLL, it does not
+     overlay anything. The ceiling defended against sticky behaviour on a footer that is no longer
+     sticky, and it was never measured.
+     What it actually did, at maximum scroll where there is nowhere further to go:
+       640x400   `.send` clipped 58 of 88px — 30px painted, centre hit-test returns NOTHING.
+                 After SEND, `.note` clipped 143px — ZERO painted pixels, unreachable.
+       400x640   `.send` an 81px sliver, under this surface's own 88px floor.
+       320x800   post-send message clipped 146px.
+     So she presses SEND at 200% zoom and the screen does not respond, and the one message that
+     B §9.6 and Addendum E criterion 9 make load-bearing renders nothing at all.
+     If a ceiling is ever genuinely wanted it must be `overflow-y: auto` — but a nested scroll
+     region inside a page that already scrolls is worse for her than a longer page, so the honest
+     answer is no ceiling. */
+  .foot { position: static; }
   /* With the footer in flow there is nothing to clear, so the reserved space goes back to the list.
      Leaving 320px here would have put a third of a short screen of blank padding under her list. */
   .page-pad { padding-bottom: var(--m-pad); }
@@ -588,10 +600,12 @@ body {
      At 640x400 (a 1280x800 tablet at 200% zoom) with a question pending, the first row's TICK was
      landing at y=403 in a 400px viewport — three pixels below the fold, which reads to her as a
      screen with no shopping on it. The chrome above the row gives up ~20px between them here, which
-     puts the tick at ~385 with roughly 15px of slack.
-     Slack is the point. The last two defects in this package were both knife-edge arithmetic that
-     was correct for the case I had in mind and wrong for the one I had not measured, so a value
-     that only just fits is treated as a value that does not. */
+     puts the tick at ~385 with 11px of slack. (Measured 11, not the "~15" this comment first
+     claimed — Vera, `18b0f98`. A slack figure that is wrong in the generous direction is spent
+     twice: once by me and once by the next reader who believes it.)
+     Slack is the point. Two defects in this package were knife-edge arithmetic that was correct
+     for the case I had in mind and wrong for the one I had not measured, so a value that only
+     just fits is treated as a value that does not. */
   .page { padding: 8px; }
   .h-title { font-size: 26px; margin-bottom: 4px; }
   .head { padding: 0; }
