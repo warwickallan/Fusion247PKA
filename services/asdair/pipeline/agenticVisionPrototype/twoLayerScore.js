@@ -341,6 +341,17 @@ export function scoreMetricFamilies({
     reconciledSameLine: 0,
     incorrectCrossLineMerges: 0,
     incorrectCrossLineMergeDetail: [],
+    /**
+     * WP-B15-34 AC5 - a merge the application made on AGREEING IDENTITY whose
+     * merged reading text-matches a different page line. A MISREADING worth
+     * reporting; NOT a destroyed purchase. Published separately rather than
+     * folded into either bucket, because collapsing it into
+     * `reconciledSameLine` would hide a real reading error and leaving it in
+     * `incorrectCrossLineMerges` overstates a purchase-destroying failure that
+     * did not happen.
+     */
+    mergesTextAmbiguous: 0,
+    mergesTextAmbiguousDetail: [],
     mergesUngradable: 0,
     residualUnreconciledDuplicates: residualDuplicates,
     crossRegionCollisionGroups: (duplicateGroups || []).filter((g) => g.kind === 'cross_region').length,
@@ -356,10 +367,54 @@ export function scoreMetricFamilies({
     for (const m of merges) {
       const a = bestPageLineFor(String(m.kept_as_written ?? ''), expected);
       const b = bestPageLineFor(String(m.merged_as_written ?? ''), expected);
+
+      // ── WP-B15-34 AC5: THE FALSE POSITIVE THIS METRIC SHIPPED WITH ──────
+      //
+      // `bestPageLineFor` is FUZZY TEXT MATCHING against the fixture, and a
+      // MISREADING can resemble a different page line more than it resembles
+      // the line it actually came from. Measured on all three WP-B15-33
+      // artefacts, the same record was reported every time:
+      //
+      //   kept   "1 SULTANA&CHERRY CAKE"  -> page 33 "1 SULTARA + CHERRY CAKE"
+      //   merged "STRAWBERRY CAKE"        -> page 16 "3 YAZZO STRAWBERRY MiLK SHAKE"
+      //
+      // "STRAWBERRY CAKE" is a misreading of the cake line. It is not a
+      // reading of the milkshake line, and the merge did not destroy a
+      // purchase. The scorer was grading a decision the application never
+      // made, using evidence the application never used.
+      //
+      // ⛔ THE GUARD IS IDENTITY, AND IT IS THE APPLICATION'S OWN. Reconciliation
+      //    merges only observations whose `product_id` AGREES - the identity
+      //    veto, proved by AC7 PROOF 2. So when both sides carry the same
+      //    resolved identity, the application had positive evidence they were
+      //    one line, and a text disagreement is a MISREADING to report, not a
+      //    destroyed purchase to alarm about.
+      //
+      // ⛔ THIS NARROWS THE METRIC; IT DOES NOT SWITCH IT OFF. A merge whose
+      //    two sides resolved to DIFFERENT identities, or where either side
+      //    resolved to none, is still graded by text exactly as before - and
+      //    that is the shape a genuine purchase-destroying merge has.
+      const keptId = m.kept_product_id ?? null;
+      const mergedId = m.merged_product_id ?? null;
+      const sameResolvedIdentity = keptId !== null && mergedId !== null && keptId === mergedId;
+
       if (a === null || b === null) {
         duplicates.mergesUngradable += 1;
       } else if (a === b) {
         duplicates.reconciledSameLine += 1;
+      } else if (sameResolvedIdentity) {
+        duplicates.mergesTextAmbiguous += 1;
+        duplicates.mergesTextAmbiguousDetail.push({
+          kept_as_written: m.kept_as_written,
+          kept_page_line: expected[a].page_order,
+          merged_as_written: m.merged_as_written,
+          text_matched_page_line: expected[b].page_order,
+          product_id: keptId,
+          regions: m.regions ?? null,
+          note: 'Both observations resolved to the SAME product identity, which is what the application '
+            + 'merged on. The merged reading text-matches a different page line, which makes it a MISREADING '
+            + 'to report - NOT a merge that destroyed a purchase.',
+        });
       } else {
         duplicates.incorrectCrossLineMerges += 1;
         duplicates.incorrectCrossLineMergeDetail.push({
@@ -367,6 +422,8 @@ export function scoreMetricFamilies({
           kept_page_line: expected[a].page_order,
           merged_as_written: m.merged_as_written,
           merged_page_line: expected[b].page_order,
+          kept_product_id: keptId,
+          merged_product_id: mergedId,
           regions: m.regions ?? null,
         });
       }
@@ -394,6 +451,25 @@ export function scoreMetricFamilies({
             + 'about this run; it is NOT evidence about the gate.',
         preserved: rate(quantity.countPreserved, quantity.detectedWherePageCarriesCount),
         correct: rate(quantity.countCorrect, quantity.countCorrect + quantity.countWrong),
+        // ── WP-B15-34 AC5: THE DENOMINATOR THAT COVERS ALL 39 ──────────────
+        // Warwick: "Do not use a denominator that can pass while an over-count
+        // such as '1 x 6pts' -> 7 survives."
+        //
+        // WP-B15-33 already moved CORRECTNESS off the 12-line subset, which
+        // closed the over-count hole. It left a SECOND one, of the same shape:
+        // `correct` is graded over DETECTED lines, so a line the run never
+        // detected is in no denominator at all - and a run that read 20 of 39
+        // could report 100% quantity correctness while losing nineteen
+        // purchases. An omission is not a neutral event; the household does
+        // not get the item.
+        //
+        // `correctOfAllExpected` therefore grades over EVERY page line: an
+        // omitted line counts as not-correct, because that is what it is.
+        // Both figures are published. Neither replaces the other - `correct`
+        // answers "when it read a line, did it get the count right?", this one
+        // answers "did Warwick end up with the right shopping list?".
+        correctOfAllExpected: rate(quantity.countCorrect, expected.length),
+        expectedPageLines: expected.length,
         lossSubset: rate(quantity.lossSubsetCorrect, quantity.lossSubsetTotal),
         preservedVsCorrectNote:
           'PRESERVED is AVAILABILITY - a count reached the application. CORRECT is whether it was the RIGHT '
@@ -404,7 +480,9 @@ export function scoreMetricFamilies({
           + 'The 12-line loss subset is the ONLY population where a LOST count is distinguishable from a read '
           + 'one, and it is the right denominator for LOSS ONLY. Quoting the 12 as the correctness denominator '
           + 'excludes the over-counting class entirely - page 19 (1 read as 2) and page 2 (1 read as 7) both '
-          + 'sit outside it, and both spend real money.',
+          + 'sit outside it, and both spend real money. '
+          + 'CORRECT-OF-ALL-EXPECTED grades over every page line, so an OMITTED line counts as not-correct '
+          + 'and no run can reach a high correctness figure by detecting less.',
       },
       identity: {
         ...identity,
@@ -449,6 +527,7 @@ export function formatFamilies(score, label) {
     `       raw observations before reconciliation ... ${f.duplicates.rawObservations ?? 'not supplied'}`,
     `       correctly reconciled same-line .......... ${f.duplicates.reconciledSameLine}`,
     `       INCORRECT CROSS-LINE MERGES ............. ${f.duplicates.incorrectCrossLineMerges}${f.duplicates.measurable ? '' : '  [' + f.duplicates.note + ']'}`,
+    `       merges on agreeing identity, text ambiguous  ${f.duplicates.mergesTextAmbiguous}  [a MISREADING to report, NOT a destroyed purchase]`,
     `       merges ungradable against the fixture ... ${f.duplicates.mergesUngradable}`,
     `       residual unreconciled duplicates ........ ${f.duplicates.residualUnreconciledDuplicates}`,
     '  4. QUANTITY',
@@ -457,6 +536,7 @@ export function formatFamilies(score, label) {
     `       explicit counts CORRECT .................. ${r(f.quantity.correct)}`,
     `       wrong: SILENTLY wrong .................... ${f.quantity.silentlyWrong}   <- Warwick's bar. Target 0.`,
     `       wrong: referred to a human ............... ${f.quantity.wrongButReferred}   (a SUCCESS by that bar)`,
+    `       correct over ALL ${String(f.quantity.expectedPageLines).padStart(2)} page lines ......... ${r(f.quantity.correctOfAllExpected)}   (an OMITTED line counts as not-correct)`,
     `       12-line LOSS subset correct .............. ${r(f.quantity.lossSubset)}   (loss only - NOT the correctness denominator)`,
     `       household default-one lines .............. ${f.quantity.defaultOneLines}`,
     `       pack digits ignored as quantity .......... ${f.quantity.packDigitsIgnoredAsQuantity}`,

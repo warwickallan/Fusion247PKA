@@ -162,9 +162,19 @@ export function buildProductIdEnum(candidates = []) {
  * @param {object} args
  * @param {Array<{id: string|number}>} [args.candidates] - the supplied candidate set.
  * @param {number[]} args.regionNos - every region the application supplied this turn.
+ * @param {boolean} [args.withPosition=true] - WP-B15-34 AC1. When false, the
+ *   `band_position_pct` property is neither offered nor required, and the
+ *   schema returns to its `54e1743` shape byte-for-byte.
+ *
+ *   ⛔ THIS IS A MEASUREMENT SWITCH, NEVER A RUNTIME TUNING KNOB. It exists so
+ *   the field's effect on DETECTION can be settled by a controlled comparison
+ *   instead of argued about: WP-B15-33 lost page 25 twice, and the field was
+ *   the only change to what the model was asked. Default `true` preserves the
+ *   WP-B15-33 contract exactly, and nothing on the production path passes
+ *   `false` - only `runs/ac1-position-ab.mjs` does.
  * @returns {object} a JSON Schema object.
  */
-export function buildLineSchema({ candidates = [], regionNos } = {}) {
+export function buildLineSchema({ candidates = [], regionNos, withPosition = true } = {}) {
   if (!Array.isArray(regionNos) || regionNos.length === 0) {
     throw new Error('buildLineSchema: regionNos is required and must be non-empty');
   }
@@ -181,7 +191,9 @@ export function buildLineSchema({ candidates = [], regionNos } = {}) {
           type: 'object',
           additionalProperties: false,
           // strict mode: EVERY property is required; optionality is a null type.
-          required: ['line_no', 'as_written', 'leading_mark', 'band_position_pct', 'visible_line', 'product_id', 'source_region', 'quantity', 'confidence'],
+          required: withPosition
+            ? ['line_no', 'as_written', 'leading_mark', 'band_position_pct', 'visible_line', 'product_id', 'source_region', 'quantity', 'confidence']
+            : ['line_no', 'as_written', 'leading_mark', 'visible_line', 'product_id', 'source_region', 'quantity', 'confidence'],
           properties: {
             line_no: {
               type: 'integer',
@@ -195,10 +207,12 @@ export function buildLineSchema({ candidates = [], regionNos } = {}) {
               type: ['string', 'null'],
               description: 'TRANSCRIBE, never interpret: the mark or marks written at the very START of this line, BEFORE the product name begins - for example "2", "16", "1 x 6pts", "4 x 4pts", "2 PKTS.". Copy exactly what is written there, even if it is a single digit. If the line begins directly with a word, this is null. Never infer it, never calculate it, never take a number from later in the line, and never omit it because the line looks like an ordinary single item.',
             },
-            band_position_pct: {
-              type: ['integer', 'null'],
-              description: 'OBSERVATION ONLY: how far along this crop, in the direction you are reading the lines, the START of this line physically sits. 0 = hard against the beginning edge of this crop, 100 = hard against the far edge. Read it off where the ink actually is. NEVER derive it from the order of your answer, never space your lines out evenly to look tidy, and never adjust it to make two lines differ. If you genuinely cannot place the line in this crop, return null - that is an honest and acceptable answer. This value says nothing about what the line is or how many to buy.',
-            },
+            ...(withPosition ? {
+              band_position_pct: {
+                type: ['integer', 'null'],
+                description: 'OBSERVATION ONLY: how far along this crop, in the direction you are reading the lines, the START of this line physically sits. 0 = hard against the beginning edge of this crop, 100 = hard against the far edge. Read it off where the ink actually is. NEVER derive it from the order of your answer, never space your lines out evenly to look tidy, and never adjust it to make two lines differ. If you genuinely cannot place the line in this crop, return null - that is an honest and acceptable answer. This value says nothing about what the line is or how many to buy.',
+              },
+            } : {}),
             visible_line: {
               type: 'boolean',
               description: 'FIRST question, answered independently: is there actually a handwritten shopping line at this place on the page? true = you can see writing here. false = there is no line here.',

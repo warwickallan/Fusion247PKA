@@ -65,7 +65,7 @@ import {
 } from './twoLayerScore.js';
 import { applyVisualEvidenceGate } from './visualEvidenceGate.js';
 import { planOrientationAwareBands, proveCoverage, DEFAULT_BAND_COUNT } from './bandPlan.js';
-import { inspectBandsIndividually, reconcileAcrossBands } from './bandInspection.js';
+import { inspectBandsIndividually, reconcileAcrossBands, clearResolvedNeedsHuman } from './bandInspection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -342,6 +342,18 @@ export function rescoreArtefact(artefactPath, { fixturePath = DEFAULT_FIXTURE_PA
       linePitch: plan.linePitch?.pitch ?? null,
     })
     : null;
+
+  // WP-B15-34 AC3, applied on the re-score path too. A re-score that graded a
+  // DIFFERENT set of referrals from the one a live run produces would make
+  // every banked comparison incomparable, which is the whole value of
+  // re-scoring in the first place.
+  if (gate) {
+    const referrals = clearResolvedNeedsHuman(gate.lines);
+    gate.lines = referrals.lines;
+    gate.counts.needsHumanCleared = referrals.cleared;
+    gate.counts.needsHumanClearedByReason = referrals.clearedByReason;
+    gate.counts.needsHumanRemaining = referrals.lines.filter((l) => l.needs_human).length;
+  }
   const finalLines = gate ? gate.lines : grounded.accepted;
 
   // AC4 - the instrument that grades. Two layers, never one number.
@@ -449,7 +461,7 @@ export async function proveCoverageForPhoto(imagePath, { bandCount = DEFAULT_BAN
  *
  * Deterministic and application-owned: a fixed factor and a fixed kernel.
  */
-async function renderBand(sharp, buf, region, upscale) {
+export async function renderBand(sharp, buf, region, upscale) {
   const width = region.pixel_right - region.pixel_left;
   const height = region.pixel_bottom - region.pixel_top;
   let pipeline = sharp(buf).extract({
@@ -473,6 +485,7 @@ async function renderBand(sharp, buf, region, upscale) {
  */
 export async function runBandArm({
   imagePath, catalogueItems = [], bandCount = DEFAULT_BAND_COUNT, upscale = 1, callModel,
+  withPosition = true,
 }) {
   const sharp = (await import('sharp')).default;
   const { toDataUrl } = await import('../imageRender.js');
@@ -498,7 +511,7 @@ export async function runBandArm({
 
   const startedAt = Date.now();
   const inspection = await inspectBandsIndividually({
-    bandRegions, bandImageUrls, candidates: catalogueItems, ...(callModel ? { callModel } : {}),
+    bandRegions, bandImageUrls, candidates: catalogueItems, withPosition, ...(callModel ? { callModel } : {}),
   });
   const elapsedMs = Date.now() - startedAt;
 
@@ -526,8 +539,18 @@ export async function runBandArm({
     linePitch: plan.linePitch?.pitch ?? null,
   });
 
+  // ── WP-B15-34 AC3: DISCHARGE EVERY QUESTION THE PIPELINE HAS ANSWERED ───
+  // Last of all, over the exact lines the Cockpit would render. Warwick:
+  // "Cockpit must not ask Warwick questions about things AsdAIr has already
+  // resolved." It only ever clears - see `clearResolvedNeedsHuman`.
+  const referrals = clearResolvedNeedsHuman(gate.lines);
+  gate.lines = referrals.lines;
+  gate.counts.needsHumanCleared = referrals.cleared;
+  gate.counts.needsHumanClearedByReason = referrals.clearedByReason;
+  gate.counts.needsHumanRemaining = referrals.lines.filter((l) => l.needs_human).length;
+
   return {
-    plan, bandRegions, inspection, grounded, reconciliation, gate, elapsedMs, renderedBytes, upscale, bandCount,
+    plan, bandRegions, inspection, grounded, reconciliation, gate, referrals, elapsedMs, renderedBytes, upscale, bandCount,
   };
 }
 

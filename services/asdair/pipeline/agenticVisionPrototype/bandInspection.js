@@ -86,6 +86,149 @@ function clearNeedsHumanReason(line, reason) {
   line.needs_human = line.needs_human_reasons.length > 0;
 }
 
+// =====================================================================
+// WP-B15-34 AC3 - STALE "NEEDS HUMAN" MUST CLEAR DETERMINISTICALLY.
+//
+// Warwick: "Once reconciliation resolves a line sufficiently, stale 'needs
+// human' state must clear deterministically. COCKPIT MUST NOT ASK WARWICK
+// QUESTIONS ABOUT THINGS ASDAIR HAS ALREADY RESOLVED."
+//
+// WP-B15-33 fixed ONE of these by hand - the cross-region duplicate, which
+// held at 3/3. The sweep this AC asks for shows the fix was site-shaped, and
+// the defect is CLASS-shaped:
+//
+//   `needs_human_reasons` is an ACCUMULATOR. Every stage adds; exactly one
+//   stage, for exactly one reason, subtracts. Any cause that stops being true
+//   after the stage that recorded it therefore survives to the Cockpit, and
+//   the survivors are the WORST case - a line whose disputed counterpart was
+//   subsequently merged away still carries LEADING_MARK_DISAGREEMENT and
+//   still points `disputed_count_with` at a line that no longer exists
+//   independently. Warwick is then asked to adjudicate a disagreement that
+//   has exactly one surviving side.
+//
+// ── THE FIX IS RE-DERIVATION, NOT ANOTHER CLEAR CALL ────────────────────
+// Adding a second hand-placed `clearNeedsHumanReason` would close today's two
+// sites and leave the next stage free to reopen the class. Instead every
+// reason gets a PREDICATE over the FINAL line set, and a reason survives only
+// while its predicate still holds. A stage may still add a reason wherever it
+// likes; it can no longer make that reason outlive its own cause.
+//
+// ⛔ THIS ONLY EVER CLEARS. It cannot add a reason, cannot change a quantity,
+//    cannot drop a line, and cannot turn `needs_human` ON. A resolver that
+//    could also raise questions would be a second opinion competing with the
+//    stages, and the accounting identity would stop closing.
+//
+// ⛔ AND IT IS NOT AN ORACLE. It discharges a question only where the
+//    APPLICATION'S OWN STATE proves the question was answered. Where the
+//    evidence is merely absent, the referral STANDS - AC4's honest limit
+//    applies here too, and a resolver that guessed would be worse than the
+//    staleness it replaced.
+// =====================================================================
+
+/**
+ * Does this reason still hold against the FINAL state of the line set?
+ *
+ * One predicate per member of `NEEDS_HUMAN`. An unrecognised reason is
+ * DELIBERATELY retained: a future stage adding a cause this function has never
+ * heard of must not have it silently discarded, because that failure mode -
+ * questions vanishing - is worse than the staleness this closes.
+ */
+function reasonStillHolds(reason, line, survivingLineNos) {
+  switch (reason) {
+    case NEEDS_HUMAN.CROSS_REGION_DUPLICATE_UNRESOLVED:
+      // Resolved exactly when reconciliation absorbed the other observation.
+      // `merged_from` is the evidence, and it is the application's own record
+      // of having answered the question.
+      return !(Array.isArray(line.merged_from) && line.merged_from.length > 0);
+
+    case NEEDS_HUMAN.LEADING_MARK_DISAGREEMENT: {
+      // A disagreement needs TWO surviving sides. If the counterpart was
+      // merged away, there is no longer anything to adjudicate.
+      const counterparts = Array.isArray(line.disputed_count_with) ? line.disputed_count_with : [];
+      if (counterparts.length > 0) {
+        return counterparts.some((n) => survivingLineNos.has(n));
+      }
+      // The merge-time form: two marks were read off ONE physical line and
+      // differed. That is a genuine unresolved dispute and it stands - unless
+      // the recorded marks have collapsed to a single value, in which case
+      // there is no longer a disagreement to report.
+      const marks = Array.isArray(line.leading_mark_disagreement) ? line.leading_mark_disagreement : [];
+      return marks.length > 1;
+    }
+
+    // Owned by `applyVisualEvidenceGate`, which runs last and re-derives both
+    // from scratch on every invocation. Nothing upstream can make them stale,
+    // so they are retained exactly as the gate left them.
+    case NEEDS_HUMAN.NO_LOCATED_VISUAL_EVIDENCE:
+    case NEEDS_HUMAN.POSITION_COLLISION:
+      return true;
+
+    default:
+      return true;
+  }
+}
+
+/**
+ * AC3 - re-derive every human-attention flag against the final line set.
+ *
+ * Runs LAST, after the gate, over the lines the application would actually put
+ * in front of Warwick. Returns the same array, never a shorter one.
+ *
+ * @param {Array<object>} lines
+ * @returns {{lines:Array<object>, cleared:number, clearedByReason:Record<string,number>}}
+ */
+export function clearResolvedNeedsHuman(lines) {
+  const input = Array.isArray(lines) ? lines : [];
+  const survivingLineNos = new Set(input.map((l) => l?.line_no));
+  const clearedByReason = {};
+  let cleared = 0;
+
+  const out = input.map((line) => {
+    const reasons = Array.isArray(line?.needs_human_reasons) ? line.needs_human_reasons : [];
+    const kept = reasons.filter((r) => reasonStillHolds(r, line, survivingLineNos));
+    for (const r of reasons) {
+      if (!kept.includes(r)) {
+        cleared += 1;
+        clearedByReason[r] = (clearedByReason[r] ?? 0) + 1;
+      }
+    }
+    const droppedDispute = reasons.includes(NEEDS_HUMAN.LEADING_MARK_DISAGREEMENT)
+      && !kept.includes(NEEDS_HUMAN.LEADING_MARK_DISAGREEMENT);
+    return {
+      ...line,
+      needs_human_reasons: kept,
+      // The derived truth, recomputed - never a separate boolean anyone can
+      // set independently of the reasons that justify it.
+      needs_human: kept.length > 0,
+      // A discharged dispute must not leave a dangling pointer behind it:
+      // the Cockpit renders `disputed_count_with`, and a stale one is the
+      // same question asked in a different field.
+      ...(droppedDispute ? { disputed_count_with: [], leading_mark_disagreement: [] } : {}),
+    };
+  });
+
+  // ⛔ ASSERTED, NOT PROMISED. This function may only ever REMOVE a question.
+  //    A resolver that could add one would be a stage in disguise.
+  for (let i = 0; i < out.length; i += 1) {
+    const before = Array.isArray(input[i]?.needs_human_reasons) ? input[i].needs_human_reasons : [];
+    const after = out[i].needs_human_reasons;
+    if (after.length > before.length || after.some((r) => !before.includes(r))) {
+      throw new Error(
+        `clearResolvedNeedsHuman: A REASON WAS ADDED on line_no ${out[i].line_no}. `
+        + 'This function may only ever discharge a question, never raise one.',
+      );
+    }
+  }
+  if (out.length !== input.length) {
+    throw new Error(
+      `clearResolvedNeedsHuman: LINE COUNT CHANGED - ${input.length} in, ${out.length} out. `
+      + 'Clearing a referral must never drop a line.',
+    );
+  }
+
+  return { lines: out, cleared, clearedByReason };
+}
+
 /**
  * WP-B15-33 AC2 - two observations of ONE physical line that disagree about
  * the written count.
@@ -117,7 +260,21 @@ function recordLeadingMarkDisagreement(kept, other) {
  * over six rounds in buildAgenticPrompt's constrained prompt, reused rather
  * than re-derived.
  */
-export function buildBandPrompt({ candidateBlock, bandNo, bandCount }) {
+export function buildBandPrompt({
+  candidateBlock, bandNo, bandCount, withPosition = true,
+}) {
+  // ── WP-B15-34 AC1: THE ONE SWITCH ──────────────────────────────────────
+  // Rule 2b below is the ONLY prompt text the positional field adds. With
+  // `withPosition: false` this prompt returns to its `54e1743` bytes - the
+  // commit that scored 39/39 three times - so an A/B on this flag is a
+  // controlled comparison of the field and nothing else.
+  //
+  // ⛔ MEASUREMENT SWITCH, NEVER A RUNTIME TUNING KNOB. Nothing on the
+  //    production path passes `false`; only `runs/ac1-position-ab.mjs` does.
+  const rule2b = withPosition ? `
+
+2b. SAY WHERE THE LINE PHYSICALLY SITS, in band_position_pct. Look at where the ink actually is in THIS crop and give the position of the START of the line as a whole number from 0 to 100, measured along the direction you are reading the lines: 0 is hard against the beginning edge of this crop, 100 is hard against the far edge. This is OBSERVATION, exactly as leading_mark is TRANSCRIPTION. Read it off the image. Do NOT derive it from the order of your answer, do NOT space your values out evenly to look tidy, and do NOT nudge two values apart to make them look distinct. If you genuinely cannot place a line in this crop, return null - that is honest and it costs nothing. This value says nothing about what the line is or how many to buy, and it is never used to accept a line.` : '';
+
   return `You are reading ONE horizontal band cut from a photograph of a handwritten household shopping list.
 
 This is band ${bandNo} of ${bandCount}. The application cut it; you did not choose it. Adjacent bands OVERLAP deliberately, so a line at the very top or bottom edge of this band may also appear in a neighbouring one. Report it anyway - the application resolves duplicates, and a line you leave out because you assume someone else saw it is a line nobody sees.
@@ -131,9 +288,7 @@ TASK - two SEPARATE questions per line, in this order. Do not merge them.
 
 2. WRITE DOWN WHAT YOU ACTUALLY SEE. as_written is your best literal reading of the marks, verbatim, including shorthand and spelling as written. This is the ONLY field where you write your own words. Never replace it with a tidied or catalogue-matched product name - it is the record of what the page says, not of what you concluded. If a line is CUT OFF at the edge of this band, still write down what you can see of it.
 
-2a. COPY THE START OF THE LINE INTO leading_mark, AS A SEPARATE FIELD. Almost every line on this household's list begins with something written before the product name. Look at the very start of the line and transcribe exactly what is there - "2", "16", "1", "1 x 6pts", "4 x 4pts", "2 PKTS." - into leading_mark. Copy it even when it is a single "1", even when it seems obvious, and even when you have already included it in as_written. If the line genuinely begins with a word, leading_mark is null. This is TRANSCRIPTION, not judgement: do not decide whether the mark is a purchase count, do not take a number from later in the line, and do not work out what it "ought" to be. The application decides what the mark MEANS; your only job is to say what is WRITTEN.
-
-2b. SAY WHERE THE LINE PHYSICALLY SITS, in band_position_pct. Look at where the ink actually is in THIS crop and give the position of the START of the line as a whole number from 0 to 100, measured along the direction you are reading the lines: 0 is hard against the beginning edge of this crop, 100 is hard against the far edge. This is OBSERVATION, exactly as leading_mark is TRANSCRIPTION. Read it off the image. Do NOT derive it from the order of your answer, do NOT space your values out evenly to look tidy, and do NOT nudge two values apart to make them look distinct. If you genuinely cannot place a line in this crop, return null - that is honest and it costs nothing. This value says nothing about what the line is or how many to buy, and it is never used to accept a line.
+2a. COPY THE START OF THE LINE INTO leading_mark, AS A SEPARATE FIELD. Almost every line on this household's list begins with something written before the product name. Look at the very start of the line and transcribe exactly what is there - "2", "16", "1", "1 x 6pts", "4 x 4pts", "2 PKTS." - into leading_mark. Copy it even when it is a single "1", even when it seems obvious, and even when you have already included it in as_written. If the line genuinely begins with a word, leading_mark is null. This is TRANSCRIPTION, not judgement: do not decide whether the mark is a purchase count, do not take a number from later in the line, and do not work out what it "ought" to be. The application decides what the mark MEANS; your only job is to say what is WRITTEN.${rule2b}
 
 3. ONLY THEN, WHICH CANDIDATE IS IT? For a line you have ALREADY established exists, choose the candidate id it most likely refers to. Use the aliases - the household writes shorthand and their own alias list is the strongest signal. Use brand, category and usual quantity as supporting evidence.
 
@@ -179,6 +334,7 @@ function parseLines(outputText) {
  */
 export async function inspectBandsIndividually({
   bandRegions, bandImageUrls, candidates = [], callModel = visionAgenticTurn,
+  withPosition = true,
 } = {}) {
   if (!Array.isArray(bandRegions) || bandRegions.length === 0) {
     throw new Error('inspectBandsIndividually: bandRegions is required and must be non-empty');
@@ -202,9 +358,11 @@ export async function inspectBandsIndividually({
     // The schema's source_region enum holds ONLY this band. The model cannot
     // cite a region it was not shown, and the application overwrites the value
     // anyway - it knows which band it sent.
-    const textFormat = buildTextFormat(buildLineSchema({ candidates, regionNos: [region.region_no] }));
+    const textFormat = buildTextFormat(buildLineSchema({
+      candidates, regionNos: [region.region_no], withPosition,
+    }));
     const prompt = buildBandPrompt({
-      candidateBlock, bandNo: region.region_no - 1, bandCount: bandRegions.length,
+      candidateBlock, bandNo: region.region_no - 1, bandCount: bandRegions.length, withPosition,
     });
 
     const startedAt = Date.now();
@@ -336,6 +494,17 @@ export function reconcileAcrossBands({
       merged_line_no: line.line_no,
       merged_as_written: written,
       regions: kept.seen_in_regions,
+      // WP-B15-34 AC5. The scorer graded merges by FUZZY TEXT alone and
+      // produced a false positive on exactly this record: "STRAWBERRY CAKE"
+      // is a MISREADING of page 33 "1 SULTARA + CHERRY CAKE", but it
+      // text-matches page 16 "3 YAZZO STRAWBERRY MiLK SHAKE" more strongly,
+      // so a correct merge was reported as one that destroyed a purchase.
+      //
+      // The identity the application ACTUALLY ACTED ON is recorded here, so
+      // the scorer can grade the decision that was made rather than re-derive
+      // a different one from the same words.
+      kept_product_id: kept.identified ? String(kept.product_id) : null,
+      merged_product_id: line.identified ? String(line.product_id) : null,
     });
 
     // ── WP-B15-33 AC2: TWO OBSERVATIONS OF ONE LINE THAT DISAGREE ABOUT THE
