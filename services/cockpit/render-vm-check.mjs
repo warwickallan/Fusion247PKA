@@ -21,12 +21,20 @@
 // headless Edge self-relaunches and detaches; it fails identically on untouched HEAD, so it is
 // environmental). See VERIFICATION.md.
 //
-// ── FIXTURES ARE SYNTHETIC, DELIBERATELY ─────────────────────────────────────────────────────────
-// This repository is PUBLIC. The real payloads this harness was developed against are a real
-// household's shopping list, and they are personal data that must never be committed. The fixtures
-// under `fixtures/` are therefore hand-written, structurally faithful to the live payload shape, and
-// contain no household data whatsoever. Point `--ws` at a live capture when you want to check
-// against real data; keep that capture OUT of the repository.
+// ── FIXTURES ARE SYNTHETIC, DELIBERATELY — AND NOT FOR PRIVACY ───────────────────────────────────
+// ⛔ CORRECTED 2026-08-13. This block previously said the shopping payloads "are personal data that
+// must never be committed". THAT IS FALSE, and it inverted a ruling Warwick has now had to give
+// THREE times (2026-07-27, 2026-08-04, 2026-08-12): "nothing private about my shopping as I have
+// told you a million times and is meant to be written down!" This repository is public and that is
+// FINE. Product names, regulars, quantities, run outputs and itemised lists are COMMITTED on
+// purpose. Only SECRETS stay out — credentials, tokens, connection strings.
+//
+// The fixtures under `fixtures/` are hand-written for a different and still-good reason:
+// A GATE MUST BE DETERMINISTIC. Real captures change every week, so a harness pinned to one would
+// go red on a change in the shop rather than a change in the code, and its failures would stop
+// meaning anything. The fixtures are structurally faithful to the live payload shape and stable by
+// construction. Point `--ws` at a live capture when you want to check against real data — and that
+// capture may be committed if it is useful; there is no privacy reason to withhold it.
 //
 // USAGE
 //   node services/cockpit/render-vm-check.mjs               # gate, using committed fixtures
