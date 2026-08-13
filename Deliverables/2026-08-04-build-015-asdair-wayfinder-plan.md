@@ -2282,6 +2282,161 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+## ⟦PHASE SCOPE — INGESTION END-TO-END + MUM'S COCKPIT⟧ Warwick, 2026-08-13. **His destination, quoted.**
+
+> *"The entire AsdAIr input-ingestion journey is working correctly end-to-end and reaches the browser
+> stage in the real production path."* · *"Do not stop merely to tell Warwick that one of those defects
+> has been fixed."* · *"The known photograph has already demonstrated stable visual coverage at 39/39 with
+> zero omissions. **Do not reopen the eyesight architecture** or start another vision research cycle unless
+> genuinely new evidence disproves that result."*
+
+**His seven acceptance clauses:** (1) Mum's real list enters through the intended production ingestion path ·
+(2) PHOTO truth complete and grounded, **unsupported catalogue/history items unable to masquerade as things
+written on the photograph** · (3) duplicates, explicit quantities and catalogue identity behave under the
+agreed invariants · (4) **provenance survives the actual production path, not merely schemas or tests** ·
+(5) the result reaches the browser stage · (6) **Mum has a separate Cockpit view Warwick can open on the
+Fire tablet** · (7) the whole journey demonstrated as a working user experience, **not inferred from unit
+tests, fixtures or disconnected components**.
+
+### 🔴 VERITAS GATE 1 ON WP-B15-40 — **HOLD.** AC1 held; AC2–AC7 PASS. Receipt `132de83a…`
+
+**`services/asdair/pipeline/deps.js:46` imports exactly ONE provenance writer.** REGULARS, RULE and WARWICK
+land only in a test that calls the writer directly and pre-dates the work package. **By the contract's
+definition they are not on the journey.**
+
+> **Veritas, and it is right: *"You accepted something you should not have."*** And its sharper point is not
+> the wiring gap — a legitimate frontier split — but that **the residual existed only in Larry's dispatch
+> message while the map's `AC1 provenance persists` row read as satisfied.** Two older map lines (`:3220`,
+> `:3315`) were *more accurate than the current block*. **Currently latent, not harmful:** the artefact is
+> `{"PHOTO": 39}` with `additions: 0`.
+
+**Warwick's clause 4 makes it blocking. Dispatched as WP-B15-46 (Lane G).**
+
+**Veritas also verified what Larry asked it to test rather than accepting it:** the re-baseline re-executed
+from source (`resolved 30, routed 9`, 39 lines, quantity sum 53) · no emitted output labels photo evidence
+verified, **including `browser-handoff.json`, which Keel's own test does not cover** · three mutants
+re-run independently in an export **outside the repo** · and the two edited tests **vindicated by evidence
+rather than argument** — removing the AC5 routing cause turned one of them red, and *"a relaxed assertion
+does not detect the removal of the control it was relaxed around."*
+
+**⚠️ And it caught a claim Larry had passed on: `ZERO SKIPPED` is true, but the suite is NOT green on a
+fresh checkout.** `git -c core.autocrlf=true checkout-index` of `58c86ef` gives **1078 pass / 1 fail** — a
+guard test byte-compares a CRLF-converted `.md`. Non-blocking, no product effect, **but the evidence claim
+must be stated as "green in the authoring worktree; 1 CRLF-sensitive failure on a fresh Windows checkout."**
+Now AC5 of Lane G.
+
+#### 🔵 LANE G ROUTE DECISION — **ROUTE B.** Larry's, taken not escalated. *The known photograph cannot prove this.*
+
+**Keel's read-back found AC1 and AC4 MUTUALLY UNSATISFIABLE, and it was right.** The known photograph
+carries **only PHOTO lines** — `separately_justified_additions: 0`, `REGULARS/RULE/WARWICK` all zero. So a
+production run over that fixture has **nothing of the other three kinds to write**. Making it produce them
+means making the planner emit additions, which **moves the very numbers AC4 reserves to Larry.**
+*Manufacturing the three kinds from that photograph would be exactly the contamination `finalList.js`
+refuses, and would corrupt the one artefact this phase rests on.*
+
+**Keel also proved BOTH production entry points unable to satisfy AC1 as written:**
+`finalise/produceFinalList.mjs` runs the production modules over the **in-memory fake** and opens no pool,
+and injects `modelLines` so `deps.interpretPhoto` never runs — it writes **no** provenance at all.
+`deps.js realInterpretPhoto` does write PHOTO, but needs a live gateway call (`network: none`) and the real
+photograph under the private surface (`private_surface: none`). **Neither was reachable.**
+
+**ADOPTED — ROUTE B:** wire the three kinds at **`runPipeline.js planWithDecisions`**, the single place
+`planBasket` → `applyRulebook` → `applyDecisionsToPlan` already run, and prove with a **SECOND,
+purpose-built production run** exercising all three origins against real Postgres, rows read back **by kind,
+scoped to shop ids that run creates**. **The 39-line artefact is RE-PROVEN UNCHANGED, never regenerated** —
+AC4 satisfied by leaving it alone.
+
+**Route C rejected on Warwick's own clause**, and the reasoning is recorded so it is not re-proposed:
+closing F1 by correcting the record is legitimate under the receipt's own trigger, but his standing clause is
+*"required provenance survives through the actual production path rather than merely existing in schemas or
+tests."* **Correcting the record instead of building the path would satisfy Veritas and not satisfy him.**
+Route A rejected for Keel's reason — Veritas has already ruled capability evidence is not the acceptance.
+
+**AC0 was wrong and is corrected:** `asdair_rw` **cannot CREATE SCHEMA**, which `applyThrowawaySchema`
+requires, so the DB-gated file **fails hard rather than skipping** — the order's own "zero skipped" figure
+was unreachable with what it declared. Owner connection now declared. *Keel refused to treat its own probe
+as a grant, which is the correct instinct.*
+
+**Two facts Keel established that strengthen AC2:** `shop_line_provenance_region_iff_photo` is a
+**BICONDITIONAL** check (`provenance='PHOTO'` ⟺ `source_region_id IS NOT NULL`), so with the composite FK the
+database already enforces both directions. And the shared cluster now holds **98 shops** and
+**PHOTO 9 / WARWICK 5 / REGULARS 62** rows from other lanes — scoping to own-run shop ids is mandatory.
+
+### 🟢 MUM'S COCKPIT — the deferred phase is IN SCOPE. **Warwick corrected Larry mid-turn, and he was right.**
+
+Larry was about to author Mum's view from scratch. **A deferred phase already specifies it in five
+documents** — Warwick: *"There was a deferred phase for mums cockpit view which should already be visible
+on the wayfinder. I now want that brought into scope."*
+
+`POST-BUILD-ADDENDUM-mum-self-service-cockpit` (North Star, what is reused unchanged) ·
+**`addendum-B-mum-cockpit-ux` — the screen-flow and wireframe spec, PRIMARY** ·
+`addendum-A-fire-platform-truth` (Fire/Silk, accessibility numbers with sources) ·
+`addendum-E-acceptance-matrix` (the fourteen "MUM can use it" criteria) · `addendum-C-pipeline-seam`.
+
+**Dispatched as WP-B15-45 to Felix**, worktree `C:/Fusion247PKA-mumview`. Two spec points held hardest:
+**a SEPARATE surface, never a mode** — *"any control that switches into her view is a control that can
+switch out of it"* — and **the word "Cockpit" must not appear on her screen**, enforced by a harness
+assertion rather than a sweep.
+
+> **⛔ SCOPE BOUNDARY, stated in the order: Addendum E's fourteen MUM-OBSERVED criteria are NOT claimable
+> tonight.** They require an 84-year-old woman sitting in front of the device. *An honest "not yet observed"
+> is the correct result; a green one would be a lie about her ability to use software.*
+
+**Live fact that made this cheap:** `asdair.households id=1` is `name=mum, display_name=Mum`, and
+`cockpit-api/httpApi.js:163,178` **already accepts a `household` query parameter.** Her view is a scoping
+problem, not a new application — which is the reuse Warwick asked for.
+
+### 🔴 LIVE PRODUCTION STATE — established by query, and it settles the Veritas argument empirically
+
+**`asdair.shop_line_provenance` in the LIVE database contains ZERO ROWS.** The tables exist — Larry applied
+020 today — and **nothing has ever written to them in production.** That is not an inference from reading
+`deps.js`; it is the row count. **Veritas's F1 was right on the evidence as well as on the contract.**
+
+| Live shop | Status | Lines | Source image | Note |
+|---|---|---|---|---|
+| **26** | `WAITING_FOR_BROWSER` | **39** | 1 | **The known 39-line photograph, in production.** `needs_review=true` |
+| 28 | `RECEIVED` | 0 | 0 | Arrived **2026-08-11 17:47** and carries neither lines nor a source image |
+| 7 | `READY_TO_SHOP` | 3 | 1 | `needs_review=true` |
+
+**Shop 26 is the demonstration target for Warwick's clauses 5 and 7** — the real photograph, already in the
+production database, with its 39 lines. It has never had provenance written against it because nothing
+writes provenance.
+
+**Shop 28 is an observation, not yet a diagnosis:** a shop in `RECEIVED` with no lines and no source image.
+Whether that is a stalled ingestion, an empty message, or a normal transient state **has not been
+established and is not being asserted.**
+
+### 📍 THE REAL PRODUCTION INGESTION PATH — named, so the demonstration targets the right thing
+
+`services/asdair/pipeline/runtime.js` is **THE LOOP**: *"Poll intake once, advance every shop that has work,
+send whatever is waiting in the outbox, exit cleanly"* — `node --env-file=<env> runtime.js --once`. It is
+explicitly *"a DETERMINISTIC WORKER, NOT AN LLM DAEMON"*, and the **only** model call in the whole system is
+the single grounded vision request.
+
+**⚠️ `services/asdair/interpret/interpret-list.js` is NOT the production path and says so in its own header:**
+*"The live shop interprets through services/asdair/pipeline (`realInterpretPhoto` in `pipeline/deps.js`).
+This file is a second entry point kept for diagnosis. A green result HERE is evidence about THIS process and
+nothing else."* It also records why `--dry-run` was removed: on 2026-08-03 a clean exit behind a
+success-shaped body was read as proof while the gateway served no usable vision alias, **and a broken
+interpretation path reached a live household shop.**
+
+**Sequencing, and it is serial on purpose:** the end-to-end run waits for **Lane G**. Running the production
+loop before the provenance wiring lands would produce another shop with no provenance — the exact gap being
+closed. *Larry holds live authority here; the workers hold neither the network nor the private-surface grant,
+which is why this half is Larry's and not delegable.*
+
+### ⚠️ TWO THINGS RECORDED BECAUSE THEY ARE NOT LARRY'S TO FIX
+
+**1. Felix's contract has NO integration-role section.** The envelope generator flagged
+`git_authority: UNRESOLVED` and was correct — **Felix committed and pushed all night on WP-B15-42 with no
+clause granting it.** Larry granted it per-order under CLAUDE.md § Git ownership and recorded the scope in
+the envelope row. **The contract repair needs Warwick's explicit approval** — CLAUDE.md forbids modifying
+any canonical specialist contract without it, so **Nolan has NOT been dispatched.** Warwick's call.
+
+**2. Migration 020's idempotency guard is not schema-safe** (`conname` is unique per *table*, and the lookup
+is qualified by neither schema nor table). **Verified not yet bitten in live** — both FKs exist and only one
+`asdair` schema is present. **Silas's decision, and Warwick's.** Explicitly out of scope for Lane G.
+
 ### ⭐ LANE E DELIVERED — WHY TERRA INVENTS. The answer is a switch, not an argument.
 
 **`Deliverables/2026-08-13-terra-in-enum-false-positive-mechanism.md`, branch `b15-38-terra-invention-analysis` @ `9798648`.**
