@@ -2282,6 +2282,60 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+## 🔴🔴 PRODUCTION DOES NOT READ THE PHOTOGRAPH WITH TERRA. **Established by execution, 2026-08-13. WARWICK'S DECISION.**
+
+**Every measurement this phase rests on — the 39/39 coverage, the 2-of-3 reconciliation, Lane E's phantom
+mechanism — was made on `gpt-5.6-terra`. The production ingestion path is configured for `gpt-5-mini`.**
+
+| Path | Selector | Resolves to |
+|---|---|---|
+| **The prototype** that produced 39/39 and every frozen run | `answerModel()` = `process.env.FUSION_MODEL_ANSWER \|\| 'gpt-5.6-terra'` | **`gpt-5.6-terra`** |
+| **The PRODUCTION interpreter** that would read Mum's list | `ROLE_ALIAS.vision` = `process.env.FUSION_MODEL_VISION \|\| 'fusion.vision'` | **`gpt-5-mini`** (env-set) |
+
+**PROVED LIVE, not inferred.** Larry ran the real production interpreter over the real committed photograph
+today: **5 gateway calls · $0.418977 · `interpreter_model: gpt-5-mini`**, recorded in
+`testdata/known-list/vision-run-2026-08-13T12-41-13-420Z.json`.
+
+**And the fallback alias does not exist.** `fusion.vision` is **NOT registered on the gateway** — the model
+list serves `fusion.reason/query/extract/keyword/embed`, `gpt-5.6-terra`, `gpt-5-mini`, `gpt-5-nano`,
+`text-embedding-3-large`, and no `fusion.vision`. **`models.mjs:41` already says so in its own comment:**
+*"`fusion.vision`, which the gateway does not register, and it failed live."*
+
+> **⚠️ CONSEQUENCE, STATED PLAINLY: the 39/39 result is not evidence about the production journey.** It is
+> evidence about a path Mum's list would never travel. *Larry proposed to demonstrate the end-to-end journey
+> and instead demonstrated that the journey runs a different model — which is what an honest end-to-end run
+> is for.*
+
+**⛔ THIS IS NOT REOPENING VISION.** Warwick parked the eyesight architecture and Larry is respecting that.
+**This is a CONFIGURATION divergence, not a research question**, and his parking order carved out exactly
+this case: *"unless genuinely new evidence disproves that result."* **The result is not disproved — it is
+shown to have been measured on a different model from the one in production.**
+
+### ✅ FIXED, NOT ESCALATED. **Larry's framing was wrong and Warwick corrected it immediately.**
+
+> **Warwick, 2026-08-13:** *"why you talking about bloody mini!?!?! We settled vision with terra wtf is going
+> on?!"*
+
+**He is right, and the error was Larry's.** Larry sent `message_id 526` offering three options as though the
+model choice were open. **IT IS NOT OPEN. Warwick settled vision on Terra** — *"TERRA HAS THE GLASSES"* —
+and a production configuration that contradicts a settled ruling is a **DEFECT TO FIX**, not a decision to
+hand back. *Escalating something already decided is the same failure class as escalating what a safe default
+resolves: it costs Warwick attention on a question he had already answered.*
+
+**Corrected at source, 2026-08-13:** `C:\.fusion247\asdair.env` line 16 now reads
+**`FUSION_MODEL_VISION=gpt-5.6-terra`** (was `gpt-5-mini`). Backup at `asdair.env.bak-2026-08-13-larry`.
+**Verified by execution:** the value resolves, and **the gateway registers `gpt-5.6-terra`** — unlike the
+`fusion.vision` fallback, which it does not. Only that one line changed; the file still carries its same six
+assignments.
+
+**What this changes for the phase:** the production ingestion path now uses the same model every measurement
+was made on, so the 39/39 coverage and the reconciliation evidence **describe the journey Mum's list will
+actually travel.** *The capture artefact `vision-run-2026-08-13T12-41-13-420Z.json` was taken on `gpt-5-mini`
+and is therefore SUPERSEDED — it is retained only as the evidence that found the defect, and must not be used
+as the journey's input.*
+
+**Work did not stop for this.** Felix is fixing two HIGH findings on Mum's Cockpit; Lane J's runner continues.
+
 ## ⟦PHASE SCOPE — INGESTION END-TO-END + MUM'S COCKPIT⟧ Warwick, 2026-08-13. **His destination, quoted.**
 
 > *"The entire AsdAIr input-ingestion journey is working correctly end-to-end and reaches the browser
