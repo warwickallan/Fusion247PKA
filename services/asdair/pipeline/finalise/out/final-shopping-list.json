@@ -22,9 +22,9 @@
     "explicit_skips": 8,
     "product_count": 39,
     "item_count": 53,
-    "shoppable_lines": 31,
-    "held_lines": 8,
-    "routed_lines": 8
+    "shoppable_lines": 30,
+    "held_lines": 9,
+    "routed_lines": 9
   },
   "provenance_arithmetic": {
     "statement": "photo source truth + separately justified additions - explicit skips = final shopping plan",
@@ -34,7 +34,7 @@
     "final_plan": 39,
     "reconciles": true
   },
-  "packet_fingerprint": "sha256:46c430501cd01afdbede5ab9cb7d65f73c092a5abca2c1d0ebd995a0b1066dd2",
+  "packet_fingerprint": "sha256:fb1563c6d370314a97374d79fba3f067280ca295b3fe71fa472cf5b5a96afa02",
   "instructions_version": 2,
   "lines": [
     {
@@ -72,7 +72,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "51"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -118,7 +122,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "107"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -164,7 +172,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "7"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -210,7 +222,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "57"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -256,7 +272,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "16"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -302,7 +322,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "117"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -348,7 +372,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "14"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -394,7 +422,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "87"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -439,7 +471,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "37"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -449,52 +485,6 @@
       "held_detail": null,
       "routed_question": null,
       "list_item_name": "Calgon washing machine cleaner tablets limescale protection 15 tablets"
-    },
-    {
-      "brand": "Cravendale",
-      "product": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
-      "product_id": 4,
-      "category": "Semi Skimmed Milk",
-      "asda_product_id": "489747",
-      "substitutes_allowed": false,
-      "quantity": 4,
-      "quantity_basis": "explicit-on-page",
-      "quantity_settled": true,
-      "quantity_candidates": [
-        4
-      ],
-      "pack_identity_applied": false,
-      "pack_identity_refused_evidence": null,
-      "quantity_note": null,
-      "provenance": "PHOTO",
-      "provenance_detail": {
-        "kind": "PHOTO",
-        "line_no": 23,
-        "raw_reading": "4 x 4pts. ARLA SEMI SKIMMED MILK",
-        "source_region_id": 8,
-        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
-        "support": 3,
-        "support_of": 3,
-        "support_class": "unanimous",
-        "seen_in_runs": [
-          "00-19-40",
-          "00-22-40",
-          "00-25-29"
-        ],
-        "collapsed_duplicate_observations": 1,
-        "identity_disagreement": false,
-        "identity_candidates": [
-          "4"
-        ]
-      },
-      "disposition": "resolved",
-      "status": "matched",
-      "match_basis": "approximate alias",
-      "shoppable": true,
-      "held_reason": null,
-      "held_detail": null,
-      "routed_question": null,
-      "list_item_name": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer"
     },
     {
       "brand": "Dettol",
@@ -531,7 +521,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "119"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -577,7 +571,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "12"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -622,7 +620,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "72"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -668,7 +670,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "44"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -714,7 +720,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "1"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -760,7 +770,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "13"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -806,7 +820,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "116"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -852,7 +870,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "3"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -898,7 +920,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "89"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -944,7 +970,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "9"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -990,7 +1020,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "85"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1036,7 +1070,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "23"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1082,7 +1120,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "28"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1128,7 +1170,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "114"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1174,7 +1220,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "115"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1220,7 +1270,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "56"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1266,7 +1320,13 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "6"
-        ]
+        ],
+        "vision_referral": true,
+        "vision_referral_reasons": [
+          "leading_mark_disagreement"
+        ],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1312,7 +1372,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "88"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1358,7 +1422,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "26"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1404,7 +1472,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "15"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1450,7 +1522,13 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "59"
-        ]
+        ],
+        "vision_referral": true,
+        "vision_referral_reasons": [
+          "leading_mark_disagreement"
+        ],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "resolved",
       "status": "matched",
@@ -1496,7 +1574,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "33"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "needs_confirmation",
@@ -1539,7 +1621,13 @@
         ],
         "collapsed_duplicate_observations": 0,
         "identity_disagreement": false,
-        "identity_candidates": []
+        "identity_candidates": [],
+        "vision_referral": true,
+        "vision_referral_reasons": [
+          "leading_mark_disagreement"
+        ],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "unmatched_new_item",
@@ -1585,7 +1673,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "11"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "unmatched_new_item",
@@ -1631,7 +1723,11 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "30"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "unmatched_new_item",
@@ -1677,7 +1773,13 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "5"
-        ]
+        ],
+        "vision_referral": true,
+        "vision_referral_reasons": [
+          "leading_mark_disagreement"
+        ],
+        "human_route_causes": [],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "needs_confirmation",
@@ -1724,7 +1826,13 @@
         "identity_candidates": [
           "118",
           "19"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [
+          "identity_conflict"
+        ],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "needs_confirmation",
@@ -1771,7 +1879,13 @@
         "identity_candidates": [
           "80",
           "81"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [
+          "identity_conflict"
+        ],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "needs_confirmation",
@@ -1818,7 +1932,13 @@
         "identity_disagreement": false,
         "identity_candidates": [
           "2"
-        ]
+        ],
+        "vision_referral": false,
+        "vision_referral_reasons": [],
+        "human_route_causes": [
+          "quantity_unsettled"
+        ],
+        "human_route_unresolved_reasons": []
       },
       "disposition": "unresolved-routed",
       "status": "needs_confirmation",
@@ -1828,6 +1948,62 @@
       "held_detail": "the planner left this line as \"needs_decision\"",
       "routed_question": "qeffe8da8",
       "list_item_name": "1 x 6pts. ASDA SEMI SKIMMED MILK"
+    },
+    {
+      "brand": "ZZ (no brand recorded)",
+      "product": null,
+      "product_id": null,
+      "category": null,
+      "asda_product_id": null,
+      "substitutes_allowed": null,
+      "quantity": 4,
+      "quantity_basis": "explicit-on-page",
+      "quantity_settled": true,
+      "quantity_candidates": [
+        4
+      ],
+      "pack_identity_applied": false,
+      "pack_identity_refused_evidence": null,
+      "quantity_note": null,
+      "provenance": "PHOTO",
+      "provenance_detail": {
+        "kind": "PHOTO",
+        "line_no": 23,
+        "raw_reading": "4 x 4pts. ARLA SEMI SKIMMED MILK",
+        "source_region_id": 8,
+        "interpreter_model": "frozen-run:wp1534-final (vision PARKED at 54c3b0b)",
+        "support": 3,
+        "support_of": 3,
+        "support_class": "unanimous",
+        "seen_in_runs": [
+          "00-19-40",
+          "00-22-40",
+          "00-25-29"
+        ],
+        "collapsed_duplicate_observations": 1,
+        "identity_disagreement": false,
+        "identity_candidates": [
+          "4"
+        ],
+        "vision_referral": true,
+        "vision_referral_reasons": [
+          "cross_region_duplicate_unresolved"
+        ],
+        "human_route_causes": [
+          "vision_referral"
+        ],
+        "human_route_unresolved_reasons": [
+          "cross_region_duplicate_unresolved"
+        ]
+      },
+      "disposition": "unresolved-routed",
+      "status": "needs_confirmation",
+      "match_basis": "approximate alias (held: model confidence 0 below 0.6)",
+      "shoppable": false,
+      "held_reason": "awaiting_decision",
+      "held_detail": "the planner left this line as \"needs_decision\"",
+      "routed_question": "q4b08a184",
+      "list_item_name": "4 x 4pts. ARLA SEMI SKIMMED MILK"
     }
   ],
   "additions": [],

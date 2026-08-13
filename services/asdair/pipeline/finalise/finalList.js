@@ -10,11 +10,19 @@
 // where WARWICK is the HUMAN kind), taken from `pipeline/lineProvenance.js` so
 // the two cannot drift.
 //
-// ⛔ MIGRATION 020 IS COMMITTED BUT NOT APPLIED. `asdair.shop_line_provenance`
-// and `asdair.shop_image_region` DO NOT EXIST in the live database. Nothing here
-// writes schema, applies a migration, or depends on those tables existing: the
-// ledger is modelled IN THE DURABLE ARTEFACT, in the shape the table would take,
-// so that when 020 is applied the rows can be inserted without a re-derivation.
+// MIGRATION 020 IS APPLIED (2026-08-13). `asdair.shop_line_provenance` and
+// `asdair.shop_image_region` EXIST, and `asdair_rw` holds SELECT+INSERT on both
+// with UPDATE and DELETE refused at the database. The previous note here said
+// the opposite; it was true when written and became false when 020 was applied,
+// and WO-2026-08-13-10 AC7 corrects it.
+//
+// What has NOT changed is this file's own behaviour: it still writes no schema,
+// applies no migration, and depends on no table existing. The ledger is modelled
+// IN THE DURABLE ARTEFACT, in the shape the table takes, so the rows can be
+// inserted from it without a re-derivation. Persisting them is a separate,
+// deliberately MANUAL step (WO-2026-08-13-10) - proving the writer against a
+// disposable Postgres is builder evidence, and the live confirmation write is
+// Larry's, not this module's and not the pipeline's.
 //
 // The arithmetic, and it must reconcile exactly:
 //
@@ -76,6 +84,7 @@ export function buildFinalList({
     const source = byLineNo.get(sl.line_no);
     const obs = source ? source._observation : null;
     const settled = source ? source._settled : null;
+    const route = source ? source._route : null;
     const regular = sl.matched_regular_id !== null && sl.matched_regular_id !== undefined
       ? regularsById.get(Number(sl.matched_regular_id))
       : null;
@@ -126,6 +135,17 @@ export function buildFinalList({
         collapsed_duplicate_observations: obs ? (obs.collapsed_from || []).length : 0,
         identity_disagreement: obs ? obs.identity_disagreement === true : false,
         identity_candidates: obs ? obs.identity_candidates : [],
+
+        // WO-2026-08-13-10 AC5. The vision layer's OWN referral, and whether a
+        // deterministic rule discharged it. Carried here so a reader can see
+        // that agreement did not decide this line's fate on its own.
+        // `support_class` describes AGREEMENT and never evidential truth: its
+        // vocabulary is unanimous / corroborated / uncorroborated, and no value
+        // of it means verified.
+        vision_referral: obs ? obs.vision_needs_human === true : false,
+        vision_referral_reasons: obs ? (obs.vision_needs_human_reasons || []) : [],
+        human_route_causes: route ? route.causes : [],
+        human_route_unresolved_reasons: route ? route.unresolvedReasons : [],
       },
 
       // WHAT HAPPENS TO IT

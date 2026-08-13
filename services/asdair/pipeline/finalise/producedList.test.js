@@ -240,9 +240,20 @@ test('AC4: no line on the produced list carries a pack-size-as-quantity failure'
 
 test('AC4: the explicit multiplier cases survive - "4 x 4pts ARLA" is still four', async () => {
   const r = await result();
-  const arla = r.finalList.lines.find((l) => /Cravendale/i.test(String(l.product || '')));
+  // WO-2026-08-13-10 (WP-B15-40) AC5: this line is now ROUTED TO A HUMAN. All
+  // three readings agreed on it, but it carries an unresolved cross-region
+  // duplicate, and agreement is not certainty. A routed line has no resolved
+  // `product`, so it is matched on its READING - exactly as the held ASDA milk
+  // line already is further down this file.
+  //
+  // THE CLAIM THIS TEST MAKES IS UNCHANGED AND STILL ASSERTED: the explicit
+  // multiplier "4 x" must still be read as four. Routing a line for review must
+  // never disturb the number the page actually carried.
+  const arla = r.finalList.lines.find((l) => /4\s*x\s*4\s*pts?\.?\s*ARLA/i.test(String(l.provenance_detail.raw_reading || '')));
   assert.ok(arla, 'the Arla/Cravendale milk line is missing');
   assert.equal(arla.quantity, 4);
+  assert.equal(arla.shoppable, false,
+    'and it is now held for a human on its unresolved cross-region duplicate (WP-B15-40 AC5)');
 });
 
 test('AC4: a line with no purchase count on the page asks for one', async () => {
@@ -287,9 +298,12 @@ for (const [a, b] of PRODUCED_PAIRS) {
 
 test('AC2 on the produced list: Arla/Cravendale milk and ASDA milk are two separate lines', async () => {
   const r = await result();
-  const arla = r.finalList.lines.filter((l) => /Cravendale/i.test(String(l.product || '')));
-  // The ASDA 6-pint line is HELD by the quantity conflict, so it is matched on
-  // its reading rather than on a resolved product name.
+  // BOTH milk lines are now matched on their readings rather than on resolved
+  // product names: the ASDA 6-pint line is held by its quantity conflict, and
+  // (WP-B15-40 AC5) the Arla line is held by its unresolved cross-region
+  // duplicate. The claim under test is unaffected - these are two DIFFERENT
+  // physical purchases and must never collapse into one, held or not.
+  const arla = r.finalList.lines.filter((l) => /4\s*x\s*4\s*pts?\.?\s*ARLA/i.test(String(l.provenance_detail.raw_reading || '')));
   const asda = r.finalList.lines.filter((l) => /6\s*pts?\.?\s*ASDA/i.test(String(l.provenance_detail.raw_reading || '')));
   assert.equal(arla.length, 1);
   assert.equal(asda.length, 1);

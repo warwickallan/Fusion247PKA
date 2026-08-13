@@ -6,7 +6,7 @@
 - Source: the three FINAL frozen vision runs of the real photograph; vision PARKED at 54c3b0b
 - Sorted by: **BRAND, then product name**
 - Products: **39** · Items: **53**
-- Shoppable now: **31** · Held for a decision: **8**
+- Shoppable now: **30** · Held for a decision: **9**
 - Photo lines: 39 · Separate additions: 0 · Explicit skips: 8
 
 ## The list, by brand
@@ -22,7 +22,6 @@
 | Batchelors | Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g | 1 | explicit-on-page | PHOTO | yes |  |
 | Bloo | Bloo Spa Moments Toilet Rim Block - Vitality 50g | 1 | explicit-on-page | PHOTO | yes |  |
 | Calgon | Calgon washing machine cleaner tablets limescale protection 15 tablets | 1 | explicit-on-page | PHOTO | yes |  |
-| Cravendale | Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer | 4 | explicit-on-page | PHOTO | yes |  |
 | Dettol | Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml | 1 | explicit-on-page | PHOTO | yes |  |
 | Dreamies | Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g | 1 | explicit-on-page | PHOTO | yes |  |
 | Exceptional | Exceptional by ASDA Creamy Mashed Potato 400g | 1 | explicit-on-page | PHOTO | yes |  |
@@ -52,6 +51,7 @@
 | ZZ (no brand recorded) | _1 PK. BIRDS EYE QUARTER POUNDERS._ | 1 | household-default-one | PHOTO | HELD (awaiting_decision) | the planner left this line as "needs_decision" |
 | ZZ (no brand recorded) | _1 PKT. ROAST BEEF_ | 1 | explicit-on-page | PHOTO | HELD (awaiting_decision) | the planner left this line as "needs_decision" |
 | ZZ (no brand recorded) | _1 x 6pts. ASDA SEMI SKIMMED MILK_ | 1 | conflicting-observations | PHOTO | HELD (awaiting_decision) | the runs disagree about the quantity (1 vs 7) and no deterministic rule settles it - routed rather than guessed |
+| ZZ (no brand recorded) | _4 x 4pts. ARLA SEMI SKIMMED MILK_ | 4 | explicit-on-page | PHOTO | HELD (awaiting_decision) | the planner left this line as "needs_decision" |
 
 ## Explicitly skipped - unsupported photo candidates, routed for review
 

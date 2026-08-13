@@ -5,8 +5,8 @@
     "generated_at": "2026-08-03T09:00:00.000Z",
     "household_id": 1,
     "sort_contract": "brand_az_then_product_az",
-    "expected_distinct_products": 31,
-    "expected_total_units": 45,
+    "expected_distinct_products": 30,
+    "expected_total_units": 41,
     "lines": [
       {
         "seq": 1,
@@ -172,24 +172,6 @@
       },
       {
         "seq": 10,
-        "shop_line_no": 23,
-        "original_list_line": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
-        "canonical_product_name": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
-        "brand": "Cravendale",
-        "normalized_brand": "cravendale",
-        "source_view": "regulars",
-        "required_quantity": 4,
-        "origin": "known",
-        "canonical_product_id": 4,
-        "asda_product_ref": "489747",
-        "approved_search_term": null,
-        "asda_url": null,
-        "substitutes_allowed": false,
-        "applied_rules": [],
-        "quantity_rationale": null
-      },
-      {
-        "seq": 11,
         "shop_line_no": 8,
         "original_list_line": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
         "canonical_product_name": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
@@ -207,7 +189,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 12,
+        "seq": 11,
         "shop_line_no": 9,
         "original_list_line": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
         "canonical_product_name": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
@@ -225,7 +207,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 13,
+        "seq": 12,
         "shop_line_no": 32,
         "original_list_line": "Exceptional by ASDA Creamy Mashed Potato 400g",
         "canonical_product_name": "Exceptional by ASDA Creamy Mashed Potato 400g",
@@ -243,7 +225,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 14,
+        "seq": 13,
         "shop_line_no": 24,
         "original_list_line": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
         "canonical_product_name": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
@@ -261,7 +243,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 15,
+        "seq": 14,
         "shop_line_no": 1,
         "original_list_line": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
         "canonical_product_name": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
@@ -279,7 +261,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 16,
+        "seq": 15,
         "shop_line_no": 10,
         "original_list_line": "Kleenex Original Tissues - Twin Pack",
         "canonical_product_name": "Kleenex Original Tissues - Twin Pack",
@@ -297,7 +279,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 17,
+        "seq": 16,
         "shop_line_no": 6,
         "original_list_line": "Loctite Super Glue Original 3g",
         "canonical_product_name": "Loctite Super Glue Original 3g",
@@ -315,7 +297,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 18,
+        "seq": 17,
         "shop_line_no": 19,
         "original_list_line": "Lucozade Sport Drink Orange 4 x 500ml",
         "canonical_product_name": "Lucozade Sport Drink Orange 4 x 500ml",
@@ -333,7 +315,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 19,
+        "seq": 18,
         "shop_line_no": 37,
         "original_list_line": "Lurpak Slightly Salted Butter 200g",
         "canonical_product_name": "Lurpak Slightly Salted Butter 200g",
@@ -351,7 +333,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 20,
+        "seq": 19,
         "shop_line_no": 38,
         "original_list_line": "Princes Lean Corned Beef 200g",
         "canonical_product_name": "Princes Lean Corned Beef 200g",
@@ -369,7 +351,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 21,
+        "seq": 20,
         "shop_line_no": 34,
         "original_list_line": "Richmond 12 Skinless Pork Sausages 319g",
         "canonical_product_name": "Richmond 12 Skinless Pork Sausages 319g",
@@ -387,7 +369,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 22,
+        "seq": 21,
         "shop_line_no": 16,
         "original_list_line": "Rustlers All Day Breakfast Sausage Muffin 155g",
         "canonical_product_name": "Rustlers All Day Breakfast Sausage Muffin 155g",
@@ -405,7 +387,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 23,
+        "seq": 22,
         "shop_line_no": 18,
         "original_list_line": "The BAKERY at ASDA Sultana & Cherry Cake",
         "canonical_product_name": "The BAKERY at ASDA Sultana & Cherry Cake",
@@ -423,7 +405,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 24,
+        "seq": 23,
         "shop_line_no": 4,
         "original_list_line": "Twix Chocolate & Caramel Ice Cream 4pk",
         "canonical_product_name": "Twix Chocolate & Caramel Ice Cream 4pk",
@@ -441,7 +423,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 25,
+        "seq": 24,
         "shop_line_no": 5,
         "original_list_line": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
         "canonical_product_name": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
@@ -459,7 +441,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 26,
+        "seq": 25,
         "shop_line_no": 27,
         "original_list_line": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
         "canonical_product_name": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
@@ -477,7 +459,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 27,
+        "seq": 26,
         "shop_line_no": 30,
         "original_list_line": "Walkers Cheese & Onion Multipack Crisps 6x25g",
         "canonical_product_name": "Walkers Cheese & Onion Multipack Crisps 6x25g",
@@ -495,7 +477,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 28,
+        "seq": 27,
         "shop_line_no": 36,
         "original_list_line": "Warburtons Danish Lighter White Bread 400g",
         "canonical_product_name": "Warburtons Danish Lighter White Bread 400g",
@@ -513,7 +495,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 29,
+        "seq": 28,
         "shop_line_no": 17,
         "original_list_line": "Weetabix Protein 24 pack cereal",
         "canonical_product_name": "Weetabix Protein 24 pack cereal",
@@ -531,7 +513,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 30,
+        "seq": 29,
         "shop_line_no": 12,
         "original_list_line": "Yazoo Chocolate Milk Drink 400ml",
         "canonical_product_name": "Yazoo Chocolate Milk Drink 400ml",
@@ -549,7 +531,7 @@
         "quantity_rationale": null
       },
       {
-        "seq": 31,
+        "seq": 30,
         "shop_line_no": 29,
         "original_list_line": "Yazoo Strawberry Milk Drink 400ml",
         "canonical_product_name": "Yazoo Strawberry Milk Drink 400ml",
@@ -604,6 +586,13 @@
         "rule_id": null
       },
       {
+        "shop_line_no": 23,
+        "original_list_line": "4 x 4pts. ARLA SEMI SKIMMED MILK",
+        "reason": "awaiting_decision",
+        "detail": "the planner left this line as \"needs_decision\"",
+        "rule_id": null
+      },
+      {
         "shop_line_no": 25,
         "original_list_line": "1 LENOR O",
         "reason": "awaiting_decision",
@@ -631,21 +620,21 @@
     "instructions_version": 2,
     "packet_version": 1,
     "shop_ref": "SHOP-2026-08-13",
-    "packet_fingerprint": "sha256:46c430501cd01afdbede5ab9cb7d65f73c092a5abca2c1d0ebd995a0b1066dd2",
+    "packet_fingerprint": "sha256:fb1563c6d370314a97374d79fba3f067280ca295b3fe71fa472cf5b5a96afa02",
     "generated_at": "2026-08-03T09:00:00.000Z",
     "household_id": 1,
     "sort_contract": "brand_az_then_product_az",
     "sort_contract_declared": true,
     "sort_contract_verified": true,
     "expected": {
-      "distinct_products": 31,
-      "total_units": 45
+      "distinct_products": 30,
+      "total_units": 41
     },
     "counts": {
-      "lines": 31,
-      "known": 31,
+      "lines": 30,
+      "known": 30,
       "new_approved": 0,
-      "held": 8,
+      "held": 9,
       "retrieval_required": 4
     },
     "duplicate_identities": [],
@@ -1022,25 +1011,6 @@
       },
       {
         "seq": 10,
-        "shop_line_no": 23,
-        "original_list_line": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
-        "canonical_product_id": 4,
-        "canonical_product_name": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
-        "brand": "Cravendale",
-        "normalized_brand": "cravendale",
-        "source_view": "regulars",
-        "asda_product_ref": "489747",
-        "asda_url": null,
-        "required_quantity": 4,
-        "origin": "known",
-        "approved_search_term": null,
-        "substitutes_allowed": false,
-        "applied_rules": [],
-        "quantity_rationale": null,
-        "retrieval": null
-      },
-      {
-        "seq": 11,
         "shop_line_no": 8,
         "original_list_line": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
         "canonical_product_id": 119,
@@ -1059,7 +1029,7 @@
         "retrieval": null
       },
       {
-        "seq": 12,
+        "seq": 11,
         "shop_line_no": 9,
         "original_list_line": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
         "canonical_product_id": 12,
@@ -1078,7 +1048,7 @@
         "retrieval": null
       },
       {
-        "seq": 13,
+        "seq": 12,
         "shop_line_no": 32,
         "original_list_line": "Exceptional by ASDA Creamy Mashed Potato 400g",
         "canonical_product_id": 72,
@@ -1123,7 +1093,7 @@
         }
       },
       {
-        "seq": 14,
+        "seq": 13,
         "shop_line_no": 24,
         "original_list_line": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
         "canonical_product_id": 44,
@@ -1168,7 +1138,7 @@
         }
       },
       {
-        "seq": 15,
+        "seq": 14,
         "shop_line_no": 1,
         "original_list_line": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
         "canonical_product_id": 1,
@@ -1187,7 +1157,7 @@
         "retrieval": null
       },
       {
-        "seq": 16,
+        "seq": 15,
         "shop_line_no": 10,
         "original_list_line": "Kleenex Original Tissues - Twin Pack",
         "canonical_product_id": 13,
@@ -1206,7 +1176,7 @@
         "retrieval": null
       },
       {
-        "seq": 17,
+        "seq": 16,
         "shop_line_no": 6,
         "original_list_line": "Loctite Super Glue Original 3g",
         "canonical_product_id": 116,
@@ -1225,7 +1195,7 @@
         "retrieval": null
       },
       {
-        "seq": 18,
+        "seq": 17,
         "shop_line_no": 19,
         "original_list_line": "Lucozade Sport Drink Orange 4 x 500ml",
         "canonical_product_id": 3,
@@ -1244,7 +1214,7 @@
         "retrieval": null
       },
       {
-        "seq": 19,
+        "seq": 18,
         "shop_line_no": 37,
         "original_list_line": "Lurpak Slightly Salted Butter 200g",
         "canonical_product_id": 89,
@@ -1263,7 +1233,7 @@
         "retrieval": null
       },
       {
-        "seq": 20,
+        "seq": 19,
         "shop_line_no": 38,
         "original_list_line": "Princes Lean Corned Beef 200g",
         "canonical_product_id": 9,
@@ -1282,7 +1252,7 @@
         "retrieval": null
       },
       {
-        "seq": 21,
+        "seq": 20,
         "shop_line_no": 34,
         "original_list_line": "Richmond 12 Skinless Pork Sausages 319g",
         "canonical_product_id": 85,
@@ -1301,7 +1271,7 @@
         "retrieval": null
       },
       {
-        "seq": 22,
+        "seq": 21,
         "shop_line_no": 16,
         "original_list_line": "Rustlers All Day Breakfast Sausage Muffin 155g",
         "canonical_product_id": 23,
@@ -1320,7 +1290,7 @@
         "retrieval": null
       },
       {
-        "seq": 23,
+        "seq": 22,
         "shop_line_no": 18,
         "original_list_line": "The BAKERY at ASDA Sultana & Cherry Cake",
         "canonical_product_id": 28,
@@ -1339,7 +1309,7 @@
         "retrieval": null
       },
       {
-        "seq": 24,
+        "seq": 23,
         "shop_line_no": 4,
         "original_list_line": "Twix Chocolate & Caramel Ice Cream 4pk",
         "canonical_product_id": 114,
@@ -1358,7 +1328,7 @@
         "retrieval": null
       },
       {
-        "seq": 25,
+        "seq": 24,
         "shop_line_no": 5,
         "original_list_line": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
         "canonical_product_id": 115,
@@ -1377,7 +1347,7 @@
         "retrieval": null
       },
       {
-        "seq": 26,
+        "seq": 25,
         "shop_line_no": 27,
         "original_list_line": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
         "canonical_product_id": 56,
@@ -1396,7 +1366,7 @@
         "retrieval": null
       },
       {
-        "seq": 27,
+        "seq": 26,
         "shop_line_no": 30,
         "original_list_line": "Walkers Cheese & Onion Multipack Crisps 6x25g",
         "canonical_product_id": 6,
@@ -1415,7 +1385,7 @@
         "retrieval": null
       },
       {
-        "seq": 28,
+        "seq": 27,
         "shop_line_no": 36,
         "original_list_line": "Warburtons Danish Lighter White Bread 400g",
         "canonical_product_id": 88,
@@ -1434,7 +1404,7 @@
         "retrieval": null
       },
       {
-        "seq": 29,
+        "seq": 28,
         "shop_line_no": 17,
         "original_list_line": "Weetabix Protein 24 pack cereal",
         "canonical_product_id": 26,
@@ -1453,7 +1423,7 @@
         "retrieval": null
       },
       {
-        "seq": 30,
+        "seq": 29,
         "shop_line_no": 12,
         "original_list_line": "Yazoo Chocolate Milk Drink 400ml",
         "canonical_product_id": 15,
@@ -1472,7 +1442,7 @@
         "retrieval": null
       },
       {
-        "seq": 31,
+        "seq": 30,
         "shop_line_no": 29,
         "original_list_line": "Yazoo Strawberry Milk Drink 400ml",
         "canonical_product_id": 59,
@@ -1523,6 +1493,13 @@
       {
         "shop_line_no": 21,
         "original_list_line": "1 BAG ASDA PLAIN TOFFEE'S",
+        "reason": "awaiting_decision",
+        "detail": "the planner left this line as \"needs_decision\"",
+        "rule_id": null
+      },
+      {
+        "shop_line_no": 23,
+        "original_list_line": "4 x 4pts. ARLA SEMI SKIMMED MILK",
         "reason": "awaiting_decision",
         "detail": "the planner left this line as \"needs_decision\"",
         "rule_id": null

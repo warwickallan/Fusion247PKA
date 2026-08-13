@@ -5,9 +5,9 @@
   "accounted": 47,
   "established": 39,
   "unsupported": 8,
-  "resolved": 31,
+  "resolved": 30,
   "skipped": 8,
-  "routed": 8,
+  "routed": 9,
   "missing": [],
   "duplicated": [],
   "closes": true,
@@ -256,12 +256,12 @@
     ],
     "id:4": [
       {
-        "fate": "resolved",
+        "fate": "unresolved-routed",
         "detail": {
           "line_no": 23,
-          "status": "matched",
-          "product": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
-          "held_reason": null
+          "status": "needs_confirmation",
+          "product": null,
+          "held_reason": "awaiting_decision"
         }
       }
     ],

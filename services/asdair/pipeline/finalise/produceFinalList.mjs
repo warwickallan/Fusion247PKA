@@ -58,6 +58,7 @@ import * as commands from '../commands.js';
 import { runPipeline, buildBrowserHandoff } from '../runPipeline.js';
 import { corroborate } from './corroborate.js';
 import { settleQuantity } from './settleQuantity.js';
+import { routeToHuman } from './humanRouting.js';
 import { buildFinalList } from './finalList.js';
 import { buildAccounting } from './accounting.js';
 
@@ -133,13 +134,18 @@ export function catalogueFromSnapshot(snapshot) {
  * as `needs_confirmation` and the planner opens a question. That is how genuine
  * uncertainty reaches Warwick through the production route instead of being
  * decided here.
+ *
+ * WO-2026-08-13-10 AC5: the decision is now `finalise/humanRouting.js`, and it
+ * adds a FOURTH cause the three original ones could not express - an UNDISCHARGED
+ * VISION REFERRAL. That cause is independent of agreement, so a line every
+ * reading agreed on can still reach a human. Read that module's header for why
+ * unanimity was never evidence of truth here.
  */
 export function modelLinesFrom(observations, productNameById) {
   return observations.map((obs, i) => {
     const settled = settleQuantity(obs, productNameById);
-    const uncertain = obs.support < 2
-      || obs.identity_disagreement === true
-      || settled.settled === false;
+    const route = routeToHuman(obs, settled);
+    const uncertain = route.human;
     return {
       line_no: i + 1,
       raw_reading: obs.as_written,
@@ -149,6 +155,7 @@ export function modelLinesFrom(observations, productNameById) {
       _observation: obs,
       _settled: settled,
       _uncertain: uncertain,
+      _route: route,
     };
   });
 }
@@ -173,7 +180,7 @@ export async function produce({ runs, snapshot } = {}) {
   // ── 2. DRIVE THE REAL PIPELINE ───────────────────────────────────────────
   const harness = makeHarness({
     catalogue,
-    modelLines: modelLines.map(({ _observation, _settled, _uncertain, ...line }) => line),
+    modelLines: modelLines.map(({ _observation, _settled, _uncertain, _route, ...line }) => line),
     visionModel: 'frozen-run:wp1534-final (vision PARKED at 54c3b0b)',
     planningInputs: {
       rules: household.rules || [],
@@ -280,6 +287,12 @@ if (process.argv[1] && process.argv[1].endsWith('produceFinalList.mjs')) {
 
   const { renderFinalListMarkdown } = await import('./finalList.js');
   writeFileSync(join(OUT, 'final-shopping-list.md'), renderFinalListMarkdown(result.finalList), 'utf8');
+
+  // WO-2026-08-13-10 AC2. The derivation, generated from the artefact that was
+  // just built - never hand-authored, and never a second opinion about the
+  // numbers the production run already settled.
+  const { renderQuantityDerivationMarkdown } = await import('./quantityDerivation.js');
+  writeFileSync(join(OUT, 'quantity-derivation.md'), renderQuantityDerivationMarkdown(result.finalList), 'utf8');
 
   process.stdout.write([
     `steps            : ${result.steps.map((s) => s.step).join(' -> ')}`,
