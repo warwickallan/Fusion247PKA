@@ -874,3 +874,49 @@ test('R2: the rulebook error path is the module\'s ONE layer - deps.js adds no s
   assert.match(rulebookSrc, /addFlag\(item, 'rulebook not consulted'\)/,
     'skill/rulebook.js no longer flags the lines an unreachable consumer left unjudged');
 });
+
+// =====================================================================
+// WP-B15-46 - THE PRODUCTION CALLER FOR NON-PHOTO PROVENANCE
+//
+// This is the check Veritas performed BY HAND against WP-B15-40 and which
+// failed: it grepped services/asdair for production imports of the provenance
+// writer, found exactly one - the PHOTO one - and graded AC1 HOLD because
+// REGULARS/RULE/WARWICK were reachable only from a test calling the writer
+// directly. The check now lives in the suite so the same regression cannot
+// recur silently, and so it is answered by execution rather than by a person
+// remembering to grep.
+// =====================================================================
+
+test('WP-B15-46: a PRODUCTION caller writes the three non-photo provenance kinds', () => {
+  // 1. The caller is on the journey, statically imported by the module that
+  //    owns the plan - not injected, so it cannot resolve to undefined (D-1).
+  assert.match(runPipelineSrc, /import \{ persistPlanProvenance \} from '\.\/planProvenance\.js'/,
+    'runPipeline.js no longer imports the non-photo provenance caller');
+  assert.match(runPipelineSrc, /await persistPlanProvenance\(deps, \{/,
+    'runPipeline.js imports the provenance caller but never calls it - which is the exact '
+    + 'shape of the defect Veritas found: present, wired-looking, and not on the journey');
+
+  // 2. It is called from planWithDecisions, which is the ONE place all three
+  //    origins are observable, and therefore from every recomputation.
+  const planFn = runPipelineSrc.slice(
+    runPipelineSrc.indexOf('export async function planWithDecisions'),
+    runPipelineSrc.indexOf('export function listDateOf'),
+  );
+  assert.ok(planFn.length > 0, 'planWithDecisions could not be located in runPipeline.js');
+  assert.match(planFn, /persistPlanProvenance/,
+    'the provenance write is no longer inside planWithDecisions, so a recomputation path can miss it');
+
+  // 3. The module genuinely reaches the three writers.
+  const provenanceSrc = stripComments(fs.readFileSync(path.join(HERE, 'planProvenance.js'), 'utf8'));
+  for (const builder of ['buildRegularsProvenanceRow', 'buildRuleProvenanceRow', 'buildWarwickProvenanceRow']) {
+    assert.ok(provenanceSrc.includes(`${builder}(`),
+      `planProvenance.js never calls ${builder} - that kind has no production caller`);
+  }
+  assert.match(provenanceSrc, /insertProvenanceRow\(deps, row\)/,
+    'planProvenance.js derives rows but never persists them');
+
+  // 4. AND IT MUST NEVER BE ABLE TO CLAIM PHOTO TRUTH. Only the photo
+  //    interpreter, which holds resolved region ids, may build a PHOTO row.
+  assert.doesNotMatch(provenanceSrc, /buildPhotoProvenanceRow|insertPhotoProvenanceBatch|'PHOTO'|"PHOTO"/,
+    'planProvenance.js references PHOTO - the plan path must never be able to record photograph truth');
+});

@@ -60,6 +60,12 @@ import * as shopLines from './shopLines.js';
 import * as shopDecisions from './shopDecisions.js';
 import * as rememberedChoice from './rememberedChoice.js';
 import { applyDecisionsToPlan } from './applyDecisions.js';
+// WP-B15-46 AC1. The production caller for REGULARS / RULE / WARWICK provenance.
+// A STATIC import, exactly like `applyDecisionsToPlan` above and for the reason
+// deps.js states: a `deps.X` that nothing binds is undefined at runtime while
+// every stubbed test passes (Veritas D-1), and this is the one seam that must
+// not be able to fail that way twice.
+import { persistPlanProvenance } from './planProvenance.js';
 
 // ── THE BROWSER HANDOFF, ON THE LIVE ROUTE ─────────────────────────────────
 //
@@ -147,7 +153,13 @@ const { applyRulebook } = requireCjs('../skill/rulebook.js');
  * @returns {{plan:object, applied:Array, unresolved:Array, unlinkable:Array,
  *           decisions:Array}}
  */
-async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
+// EXPORTED for the same reason `buildBrowserHandoff` is (see its own comment):
+// it is a PRODUCTION function that an acceptance proof must be able to drive
+// DIRECTLY, rather than reaching it through a step that additionally advances a
+// shop. WP-B15-46's AC1 requires evidence that the REAL caller writes the three
+// non-photo provenance kinds, and a proof that re-implemented the call chain
+// would be evidence about the proof rather than about the journey.
+export async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
   const planned = deps.planBasket({
     listItems,
     rules: inputs.rules,
@@ -179,7 +191,7 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
   // A `consult` that THROWS is already caught inside the module: no line
   // changes, every affected line carries `rulebook not consulted`, and the
   // audit records why. There is deliberately no second catch here.
-  const { plan: judged } = await applyRulebook({
+  const { plan: judged, audit: rulebookAudit } = await applyRulebook({
     plan: planned,
     rules: inputs.rules,
     household: shop.household_id,
@@ -215,6 +227,49 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
     plan: result.plan, unresolved: result.unresolved, regularsById,
   });
 
+  // ── WHY EACH NON-PHOTO LINE IS IN THIS SHOP (WP-B15-46 AC1/AC3) ──────────
+  //
+  // THE PRODUCTION CALLER Veritas found missing. Its receipt (F1) recorded that
+  // `deps.js` imported exactly ONE provenance writer, so REGULARS, RULE and
+  // WARWICK rows existed only where a TEST called the writer directly - "by
+  // this contract's definition, not on the journey". Warwick's clause for this
+  // phase is that required provenance must survive through the ACTUAL
+  // production path, so the caller belongs on the path.
+  //
+  // It lives HERE, and the reason is the one written three times above: there
+  // is no plan table, so "this shop recorded where its non-photo lines came
+  // from" is a claim about EVERY recomputation. The three origins are only ALL
+  // observable at this point - the planner's additions, the rulebook's audit,
+  // and the decisions actually applied - and nowhere else does the journey hold
+  // all three at once.
+  //
+  // IDEMPOTENT BY CONSTRUCTION, because this function is called at every
+  // recomputation and the ledger is INSERT-ONLY with no unique index. See
+  // planProvenance.js's header for why that guard is a read-then-insert and
+  // exactly what it does and does not promise.
+  //
+  // NOT CAUGHT, deliberately. `resolveRememberedChoices` above catches its read
+  // because a household with no memory simply asks again; this is the opposite
+  // case and matches `recordAnswerLearning`'s judgement instead. A swallowed
+  // failure here would leave the journey LOOKING wired while silently recording
+  // nothing - which is indistinguishable from the defect being closed.
+  const provenance = await persistPlanProvenance(deps, {
+    shopId: shop.id,
+    listItems,
+    shopLines: await shopLines.listLines(deps, shop.id),
+    plan: memory.plan,
+    rulebookAudit,
+    decisionsApplied: result.applied,
+    regularsById,
+  });
+  deps.log({
+    event: 'asdair_plan_provenance',
+    shop_id: shop.id,
+    written: provenance.written.length,
+    skipped_already_recorded: provenance.skipped,
+    declined: provenance.declined.length,
+  });
+
   return {
     ...result,
     plan: memory.plan,
@@ -222,6 +277,7 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
     remembered: memory.remembered,
     remembered_refused: memory.refused,
     decisions,
+    provenance,
   };
 }
 

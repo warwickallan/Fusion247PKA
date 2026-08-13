@@ -395,11 +395,94 @@ test('the run performs NO live database write - the durable store is the offline
     'no write connection string is present in this process');
 });
 
-test('migration 020 is NOT depended upon - no provenance table is read or written', async () => {
+// ── RE-ANCHORED BY WO-2026-08-13-13 (WP-B15-46). READ THIS BEFORE JUDGING IT ──
+//
+// This test used to assert `r.harness.db.shop_line_provenance === undefined` -
+// that the finalise run touched migration 020's ledger not at all. That premise
+// was correct when written (020 was unapplied) and is now DELIBERATELY FALSE:
+// WP-B15-46 puts a real production caller for REGULARS/RULE/WARWICK provenance
+// on the journey at `runPipeline.planWithDecisions`, discharging the Veritas
+// HOLD (F1) that said those three kinds were reachable only from a test.
+//
+// ⚠️ THE ASSERTION WAS NOT RELAXED TO GO GREEN. What the old test actually
+// protected was two things, and BOTH are asserted below, more tightly than
+// before:
+//
+//   1. NO LIVE DATABASE WRITE. Unchanged, still proven, and additionally
+//      proven here to be an in-memory store rather than inferred from the
+//      absence of an env var (the sibling test above carries that half too).
+//   2. `finalise/finalList.js` DEPENDS ON NO TABLE. That is the invariant its
+//      own header states, it is the one that mattered, and it is now asserted
+//      against the MODULE'S SOURCE - which the old test never did. The old
+//      shape would have passed even if finalList.js had grown a SELECT, as
+//      long as this particular run happened not to reach it.
+//
+// And one thing the old test could not express at all, which is Warwick's
+// actual rule ("do not contaminate PHOTO truth merely to make the final plan
+// balance"): the rows this run now writes must be NON-PHOTO ONLY. A production
+// caller that could emit PHOTO without a citable region is exactly what AC2
+// forbids, and this is where that becomes visible on the offline path.
+test('migration 020: finalList.js depends on no table, and the run writes NON-PHOTO provenance only', async () => {
   const r = await result();
-  assert.equal(r.harness.db.shop_line_provenance, undefined);
-  assert.equal(r.harness.db.shop_image_region, undefined);
-  // The ledger lives in the artefact instead, in migration 020's own vocabulary.
+
+  // (1) Still the offline in-memory store. No pool was opened.
+  assert.ok(Array.isArray(r.harness.db.shop_line_provenance),
+    'the offline store must model the ledger now that the journey writes to it');
+  assert.equal(process.env.ASDAIR_DB_WRITE_URL, undefined,
+    'no write connection string is present in this process');
+
+  // (2) THE REAL INVARIANT, asserted against the source rather than the run.
+  //
+  // ⚠️ COMMENTS ARE STRIPPED FIRST, and the stripper ASSERTS THAT IT STRIPPED.
+  // finalList.js's own header discusses `asdair.shop_line_provenance` by name
+  // (it explains that the ledger is modelled in the artefact rather than read),
+  // so a naive scan of the raw text fails on the module's PROSE while a module
+  // that genuinely grew a SELECT inside a comment-free line would pass. Scanning
+  // source without stripping comments is not a control, it is a coincidence.
+  const finalListRaw = readFileSync(new URL('./finalList.js', import.meta.url), 'utf8');
+  const finalListSrc = finalListRaw
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/([^:])\/\/.*$/gm, '$1');
+  assert.ok(finalListSrc.length < finalListRaw.length,
+    'the comment stripper removed nothing - it is broken, and every scan below it is meaningless');
+
+  assert.ok(!/shop_line_provenance|shop_image_region/.test(finalListSrc),
+    'finalList.js must depend on no table - it models the ledger in the artefact, it does not read it');
+  assert.ok(!/\b(SELECT|INSERT INTO|UPDATE|DELETE FROM)\b/i.test(finalListSrc),
+    'finalList.js must remain pure: no SQL, no I/O');
+
+  // (3) THIS FIXTURE WRITES ZERO NON-PHOTO ROWS, AND THAT IS PINNED ON PURPOSE.
+  //
+  // ⚠️ DO NOT READ THE LOOP BELOW AS EVIDENCE THAT THE WIRING WORKS. On THIS
+  // photograph it iterates nothing, because the photograph genuinely carries no
+  // non-photo origin: `separately_justified_additions: 0`, the rulebook consult
+  // is declined by produceFinalList.mjs, and no decision has been recorded. A
+  // loop over an empty array asserts nothing at all, and calling it a pass would
+  // be the "green over a capability nothing called" failure.
+  //
+  // So the COUNT is pinned instead. Zero is the correct, meaningful answer here,
+  // and pinning it means that if a future change starts manufacturing non-photo
+  // origins from this photograph - which is exactly the contamination Warwick
+  // forbade, and would move the 39/53 artefact - this test says so immediately.
+  //
+  // The wiring's real proof is a SEPARATE, purpose-built production run against
+  // a real Postgres, which exercises all three origins: see
+  // `test/planProvenanceProductionSeam.dbtest.js`.
+  const written = r.harness.db.shop_line_provenance;
+  assert.equal(written.length, 0,
+    'the known photograph carries only PHOTO lines, so this run must write no non-photo provenance. '
+    + `Got ${written.length} row(s) - either the fixture changed or a line's origin is being invented`);
+
+  for (const row of written) {
+    assert.notEqual(row.provenance, 'PHOTO',
+      `planWithDecisions wrote a PHOTO row (line_no ${row.line_no}); only the photo interpreter may do that`);
+    assert.ok(['REGULARS', 'RULE', 'WARWICK'].includes(row.provenance));
+    assert.equal(row.source_region_id, null,
+      'a non-photo row may never cite a photograph region - migration 020 refuses it and so does this');
+  }
+
+  // The artefact's own ledger is unaffected and still four-way.
   for (const l of r.finalList.lines) {
     assert.ok(['PHOTO', 'REGULARS', 'RULE', 'WARWICK'].includes(l.provenance));
   }

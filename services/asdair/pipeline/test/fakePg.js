@@ -343,6 +343,15 @@ export function createFakeDatabase(seed = {}) {
     // question being asked next week, so the pipeline suite has to be able to
     // see a row land in it.
     rule_qa_log: [],
+    // asdair.shop_line_provenance (migration 020) - the four-way "why is this
+    // line in the shop?" ledger. Modelled here because WP-B15-46 puts a REAL
+    // production caller for REGULARS/RULE/WARWICK on the journey
+    // (runPipeline.planWithDecisions -> planProvenance.js), so the offline
+    // pipeline now writes to it on every plan recomputation. Migration 020's
+    // CHECK constraints are modelled below rather than assumed: an offline
+    // store that accepts a row the live database would refuse is worse than no
+    // store, because it teaches the suite that an impossible row is fine.
+    shop_line_provenance: [],
     ...seed,
   };
   const nextId = {};
@@ -993,6 +1002,69 @@ export function createFakeClient(store, options = {}) {
       target.resolved_at = target.resolved_at || nowIso();
       return rows([{ id: target.id }]);
     }],
+
+    // ── asdair.shop_line_provenance (migration 020) ────────────────────────
+    //
+    // WP-B15-46. Written on the offline path now that runPipeline's
+    // planWithDecisions carries a real production caller for the three
+    // non-photo kinds. INSERT-ONLY: migration 020 grants asdair_rw SELECT and
+    // INSERT and nothing else, so there is deliberately no UPDATE or DELETE
+    // handler here and adding one would model a database that does not exist.
+    //
+    // The CHECKs below are migration 020's own, verified against the live
+    // constraint definitions rather than transcribed from the migration text.
+    // `region_iff_photo` is the important one and it is a BICONDITIONAL - it is
+    // what makes AC2's converse true at the database: a non-photo row may not
+    // carry a region, and a PHOTO row may not omit one.
+    [/^INSERT INTO asdair\.shop_line_provenance \(/i, (sql, params) => {
+      const row = insertRow(sql, 'asdair.shop_line_provenance', params);
+      const isPhoto = row.provenance === 'PHOTO';
+      const hasRegion = row.source_region_id !== null && row.source_region_id !== undefined;
+      const hasText = row.raw_text !== null && row.raw_text !== undefined && String(row.raw_text).trim() !== '';
+      const hasProduct = row.matched_regular_id !== null && row.matched_regular_id !== undefined;
+
+      if (!['PHOTO', 'REGULARS', 'RULE', 'WARWICK'].includes(row.provenance)) {
+        throw new Error(`fakePg: CHECK shop_line_provenance_provenance_known violated (provenance = "${row.provenance}")`);
+      }
+      if (isPhoto !== hasRegion) {
+        throw new Error('fakePg: CHECK shop_line_provenance_region_iff_photo violated');
+      }
+      if (isPhoto && !hasText) {
+        throw new Error('fakePg: CHECK shop_line_provenance_photo_has_text violated');
+      }
+      if (isPhoto && !(row.interpreter_model && row.prompt_version)) {
+        throw new Error('fakePg: CHECK shop_line_provenance_photo_has_model violated');
+      }
+      if (row.provenance === 'REGULARS' && !hasProduct) {
+        throw new Error('fakePg: CHECK shop_line_provenance_regulars_has_product violated');
+      }
+      if (['RULE', 'WARWICK'].includes(row.provenance) && !hasProduct && !hasText) {
+        throw new Error('fakePg: CHECK shop_line_provenance_rule_warwick_names_something violated');
+      }
+      if (row.line_no !== null && row.line_no !== undefined && Number(row.line_no) <= 0) {
+        throw new Error('fakePg: CHECK shop_line_provenance_line_no_sane violated');
+      }
+      if (row.quantity !== null && row.quantity !== undefined
+        && (!Number.isInteger(Number(row.quantity)) || Number(row.quantity) < 1 || Number(row.quantity) > 999)) {
+        throw new Error('fakePg: CHECK shop_line_provenance_qty_sane violated');
+      }
+      // FK to asdair.shop. A provenance row for a shop that does not exist is
+      // refused by the real database and must be refused here too.
+      if (!db.shop.some((s) => String(s.id) === String(row.shop_id))) {
+        throw new Error('fakePg: FK shop_line_provenance_shop_id_fkey violated');
+      }
+
+      const created = {
+        id: id('shop_line_provenance'),
+        line_no: null, source_region_id: null, interpreter_model: null, prompt_version: null,
+        raw_text: null, matched_regular_id: null, quantity: null, confidence: null,
+        superseded_by_id: null, interpreted_at: nowIso(), created_at: nowIso(), ...row,
+      };
+      db.shop_line_provenance.push(created);
+      return rows([created]);
+    }],
+    [/^SELECT provenance, line_no, matched_regular_id, quantity, raw_text FROM asdair\.shop_line_provenance WHERE shop_id = \$1/i,
+      (sql, p) => rows(db.shop_line_provenance.filter((r) => String(r.shop_id) === String(p[0])))],
 
     // ── asdair.shop_line (migration 008 - the durable interpretation) ──────
     // UNIQUE (shop_id, line_no), plus the two CHECKs that matter: a `matched`

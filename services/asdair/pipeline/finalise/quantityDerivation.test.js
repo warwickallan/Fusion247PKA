@@ -145,6 +145,35 @@ test('AC2: the rendered artefact states the arithmetic it claims to reconcile', 
     'the rendered table must carry every line, not a selection');
 });
 
+// ---------------------------------------------------------------------
+// WO-2026-08-13-13 (WP-B15-46) AC5 - THE STALENESS GUARD, MADE PORTABLE.
+//
+// Veritas measured this file failing 1078/1 on a PRISTINE WINDOWS CHECKOUT of
+// a commit whose suite is 1079/0 in the authoring worktree. The cause is not
+// the artefact and not the renderer: this repository is configured
+// `core.autocrlf=true` and carries no `.gitattributes`, so `git checkout`
+// rewrites the committed `.md` to CRLF on the way to disk. The generator emits
+// LF, so a BYTE-EXACT compare is really asserting "this file was written by the
+// generator and never re-checked-out" - a property of one worktree, not of the
+// commit.
+//
+// So the comparison normalises line endings on BOTH sides. It compares CONTENT,
+// which is what "in step with the committed list" ever meant; the byte width of
+// a newline was never part of the claim.
+//
+// ⚠️ NORMALISING MUST NOT TURN THE GUARD OFF. A guard that stops guarding is
+// worse than the flake it replaced, so the staleness detection is proven by
+// being MADE TO FAIL in the test immediately below, rather than asserted here.
+// Fixing `.gitattributes` instead was considered and rejected: it would repair
+// the checkout on machines that have it and leave the test just as fragile
+// everywhere else. This fix travels with the assertion.
+// ---------------------------------------------------------------------
+
+/** Content-equality for text artefacts: CRLF/CR and LF are the same newline. */
+function normaliseNewlines(text) {
+  return String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 test('AC2: the committed derivation artefact is in step with the committed list', (t) => {
   const path = join(OUT, 'quantity-derivation.md');
   const list = loadList(t);
@@ -153,6 +182,36 @@ test('AC2: the committed derivation artefact is in step with the committed list'
     t.skip('quantity-derivation.md not built - run `node finalise/produceFinalList.mjs` first');
     return;
   }
-  assert.equal(readFileSync(path, 'utf8'), renderQuantityDerivationMarkdown(list),
+  const rendered = renderQuantityDerivationMarkdown(list);
+
+  // NOT A VACUOUS COMPARE. Two empty strings are equal, and an empty render
+  // would make this test pass while proving nothing at all.
+  assert.ok(rendered.length > 0, 'the renderer produced nothing to compare against');
+  assert.match(rendered, /SOURCE LINE -> PRODUCT IDENTITY -> PURCHASE QUANTITY/);
+
+  assert.equal(normaliseNewlines(readFileSync(path, 'utf8')), normaliseNewlines(rendered),
     'the committed derivation is stale: regenerate it with `node finalise/produceFinalList.mjs`');
+});
+
+test('AC5: newline normalisation does NOT stop the staleness guard from firing', (t) => {
+  const list = loadList(t);
+  if (!list) return;
+  const rendered = renderQuantityDerivationMarkdown(list);
+
+  // 1. A CRLF copy of the CURRENT artefact must still be accepted. This is the
+  //    exact fresh-Windows-checkout condition that produced Veritas's 1078/1.
+  const asCheckedOutOnWindows = rendered.replace(/\n/g, '\r\n');
+  assert.notEqual(asCheckedOutOnWindows, rendered,
+    'the CRLF fixture is identical to the LF render, so this test would prove nothing');
+  assert.equal(normaliseNewlines(asCheckedOutOnWindows), normaliseNewlines(rendered),
+    'a CRLF checkout of the CURRENT artefact must compare equal - that is the whole point of AC5');
+
+  // 2. A GENUINELY STALE artefact must still be REFUSED, in either line ending.
+  //    Staleness is a real number moving, so the mutant moves one.
+  const stale = rendered.replace(/FINAL ITEM COUNT: (\d+)/, (m, n) => `FINAL ITEM COUNT: ${Number(n) + 1}`);
+  assert.notEqual(stale, rendered, 'the staleness mutant did not change the rendered artefact');
+  assert.notEqual(normaliseNewlines(stale), normaliseNewlines(rendered),
+    'a stale derivation must NOT compare equal after normalisation - the guard would be dead');
+  assert.notEqual(normaliseNewlines(stale.replace(/\n/g, '\r\n')), normaliseNewlines(rendered),
+    'a stale derivation must NOT compare equal even when checked out with CRLF');
 });
