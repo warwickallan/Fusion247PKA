@@ -48,7 +48,7 @@
 'use strict';
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +60,27 @@ export const KNOWN_PHOTO_SHA256 = '89f33073296b4808f544b1f6111f10c723e532106f339
 
 /** Where captured artefacts live, beside the photograph they were captured from. */
 export const ARTEFACT_DIR = join(HERE, 'testdata', 'known-list');
+
+/**
+ * THE MODEL THIS BUILD'S EVIDENCE WAS MADE ON - the only model an artefact may
+ * have been captured with.
+ *
+ * ── A DEFECT THE FIRST CREDENTIALED RUN ACTUALLY FOUND ────────────────────
+ * The first capture recorded `interpreter_model: gpt-5-mini`, because production
+ * was configured for mini - while EVERY measurement this build rests on (the
+ * 39/39 coverage, the 2-of-3 reconciliation, the phantom mechanism) was made on
+ * Terra. The configured fallback alias `fusion.vision` is not registered on the
+ * gateway at all. Corrected at source; the mini artefact is kept beside the real
+ * one, prefixed SUPERSEDED-, as the evidence that found it.
+ *
+ * A reading taken by a different model is not a cheaper reading - it is a
+ * reading from a DIFFERENT EXPERIMENT, and every figure downstream would be
+ * silently incomparable with what this build already banked. So it is checked
+ * mechanically, before anything runs, exactly like the photograph's hash. The
+ * cost of the check is one string comparison; the cost of missing it was nearly
+ * a whole set of numbers nobody could trust.
+ */
+export const EXPECTED_INTERPRETER_MODEL = 'gpt-5.6-terra';
 
 /** Every field the artefact MUST carry. Absent -> throw, never substitute (M7). */
 export const REQUIRED_FIELDS = Object.freeze([
@@ -153,6 +174,14 @@ export function validateArtefact(artefact) {
       throw new Error(`visionRunArtefact: artefact.calls[${i}].seq is ${call.seq}, expected ${i + 1} - call order is load-bearing for replay`);
     }
   });
+  if (artefact.interpreter_model !== EXPECTED_INTERPRETER_MODEL) {
+    throw new Error(
+      `visionRunArtefact: REFUSING artefact captured with interpreter_model "${artefact.interpreter_model}" - `
+      + `this build's evidence was all made on "${EXPECTED_INTERPRETER_MODEL}". A reading by another model is a `
+      + 'reading from a different experiment, and every figure derived from it would be silently incomparable '
+      + 'with what this build already banked. Recapture on the expected model rather than relaxing this check.',
+    );
+  }
   if (artefact.vision_calls !== artefact.calls.length) {
     throw new Error(
       `visionRunArtefact: vision_calls says ${artefact.vision_calls} but ${artefact.calls.length} calls were recorded - `
@@ -165,6 +194,27 @@ export function validateArtefact(artefact) {
 /** Read + validate an artefact from disk. */
 export function loadArtefact(path) {
   return validateArtefact(JSON.parse(readFileSync(path, 'utf8')));
+}
+
+/**
+ * The artefact a run should consume, chosen by NAME PREFIX rather than by
+ * "newest file wins".
+ *
+ * `vision-run-*.json` is the eligible set. `SUPERSEDED-*` is excluded here AND
+ * refused by `validateArtefact` if it is ever passed explicitly - two
+ * independent barriers, because the superseded mini capture is deliberately
+ * kept on disk beside the real one and a selector that merely sorted filenames
+ * could pick it up. Belt and braces is warranted: consuming it would silently
+ * produce a full set of numbers from the wrong experiment.
+ */
+export function latestArtefactPath(dir = ARTEFACT_DIR) {
+  const eligible = readdirSync(dir)
+    .filter((f) => f.startsWith('vision-run-') && f.endsWith('.json'))
+    .sort();
+  if (eligible.length === 0) {
+    throw new Error(`visionRunArtefact: no vision-run-*.json artefact in ${dir} - the capture has not been committed yet`);
+  }
+  return join(dir, eligible[eligible.length - 1]);
 }
 
 const sameRegions = (a, b) => Array.isArray(a) && Array.isArray(b)

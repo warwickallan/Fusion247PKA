@@ -23,10 +23,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
-  KNOWN_PHOTO_PATH, KNOWN_PHOTO_SHA256, REQUIRED_FIELDS,
+  KNOWN_PHOTO_PATH, KNOWN_PHOTO_SHA256, REQUIRED_FIELDS, ARTEFACT_DIR,
+  EXPECTED_INTERPRETER_MODEL, latestArtefactPath, loadArtefact,
   assertPhotoIdentity, computeRegionPlan, regionPlanSha256,
   validateArtefact, makeReplayVision, sha256,
 } from './visionRunArtefact.mjs';
@@ -168,4 +170,35 @@ test('AC1: region-set comparison is order-insensitive but membership-exact', asy
 
 test('sha256 helper agrees with the committed photograph fingerprint', () => {
   assert.equal(sha256(readFileSync(KNOWN_PHOTO_PATH)), KNOWN_PHOTO_SHA256);
+});
+
+// =====================================================================
+// 7 - THE COMMITTED ARTEFACTS, including the one that MUST be refused
+// =====================================================================
+
+test('AC1: the committed Terra artefact validates, and its region plan matches one recomputed HERE', async () => {
+  const artefact = loadArtefact(latestArtefactPath());
+
+  assert.equal(artefact.interpreter_model, EXPECTED_INTERPRETER_MODEL);
+  assert.equal(artefact.photo_sha256, KNOWN_PHOTO_SHA256);
+
+  // THE CHAIN ASSERTION: the plan the model was shown, recomputed in THIS
+  // process from the committed pixels with the real production modules.
+  const plan = await computeRegionPlan(readFileSync(KNOWN_PHOTO_PATH));
+  assert.equal(
+    regionPlanSha256(plan), artefact.region_plan_sha256,
+    'the region plan this run computes must be the plan the model was actually shown, or the '
+    + 'replayed answers describe pixels this run never rendered',
+  );
+});
+
+test('AC1: the SUPERSEDED gpt-5-mini artefact is REFUSED by name - a filename prefix is not a control', () => {
+  const superseded = readdirSync(ARTEFACT_DIR).find((f) => f.startsWith('SUPERSEDED-') && f.endsWith('.json'));
+  assert.ok(superseded, 'the superseded mini artefact is kept as the evidence that found the defect');
+
+  assert.throws(
+    () => loadArtefact(join(ARTEFACT_DIR, superseded)),
+    /REFUSING artefact captured with interpreter_model "gpt-5-mini"/,
+    'an artefact from a different model must be refused mechanically, whatever it is called',
+  );
 });
