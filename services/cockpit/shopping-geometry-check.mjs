@@ -76,9 +76,16 @@ const rules = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.sample.json'), 'u
 // ONE row is deliberately unnamed, so the retailer-string fallback stays exercised. That is the
 // honest model of live, where 109 of 109 are named and only a brand-new regular falls back.
 //
-// ⛔ ROW 0 CARRIES A 20-CHARACTER DISPLAY NAME — THE CURRENT LIVE MAXIMUM — IN BOTH FIXTURES, AND IT
-// IS ROW 0 ON PURPOSE. The first row is the one the landing-screen assertion measures, so it is the
-// hardest place to put a long name and therefore the only honest place to pin the boundary.
+// ⛔ ROW 0 CARRIES A DISPLAY NAME AT `LAYOUT_SAFE_NAME` — 14 CHARACTERS, WORST-CASE WRAPPING ("Bacon
+// and eggs", three short words) — IN BOTH FIXTURES, AND IT IS ROW 0 ON PURPOSE. The first row is the
+// one the landing-screen assertion measures, so it is the hardest place to put a long name and the
+// only honest place to pin the boundary the editor warns at.
+//
+// ⚠️ IT WAS 20 CHARACTERS AND THAT WAS PASSING ON LUCK (Vera, HIGH-2). At 300x512 the name column is
+// 118px, about seven characters a line, so WORD BOUNDARIES decide the line count, not the length:
+//     "Chicken pasta sachet"  20 chars, 3 lines,   1px headroom   passed
+//     "Chicken and bacon pa"  20 chars, 4 lines, -17px headroom   FAILS
+// Same length, one line apart. A fixture pinned to the first of those is pinned to its spaces.
 //
 // ⚠️ IT COULD NOT BE ROW 0 UNTIL THE ROW LAYOUT WAS FIXED, AND THAT SEQUENCE IS THE POINT.
 // This fixture used to pass at 512x300 only because row 0 happened to be "Milk". At that viewport
@@ -93,9 +100,13 @@ const rules = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.sample.json'), 'u
 //
 // ⛔ AND THE ASSERTION IS PROVEN TO STILL FAIL, because a taller row could reintroduce the same
 // defect from the opposite direction. Measured by mutating row 0 in both fixtures:
-//     20 chars "Chicken pasta sachet"                      PASS  104 viewports / 0 violations
+//     14 chars "Bacon and eggs"                             PASS  104 viewports / 0 violations
+//     20 chars "Chicken and bacon pa"                       FAIL  300x512, headroom -17px
 //     41 chars "Chicken and bacon pasta sachet with beans"  FAIL  4 viewports, landing screen empty
 // A gate that only ever sees the passing case is not holding the line, it is decorating it.
+// ⚠️ THE 41-CHARACTER MUTANT WAS NOT ENOUGH ON ITS OWN, and that is the durable lesson: it is
+// eighteen characters past the edge, so it proved the assertion FIRES without locating WHERE. The
+// 20-character case is the one that pins the boundary, and it took a sweep to find it.
 const rulesLarge = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.large.sample.json'), 'utf8'));
 let servingLarge = false;
 const workspace = JSON.parse(fs.readFileSync(path.join(FIX, 'workspace.sample.json'), 'utf8'));
@@ -329,6 +340,8 @@ const measureInPage = () => {
   // the landing state must carry AT LEAST ONE FULLY USABLE ITEM ROW and, when a question is
   // pending, the banner — measured by hit-testing, not by box arithmetic.
   let firstUsableRowVisible = null, firstWholeRowVisible = null, bannerInInitialViewport = null;
+  // Vera HIGH-2 — reported at every result, never asserted. See the note where they are measured.
+  let landingHeadroom = null, row0NameLines = null, row0Height = null;
   if (foot && candidates.length) {
     const rf0 = () => R(foot);
     const y0 = scrollY;
@@ -380,6 +393,27 @@ const measureInPage = () => {
       const r = R(row);
       return r.top >= 0 && r.bottom <= innerHeight && tickUsable(row);
     });
+
+    // ⛔ HOW MUCH ROOM IS LEFT, NOT MERELY WHETHER THERE IS ANY (Vera, HIGH-2).
+    // Promoted verbatim in method from her `vera-headroom-probe.mjs`: the pixels between the bottom
+    // of ROW 0's tick and the bottom of the viewport. It changes nothing about pass or fail — it is
+    // reported beside every result, because A 1px PASS AND A 300px PASS PRINTED THE SAME WORD, and
+    // that is how a boundary two characters away sat undetected behind a green run.
+    // `LAYOUT_SAFE_NAME = 20` was derived at 512x300, where it has 31px to spare. At 300x512 the same
+    // name had ONE PIXEL. Nobody would have had to think of sweeping if this number had been on screen.
+    // Negative means her first tick is already below the fold, which is the failure above stated as a
+    // distance rather than as a boolean.
+    const row0 = rowsAtRest[0];
+    if (row0) {
+      const t0 = row0.querySelector('.tick');
+      const n0 = row0.querySelector('.r-name');
+      if (t0) landingHeadroom = Math.round(innerHeight - R(t0).bottom);
+      if (n0) {
+        const lh = parseFloat(getComputedStyle(n0).lineHeight);
+        row0NameLines = lh > 0 ? Math.round(R(n0).height / lh) : null;
+      }
+      row0Height = Math.round(R(row0).height);
+    }
 
     // ⛔ RESTATED BY WARWICK, 2026-08-13 — THIS MEASURES THE HEADING, NOT THE WHOLE BANNER.
     // "bannerInInitialViewport becomes: THE BANNER-S HEADING is wholly within the initial
@@ -498,6 +532,7 @@ const measureInPage = () => {
     rowCount: rows.length, targets, gutters, oppos, smallest, smallestText, pairs, faded,
     coveredAtRest, unreachableAtEnd, occludedAtRest, buriedAtEnd, footClipped, deadSpaceLive, deadSpaceRowsTested,
     firstUsableRowVisible, firstWholeRowVisible, bannerInInitialViewport, outcomeVisible, outcomeWhy, confirmGap,
+    landingHeadroom, row0NameLines, row0Height,
     cockpitWord: /cockpit/i.test(document.body.innerText),
     title: document.title,
     // The state machine, read off the DOM rather than out of a testing hook the page exports for
@@ -1679,12 +1714,25 @@ for (const [label, m] of Object.entries(clean)) {
   checked++;
   const worst = (m.pairs || []).reduce((w, p) => Math.min(w, ratio(p.fg, p.bg)), 99);
   const minT = (m.targets || []).reduce((w, t) => Math.min(w, t.w, t.h), 999);
+  // ⛔ HEADROOM IS PRINTED ON EVERY LINE, PASSING OR NOT (Vera, HIGH-2). A 1px pass and a 300px pass
+  // used to print the identical word `ok`, which is how a boundary two characters from the shipped
+  // value survived a green 104/104 run. The margin is now impossible not to see.
+  const head = m.landingHeadroom === null || m.landingHeadroom === undefined
+    ? '-' : m.landingHeadroom + 'px';
   console.log((bad.length ? 'FAIL  ' : 'ok    ') + label.padEnd(38)
     + ' rows=' + m.rowCount
     + '  min-target=' + minT + 'px'
     + '  gutter=' + (m.gutters && m.gutters.length ? Math.min(...m.gutters) : '-') + 'px'
     + '  min-text=' + m.smallest + 'px'
+    + '  headroom=' + head.padStart(6)
     + '  worst-contrast=' + (worst === 99 ? '-' : worst.toFixed(2)) + ':1');
+  // Tight margins are called out in words as well as printed as a number, because a reader scanning
+  // 104 green lines for a small figure is doing the job the gate is supposed to do for them.
+  if (typeof m.landingHeadroom === 'number' && m.landingHeadroom >= 0 && m.landingHeadroom < 24) {
+    info.push('⚠️ LANDING HEADROOM IS ONLY ' + m.landingHeadroom + 'px — row 0 renders '
+      + (m.row0NameLines || '?') + ' name line(s) in a ' + (m.row0Height || '?') + 'px row. This passes, '
+      + 'but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.');
+  }
   for (const b of bad) { failures++; console.error('        ⛔ ' + b); }
   for (const i of info) console.log('        ·  ' + i);
 }
