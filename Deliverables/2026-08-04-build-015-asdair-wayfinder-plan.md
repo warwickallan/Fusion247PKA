@@ -2284,61 +2284,94 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
-## ⭐⭐ SUB-PHASE B15-5 — **THE REAL SHOP, W/C 16 AUGUST 2026.** Warwick, 2026-08-14. **THIS IS THE CURRENT FRONTIER.**
+## ✅ SETTLED TRUTH AS AT 2026-08-14 — **read this before anything below it. Every row is closed and proven; none is an open question.**
 
-> **Warwick, verbatim:** *"I want everything tidied up and finished off, with a sub phase added to the
-> wayfinder for shop w/c 16th August… We come back to this on Tuesday and run one for real but I don't
-> know which input method it will be yet."*
+**Warwick, 2026-08-14: *"Close tonight's engineering phase as COMPLETE FOR NOW."*** The engineering is done.
+What remains is a real weekly shop, and that is SUB-PHASE B15-5 below.
 
-**⛔ THE INPUT METHOD IS DELIBERATELY UNDECIDED AND MUST NOT BE ASSUMED.** Warwick will choose on the day.
-**All three doors are built and live** — do not pre-empt him by preparing only one, and do not treat the
-Cockpit as the default merely because it is newest:
+| was open | state now | proof |
+|---|---|---|
+| **Vera HIGH-4 / `display_name`** — 55 of 109 rendered retailer strings | **CLOSED** | **109/109 named, ZERO fall back**, measured on live. Migration 021 applied |
+| **`:8710` had no supervisor** | **CLOSED** | Managed by `MyPKA-Local-Services-Live`, every 15 min. **Proven by kill-and-revive AND by a mutation** — a stub answering `200`/`ok:true` with no `receiveList` was caught as DEGRADED and replaced |
+| **The integrated head was local-only** | **CLOSED** | **On `origin/main`.** Veritas's own check `git branch -r --contains` now returns it |
+| **The bananas / display-name sense-check gap** | **CLOSED** | `"bananas"` → `matched` / `"Bananas"` / id 60 on live. Presentation-only; the matcher never reads `display_name` |
+| **Vera's gate** | **PASS** | Four rounds. Her final: zero CRITICAL, zero HIGH |
+| **Veritas on the integrated build** | **Defects 1 and 3 DISCHARGED** | His words: ***"I no longer hold any finding that argues against putting the page in front of Mum."*** His boundary HOLD stands on completion/closure/merge, which the real run answers |
+| **Fire / Silk device evidence** | **PRESERVED, and extended** | Warwick opened her Cockpit in Silk on the real Fire HD 8 earlier; on **2026-08-14 he confirmed the view is fine at 200% zoom** and completed a real submission from it |
+
+### ⚠️ WHAT IS **NOT** PROVEN — and must never be rounded up to PASS
+
+1. **No real production WEEKLY submission has been run through the final surface.** 2026-08-14 proved
+   **intake only**: `SHOP-2026-08-14` sits at `RECEIVED` with **zero `shop_line` rows** — never interpreted,
+   never planned, never handed to a browser.
+2. **No genuine ShopperBot notification from a real WEEKLY run has reached Warwick.** *(One real
+   notification did fire on 2026-08-14 from the intake test — that is real evidence and is preserved. It is
+   not the weekly run.)*
+3. **The longer multi-session Mum soak is future acceptance evidence.** **A-15 has never been run.**
+
+## ⭐⭐ SUB-PHASE B15-5 — **SHOP W/C 16 AUGUST 2026 — REAL WEEKLY RUN.** **⭐ THIS IS THE ONLY CURRENT FRONTIER. START HERE.**
+
+> **Warwick, 2026-08-14:** *"We come back to this on Tuesday and run one for real but I don't know which
+> input method it will be yet."* · *"Close tonight's engineering phase as COMPLETE FOR NOW… This is not
+> licence to invent more pre-Tuesday work."*
+
+**DESTINATION: one genuine weekly shop through the finished production system.**
+
+**⛔ NO PRE-TUESDAY WORK. The engineering phase is CLOSED.** Do not build, harden, refactor or "prepare"
+anything before the run. If something is wrong, **the real run is what will show it.**
+
+### ⛔ THE INPUT METHOD IS DELIBERATELY UNDECIDED. Warwick chooses on the day.
 
 | door | state |
 |---|---|
-| **Mum's Cockpit** (`http://warwick-yoga/shopping.html`) | **PROVEN 2026-08-14** — a real tap created `SHOP-2026-08-14`, 31 items, real ShopperBot message |
-| **A photograph via ShopperBot** | the Terra ingestion path. Last exercised 2026-08-13 on Lane J |
-| **A typed list via ShopperBot** | deterministic, no model call (`runPipeline.js:225-233`) |
+| **Mum's Cockpit** — `http://warwick-yoga/shopping.html` | proven for intake, 2026-08-14 |
+| **TerraVision handwritten-photo** via ShopperBot | the settled vision route, exercised 2026-08-13 |
 
-### What has to happen for a REAL shop, beyond what 2026-08-14 proved
+**⛔ DO NOT FORCE THE DECISION AND DO NOT CREATE TWO PIPELINES.** Both doors enter the **same existing
+downstream journey**. **Do not reopen TerraVision architecture — Terra is the settled vision route and
+MUST REMAIN AVAILABLE even if Mum's Cockpit becomes the normal weekly input.**
 
-**2026-08-14 proved INTAKE. It did not touch anything downstream of it.** `SHOP-2026-08-14` sits at
-`RECEIVED` / `ASDAIR_WORKING` with **zero `shop_line` rows** — it was never interpreted, never planned,
-never handed to a browser. **The distance from here to a real shop is the whole of the rest of the
-pipeline, and none of it ran this session.**
+### THE ACCEPTANCE SPINE
 
-1. **Interpretation** — the list becomes `shop_line` rows with catalogue identity.
-2. **Questions** — anything ambiguous is put to **Warwick** (never to Mum) through his existing flow.
-3. **Planning** → `READY_TO_SHOP` → the **brand-sorted browser handoff** (proven on Lane J, 2026-08-13).
-4. **The supervised ASDA browser session.** ⛔ **Never checks out, never pays, never chooses a slot.**
+```
+real chosen input
+  → grounded shopping truth
+  → Mum/Warwick amendments PERMITTED until browser/CDP handoff
+  → questions handled by WARWICK through his existing process
+  → real ShopperBot notification, including NEW ITEMS where applicable
+  → durable real shop
+  → browser/CDP handoff          ⬅ THE FREEZE POINT FOR THE RUN
+  → existing basket workflow
+```
 
-### ⚠️ WHAT WILL BITE ON TUESDAY, named now rather than discovered then
+### ⚖️ WARWICK'S OPERATING RULING — the freeze point
 
-- **`SHOP-2026-08-14` ALREADY EXISTS and is non-terminal.** A Tuesday submission gets a different
-  `shop_ref` (date-derived), so it will not collide — **but today's shop is still sitting open** and there
-  are now **four** non-terminal shops for household 1. **Decide what happens to it before Tuesday.**
-- **The re-send gap is REAL and OBSERVED** — see the ruling below.
-- **`display_name` is live for all 109 regulars.** Warwick's editor is at `http://warwick-yoga/names.html`.
-- **The AsdAIr API is supervised now** (`MyPKA-Local-Services-Live`, every 15 min) — but the
-  `dbProofs.test.js` non-idempotency means **any "N/N" figure for that suite is a claim about the day it
-  was run.** Do not quote yesterday's number.
+> **His words, 2026-08-14:** *"The shop should be able to be amended as many times as she likes up to the
+> point that the browser session is launched. i.e the list is handed over to CDP."*
 
-### ⚖️ WARWICK'S RULING ON THE RE-SEND GAP — **decided, deliberately NOT built**
+**RULE, recorded and in force: Mum may amend and re-submit as many times as she likes UNTIL the list is
+handed to the browser/CDP execution session. Once that session has launched for that shop, the input list
+is FROZEN for that run.**
 
-> **His words:** *"The shop should be able to be amended as many times as she likes up to the point that
-> the browser session is launched. i.e the list is handed over to CDP. But tbh I'm bored of this now and
-> it's an edge case because in reality if this works properly there won't be enough time to make the
-> changes."*
+**⛔ NO MACHINERY FOR THIS IS AUTHORISED.** *"I'm bored of this now and it's an edge case because in
+reality if this works properly there won't be enough time to make the changes."* **Build nothing for it
+unless the real run demonstrates a defect.**
 
-**The answer is settled: amendable until CDP handover.** **The build is NOT authorised** — he has ruled it
-an edge case and closed the session. *Recorded so that a fresh instance does not rediscover the gap and
-treat it as an open question, and does not build it uninvited either.*
+**The observed instance, kept because it is the honest record:** on 2026-08-14 Warwick added
+`"asda bacon 10 rashers"` after sending. It reached **no durable row** — verified across `shop_line`,
+`shop_question`, `shop_event` and the shop's `raw_text`. The notification said plainly *"this does NOT
+change it"* and **he still read it as added.** The shipped mitigation is the **`NEW ITEMS`** section, above
+the full list, because that is where the eye lands.
 
-**The observed instance, because it is the honest record:** on 2026-08-14 Warwick added
-`"asda bacon 10 rashers"` after sending. **It reached NO durable row** — verified across `shop_line`,
-`shop_question`, `shop_event` and the shop's own `raw_text`. The notification said plainly *"this does NOT
-change it"*, and **he still read it as added.** The mitigation shipped the same day is the **`NEW ITEMS
-SHE TYPED:` section**, placed above the full list because that is where the eye lands.
+### ⚠️ WHAT WILL BITE ON TUESDAY — named now rather than discovered then
+
+- **`SHOP-2026-08-14` IS STILL OPEN** at `RECEIVED` / `ASDAIR_WORKING` with zero lines, and there are now
+  **four** non-terminal shops for household 1. **Decide its fate before the real run** — a Tuesday
+  submission gets a different date-derived `shop_ref`, so it will not collide, but it will not tidy itself.
+- **Any "N/N" figure for the `cockpit-api` suite is a claim about the day it was run.** `dbProofs.test.js`
+  seeds by walking back from `CURRENT_DATE` and collides with its own leftovers
+  (`uq_lists_household_date_unowned`). Known, reported, out of scope. **Re-run before quoting.**
+- `display_name` is live for all 109 regulars; Warwick's editor is `http://warwick-yoga/names.html`.
 
 ## ⛔ CLOSED PERMANENTLY — THE PUBLIC-REPO QUESTION IS NOT A BLOCKER AND MUST NEVER BE RAISED AGAIN
 
@@ -2399,7 +2432,11 @@ ShopperBot ping.**
 **⛔ Veritas has gated NOTHING this entire build.** Warwick has now named it explicitly in the runway:
 *"Veritas gates the integrated build before you ask me for the single real Fire submission."*
 
-## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-13 (CURRENT) — **WARWICK SAW MUM'S COCKPIT ON THE FIRE AND ACCEPTED IT. Four feature requests. START HERE.**
+## ✅ DELIVERED — ⟦former work package⟧ 2026-08-13 — **Warwick saw Mum's Cockpit on the Fire and accepted it. His four feature requests: ALL FOUR SHIPPED 2026-08-14.** ⛔ **This directs nothing. The frontier is SUB-PHASE B15-5 above.**
+
+> **All four are live and were proven by execution:** the sense-check with its amber nudge · the confirm screen showing today's date · the ShopperBot notification (**fired for real on 2026-08-14**) · and the rest of the process unchanged, which was satisfied by building nothing.
+
+> *Retained for its detail and its verbatim quotes. Superseded in place, not appended to.*
 
 > **Warwick, 2026-08-13, verbatim — the first acceptance of AsdAIr in a long time, recorded because the
 > record has carried nothing but defects:** *"let me say for first time in a long time with fucking asdair
