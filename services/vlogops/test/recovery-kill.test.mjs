@@ -170,6 +170,15 @@ for (const stage of KILL_STAGES) {
       'select count(*)::int n from vlogops.source_snapshot where seed_id = $1', [seedId],
     );
     assert.equal(finalSnaps.rows[0].n, 1, 'the restart did not land exactly one snapshot');
+
+    // Print what was observed, not merely assert it. An assertion proves the number to the
+    // runner; printing it proves the number to a human reading the evidence afterwards.
+    console.log(
+      `[AC7] ${stage}: killed via ${KILL_MECHANISM} (exit=${code}, signal=${signal}) | ` +
+      `after kill -> seeds=0 snapshots=0 ledger=0 | ` +
+      `after cold restart -> seeds=${finalSeeds.rowCount} snapshots=${finalSnaps.rows[0].n} ` +
+      `status=${finalSeeds.rows[0].status} identity=${seedId.slice(0, 12)}… (unchanged)`,
+    );
   });
 }
 
