@@ -542,6 +542,13 @@ async function handleRequest(req, deps) {
         shop_ref: r.shop_ref === undefined ? null : r.shop_ref,
         items: built.items.length,
         extras: built.extras.length,
+        // WARWICK, 2026-08-14, after the first real submission: "there should be a
+        // little header or section in the telegram message that says new items and
+        // then lists any she has manually added so they are easy to see."
+        // The WORDS, not just the count. On the recorded-not-created row this
+        // message is the ONLY place they survive, and he read a 32-line list and
+        // did not see the one line that was new.
+        extraWords: built.extras,
         rawText: built.rawText,
         clock: built.clock
       }, d.notify);

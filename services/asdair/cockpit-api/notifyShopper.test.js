@@ -491,3 +491,44 @@ test('M2: server.js never reads the token value - it only checks that one is pre
   assert.ok(!/SHOPPER_BOT_TOKEN[\s\S]{0,400}?check:\s*function\s*\(\s*v\s*\)/.test(src),
     'the token check must take no value argument');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WARWICK, 2026-08-14, AFTER THE FIRST REAL SUBMISSION.
+//
+// He read a 32-line list in a real Telegram message, did not spot the one line
+// that was new, and told Larry "bacon added" - when the bacon was in NO durable
+// row at all. The information was present and invisible, which for this message
+// is the same as absent. His words: "there should be a little header or section
+// in the telegram message that says new items and then lists any she has
+// manually added so they are easy to see."
+// ─────────────────────────────────────────────────────────────────────────────
+test('WARWICK-2026-08-14: her typed items get their own named section, ABOVE the full list', () => {
+  const m = notifyShopper.renderShopperNotification({
+    created: false, recorded_new: true, shop_ref: 'SHOP-2026-08-14',
+    items: 31, extras: 1, extraWords: ['asda bacon 10 rashers'],
+    rawText: '1 x Toothpaste\n1 x asda bacon 10 rashers',
+  });
+  assert.match(m.text, /NEW ITEM SHE TYPED:/, 'the section is named');
+  assert.match(m.text, /\* asda bacon 10 rashers/, 'her exact words are in it');
+  assert.ok(m.text.indexOf('NEW ITEM SHE TYPED:') < m.text.indexOf('HER WHOLE LIST:'),
+    'the new items come FIRST - that is where the eye lands, and it is the whole point');
+});
+
+test('WARWICK-2026-08-14: plural when there is more than one, and her words are never tidied', () => {
+  const m = notifyShopper.renderShopperNotification({
+    created: true, recorded_new: true, shop_ref: 'SHOP-X', items: 2, extras: 2,
+    extraWords: ['asda bacon 10 rashers', 'some of those little cakes'],
+    rawText: 'x',
+  });
+  assert.match(m.text, /NEW ITEMS SHE TYPED:/);
+  assert.match(m.text, /\* some of those little cakes/, 'verbatim, not title-cased or corrected');
+});
+
+test('WARWICK-2026-08-14: no section at all when she typed nothing - no empty heading', () => {
+  const m = notifyShopper.renderShopperNotification({
+    created: true, recorded_new: true, shop_ref: 'SHOP-X', items: 3, extras: 0,
+    extraWords: [], rawText: '1 x Milk',
+  });
+  assert.ok(!/NEW ITEM/.test(m.text), 'a heading over nothing is noise');
+  assert.ok(!/HER WHOLE LIST:/.test(m.text), 'and the list needs no label when it is the only list');
+});

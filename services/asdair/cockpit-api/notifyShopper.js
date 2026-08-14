@@ -124,7 +124,7 @@ function renderLines(rawText) {
  * PURE. The message itself.
  *
  * @param {{created:boolean, recorded_new:boolean, shop_ref:*, items:*, extras:*,
- *          rawText:*, clock:*}} outcome
+ *          extraWords:*, rawText:*, clock:*}} outcome
  *
  * Plain text, no parse_mode - the same decision renderMessages.js documents: a
  * shopping list full of brackets and apostrophes is a minefield for Markdown,
@@ -168,8 +168,32 @@ function renderShopperNotification(outcome) {
       + ', but the shop was recorded as ' + String(clock.recorded) + '.');
   }
 
+  // ⭐ WARWICK, 2026-08-14, after the FIRST REAL SUBMISSION, and it is the whole
+  // reason this block exists: "there should be a little header or section in the
+  // telegram message that says new items and then lists any she has manually
+  // added so they are easy to see."
+  //
+  // WHY IT MATTERS MORE THAN IT LOOKS. On the recorded-not-created row this
+  // message is the ONLY place her typed words survive - `raw_*` is excluded from
+  // shopStore's UPDATE allowlist, so nothing downstream carries them. Warwick
+  // read a 32-line list, did not spot the one line that was new, and told Larry
+  // "bacon added" when it was not in the shop at all. The information was
+  // present and invisible, which for this message is the same as absent.
+  //
+  // It goes FIRST, above the full list, because that is where the eye lands.
+  const extraWords = Array.isArray(o.extraWords)
+    ? o.extraWords.map(function (x) { return typeof x === 'string' ? x.trim() : ''; }).filter(Boolean)
+    : [];
+  if (extraWords.length > 0) {
+    parts.push('', extraWords.length === 1 ? 'NEW ITEM SHE TYPED:' : 'NEW ITEMS SHE TYPED:');
+    extraWords.slice(0, MAX_RENDERED_LINES).forEach(function (w) { parts.push('  * ' + w); });
+    if (extraWords.length > MAX_RENDERED_LINES) {
+      parts.push('  ... and ' + (extraWords.length - MAX_RENDERED_LINES) + ' more');
+    }
+  }
+
   const lines = renderLines(o.rawText);
-  if (lines !== '') parts.push('', lines);
+  if (lines !== '') parts.push('', extraWords.length > 0 ? 'HER WHOLE LIST:' : '', lines);
 
   const text = parts.join('\n');
   return { text: text.length > MAX_MESSAGE_CHARS ? text.slice(0, MAX_MESSAGE_CHARS) + '\n...' : text };
@@ -252,7 +276,7 @@ function senderFromEnv(env, fetchImpl) {
  * ⛔ SEND THE NOTIFICATION. NEVER THROWS. NEVER REJECTS.
  *
  * @param {object} outcome  what the submission actually did - created,
- *                          recorded_new, shop_ref, items, extras, rawText, clock
+ *                          recorded_new, shop_ref, items, extras, extraWords, rawText, clock
  * @param {{sender?:object, chatId?:*, env?:object, fetchImpl?:Function,
  *          timeoutMs?:number, log?:Function}} [deps]
  * @returns {Promise<{attempted:boolean, notified:boolean, error:string|null}>}
