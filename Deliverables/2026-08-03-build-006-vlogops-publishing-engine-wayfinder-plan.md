@@ -457,13 +457,16 @@ thing being closed**, and that **no later material in-scope change invalidated i
 applicable PASS. A missing, non-PASS, scope-mismatched or superseded receipt behind a closure claim is an
 active `BLOCKS_CURRENT_MERGE` finding.
 
-> ⚠️ **ONE OPEN QUESTION, REFERRED TO WARWICK 2026-08-14 AND NOT SETTLED HERE.** His instruction of
-> 2026-08-14 lists *"cover the reviewed SHA/state"* among the receipt properties Codex must confirm. **That
-> sub-check was deliberately REMOVED from the contract by Warwick himself on 2026-08-07** (`7d739d2`,
-> *"rebase the Codex contract off the exact-head model onto the human outcome"*), and replaced with
-> ***"Scope, not SHA equality, is the test."*** **Larry has NOT modified the contract**, per Warwick's
-> standing instruction to stop and report rather than edit. Until he rules, the contract as ratified
-> governs.
+> ✅ **SETTLED BY WARWICK, 2026-08-15. The question is closed and must not be reopened.** He was shown the
+> diff in which he himself removed the `reviewed_sha` sub-check on 2026-08-07, and ruled:
+>
+> > *"The reviewed_sha decision is settled: retain the current scope-not-SHA model. reviewed_sha is
+> > provenance; assurance remains valid where its scope covers the claimed outcome and no later material
+> > in-scope change invalidates it. Do not restore exact SHA equality."*
+>
+> **The contract was never modified and needs no change.** Four receipt properties bind — exists · PASS ·
+> covers the claimed scope · not invalidated by later material in-scope change — and **SHA equality is
+> explicitly NOT a fifth.**
 
 ### Enforcement, stated honestly
 
