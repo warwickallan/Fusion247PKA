@@ -1,0 +1,169 @@
+⚠️  LARGE fixture OVERRIDDEN -> C:/Users/Buggly/AppData/Local/Temp/claude/C--Fusion247PKA/6b147a85-fd06-4294-bf71-d171357401f2/scratchpad/rules.live.json
+token parity  13/13 pinned GL-003 token(s) byte-identical in shopping.css (--ink3, --park and --accent deliberately excluded from this surface)
+ok    landscape 1280x800 (Fire HD 10 class)  rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 (Fire HD 10 class)  [the confirm screen] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 (Fire HD 10 class)  [adding something in her own words] rows=4  min-target=72px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 (Fire HD 10 class)  [after SEND -> sent] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 (Fire HD 10 class)  [after SEND -> already gone, Warwick told] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 (Fire HD 10 class)  [after SEND -> already gone, saved but Warwick NOT told] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  3 control(s) behind the sticky footer at rest [row, row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 (Fire HD 10 class)  [after SEND -> already gone, nothing changed] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 (Fire HD 10 class)  [after SEND -> not sent] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 293px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1024x600 (Fire HD 8 class)   rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    landscape 1024x600 (Fire HD 8 class)  [the confirm screen] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    landscape 1024x600 (Fire HD 8 class)  [adding something in her own words] rows=4  min-target=72px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    landscape 1024x600 (Fire HD 8 class)  [after SEND -> sent] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    landscape 1024x600 (Fire HD 8 class)  [after SEND -> already gone, Warwick told] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    landscape 1024x600 (Fire HD 8 class)  [after SEND -> already gone, saved but Warwick NOT told] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    landscape 1024x600 (Fire HD 8 class)  [after SEND -> already gone, nothing changed] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    landscape 1024x600 (Fire HD 8 class)  [after SEND -> not sent] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    portrait  800x1280                     rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  1 control(s) behind the sticky footer at rest [row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  800x1280  [the confirm screen] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  800x1280  [adding something in her own words] rows=4  min-target=72px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  800x1280  [after SEND -> sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  800x1280  [after SEND -> already gone, Warwick told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  800x1280  [after SEND -> already gone, saved but Warwick NOT told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  800x1280  [after SEND -> already gone, nothing changed] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  800x1280  [after SEND -> not sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024                     rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  1 control(s) behind the sticky footer at rest [row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024  [the confirm screen] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024  [adding something in her own words] rows=4  min-target=72px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  1 control(s) behind the sticky footer at rest [row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024  [after SEND -> sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024  [after SEND -> already gone, Warwick told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024  [after SEND -> already gone, saved but Warwick NOT told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024  [after SEND -> already gone, nothing changed] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    portrait  600x1024  [after SEND -> not sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom= 451px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    landscape 1280x800 at 200% zoom        rows=3  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    landscape 1280x800 at 200% zoom  [the confirm screen] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    landscape 1280x800 at 200% zoom  [adding something in her own words] rows=4  min-target=72px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    landscape 1280x800 at 200% zoom  [after SEND -> sent] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    landscape 1280x800 at 200% zoom  [after SEND -> already gone, Warwick told] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    landscape 1280x800 at 200% zoom  [after SEND -> already gone, saved but Warwick NOT told] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    landscape 1280x800 at 200% zoom  [after SEND -> already gone, nothing changed] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    landscape 1280x800 at 200% zoom  [after SEND -> not sent] rows=3  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    portrait  800x1280 at 200% zoom        rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+        ·  an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible
+ok    portrait  800x1280 at 200% zoom  [the confirm screen] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+ok    portrait  800x1280 at 200% zoom  [adding something in her own words] rows=4  min-target=72px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+ok    portrait  800x1280 at 200% zoom  [after SEND -> sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+ok    portrait  800x1280 at 200% zoom  [after SEND -> already gone, Warwick told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+ok    portrait  800x1280 at 200% zoom  [after SEND -> already gone, saved but Warwick NOT told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+ok    portrait  800x1280 at 200% zoom  [after SEND -> already gone, nothing changed] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+ok    portrait  800x1280 at 200% zoom  [after SEND -> not sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  58px  worst-contrast=7.08:1
+ok    LARGE 46 rows reflow 320px equivalent  rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=7.08:1
+ok    LARGE 46 rows reflow 320px equivalent  [the confirm screen] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=14.06:1
+ok    LARGE 46 rows reflow 320px equivalent  [adding something in her own words] rows=110  min-target=72px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=7.08:1
+ok    LARGE 46 rows reflow 320px equivalent  [after SEND -> sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=14.06:1
+ok    LARGE 46 rows reflow 320px equivalent  [after SEND -> already gone, Warwick told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=14.06:1
+ok    LARGE 46 rows reflow 320px equivalent  [after SEND -> already gone, saved but Warwick NOT told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=14.06:1
+ok    LARGE 46 rows reflow 320px equivalent  [after SEND -> already gone, nothing changed] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=14.06:1
+ok    LARGE 46 rows reflow 320px equivalent  [after SEND -> not sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 357px  worst-contrast=13.52:1
+ok    landscape  800x500                     rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+        ·  an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible
+ok    landscape  800x500  [the confirm screen] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+ok    landscape  800x500  [adding something in her own words] rows=4  min-target=72px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+ok    landscape  800x500  [after SEND -> sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+ok    landscape  800x500  [after SEND -> already gone, Warwick told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+ok    landscape  800x500  [after SEND -> already gone, saved but Warwick NOT told] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+ok    landscape  800x500  [after SEND -> already gone, nothing changed] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+ok    landscape  800x500  [after SEND -> not sent] rows=3  min-target=88px  gutter=48px  min-text=22px  headroom=  83px  worst-contrast=7.08:1
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom) rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=7.08:1
+        ·  an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)  [the confirm screen] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)  [adding something in her own words] rows=110  min-target=72px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=7.08:1
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)  [after SEND -> sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)  [after SEND -> already gone, Warwick told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)  [after SEND -> already gone, saved but Warwick NOT told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)  [after SEND -> already gone, nothing changed] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)  [after SEND -> not sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=  31px  worst-contrast=13.52:1
+ok    LARGE 46 rows portrait   300x512       rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=7.08:1
+        ·  an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows portrait   300x512  [the confirm screen] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows portrait   300x512  [adding something in her own words] rows=110  min-target=72px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows portrait   300x512  [after SEND -> sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows portrait   300x512  [after SEND -> already gone, Warwick told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows portrait   300x512  [after SEND -> already gone, saved but Warwick NOT told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows portrait   300x512  [after SEND -> already gone, nothing changed] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows portrait   300x512  [after SEND -> not sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom=   1px  worst-contrast=13.52:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 1px — row 0 renders 3 name line(s) in a 314px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows landscape 1024x600       rows=109  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    LARGE 46 rows landscape 1024x600  [the confirm screen] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape 1024x600  [adding something in her own words] rows=110  min-target=72px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=7.08:1
+ok    LARGE 46 rows landscape 1024x600  [after SEND -> sent] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape 1024x600  [after SEND -> already gone, Warwick told] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape 1024x600  [after SEND -> already gone, saved but Warwick NOT told] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape 1024x600  [after SEND -> already gone, nothing changed] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=14.06:1
+ok    LARGE 46 rows landscape 1024x600  [after SEND -> not sent] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom= 183px  worst-contrast=13.52:1
+ok    LARGE 46 rows portrait  800x1280       rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows portrait  800x1280  [the confirm screen] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=14.06:1
+        ·  3 control(s) behind the sticky footer at rest [row, row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows portrait  800x1280  [adding something in her own words] rows=110  min-target=72px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=7.08:1
+        ·  2 control(s) behind the sticky footer at rest [row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows portrait  800x1280  [after SEND -> sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=14.06:1
+        ·  3 control(s) behind the sticky footer at rest [row, row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows portrait  800x1280  [after SEND -> already gone, Warwick told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=14.06:1
+        ·  3 control(s) behind the sticky footer at rest [row, row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows portrait  800x1280  [after SEND -> already gone, saved but Warwick NOT told] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=14.06:1
+        ·  3 control(s) behind the sticky footer at rest [row, row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows portrait  800x1280  [after SEND -> already gone, nothing changed] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=14.06:1
+        ·  3 control(s) behind the sticky footer at rest [row, row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows portrait  800x1280  [after SEND -> not sent] rows=109  min-target=88px  gutter=48px  min-text=22px  headroom= 773px  worst-contrast=13.52:1
+        ·  3 control(s) behind the sticky footer at rest [row, row, row] — expected for a sticky footer; the landing-screen assertions below are what decide it
+ok    LARGE 46 rows at 200% zoom 640x400     rows=109  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  an item is visible and tappable on arrival, but no row fits WHOLLY above the fold — acceptable on a scrolling page, recorded so the stricter reading of the requirement stays visible
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows at 200% zoom 640x400  [the confirm screen] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows at 200% zoom 640x400  [adding something in her own words] rows=110  min-target=72px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=7.08:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows at 200% zoom 640x400  [after SEND -> sent] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows at 200% zoom 640x400  [after SEND -> already gone, Warwick told] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows at 200% zoom 640x400  [after SEND -> already gone, saved but Warwick NOT told] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows at 200% zoom 640x400  [after SEND -> already gone, nothing changed] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=14.06:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+ok    LARGE 46 rows at 200% zoom 640x400  [after SEND -> not sent] rows=109  min-target=88px  gutter=24px  min-text=22px  headroom=   3px  worst-contrast=13.52:1
+        ·  ⚠️ LANDING HEADROOM IS ONLY 3px — row 0 renders 2 name line(s) in a 141px row. This passes, but a slightly longer display name would not. Re-derive LAYOUT_SAFE_NAME here, not at a roomier viewport.
+SHOPPING-GEOMETRY-CHECK PASS — 104 viewports measured in a real browser, 0 violations. Targets, dead space, text size, composited contrast and footer clearance all measured on the rendered box. ⚠️ Chromium at her viewport sizes — NOT Silk, and NOT her tablet.
