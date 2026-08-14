@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=18C1Qo3-QII",
+  "video_id": "18C1Qo3-QII",
+  "captured_at": "2026-08-14T23:48:59+00:00",
+  "title": "We Booked 1,150+ Sales Meetings Without Hiring a Single SDR (Here's the Exact System)",
+  "channel": "Alex Zartarian",
+  "published_date": "2026-08-14",
+  "duration_seconds": 2020,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 955,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-08-14__we-booked-1150-sales-meetings-without-hiring-a-single-sdr-he__18C1Qo3-QII",
+  "files": [
+    "TubeAIR Report - we-booked-1150-sales-meetings-without-hiring-a-single-sdr-he - 18C1Qo3-QII.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}
