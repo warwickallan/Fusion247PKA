@@ -72,7 +72,35 @@ explicitly not to reopen the Fire/Tailscale architecture. The HTTP route removes
 makes the cause moot rather than answered. *Verification from a second tailnet client was NOT possible:
 Tailscale SSH is not enabled on `fusion247-core`, the only shell-capable peer.*
 
-### 🔴 THE ASDAIR API ON 8710 HAS NO SUPERVISOR. **Established by execution, 2026-08-13. If it dies, nothing brings it back.**
+### ✅ THE ASDAIR API ON 8710 IS NOW SUPERVISED. **Fixed and PROVEN BY KILLING IT, 2026-08-14.**
+
+**`MyPKA-Local-Services-Live` now manages `asdair` alongside `cockpit`, `api`, `email` and `bot`.**
+It fires **at logon (+90 s) and every 15 minutes**; last result `0`.
+
+**⚠️ The supervisor script is `scripts/ensure-local-services.mjs` under the private CareerAIR store, which
+is NOT in this repository.** That is why this paragraph exists: the mechanism lives off-repo, so the
+knowledge of it must not.
+
+**Proven by execution, not by the supervisor existing:**
+
+| test | result |
+|---|---|
+| kill `:8710`, run the supervisor | **`DOWN` → started → `UP — write-capable, 11 commands, database ok`** |
+| **mutation:** plant a stale stub — alive, `200`, `ok:true`, database ok, but **no `receiveList`** | **`DEGRADED` → "a submission would 400 at the last hop" → stopped and replaced** |
+| Mum's page, names page, sense-check and write door after the thrashing | all correct |
+
+**⛔ THE HEALTH CHECK ASKS MORE THAN "DID THE PORT ANSWER", and it has to.** Her shopping page is static
+and served by the *cockpit* on `:8090`. It keeps returning `200` and rendering perfectly while every AsdAIr
+call behind it fails — **a dead `:8710` is a silently half-working product in front of an 84-year-old, not
+a visible outage.** So the check reads the command surface and treats a missing `receiveList` as
+`degraded`: alive, wrong, and fixed by a restart.
+
+**⚠️ A `read_only:true` branch was written first and REMOVED after being mutation-tested.**
+`httpApi.js:270` returns `read_only: false` as a hard literal, so that branch could never fire on any
+input. **A check no test can make fail is not a check**, and leaving it in would have made the health
+function look stricter than it is.
+
+### 📜 HISTORY — the defect this replaced. **Established by execution, 2026-08-13.**
 
 **The `MyPKA-Local-Services-Live` scheduled task restores the Cockpit on 8090 — it came back in ~1 second.
 It does NOT restore `services/asdair/cockpit-api` on 8710.** Proven: the task was run immediately after
