@@ -185,7 +185,7 @@ function renderShopperNotification(outcome) {
     ? o.extraWords.map(function (x) { return typeof x === 'string' ? x.trim() : ''; }).filter(Boolean)
     : [];
   if (extraWords.length > 0) {
-    parts.push('', extraWords.length === 1 ? 'NEW ITEM SHE TYPED:' : 'NEW ITEMS SHE TYPED:');
+    parts.push('', 'NEW ITEMS');
     extraWords.slice(0, MAX_RENDERED_LINES).forEach(function (w) { parts.push('  * ' + w); });
     if (extraWords.length > MAX_RENDERED_LINES) {
       parts.push('  ... and ' + (extraWords.length - MAX_RENDERED_LINES) + ' more');
@@ -193,7 +193,14 @@ function renderShopperNotification(outcome) {
   }
 
   const lines = renderLines(o.rawText);
-  if (lines !== '') parts.push('', extraWords.length > 0 ? 'HER WHOLE LIST:' : '', lines);
+  if (lines !== '') {
+    // The list is only LABELLED when there is something above it to distinguish it
+    // from. On its own it needs no heading, and an unconditional one would leave a
+    // stray blank line above the list on every ordinary submission.
+    if (extraWords.length > 0) parts.push('', 'HER WHOLE LIST:');
+    else parts.push('');
+    parts.push(lines);
+  }
 
   const text = parts.join('\n');
   return { text: text.length > MAX_MESSAGE_CHARS ? text.slice(0, MAX_MESSAGE_CHARS) + '\n...' : text };

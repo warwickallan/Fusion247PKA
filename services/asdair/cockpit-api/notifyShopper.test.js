@@ -508,9 +508,9 @@ test('WARWICK-2026-08-14: her typed items get their own named section, ABOVE the
     items: 31, extras: 1, extraWords: ['asda bacon 10 rashers'],
     rawText: '1 x Toothpaste\n1 x asda bacon 10 rashers',
   });
-  assert.match(m.text, /NEW ITEM SHE TYPED:/, 'the section is named');
+  assert.match(m.text, /^NEW ITEMS$/m, 'the section is named');
   assert.match(m.text, /\* asda bacon 10 rashers/, 'her exact words are in it');
-  assert.ok(m.text.indexOf('NEW ITEM SHE TYPED:') < m.text.indexOf('HER WHOLE LIST:'),
+  assert.ok(m.text.indexOf('NEW ITEMS') < m.text.indexOf('HER WHOLE LIST:'),
     'the new items come FIRST - that is where the eye lands, and it is the whole point');
 });
 
@@ -520,7 +520,7 @@ test('WARWICK-2026-08-14: plural when there is more than one, and her words are 
     extraWords: ['asda bacon 10 rashers', 'some of those little cakes'],
     rawText: 'x',
   });
-  assert.match(m.text, /NEW ITEMS SHE TYPED:/);
+  assert.match(m.text, /^NEW ITEMS$/m);
   assert.match(m.text, /\* some of those little cakes/, 'verbatim, not title-cased or corrected');
 });
 
