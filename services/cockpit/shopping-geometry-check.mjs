@@ -69,8 +69,28 @@ const rules = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.sample.json'), 'u
 // ⛔ MEDIUM-5, VERA. The surface had only ever been rendered at n=3. Scroll behaviour, control
 // density and — decisively — HIGH-1's occlusion arithmetic all change at realistic length: with
 // three rows the page barely scrolls, so a sticky footer costs almost nothing and the defect hides.
-// 46 rows across 5 sections, 9 of them with no household word so the retailer-string fallback is
-// exercised in bulk rather than once.
+// 46 rows across 5 sections.
+// ⚠️ LOW-1, VERA — THIS SAID "9 of them with no household word". IT IS ONE. The figure was true of
+// the fixture before WP-B15-52 gave it display names, and was not re-derived when the data beneath
+// it changed — exactly the kind of stale number a later reader trusts instead of counting.
+// ONE row is deliberately unnamed, so the retailer-string fallback stays exercised. That is the
+// honest model of live, where 109 of 109 are named and only a brand-new regular falls back.
+// ONE row (index 23, mid-list) carries a display name at the LAYOUT boundary — 20 characters, the
+// current live maximum — so the gate holds that line the way the unnamed row holds the fallback path.
+//
+// ⛔ IT IS MID-LIST AND NOT ROW 0, AND THE REASON IS A DEFECT THIS GATE SHOULD NOT HIDE.
+// Putting it on the FIRST row failed at 512x300, and bisecting showed why: at that viewport the name
+// column is only 66px wide, so the longest name that stays on one line is FOUR CHARACTERS. Measured
+// widths, first-row .r-name, Chromium at her device classes:
+//     640x400   194px  -> 14 chars      300x512   118px -> 8 chars      512x300   66px -> 4 chars
+// The 46-row fixture passes at 512x300 today ONLY because row 0 happens to be "Milk". Any realistic
+// display name wraps to three or four lines there, the first row grows past 140px, and the sticky
+// footer covers her only tappable item. That is a ROW-LAYOUT defect at 512px width — the qty cluster
+// and the 88px tick leave almost nothing for the name — and NO display-name length an operator could
+// type would fix it. It is reported rather than papered over; pinning a 4-character name here would
+// have made the gate green while proving nothing.
+// So this row tests long-name RENDERING (wrap, row growth, overflow, footer clearance) where that is
+// the variable under test, and the landing-screen assertion continues to be carried by row 0.
 const rulesLarge = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.large.sample.json'), 'utf8'));
 let servingLarge = false;
 const workspace = JSON.parse(fs.readFileSync(path.join(FIX, 'workspace.sample.json'), 'utf8'));
@@ -109,15 +129,24 @@ const VIEWS = [
   { label: 'landscape 1280x800 at 200% zoom', w: 640, h: 400 },
   { label: 'portrait  800x1280 at 200% zoom', w: 400, h: 640 },
   // WCAG 1.4.10 reflow. B §11 calls it "the cheapest proof the layout is not brittle".
-  { label: 'reflow 320px equivalent', w: 320, h: 800 },
+  // Also at realistic length (MEDIUM-2) — reflow with three rows proves almost nothing.
+  { label: 'LARGE 46 rows reflow 320px equivalent', w: 320, h: 800, large: true },
   // ⛔ THE THREE VERA MEASURED AT AND THIS FILE DID NOT. Every HIGH she returned was found at a
   // viewport absent from this list, which is the plainest possible statement of the gap: a gate
   // cannot see a defect at a size it never renders. 800x500 is where 10px of an 88px "YES, SEND IT"
   // was painted; 512x300 is Fire HD 8 landscape at 200% zoom, where the 16px opposite-effect gap
   // shipped; 300x512 is its portrait. They are kept permanently, not borrowed for one fix.
   { label: 'landscape  800x500', w: 800, h: 500 },
-  { label: 'landscape  512x300 (Fire HD 8 at 200% zoom)', w: 512, h: 300 },
-  { label: 'portrait   300x512', w: 300, h: 512 },
+  // ⛔ MEDIUM-2, VERA — THESE TWO NOW RUN AT REALISTIC LENGTH, AND THE OMISSION HID A REAL DEFECT.
+  // MEDIUM-5 added the large fixture but only to 1024x600, 800x1280 and 640x400. The SMALLEST
+  // viewports — the ones that exist precisely because Vera found HIGHs at them — kept running at
+  // n=3, where the fold arithmetic is trivially satisfied because the page barely scrolls.
+  // The cost was not hypothetical: TWO OF HIGH-1's THREE FAILING VIEWPORTS WERE IN THIS BLIND SPOT,
+  // so the long-display-name defect that emptied her landing screen could not be seen here at all.
+  // A gate cannot see a defect at a size it never renders — and equally cannot see one at a LIST
+  // LENGTH it never renders. Half a fix is how the second half stays invisible.
+  { label: 'LARGE 46 rows landscape  512x300 (Fire HD 8 at 200% zoom)', w: 512, h: 300, large: true },
+  { label: 'LARGE 46 rows portrait   300x512', w: 300, h: 512, large: true },
   // MEDIUM-5 — the same device classes at REALISTIC LIST LENGTH. Her real list is not three items.
   { label: 'LARGE 46 rows landscape 1024x600', w: 1024, h: 600, large: true },
   { label: 'LARGE 46 rows portrait  800x1280', w: 800, h: 1280, large: true },

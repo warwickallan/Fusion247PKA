@@ -55,7 +55,13 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.nm-id { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink3); }
+/* ⛔ MEDIUM-1, VERA — --ink2, NOT --ink3. This was a THIRD --ink3 selector, and GL-003 §2b is
+   explicit: "--ink3 survives on exactly two selectors. Keep it that way: if a third appears, it is
+   almost certainly a defect." It was: 3.80 light / 3.72 dark, both under the 4.5 text floor.
+   The tempting defence is that an id is ornament. It is not — this renders as "What Mum reads #60"
+   and is how Warwick tells two nearly identical rows apart on a phone, which is the whole reason the
+   eleven flagged decisions exist. --ink2 is 7.47 / 7.37. */
+.nm-id { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink2); }
 
 .nm-search, .nm-input {
   width: 100%;
@@ -136,6 +142,19 @@
   gap: 12px;
   margin-top: 12px;
 }
+/* ⛔ CRITICAL-1, VERA — THIS BUTTON WAS WHITE ON PALE CYAN IN DARK MODE. 1.68:1. THE WORST RENDERED
+   TEXT PAIRING IN THE ESTATE, worse than the 2.00:1 that got D-11 raised.
+   `color: #fff` on `background: var(--accent-ink)` passed 7.70:1 in light and was never rendered in
+   dark, where styles.css flips --accent-ink from #0a5c64 to #6fd8dc. White on #6fd8dc is 1.68:1.
+   THIS PAGE DECLARES `color-scheme: light dark` AND WARWICK'S PHONE DEFAULTS TO DARK, so the only
+   primary action on the page was effectively invisible to the one person who uses it.
+   GL-003 §2a says it in as many words under --accent-ink: "What it must NEVER be: a fill behind
+   white text." I had the rule, quoted its sibling D-11 twelve lines below this, and then broke it
+   with a different token — fixing the flagged instance while reintroducing the class.
+   ⛔ THE `#fff` LITERAL IS GONE AND MUST NOT COME BACK. A hardcoded colour cannot respond to a
+   scheme flip, which is the entire mechanism of this defect. Every value here is a token.
+   GL-003 §2b lists this pairing at 6.64 light / 8.23 dark — it passes in BOTH, which the previous
+   version could not do at any value because one side of it was not a token. */
 .nm-save {
   min-height: 48px;
   min-width: 110px;
@@ -143,9 +162,9 @@
   font-family: inherit;
   font-size: 16px;
   font-weight: 700;
-  color: #fff;
-  background: var(--accent-ink);
-  border: 0;
+  color: var(--accent-ink);
+  background: var(--accent-w);
+  border: 2px solid var(--accent-ink);
   border-radius: 8px;
   cursor: pointer;
 }
@@ -185,6 +204,23 @@
 .nm-msg.warn { background: var(--warn-w); border-left-color: var(--warn); }
 .nm-msg.fail { background: var(--stop-w); border-left-color: var(--stop); }
 .nm-hint { font-size: 15px; color: var(--ink2); }
+
+/* ⛔ HIGH-1 — THE LAYOUT WARNING. Amber because it is "worth noticing and not a fault", the same
+   reading the rest of this estate gives --warn; it is explicitly NOT --stop, because the name is
+   perfectly savable and he may have a reason. --ink on --warn-w is 14.06 light / 12.4 dark, and the
+   rail carries the weight in greyscale. It sits above the Save button rather than beside it so a
+   long name is read BEFORE the tap, not explained after it. */
+.nm-long {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink);
+  background: var(--warn-w);
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+}
+.nm-long strong { color: var(--ink); }
 
 .nm-empty {
   padding: 20px;
