@@ -76,6 +76,7 @@ a **real** producer and a **real** package rather than another synthetic fixture
 | **Model for Phase 1** | **Opus-high.** Durable state, identity, provenance and idempotency are the expensive things to get wrong, and everything downstream inherits them. |
 | **Depends on BUILD-019** | Only at Phase 7, and only through a **contract** — see §4. BUILD-006 develops against the accepted Publication Package contract without waiting for BUILD-019 Phases 4–7. |
 | **Open Warwick gates** | **None blocking Phase 1.** The §6 F4 store decision was raised and **SETTLED by Warwick on 2026-08-14 — Supabase.** Later: **spend** before any HeyGen render (§6 F1). |
+| **Assurance route — MANDATORY** | **§9.2.** Functional goal DEMONSTRATED → **Veritas** internal → **Codex** external merge-class QA → **Warwick's** merge decision. **Veritas does not replace Codex; Warwick's authority does not replace Codex; a green suite replaces neither.** The Codex gate does **not** disappear because work reached the boundary by a route that created no PR. **WP-1's PR #105 stays draft and unmerged until the route is satisfied.** |
 | **Store — settled** | **Supabase Postgres** (Warwick, 2026-08-14). Live state established the same day: the project holds `asdair.*` and `session_report.*`; there is **no `ops.*` schema in it**, so reusing `services/control-plane/worker` means applying its DDL to Supabase, not pointing at an existing live queue. |
 
 > **✅ WARWICK ACCEPTED THIS PLAN IN SUBSTANCE, 2026-08-03.** Phase 0 is closed. **Implementation of Phase 1 is authorised and has not begun** — it was deliberately not started in the session that wrote this map. This map and the staged canonical source are the only artefacts so far.
@@ -387,6 +388,86 @@ Warwick, 2026-08-03, on what happened next:
 - **Phase 5's single approval is taken on rung 1 and rung 2 together** — Warwick reads the package and sees it rendered — and **production is downstream of his approval, never a step within it.**
 - **Phase 7 publishes only what has passed both.** A destination adapter is not a preview.
 - **When a check fails, establish which rung failed and why before changing anything.** An auth failure, a 302, a protected URL and a missing environment are four different facts. Treating them as one is how a review step turns into a public deployment.
+
+---
+
+## 9.2 THE ASSURANCE ROUTE — Veritas then Codex then Warwick (Warwick, 2026-08-14)
+
+**§9.1 governs how human-facing CONTENT is reviewed. This section governs how WORK reaches a completion,
+closure or merge claim. They are different axes and neither substitutes for the other.**
+
+**The settled chain, and no step may be skipped or swapped:**
+
+```
+builder/team → the actual functional Work Package outcome, DEMONSTRATED
+             → Veritas internal Work Package / phase assurance
+             → Codex external PR/release merge-class QA
+             → Warwick's consequential merge/release decision
+```
+
+**The distinctions are mandatory, in Warwick's own framing:**
+
+- **VERITAS is INTERNAL assurance. CODEX is independent, different-model, EXTERNAL PR/release QA.**
+- **Veritas does NOT replace Codex.**
+- **Warwick's merge authority does NOT replace Codex.** Authority answers whether *he permits* a
+  consequential merge. Codex independently answers whether *the actual release state should pass external
+  QA.* **One is never a substitute for the other.**
+- **A green test suite replaces NEITHER.**
+- **A Work Package that has not met its functional goal is NOT thrown at Codex because its tests are green.**
+
+### The defect this closes — and it is narrow
+
+> **A required Codex release/merge-class gate must NOT disappear merely because work reached an integration
+> boundary through a route that happens not to create the usual PR-shaped trigger** — direct lane
+> integration, a locally-performed merge, `/reconcile`, or standing merge authority.
+
+**This is a rule about the OBLIGATION, not a new mechanism.** No tracker, no counter, no control plane, no
+checker exists to administer it, and building one is the diagnosis Warwick has already rejected.
+
+### The canonical route, established by execution 2026-08-14 — never re-derived from memory
+
+| | |
+|---|---|
+| **Reviewer-facing law** | `services/control-plane/review/prompts/tower-qa-skill.md` (v3, ratified, `governs_live: true`) **+** `reviewer-classification-amendment.md`, delivered together. **This is the single reviewer-facing contract. `CLAUDE.md` is NEVER injected into Codex.** |
+| **Bounded manual review** | `services/control-plane/tower-loop/reviewDiff.mjs --repo --base --head --claim <claim.json>` — **refuses without a real claim.** This is the route `CLAUDE.md` already names. |
+| **PR merge-class route** | `services/control-plane/tower-loop/mergeCheck.mjs` and `tower-loop/watcher.mjs` |
+| **⚠️ NOT the route** | `services/control-plane/tower/merge-check.mjs` — live-capable, loads **no ratified contract**, builds its own inline prompt, and uses a **different verdict vocabulary**. It is outside the contract's own declared scope list. **Never invoke it for an assurance gate.** Recorded as a finding for Warwick; not this build's to repair. |
+| **Verdicts** | `APPROVE · CORRECTIONS_REQUIRED · DECISION_REQUIRED · BLOCKED` — Codex returns a **technical** verdict; Warwick retains merge and final acceptance |
+| **Budget** | **Three executions per gate, never a fourth** — initial, one after genuine `BLOCKS_CURRENT_MERGE` corrections, one final confirmation |
+| **Authority to run** | **Warwick's explicit authority is required before any Codex run.** Unchanged. |
+
+**What Codex confirms about Veritas receipts** (contract §4, quoted not paraphrased): that the applicable
+committed receipt **exists**, that its verdict is **PASS**, that its **assured scope actually covers the
+thing being closed**, and that **no later material in-scope change invalidated it** without a newer
+applicable PASS. A missing, non-PASS, scope-mismatched or superseded receipt behind a closure claim is an
+active `BLOCKS_CURRENT_MERGE` finding.
+
+> ⚠️ **ONE OPEN QUESTION, REFERRED TO WARWICK 2026-08-14 AND NOT SETTLED HERE.** His instruction of
+> 2026-08-14 lists *"cover the reviewed SHA/state"* among the receipt properties Codex must confirm. **That
+> sub-check was deliberately REMOVED from the contract by Warwick himself on 2026-08-07** (`7d739d2`,
+> *"rebase the Codex contract off the exact-head model onto the human outcome"*), and replaced with
+> ***"Scope, not SHA equality, is the test."*** **Larry has NOT modified the contract**, per Warwick's
+> standing instruction to stop and report rather than edit. Until he rules, the contract as ratified
+> governs.
+
+### Enforcement, stated honestly
+
+**None of this is mechanically enforced, and no reply may imply otherwise.** Measured 2026-08-14: the Tower
+watcher is running and polling, but its **only** automatic trigger requires an **open PR carrying a
+hand-written `@tower … head:` comment**; there is **no branch protection on `main`**; no workflow, git hook
+or scheduled task notices work that reaches `main` without a PR; and the session-side ingest hook writes to
+a store the watcher does not read. **Nine days of continuous operation produced zero review events.** The
+obligation above therefore rests on discipline — which is exactly why it is written on the map a fresh
+Larry is required to open, rather than left in his head.
+
+### Applied to this build, concretely
+
+- **WP-1 (Phase 1) may not be reported complete, closed or merge-ready on a green suite.** The route is:
+  the three-route Content Seed goal **actually demonstrated** → **Veritas Gate 1** on the integrated
+  outcome → **Codex external QA** on the consequential PR/release state → **Warwick's merge decision**.
+- **PR #105 stays DRAFT and UNMERGED until that route is satisfied** (Warwick, 2026-08-14).
+- **Every later phase boundary inherits this**, and a phase marked **PASS** additionally requires the
+  Veritas receipt the §Wayfinder rules already demand.
 - **If the answer to a review problem is to build something, the diagnosis was rejected.** Same rule as everywhere else in this file; it simply gets broken here most often, because review feels like governance and governance is the thing this estate grows when it is anxious.
 
 ---
