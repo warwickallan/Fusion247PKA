@@ -69,3 +69,26 @@ more real vacancies including one paste and one below-7-then-proceed. **Moves ei
 - **`CareerAIR-Ops-Liveness` is DISABLED** — the only liveness reporter on the webhook receiver is off.
 - The application engine has been **frozen since 2026-07-30**; the 2026-08-06 work touched only
   `src/email/` and `src/cockpit/`.
+
+## ⚠️ AC-10 — LARRY VERIFIED THIS HIMSELF, AND THE CENSUS OVERSTATED IT
+
+**The census implied the exposure was *"the employer/salary/CV content the whole privacy contract exists to
+protect."* IT IS NOT. Established by running the scanner personally:**
+
+```
+exit 1 · 20 findings · 9 files · ONE distinct term: "warwickallan@outlook"
+```
+
+**Every one of the 20 is the same email address.** No employer, no vacancy, no salary, no recruiter, no CV
+content, no application state. **The scanner is doing exactly its job — flagging a private term on a public
+repo — and the term is an email address, not career data.**
+
+**Proportion, using the HOBBY BRAIN test rather than the framework's instinct:** an email address on a
+public repo is real but low-consequence, and it is **not** the class of exposure the CareerAIR privacy
+contract was written against. **Recorded for the next session; not escalated tonight, and not urgent.**
+Removing 20 occurrences across 9 files is minutes of work when CareerAIR resumes.
+
+**The genuine AC-10/AC-13 finding survives the correction and is the important half:**
+**the scanner is invoked by NOTHING** — no CI workflow, no git hook, no scheduled task. It is named in
+three prose documents that assert it enforces the boundary. **A control nothing runs is not a control**,
+and that is why a clean PASS on 2026-07-30 could silently regress to 20 findings.
