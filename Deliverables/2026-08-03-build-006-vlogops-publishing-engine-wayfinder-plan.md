@@ -35,7 +35,20 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 
 ---
 
-## ✅ RECONCILED AGAINST `main`, 2026-08-14 — **nothing changed. Phase 1 is still the frontier and still not started.**
+## ▶️ PHASE 1 IS ACTIVE AND UNDER IMPLEMENTATION — **superseded 2026-08-15. The reconciliation below is HISTORY, kept for provenance.**
+
+**Live state, established by execution:** Phase 1 is **ACTIVE**. Keel is implementing **WP-1**
+(`WO-2026-08-14-01`) on branch `build-006/b6-01-content-seed-store` in worktree
+`C:/Fusion247PKA-vlogops`. **Draft PR #105 is open and unmerged.** `services/vlogops` **exists** —
+schema, identity, all three intake routes, tests and CI, committed at `d55965a`, `ae318a0`, `71d9627`.
+Keel returned **PARTIAL** on the implementation: ten of ten acceptance criteria met with executed
+evidence, held back from complete because **CI is built but has never been observed running**.
+
+**The next boundary is NOT another dispatch.** It is: the real three-route Content Seed goal
+**demonstrated** → **Veritas** Gate 1 → **Codex** external merge-class QA → **Warwick's** merge decision
+(§9.2). **PR #105 stays draft until that route is satisfied.**
+
+### *(historical — the pre-implementation reconciliation of 2026-08-14)*
 
 **Warwick, 2026-08-14: BUILD-006 is the NEXT ACTIVE BUILD.** Before dispatching, this map was reconciled
 against `main` — **only far enough to check that the night's estate reconciliation had not moved a
@@ -43,7 +56,7 @@ prerequisite or already delivered part of Phase 1.** *No product decision in thi
 
 | checked by execution | result |
 |---|---|
-| `services/vlogops` on `main` | **ABSENT** — Phase 1 genuinely not begun |
+| `services/vlogops` on `main` | **ABSENT** — Phase 1 genuinely not begun *(true on 2026-08-14; superseded 2026-08-15 — it now exists on `build-006/b6-01-content-seed-store`, PR #105)* |
 | the staged canonical source (§Source authority #3) | **present** — `Builds/BUILD-006-…/SOURCE-foundry-boundary-decision-2026-08-02.md` |
 | the superseded 2026-08-01 plan | **correctly marked** — carries its own ⛔ *"Do not follow this document. It is history"* and points here |
 | `services/control-plane/worker/` (§6 F4's reuse target) | **present and intact** |
@@ -70,16 +83,18 @@ a **real** producer and a **real** package rather than another synthetic fixture
 | **Build** | BUILD-006 — VlogOps Publishing Engine. **THE ACTIVE BUILD.** |
 | **Promoted from** | IDEA-006 (Foundry), on Warwick's explicit instruction 2026-08-03 |
 | **Programme position** | BUILD-019 Phases 1–3 ✅ done → **BUILD-006 in full ← YOU ARE HERE** → BUILD-019 Phase 4 → the real end-to-end acceptance journey. Fixed by Warwick, 2026-08-03. |
-| **Current phase** | **Phase 1 — seed intake and the durable Content Seed store.** Phase 0 is PASS. |
+| **Current phase** | **Phase 1 — seed intake and the durable Content Seed store. ACTIVE, under implementation.** Phase 0 is PASS. |
+| **Live WP state** | **WP-1 `WO-2026-08-14-01` with Keel** — branch `build-006/b6-01-content-seed-store`, worktree `C:/Fusion247PKA-vlogops`, **draft PR #105 open and unmerged**. Implementation returned **PARTIAL** (all ten ACs evidenced; CI built but never observed running). |
+| **Exact next action (2026-08-15)** | **NOT another dispatch.** Demonstrate the real three-route Content Seed goal → **Veritas** Gate 1 → **Codex** external merge-class QA → **Warwick's** merge decision. See §9.2. |
 | **Current gate** | **All three intake routes land a durable Content Seed with stable identity; kill mid-intake and it recovers; identity survives restart.** (§10, Phase 1 row.) |
-| **Exact next action** | **Dispatch Phase 1 as a bounded Work Order.** Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are INTERMITTENT — whole days carry zero session logs while being dense with other evidence — so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
+| **Exact next action** *(SUPERSEDED 2026-08-15 by the row above — this dispatch HAPPENED; kept for the route detail it carries)* | ~~**Dispatch Phase 1 as a bounded Work Order.**~~ Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are INTERMITTENT — whole days carry zero session logs while being dense with other evidence — so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
 | **Model for Phase 1** | **Opus-high.** Durable state, identity, provenance and idempotency are the expensive things to get wrong, and everything downstream inherits them. |
 | **Depends on BUILD-019** | Only at Phase 7, and only through a **contract** — see §4. BUILD-006 develops against the accepted Publication Package contract without waiting for BUILD-019 Phases 4–7. |
 | **Open Warwick gates** | **None blocking Phase 1.** The §6 F4 store decision was raised and **SETTLED by Warwick on 2026-08-14 — Supabase.** Later: **spend** before any HeyGen render (§6 F1). |
 | **Assurance route — MANDATORY** | **§9.2.** Functional goal DEMONSTRATED → **Veritas** internal → **Codex** external merge-class QA → **Warwick's** merge decision. **Veritas does not replace Codex; Warwick's authority does not replace Codex; a green suite replaces neither.** The Codex gate does **not** disappear because work reached the boundary by a route that created no PR. **WP-1's PR #105 stays draft and unmerged until the route is satisfied.** |
 | **Store — settled** | **Supabase Postgres** (Warwick, 2026-08-14). Live state established the same day: the project holds `asdair.*` and `session_report.*`; there is **no `ops.*` schema in it**, so reusing `services/control-plane/worker` means applying its DDL to Supabase, not pointing at an existing live queue. |
 
-> **✅ WARWICK ACCEPTED THIS PLAN IN SUBSTANCE, 2026-08-03.** Phase 0 is closed. **Implementation of Phase 1 is authorised and has not begun** — it was deliberately not started in the session that wrote this map. This map and the staged canonical source are the only artefacts so far.
+> **✅ WARWICK ACCEPTED THIS PLAN IN SUBSTANCE, 2026-08-03.** Phase 0 is closed. **Implementation of Phase 1 is authorised and IS UNDER WAY** — dispatched to Keel 2026-08-14 as `WO-2026-08-14-01`, draft PR #105. *(This line read "has not begun" until 2026-08-15; it was true when written and is superseded by execution.)*
 
 ---
 

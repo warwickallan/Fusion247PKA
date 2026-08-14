@@ -129,6 +129,36 @@ Inspect, by execution, at minimum:
 already on `main`, superseded, still genuinely required, unsafe or incomplete, or unrelated.
 **Close superseded PRs honestly. Integrate genuinely required work through the correct process.**
 
+## ⛔ THE ASSURANCE RULE — **Git convergence is not automatically assurance convergence.** Warwick, 2026-08-15.
+
+**Canonical in root `CLAUDE.md` § "CONVERGE / CONVERGENCE" → "GIT CONVERGENCE IS NOT AUTOMATICALLY
+ASSURANCE CONVERGENCE". Read it there. This is its executable form and defines nothing new.**
+
+**Before reporting ANY of `reconciled` · `converged` · `closed` · `release-ready` or equivalent, establish
+BY EXECUTION whether material executable/release state exists beyond the last applicable Veritas/Codex
+boundary.**
+
+How to establish it — cheaply, with what already exists:
+
+1. Find the **last applicable external assurance boundary** for the affected build: the most recent SHA a
+   Codex review actually covered, and its verdict. **A negative verdict is not a boundary.**
+2. Diff `that SHA..HEAD` **restricted to the consequential surface** — executable code, migrations,
+   runtime wiring, and any materially changed shared dependency the live journey relies on.
+3. **If that restricted diff is empty, there is no assurance debt. Say so and continue.** This is the
+   ordinary case and it must stay cheap.
+4. **If it is non-empty, that is ASSURANCE DEBT.** Name it explicitly in the report and in the record.
+   The estate is **NOT** reconciled while it stands, however clean the Git tree is.
+
+⛔ **This does NOT make Codex run on every `/reconcile`.** Documentation-only, pointer-only, receipt-only
+and other non-consequential reconciliation **manufactures no gate at all** — do not open one.
+
+⛔ **Build nothing to administer this.** No tracker, register, counter, watcher or control plane. The check
+above is two git commands and a judgement. **If you find yourself building, you have misread it.**
+
+**It binds regardless of how the work arrived** — direct integration to main, a local merge and push,
+standing merge authority, `/reconcile` itself, or any path that created no PR/Tower trigger. **A missing PR
+trigger must never again mean a missing external gate.**
+
 ## The runtime rule
 
 **A converged Git tree is not enough if production still runs from an abandoned worktree.**
@@ -172,7 +202,13 @@ unexplained stashes                          : 0
 forgotten-work PRs                           : 0
 runtime dependencies on noncanonical checkouts: 0
 main == origin/main                          : YES
+ASSURANCE DEBT (executable state beyond the
+  last applicable Veritas/Codex boundary)    : NONE — or the exact base..head and what it contains
 ```
+
+**⛔ The assurance line is NOT optional and NOT roundable.** `NONE` is earned by running the restricted
+diff above, never assumed from a clean tree. **If it is anything other than `NONE`, the estate is NOT
+reconciled** — report it as partial, name the debt, and name the owed route.
 
 **That is Warwick's definition of a reconciled estate.** Every line established by execution.
 **⛔ Anything not established by execution is reported as NOT established. Never rounded up.**
