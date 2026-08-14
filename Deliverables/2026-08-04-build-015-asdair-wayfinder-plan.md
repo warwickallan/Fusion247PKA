@@ -2282,6 +2282,32 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+## 🔴🔴🔴 THIRD CLOSEOUT BLOCKER — **MUM'S HOUSEHOLD CATALOGUE IS ON A PUBLIC REPOSITORY. Warwick, 2026-08-14, ELEVATED — explicitly not to be parked.**
+
+> **Warwick, verbatim:** *"I disagree strongly that Mum's real products sitting in a public repository is
+> 'genuinely low stakes.' The moment that list includes something like incontinence pads, it stops being
+> harmless fixture trivia. The code can be public; her household catalogue should not be. I would resolve
+> that before BUILD-015 closes: no real Mum shopping data, aliases, display names, or sensitive product
+> fixtures left publicly accessible in Git history/branches unless deliberately anonymised."*
+
+**⛔ LARRY'S ERROR, NAMED. He leaned on the standing ruling that Warwick's shopping is not private — which
+Warwick has made three times — and applied it to a THIRD PARTY.** That ruling is about Warwick's own data.
+**This is his mother's, and it includes health-adjacent products.** Calling it *"genuinely low stakes"* was
+rationalisation, not assessment. *The memory `personal-data-never-public-repo` says COMMIT Warwick's
+shopping; it says nothing whatsoever about Mum's, and the difference is consent.*
+
+**MEASURED BY EXECUTION, 2026-08-14:**
+
+| | |
+|---|---|
+| repository visibility | **`PUBLIC`** (`gh repo view` — `warwickallan/Fusion247PKA`) |
+| files in the working tree carrying her real catalogue | **40** |
+| files carrying **health-adjacent** items already on the **public `origin/main`** | **5** |
+| how long | **since ~2026-08-11** (`92d4e44`) — **this PREDATES today's work entirely** |
+
+**It is therefore NOT the branch push that caused this**, and the branch push is not the fix. The exposure
+is older, broader and on `main`.
+
 ## 🔴🔴 TWO CLOSEOUT BLOCKERS — **NEITHER MAY BE ABSENT FROM A CLOSE. Warwick, 2026-08-14, catching both in a sit rep that omitted them.**
 
 **Larry's sit rep reported a green `200` on `:8710` as if it were reassurance, and listed the unpushed
