@@ -2284,6 +2284,62 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+## ⭐⭐ SUB-PHASE B15-5 — **THE REAL SHOP, W/C 16 AUGUST 2026.** Warwick, 2026-08-14. **THIS IS THE CURRENT FRONTIER.**
+
+> **Warwick, verbatim:** *"I want everything tidied up and finished off, with a sub phase added to the
+> wayfinder for shop w/c 16th August… We come back to this on Tuesday and run one for real but I don't
+> know which input method it will be yet."*
+
+**⛔ THE INPUT METHOD IS DELIBERATELY UNDECIDED AND MUST NOT BE ASSUMED.** Warwick will choose on the day.
+**All three doors are built and live** — do not pre-empt him by preparing only one, and do not treat the
+Cockpit as the default merely because it is newest:
+
+| door | state |
+|---|---|
+| **Mum's Cockpit** (`http://warwick-yoga/shopping.html`) | **PROVEN 2026-08-14** — a real tap created `SHOP-2026-08-14`, 31 items, real ShopperBot message |
+| **A photograph via ShopperBot** | the Terra ingestion path. Last exercised 2026-08-13 on Lane J |
+| **A typed list via ShopperBot** | deterministic, no model call (`runPipeline.js:225-233`) |
+
+### What has to happen for a REAL shop, beyond what 2026-08-14 proved
+
+**2026-08-14 proved INTAKE. It did not touch anything downstream of it.** `SHOP-2026-08-14` sits at
+`RECEIVED` / `ASDAIR_WORKING` with **zero `shop_line` rows** — it was never interpreted, never planned,
+never handed to a browser. **The distance from here to a real shop is the whole of the rest of the
+pipeline, and none of it ran this session.**
+
+1. **Interpretation** — the list becomes `shop_line` rows with catalogue identity.
+2. **Questions** — anything ambiguous is put to **Warwick** (never to Mum) through his existing flow.
+3. **Planning** → `READY_TO_SHOP` → the **brand-sorted browser handoff** (proven on Lane J, 2026-08-13).
+4. **The supervised ASDA browser session.** ⛔ **Never checks out, never pays, never chooses a slot.**
+
+### ⚠️ WHAT WILL BITE ON TUESDAY, named now rather than discovered then
+
+- **`SHOP-2026-08-14` ALREADY EXISTS and is non-terminal.** A Tuesday submission gets a different
+  `shop_ref` (date-derived), so it will not collide — **but today's shop is still sitting open** and there
+  are now **four** non-terminal shops for household 1. **Decide what happens to it before Tuesday.**
+- **The re-send gap is REAL and OBSERVED** — see the ruling below.
+- **`display_name` is live for all 109 regulars.** Warwick's editor is at `http://warwick-yoga/names.html`.
+- **The AsdAIr API is supervised now** (`MyPKA-Local-Services-Live`, every 15 min) — but the
+  `dbProofs.test.js` non-idempotency means **any "N/N" figure for that suite is a claim about the day it
+  was run.** Do not quote yesterday's number.
+
+### ⚖️ WARWICK'S RULING ON THE RE-SEND GAP — **decided, deliberately NOT built**
+
+> **His words:** *"The shop should be able to be amended as many times as she likes up to the point that
+> the browser session is launched. i.e the list is handed over to CDP. But tbh I'm bored of this now and
+> it's an edge case because in reality if this works properly there won't be enough time to make the
+> changes."*
+
+**The answer is settled: amendable until CDP handover.** **The build is NOT authorised** — he has ruled it
+an edge case and closed the session. *Recorded so that a fresh instance does not rediscover the gap and
+treat it as an open question, and does not build it uninvited either.*
+
+**The observed instance, because it is the honest record:** on 2026-08-14 Warwick added
+`"asda bacon 10 rashers"` after sending. **It reached NO durable row** — verified across `shop_line`,
+`shop_question`, `shop_event` and the shop's own `raw_text`. The notification said plainly *"this does NOT
+change it"*, and **he still read it as added.** The mitigation shipped the same day is the **`NEW ITEMS
+SHE TYPED:` section**, placed above the full list because that is where the eye lands.
+
 ## ⛔ CLOSED PERMANENTLY — THE PUBLIC-REPO QUESTION IS NOT A BLOCKER AND MUST NEVER BE RAISED AGAIN
 
 > **Warwick, 2026-08-14, his FOURTH ruling on this and the first with visible anger:** *"Just ignore the
