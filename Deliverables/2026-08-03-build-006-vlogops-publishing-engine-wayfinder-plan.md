@@ -49,9 +49,14 @@ prerequisite or already delivered part of Phase 1.** *No product decision in thi
 | `services/control-plane/worker/` (§6 F4's reuse target) | **present and intact** |
 | estate | `main == origin/main`, clean, **primary worktree only**, 0 stashes, 0 open PRs |
 
-**The one item that must be RAISED at Phase 1 and not settled silently is unchanged: §6 F4's store choice —
-Postgres vs SQLite, with recorded priors on both sides.** *(For context, not as a decision: the night's
-reconciliation touched neither.)*
+**✅ RAISED AND SETTLED, 2026-08-14 — §6 F4's store choice is no longer fog.** It was put to Warwick at the
+top of the Phase 1 session, as this map required, and he ruled:
+
+> **Warwick, 2026-08-14: *"supabase for this"***
+
+**The durable Content Seed store is the managed Supabase Postgres project.** This honours his recorded
+boundary (*"do NOT substitute SQLite for Postgres as a side project"*) rather than sitting against it, and
+it removes the dependency on an unset `CONTROL_PLANE_DEV_DATABASE_URL`. See §6 F4, superseded in place.
 
 **Programme order, unchanged and fixed by Warwick:** BUILD-019 Phases 1–3 ✅ → **BUILD-006 in full ← HERE**
 → BUILD-019 Phase 4 → real end-to-end publication acceptance. **BUILD-006 CREATES the Publication Package;
@@ -70,7 +75,8 @@ a **real** producer and a **real** package rather than another synthetic fixture
 | **Exact next action** | **Dispatch Phase 1 as a bounded Work Order.** Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are partly dry, so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
 | **Model for Phase 1** | **Opus-high.** Durable state, identity, provenance and idempotency are the expensive things to get wrong, and everything downstream inherits them. |
 | **Depends on BUILD-019** | Only at Phase 7, and only through a **contract** — see §4. BUILD-006 develops against the accepted Publication Package contract without waiting for BUILD-019 Phases 4–7. |
-| **Open Warwick gates** | None blocking Phase 1. Later: **spend** before any HeyGen render (§6 F1), and the store decision in §6 F4 is **recorded fog to raise, not to settle silently**. |
+| **Open Warwick gates** | **None blocking Phase 1.** The §6 F4 store decision was raised and **SETTLED by Warwick on 2026-08-14 — Supabase.** Later: **spend** before any HeyGen render (§6 F1). |
+| **Store — settled** | **Supabase Postgres** (Warwick, 2026-08-14). Live state established the same day: the project holds `asdair.*` and `session_report.*`; there is **no `ops.*` schema in it**, so reusing `services/control-plane/worker` means applying its DDL to Supabase, not pointing at an existing live queue. |
 
 > **✅ WARWICK ACCEPTED THIS PLAN IN SUBSTANCE, 2026-08-03.** Phase 0 is closed. **Implementation of Phase 1 is authorised and has not begun** — it was deliberately not started in the session that wrote this map. This map and the staged canonical source are the only artefacts so far.
 
@@ -261,7 +267,7 @@ Actions: add seed · promote to VlogOps · approve · request revision · park �
 >
 > **Phase 2 must therefore treat `Deliverables/` and git history as first-class intake, not as fallback.** Whether the session-log gap is a habit failure or a four-day anomaly is **one sentence from Warwick**, and it changes whether Phase 2 also needs to fix the stream or merely read around it.
 
-### 🟠 F4 — Orchestration — **RESOLVED on what exists. The store choice is genuine, recorded fog.**
+### ✅ F4 — Orchestration — **RESOLVED on what exists. The store choice is now RESOLVED TOO — Supabase (Warwick, 2026-08-14).**
 
 **Nothing needs building.** The outbox, idempotency-key, lease/claim, attempt-budget and dead-letter shapes exist and are tested **three times over**:
 
@@ -271,8 +277,11 @@ Actions: add seed · promote to VlogOps · approve · request revision · park �
 
 Plus two **directly liftable, zero-dependency** modules: `services/fusion-capture-gateway/src/core/idempotency.js` and `retryPolicy.js`.
 
-> **🟠 STILL FOG — the store, and it has recorded priors on BOTH sides.** The generic queue needs a **Postgres server**, and `CONTROL_PLANE_DEV_DATABASE_URL` is unset in a normal session (`Deliverables/BACKLOG.md:28`). Tower *just removed* Postgres (WO-TW-01, PR #90 → `eb975bc`). But `BACKLOG.md:28` also records Warwick's boundary verbatim: ***"do NOT substitute SQLite for Postgres as a side project."***
-> **This is a real decision with evidence pulling both ways. Record it; do not settle it silently at Phase 1.**
+> **✅ THE STORE IS SETTLED — Supabase. Warwick, 2026-08-14, raised at the top of the Phase 1 session exactly as this map required: *"supabase for this"*.**
+>
+> *The fog as it stood, kept for provenance:* the generic queue needs a **Postgres server**, and `CONTROL_PLANE_DEV_DATABASE_URL` is unset in a normal session (`Deliverables/BACKLOG.md:28`); Tower *just removed* Postgres (WO-TW-01, PR #90 → `eb975bc`); but `BACKLOG.md:28` also records Warwick's boundary verbatim: ***"do NOT substitute SQLite for Postgres as a side project."*** **The ruling lands on the side of that boundary and dissolves the unset-dev-database problem — the managed project is always there.**
+>
+> **What the decision costs, established by execution against the live project on 2026-08-14 and NOT to be discovered again mid-build:** the Supabase project contains **`asdair.*` and `session_report.*` only — there is no `ops.*` schema and no `tower.*` schema in it.** So "reuse `services/control-plane/worker`" means **taking its shapes and its DDL to Supabase**; it does not mean connecting to a queue that is already live. **The applied-migration ledger there ends at `019_shopping_list_shop_identity`, while the 2026-08-14 close-session records 020 and 021 as applied to live — so the ledger is NOT a complete record of that database, and no Phase 1 numbering may be derived from it without checking the repo's own migration directory.**
 
 **Also:** neither queue is packaged (`private: true`, no `exports`) — reuse means cross-directory import or copying; there is no shared library boundary today. Two `220_` migrations collide in `db/mypka/` (cosmetic). **No HeyGen or YouTube adapter exists anywhere in the repository** — both are new code, and both are BUILD-019's.
 
@@ -303,7 +312,8 @@ The service is live (LightRAG 1.5.4 + Neo4j 5.26) but **unmerged** (draft PR #59
 
 | Dependency | Owner | State | Needed by | While waiting | Escalation |
 |---|---|---|---|---|---|
-| Accept this Wayfinder | **Warwick** | **PENDING** | Phase 1 | Nothing — this is the gate | `product-decision` |
+| Accept this Wayfinder | **Warwick** | ✅ **ACCEPTED in substance, 2026-08-03** (see §STATUS). Row corrected 2026-08-14 — it had read PENDING against an acceptance already recorded twelve lines above it | Phase 1 | — | — |
+| **Store choice — Postgres vs SQLite (§6 F4)** | **Warwick** | ✅ **SETTLED 2026-08-14 — Supabase** | Phase 1 | — | — |
 | **HeyGen account / plan / API entitlement / avatar / voice / cost** | **Warwick** | Unknown (F1) | Phase 6 | Phases 1–5 in full, stub renderer | **Before any spend** |
 | YouTube identity review + handle | Warwick | **Still pending** (BUILD-019 F1) | Phase 7 | Everything to Phase 6 | Never retry or duplicate |
 | Creative approval of a Master Story Package | **Warwick** | Not yet applicable | Phase 5 | Build the approval surface | Hard gate — the single approval is the product |
