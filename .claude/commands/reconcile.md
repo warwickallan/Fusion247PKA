@@ -1,6 +1,6 @@
 ---
 name: reconcile
-description: "The deliberate full-estate convergence transaction. Establish by EXECUTION and CONTENT what is genuinely unique anywhere in the estate, preserve everything that should survive, converge it into canonical main, and retire only proven-superseded residue."
+description: "The deliberate full-estate convergence transaction. Terminal state is main AND NOTHING ELSE: establish by EXECUTION and CONTENT what is unique anywhere in the estate, PRESERVE it ON MAIN in canonical or durable archive form, prove the preservation, then retire every other branch locally AND remotely."
 user_invocable: true
 ---
 
@@ -20,6 +20,40 @@ root `CLAUDE.md` § "RECONCILE · MERGE · CONVERGE · CLOSE — the four terms"
 executable form. **It defines nothing new.** ⛔ **If you find yourself building a tracker, register,
 counter or control plane to run this, you have misread it** — the regrowth cap in `CLAUDE.md` applies at
 full force.
+
+## ⛔⛔ THE TERMINAL STATE — CORRECTED BY WARWICK, 2026-08-14. THIS IS LITERAL.
+
+> **Warwick, verbatim, after the first run reported COMPLETE with branches still standing:** *"finish with
+> only `main` as the branch estate… The `/reconcile` command currently weakens that into 'no competing
+> source of truth' and permits retained feature/reference branches. That is not Warwick's intended terminal
+> state."*
+
+**COMPLETE means the branch estate contains `main` and NOTHING ELSE.** Unless Warwick **explicitly exempts
+a named ref for that specific reconciliation**:
+
+- **remote branches: exactly `main`**
+- **local branches: exactly `main`**
+- **primary worktree only — no feature worktrees**
+- no unclassified stashes · no open PR carrying unique work · clean primary checkout ·
+  `main == origin/main` · no runtime consuming a retired or non-`main` checkout
+
+**⛔ A FEATURE BRANCH IS NOT AN ARCHIVE.** Historical value, evidence value and "it might be useful" are
+**NOT** grounds for a branch to survive. ***"The four BUILD-015 branches holding Terra/agentic-vision
+experiments and the BUILD-020 tool do not get to remain merely because they are useful historical
+evidence."***
+
+### ⛔ AND DO NOT ACHIEVE IT BY DELETING UNIQUE WORK. For every remaining branch, in order:
+
+1. **Establish what, if anything, it contains that `main` does not** — by content, not by name.
+2. **If the content is still valuable, PRESERVE IT ON `main`** in the appropriate canonical or
+   historical/evidence form.
+3. **If exact historical code is worth retaining, bank a durable archive, patch or evidence artefact ON
+   `main`** — a restorable bundle, not a pointer at a branch.
+4. **PROVE the preservation** — restore or verify the artefact by execution, and record the proof.
+5. **THEN retire the branch — locally AND remotely.**
+
+**Preserve what genuinely matters WITHOUT reactivating or redesigning the systems the branches came from.**
+Archiving a parked research prototype is not reopening it.
 
 ## ⛔ THE ONE RULE THAT OVERRIDES EVERY OTHER
 
@@ -110,8 +144,10 @@ Report **COMPLETE** only when all of these hold:
 - [ ] **zero open PRs carrying forgotten unique work**
 - [ ] **every retired worktree proven safe BEFORE removal**
 - [ ] **no active runtime depends on a retired or non-canonical checkout**
-- [ ] **anything intentionally retained outside `main` is named, with its reason, and is NOT a competing
-      source of truth**
+- [ ] **remote branches: `main` ONLY — proven by a fresh `git ls-remote --heads origin`**
+- [ ] **local branches: `main` ONLY — proven by a fresh enumeration**
+- [ ] **every branch retired had its unique content PRESERVED ON `main` FIRST, and the preservation proven**
+- [ ] **any ref surviving is there because WARWICK EXPLICITLY EXEMPTED IT for this reconciliation, named**
 - [ ] **a fresh Larry can start from `main` and lose no genuine estate knowledge or implementation**
 
 **⛔ Anything not established by execution is reported as NOT established. Never rounded up.**
