@@ -2282,6 +2282,45 @@ acceptance before upstream truth exists.**
 **Every order carries the CORROBORATED-never-VERIFIED constraint as an acceptance criterion**, because
 Warwick's ruling binds the UI, the receipts and Veritas alike.
 
+## 🔴🔴 TWO CLOSEOUT BLOCKERS — **NEITHER MAY BE ABSENT FROM A CLOSE. Warwick, 2026-08-14, catching both in a sit rep that omitted them.**
+
+**Larry's sit rep reported a green `200` on `:8710` as if it were reassurance, and listed the unpushed
+commits as a footnote. Warwick caught both. Recorded here so they cannot go quiet again.**
+
+### 1. `:8710` SUPERVISION — **the defect Larry PROVED and then reported past**
+
+> **Warwick:** *"Earlier Larry proved the AsdAIr API could die while Mum's page still looked healthy, and it
+> had no supervisor. A 200 right now does not close that defect. Before BUILD-015 is called durable,
+> restart/recovery needs to be automatic and proven."*
+
+**Established by execution 2026-08-13:** the `MyPKA-Local-Services-Live` task restored the Cockpit on 8090
+in ~1 s and left **8710 down across ten consecutive health checks** until Larry started it by hand.
+**Mum's page keeps serving 200 while its backend is gone** — a silently half-working product, not an
+outage. **A live `200` is evidence about this second, not about recovery.**
+
+**The bar, and it is the estate's own:** automatic on the real event, observable, never silent, and
+**proven by kill-and-revive** — not by a supervisor existing. *(This is the `built-tested-never-activated`
+CAPAE family, which stands at 6 occurrences / 1 clean.)*
+
+### 2. THE INTEGRATED HEAD MUST REACH THE REMOTE
+
+> **Warwick:** *"39 integrated commits behind the main-push guard. Fine while building; absolutely not fine
+> as the final state. The integrated BUILD-015 head needs to reach the proper remote/integration boundary
+> before close."*
+
+**All four worker branches ARE pushed, so nothing is at risk of loss — but `origin/main` is stale at
+`371f79f` and every integration since is local only.** *"Committed somewhere" is explicitly not durable
+under this map's own definition.* The push is denied by the guard; **this is a `merge-decision` for Warwick
+at close, and it is the last mechanical step of CONVERGENCE.**
+
+### The agreed runway to close — Warwick's own ordering
+
+**Felix → Vera → Veritas → durability/restart proof → integrated push → one genuine Fire SEND → real
+ShopperBot ping.**
+
+**⛔ Veritas has gated NOTHING this entire build.** Warwick has now named it explicitly in the runway:
+*"Veritas gates the integrated build before you ask me for the single real Fire submission."*
+
 ## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-13 (CURRENT) — **WARWICK SAW MUM'S COCKPIT ON THE FIRE AND ACCEPTED IT. Four feature requests. START HERE.**
 
 > **Warwick, 2026-08-13, verbatim — the first acceptance of AsdAIr in a long time, recorded because the
