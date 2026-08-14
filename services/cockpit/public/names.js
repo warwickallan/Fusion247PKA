@@ -80,8 +80,16 @@
   // immediately disproved it:
   //     "Chicken and ba"  14 chars, 2 words,  2 lines,  19px
   //     "Bacon and eggs"  14 chars, 3 words,  3 lines,   1px
-  // At a 118px column, roughly seven characters a line, the LINE COUNT TRACKS THE NUMBER OF WORDS,
-  // and a threshold expressed in characters cannot see them. 14 is therefore an honest warning
+  // ⛔ CORRECTED by Vera, 2026-08-14 (LOW-5): the mechanism is NOT word count. Her counterexamples,
+  // all 14 characters at this same 118px column, show MORE words giving FEWER lines:
+  //     "Pot of hot tea"  4 words -> 2 lines        "Bacon and eggs"  3 words -> 3 lines
+  //     "Big box of tea"  4 words -> 2 lines        "Ham egg n chip"  4 words -> 3 lines
+  // It is GREEDY LINE-BREAKING against the column: what matters is how the individual word widths
+  // PACK. "and eggs" measures 119.2px and misses fitting on one line by 1.2 PIXELS, which costs the
+  // whole name a third line. Four short words pack; three medium ones do not.
+  // ⭐ THE HONEST ONE-LINER: line count tracks how the words PACK — not how many there are and not
+  // how long the string is — which is exactly why a threshold in characters is a warning point and
+  // never a guarantee. 14 is therefore an honest warning
   // point — it fires before four lines, which is where the landing screen actually breaks — and it
   // is NOT a guarantee of headroom. The residual 1px at three lines is a property of the vertical
   // budget at 300x512, not of the name, and it is reported on every run rather than left implied:
