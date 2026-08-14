@@ -32,6 +32,9 @@
 'use strict';
 
 const P = require('./present');
+// WP-B15-53. The ONE read rule for what Mum reads, shared with check-item and
+// the write route. Pure at import - no pg, no environment variable.
+const displayName = require('./displayName');
 
 // ---------------------------------------------------------------------
 // SQL. All SELECT. All parameterised.
@@ -57,12 +60,26 @@ const RULE_QA_SQL =
 // Same column list readWorkspace.CATALOGUE_SQL uses, so the two cannot disagree
 // about what a regular IS. Ordered for BROWSING (active first, then name),
 // where the workspace orders by id for stable joining.
-const REGULARS_SQL =
+const REGULARS_BASE_SQL =
   'SELECT id, name, brand, category, high_level_category, asda_product_id, asda_url, typical_qty, ' +
   'aka, substitutes_allowed, active FROM asdair.regulars ' +
   'WHERE household_id = $1 ORDER BY active DESC, lower(name) ASC, id ASC';
 
-const ALL_SQL = Object.freeze([RULES_SQL, RULE_QA_SQL, REGULARS_SQL]);
+// WP-B15-53. `display_name` reached exactly ONE payload - check-item's
+// matched_name - and this is the payload Mum's page actually reads, so the
+// column Warwick edits was populated on live and unreachable by the surface
+// that needs it. Appended only when the database has it (migration 021 reaches
+// live by hand), by the same probe-then-widen route checkItem.js and
+// readWorkspace.js already use: a blind column list would take the whole
+// rulebook read down in the window between this merging and 021 being applied.
+const REGULARS_DISPLAY_SQL =
+  REGULARS_BASE_SQL.replace(' FROM asdair.regulars', ', display_name FROM asdair.regulars');
+
+// Kept under its original name: existing references and the SELECT-only
+// assertions read this constant.
+const REGULARS_SQL = REGULARS_BASE_SQL;
+
+const ALL_SQL = Object.freeze([RULES_SQL, RULE_QA_SQL, REGULARS_SQL, REGULARS_DISPLAY_SQL]);
 
 // The five directives migration 001 + 007 permit. Frozen here so the UI can
 // group by a known set instead of discovering groups from the data - a
@@ -235,9 +252,31 @@ function presentQa(q) {
 /** PURE. One asdair.regulars row -> the display shape. Aliases are the point. */
 function presentRegular(r) {
   const aka = arr(r.aka).map(function (a) { return String(a); }).filter(function (a) { return a.trim() !== ''; });
+  // ⛔ WP-B15-53. RAW AND NULLABLE - deliberately NOT through P.text().
+  //
+  // P.text() renders a missing value as the literal string "unknown", which is
+  // TRUTHFUL but TRUTHY: a regular Warwick has not named yet would arrive at
+  // Mum's tile as "unknown", sail through every falsy guard, and be rendered as
+  // the product's name. This file already refuses that for categories, for the
+  // same reason - "unknown" is builder vocabulary and reads as an accusation
+  // that something is broken.
+  //
+  // Null must also SURVIVE for the editor: "not set" and "set to something" are
+  // different states, and clearing a display name sends null.
+  //
+  // Precedent in this very function: `aka` is projected raw beside
+  // `aka_count_display`. This is the same shape - the raw value for logic, a
+  // presented companion for display.
+  //
+  // `displayNameFor` is the ONE rule for this column, shared with checkItem.js,
+  // so a whitespace-only stored value reads as "not set" on every surface
+  // rather than only on the one whose author remembered.
+  const display = displayName.displayNameFor(r, null);
   return {
     id_display: P.count(r.id),
     name_display: P.text(r.name),
+    display_name: display,
+    has_display_name: display !== null,
     brand_display: P.text(r.brand),
     category_display: P.text(r.category),
     high_level_category_display: P.text(r.high_level_category),
@@ -365,10 +404,19 @@ async function readRules(options) {
 
   try {
     if (!injected) await client.query('BEGIN TRANSACTION READ ONLY');
+    // WP-B15-53. ONE definition of "which optional regulars columns exist",
+    // shared with the workspace reader and check-item rather than written a
+    // third time. Lazily required, so importing this module still needs no
+    // `pg` and no environment variable.
+    // eslint-disable-next-line global-require
+    const workspace = require('./readWorkspace');
+    const presentColumns = await workspace._internal.probeRegularsColumns(client);
+    const regularsSql = presentColumns.indexOf('display_name') === -1
+      ? REGULARS_BASE_SQL : REGULARS_DISPLAY_SQL;
     const payload = assembleRules({
       rules: rows(await client.query(RULES_SQL, [householdId])),
       rule_qa: rows(await client.query(RULE_QA_SQL, [householdId])),
-      regulars: rows(await client.query(REGULARS_SQL, [householdId]))
+      regulars: rows(await client.query(regularsSql, [householdId]))
     });
     if (!injected) await client.query('COMMIT');
     payload.household_id_display = P.count(householdId);
@@ -404,6 +452,8 @@ module.exports = {
     presentRegular: presentRegular,
     RULES_SQL: RULES_SQL,
     RULE_QA_SQL: RULE_QA_SQL,
-    REGULARS_SQL: REGULARS_SQL
+    REGULARS_SQL: REGULARS_SQL,
+    REGULARS_BASE_SQL: REGULARS_BASE_SQL,
+    REGULARS_DISPLAY_SQL: REGULARS_DISPLAY_SQL
   }
 };

@@ -142,6 +142,131 @@ test('AC3a: the display-name SELECT is SELECT-only and asks for exactly one more
 });
 
 // =====================================================================
+// WP-B15-53 - THE BANANAS GAP
+//
+// `POST /check-item {"text":"bananas"}` answered `unmatched_new_item` on live
+// while the household had `ASDA 6 Bananas` displaying as "Bananas". The matcher
+// reads `name` and `aka`, and the 55 products that needed a display_name are
+// exactly the ones with NO aka - so for over half the catalogue the duplicate
+// nudge could never fire.
+//
+// One test per acceptance criterion. No fuzzy matching is added anywhere, so
+// there is no threshold here for a later change to loosen.
+// =====================================================================
+
+// A row shaped like the real defect: no alias at all, a display name Warwick
+// typed, and a retailer string no human would type.
+const BANANAS = [
+  { id: 61, name: 'ASDA 6 Bananas', aka: [], display_name: 'Bananas' },
+  { id: 62, name: 'Hovis soft white medium', aka: ['bread'], display_name: null }
+];
+
+test('AC1: a display-name hit is a duplicate nudge - the bananas gap, closed', () => {
+  // STEP 1 - THE GAP IS REAL. The resolver alone still cannot do this, which is
+  // what makes the check worth having and proves it was not already passing.
+  const before = resolver.resolveReading('bananas', BANANAS);
+  assert.equal(before.matched_regular_id === null || before.matched_regular_id === undefined, true,
+    'the resolver is expected to have NO identity for "bananas" - if it does, this test proves nothing');
+
+  // STEP 2 - the route now answers.
+  const out = checkItem.classifyItem({ text: 'bananas', regulars: BANANAS, chosen: [] });
+  assert.equal(out.status, 'matched');
+  assert.equal(out.matched_regular_id, 61);
+  assert.equal(out.matched_name, 'Bananas', 'she reads Warwick\'s word, never the catalogue string');
+  assert.equal(out.already_on_list, false);
+
+  // Case and punctuation are the ESTATE'S normaliser, not a new one.
+  const shouty = checkItem.classifyItem({ text: '  BANANAS! ', regulars: BANANAS, chosen: [] });
+  assert.equal(shouty.matched_regular_id, 61);
+
+  // EXACT normalised equality only - no substring, no token overlap, no score.
+  // Both terms below are ones the RESOLVER also has no answer for (established
+  // by execution against it), so this check is the only thing running and the
+  // near-miss is genuinely testing exactness rather than the resolver's silence.
+  for (const near of ['banana', 'bananas please']) {
+    const partial = checkItem.classifyItem({ text: near, regulars: BANANAS, chosen: [] });
+    assert.equal(partial.status, 'unmatched_new_item', 'a near miss matched: ' + near);
+    assert.equal(partial.matched_regular_id, null);
+  }
+});
+
+test('AC1: a display-name hit already on her list is a possible_duplicate, same as any other', () => {
+  // The two routes into this route must not tell her two different things about
+  // the same product.
+  const out = checkItem.classifyItem({ text: 'bananas', regulars: BANANAS, chosen: ['61'] });
+  assert.equal(out.status, 'possible_duplicate');
+  assert.equal(out.already_on_list, true);
+  assert.equal(out.matched_name, 'Bananas');
+});
+
+test('AC2: display_name is handed to the resolver and IGNORED by it - the check is downstream', () => {
+  // The handoff is deliberately unchanged: display_name rides on the regulars
+  // objects (WP-B15-51 put it there) and the resolver simply does not read it.
+  // Proven by execution against the REAL resolver, not by inspection.
+  const rows = [
+    { id: 71, name: 'Warburtons Toastie 800g', aka: ['toastie'], display_name: 'milk' },
+    { id: 72, name: 'Semi skimmed milk 4 pints', aka: ['milk'], display_name: null }
+  ];
+  const verdict = resolver.resolveReading('milk', rows);
+  assert.equal(verdict.matched_regular_id, 72,
+    'a display_name reached the matcher and moved the verdict');
+
+  // And the same rows, with display_name STRIPPED, produce the identical verdict.
+  const stripped = rows.map((r) => ({ id: r.id, name: r.name, aka: r.aka }));
+  assert.deepEqual(resolver.resolveReading('milk', stripped), verdict,
+    'display_name changed a resolver result - it must be inert on that path');
+});
+
+test('AC3: two regulars sharing a normalised display name refuse, silently', () => {
+  const twins = [
+    { id: 81, name: 'ASDA 6 Bananas', aka: [], display_name: 'Bananas' },
+    { id: 82, name: 'Fairtrade Bananas Loose', aka: [], display_name: '  bananas  ' }
+  ];
+  const out = checkItem.classifyItem({ text: 'bananas', regulars: twins, chosen: [] });
+  assert.equal(out.status, 'needs_confirmation');
+  assert.equal(out.matched_name, null, 'no product may be chosen out of a tie');
+  assert.equal(out.matched_regular_id, null);
+  assert.equal(out.already_on_list, false);
+  // No candidate list, under ANY key name. Mum is never asked a question.
+  assert.deepEqual(Object.keys(out), ['status', 'matched_name', 'matched_regular_id', 'already_on_list']);
+  assert.equal(structuralOffence(out), null);
+});
+
+test('AC4: the resolver still wins - a display_name can never redirect a term the catalogue resolved', () => {
+  // "milk" is an alias on 72. 71 carries display_name "milk". The catalogue's
+  // answer must stand, and it does so STRUCTURALLY: the display-name check has
+  // exactly one call site, inside the no-identity branch.
+  const rows = [
+    { id: 71, name: 'Warburtons Toastie 800g', aka: ['toastie'], display_name: 'milk' },
+    { id: 72, name: 'Semi skimmed milk 4 pints', aka: ['milk'], display_name: null }
+  ];
+  const out = checkItem.classifyItem({ text: 'milk', regulars: rows, chosen: [] });
+  assert.equal(out.matched_regular_id, 72, 'a display_name pulled the match onto the wrong product');
+
+  // And the WP-B15-51 fixture's identities are untouched by this package.
+  assert.equal(checkItem.classifyItem({ text: 'milk', regulars: REGULARS_WITH_DISPLAY, chosen: [] })
+    .matched_regular_id, 11);
+  assert.equal(checkItem.classifyItem({ text: 'bread', regulars: REGULARS_WITH_DISPLAY, chosen: [] })
+    .matched_regular_id, 12);
+});
+
+test('AC1/AC3: an empty normal form matches NOTHING - punctuation never names a product', () => {
+  // "..." normalises to "", and a blank display_name normalises to "". Letting
+  // those two meet would tell her she already has something because she typed a
+  // full stop.
+  const blanks = [
+    { id: 91, name: 'Cathedral City mature cheddar', aka: [], display_name: '   ' },
+    { id: 92, name: 'Hovis soft white medium', aka: [], display_name: '' }
+  ];
+  const out = checkItem.classifyItem({ text: '...', regulars: blanks, chosen: [] });
+  assert.equal(out.status, 'unreadable');
+  assert.equal(out.matched_regular_id, null);
+  // And the unit itself, directly.
+  assert.equal(checkItem._internal.displayNameHit('...', blanks), null);
+  assert.equal(checkItem._internal.displayNameHit('', BANANAS), null);
+});
+
+// =====================================================================
 // AC1 - it classifies, using the resolver that already exists
 // =====================================================================
 
