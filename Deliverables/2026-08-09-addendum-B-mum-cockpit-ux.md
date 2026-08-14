@@ -30,7 +30,7 @@ That sentence is the acceptance test for everything below. A design decision tha
 | **Poor eyesight** | Large type is the baseline, not an accessibility mode. Contrast well above AA. No thin weights, no low-contrast "secondary" text carrying meaning. |
 | **Poor coordination** | Large, well-separated targets. No precision required, ever. A mis-tap must be cheap and visibly reversible. |
 | **Does not use Telegram** | Every question the system needs to ask her must surface *in this Cockpit*. There is no out-of-band channel to her. |
-| **Does not know the system's vocabulary** | She never sees a catalogue identity, an ASDA reference, a regular id, a slot, a basket state, or the word "AsdAIr". |
+| **Does not know the system's vocabulary** | She never sees a regular id, a slot, a basket state, or the word "AsdAIr". ⛔ **AMENDED 2026-08-14 — the ASDA reference is now DELIBERATELY on her tile, by Warwick's explicit design.** See §6.3. |
 
 **Design consequence stated once, because everything else follows from it:** this surface has **one job per screen** and **one obvious primary action** at any moment. Anything that is not that job is either removed or pushed below the fold where it cannot compete.
 
@@ -228,11 +228,36 @@ These bind every screen. A violation of any one is a build defect, not a style p
 | **Select control** | A large tick target, **88 × 88 px**, at the row's leading edge. Unselected: an empty outlined circle. Selected: a filled shape with a **solid tick glyph**. It is a checkbox in semantics (`role="checkbox"`, `aria-checked`), never a switch — "on/off" is a harder concept than "ticked". |
 | **Whole row is the select target** | Tapping **anywhere on the row except the `−` / `+` controls** toggles selection. This is the single largest accessibility win available and it is required, not optional. The `−`/`+` controls must therefore stop event propagation. |
 | **Product name** | **≥ 28 px, weight 700.** Plain household English. Never a catalogue string, never a code, never truncated with an ellipsis — **it wraps to a second line and the row grows.** |
-| **Sub-line** | Optional, **≥ 22 px**, the size/pack detail she would say out loud ("4 pints", "box of 6"). Must clear **7:1** — it may not be a faint "secondary" grey. If a sub-line cannot be written in her words, it is omitted rather than filled with a reference. |
+| **Sub-line** | Optional, **≥ 22 px**, the size/pack detail she would say out loud ("4 pints", "box of 6"). Must clear **7:1** — it may not be a faint "secondary" grey. If a sub-line cannot be written in her words, it is omitted rather than filled with a reference. ⛔ **OVERRULED BY WARWICK 2026-08-14 — see the amendment below this table.** |
 | **`−` and `+`** | **88 × 88 px each**, thick glyphs, **≥ 36 px** stroke-visible symbol. Separated from each other by the quantity display. Bordered so the hit area is visible, not implied. |
 | **Quantity** | **≥ 44 px, weight 700, tabular/mono numerals**, in a fixed-width box so the row does not reflow as the number changes. Never an editable text input on this row. |
 | **Row height** | **≥ 120 px.** Vertical gap between rows **≥ 20 px**. |
 | **Row order** | Fixed. Selecting an item **never** moves it, never sorts it to the top, never re-groups it. |
+
+### ⛔ AMENDMENT — Warwick, 2026-08-14. **The ASDA listing IS on her tile, by his design.**
+
+> **His words, verbatim:** *"Asda listing is the official one, Alias is what mum writes on her lists but
+> neither should be editable but alias shouldn't necessarily be displayed. Display name would be a name I
+> can enter/amend/edit on a page on my cockpit. I think on mums dashboard we should have the display name
+> large and then the official asda name quite small running in one line at the bottom of the tile, so its
+> easy for me to see what it actually is."*
+
+**Larry's record-keeping, labelled as Larry's and NOT in the heading above:** this overrides §1's
+"never sees an ASDA reference", §6.3's "omitted rather than filled with a reference", and narrows A-9.
+**The three fields and their boundaries** are `name` (the ASDA truth, not editable, small line on her
+tile) · `aka` (a MATCHING term, never displayed) · `display_name` (what she reads, the large line,
+editable only by Warwick).
+
+**Why this was amended rather than left as a known conflict** (Vera, MEDIUM-3, 2026-08-14): left as it
+stood, **A-9 was permanently unsatisfiable against Warwick's own decision**, and the next reviewer reading
+the acceptance table in a fresh context would grade a FAIL against it. *A documentation defect that
+invalidates required acceptance evidence gates acceptance, rather than merely being untidy.*
+
+**What is NOT relaxed, and Vera verified all of it by execution:** the sub-line is `--m-text-body`
+**22px — exactly the §5.1 floor, not below it** · colour `--ink`, not `--ink2` · it is `aria-hidden`, so
+the row's accessible name remains the household display name and **no retailer string is read aloud to
+her** (WCAG 2.5.3 holds) · the §10.2 banned vocabulary test is unchanged in every other respect.
+
 
 ### 6.4 Quantity rules — the negative-quantity requirement
 
@@ -608,7 +633,7 @@ Written now so the build is measured against the user, not against a developer's
 | A-6 | Every change is undoable, with the undo visible for ≥ 20 s and the session undo persistent | Manual walkthrough |
 | A-7 | A pending question is unmissable on load, undismissable, and survives refresh, tab close, and device restart | Kill and revive the tab and the device with a question pending |
 | A-8 | Every question is answerable by large candidate buttons **and** by free text, with an escape route from the candidates | Walkthrough of each question shape in §7.4 |
-| A-9 | Free text accepts her own words verbatim, with no catalogue identity, code or reference visible anywhere on the surface | Grep the rendered DOM for the §10.2 banned vocabulary — **zero occurrences** |
+| A-9 | Free text accepts her own words verbatim, with no **regular id, slot, basket state or the word "AsdAIr"** visible anywhere on the surface | Grep the rendered DOM for the §10.2 banned vocabulary — **zero occurrences**. ⛔ **AMENDED 2026-08-14: the ASDA product listing is EXCLUDED from this test — it is on her tile by Warwick's design.** As written, this criterion was permanently unsatisfiable against his own decision. |
 | A-10 | All five states render distinctly and correctly, and are reachable in testing | Drive each state from the backend |
 | A-11 | Errors, offline and blocked states are visible, plainly worded, and offer a route back — never silent, never technical | Kill the network; force a failure; confirm the UI never claims success |
 | A-12 | The full journey completes with TalkBack, at 200 % zoom, and with the device font size at maximum | On-device |
