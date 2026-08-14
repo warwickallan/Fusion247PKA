@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#18212e" />
+
+  <!-- ══ WARWICK'S PAGE. AN OPERATOR SURFACE, AND IT MUST STAY ON THIS SIDE OF THE WALL ════════════
+       This edits `display_name` — the household word Mum reads on her tile. It is HIS tool, used on
+       his phone, and it belongs to the operator cockpit.
+
+       ⛔ IT IS NOT REACHABLE FROM MUM'S PAGE AND IS NEVER LINKED FROM IT.
+       Addendum B §2: "any control that switches INTO her view is a control that can switch OUT of
+       it. One stray tap and she is inside an operator console." The same argument runs in reverse
+       here — a link from her page to an editor is a route from her list into a console full of
+       catalogue strings. shopping.html does not reference this file and this file does not
+       reference shopping.html. Enforced by construction: neither document loads the other's script
+       or stylesheet, so there is nothing to reach.
+
+       ⛔ WHY THIS ONE *DOES* LOAD /styles.css WHERE HER PAGE DELIBERATELY DOES NOT.
+       Her page avoids it because styles.css is in the service worker's SHELL list, so an
+       operator-side edit would reach her screen days later from a cache with no deploy. That
+       argument does not apply to an operator page: this IS the operator surface, it is the same
+       person looking at it, and a stale operator stylesheet makes the operator page stale, which is
+       a problem he can see and fix. Loading it also avoids a THIRD copy of the GL-003 tokens —
+       shopping.css already re-declares them and shopping-geometry-check.mjs pins that copy against
+       drift. A third would be a third thing to keep in step. names.css therefore declares LAYOUT
+       ONLY and no colour tokens.
+
+       ⛔ NOT REGISTERED WITH THE SERVICE WORKER, AND NOT ADDED TO ITS SHELL.
+       `names.*` are outside SHELL, and the worker's fetch handler only ever serves what `install`
+       put in the cache, so these files are network-fresh on every load. That is the correct
+       behaviour for a page whose whole job is to show him the CURRENT stored value: putting it in
+       SHELL would make his editor cache-first and pin him to a stale list of names on his phone,
+       which is the exact failure the shell-hash mechanism exists to prevent elsewhere.
+  ═══════════════════════════════════════════════════════════════════════════════════════════════ -->
+
+  <title>Display names</title>
+
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/names.css" />
+</head>
+<body>
+  <!-- #names, not #app and not #shop. Three surfaces, three mount ids: two pages sharing a mount id
+       is how a stray script renders the wrong UI into the right hole. -->
+  <div id="names"></div>
+
+  <script src="/vendor/vue.global.prod.js"></script>
+  <script src="/names.js"></script>
+</body>
+</html>

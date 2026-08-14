@@ -288,12 +288,57 @@ body {
 
 /* B §6.3: >=28px, weight 700, plain household English, and NEVER truncated with an ellipsis —
    it wraps to a second line and the row grows. There is no text-overflow rule in this file. */
+/* The name and the listing, stacked. A wrapper rather than two children of .r-body because .r-body
+   is centred flex ROW — the tick must stay vertically centred against the pair, not against the
+   name alone. `min-width: 0` is load-bearing twice over: it lets the name wrap (as .r-body's own
+   comment says) and it is what makes the listing's ellipsis possible at all, since a flex item
+   defaults to min-width:auto and simply refuses to shrink below its content. */
+.r-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .r-name {
   font-size: var(--m-text-name);
   font-weight: 700;
   color: var(--ink);
   overflow-wrap: break-word;
 }
+/* ⛔ THE ASDA LISTING. Warwick overruled Addendum B §6.3's "omitted rather than filled with a
+   reference" for this one line: "the official asda name quite small running in one line at the
+   bottom of the tile, so its easy for me to see what it actually is."
+   AND B §5.1's 22px FLOOR IS NOT BREACHED TO DO IT — this is --m-text-body, which IS the floor,
+   exactly. "Small" is achieved as 22 against the name's 28 and 400 against its 700. The flagged
+   conflict between Warwick's line and Vera's floor turns out not to exist.
+   ⛔ COLOUR IS --ink AND MUST NOT BE SOFTENED TO --ink2. --ink2 (#47566b) on --bg (#eef1f5) is
+   6.59:1, under this surface's 7:1 AAA bar (B §5.1/§11), and the header rule at the top of this
+   file is explicit: "on a screen built for poor eyesight, fading is never the answer. Hierarchy
+   here is carried by token, size and weight." --ink on --bg is 14.48:1, on --ok-w 14.39:1.
+   ONE LINE, ALWAYS. nowrap+ellipsis rather than a clamp: this must never wrap, because a
+   two-line retailer string would push her 88px tap target down the page and change the row
+   geometry the gate measures. Truncated orientation is the whole intent — it is a reference, and
+   he can open the editor for the full string. */
+.r-listing {
+  font-size: var(--m-text-body);
+  font-weight: 400;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ⚠️ THERE IS DELIBERATELY NO MEDIA QUERY HIDING THIS LINE, AND THE REASON IS WORTH KEEPING.
+   The first version of this change added one, because the geometry gate failed at 640x400, 512x300
+   and 300x512 with "THE LANDING SCREEN CONTAINS NO TAPPABLE ITEM" and the obvious reading was that
+   a second line per row had pushed her first tick below the fold.
+   THAT READING WAS WRONG, and it was cheap to prove: hiding .r-listing with `display: none
+   !important` left all three failures exactly where they were. So did reverting the .r-text wrapper.
+   The real cause was the FIXTURE — it carried no `display_name`, so retiring the `aka` fallback made
+   every tile in the gate fall back to its full retailer string and wrap. On live, 109 of 109 are
+   named and none falls back. The fixture now carries display names and the gate passes with this
+   line VISIBLE at every viewport, which is what Warwick asked for.
+   The lesson, since it cost three gate runs: a plausible explanation for a measurement is not a
+   diagnosis. Two A/B runs against COCKPIT_PUB falsified it faster than reasoning about it did. */
 
 /* The quantity cluster. Kept out of the row's select target: B §6.3 requires the -/+ controls to
    stop event propagation, which shopping.js does. */
@@ -484,11 +529,32 @@ body {
    markup, rather than containment, which cost her the item and cost the sentence its live region.
    --ink on --bg = 14.48:1 (it used to be measured on --ok-w inside the row); the geometry gate
    re-measures the composited pairing at every viewport, so this is verified rather than assumed. */
+/* ⛔ AMBER WITH A RAIL, AND THE COLOUR IS A DECISION WARWICK MADE FROM A RENDERED COMPARISON.
+   He tested the live page, typed "milk", got the nudge, and said it "is grey and doesn't really
+   stand out" — it was --ink on the page background with no tint and no rail, which read as body
+   copy rather than as the one sentence explaining why her list looks different from what she
+   expected.
+   ⛔ AMBER, NOT RED, AND THE REASON IS SURFACE-LOCAL: --stop ALREADY MEANS THE SEND FAILED here
+   (.note.stop). A nudge is not a failure — her item was KEPT — and spending the failure colour on
+   a success would leave the real failure state nothing louder to escalate to.
+   Tokens are the existing --warn / --warn-w. Nothing invented: this is byte-identical treatment to
+   .note's middle state below, which is the same category of message (something worth noticing that
+   is not a fault of hers), so the surface teaches ONE visual language rather than two.
+   --ink on --warn-w = 14.06:1. Tint is REINFORCEMENT only (WCAG 1.4.1) — the sentence carries the
+   meaning and survives greyscale, where the 10px rail remains as position and weight.
+   ⚠️ THIS MATTERS MORE THAN IT DID WHEN HE FLAGGED IT. WP-B15-53 taught the matcher the display
+   names, so "bananas" now matches where it returned unmatched_new_item before; the nudge fires for
+   far more of the catalogue than it could when he saw it grey. */
 .e-note {
   margin: calc(var(--m-gap-row) * -1 + 8px) 0 var(--m-gap-row);
-  padding: 0 var(--m-pad);
+  padding: var(--m-pad);
   font-size: var(--m-text-body);
+  font-weight: 700;
   color: var(--ink);
+  background: var(--warn-w);
+  border: 2px solid var(--warn);
+  border-left-width: 10px;
+  border-radius: var(--m-radius);
 }
 
 /* ── FOOTER ──────────────────────────────────────────────────────────────────────────────────────
