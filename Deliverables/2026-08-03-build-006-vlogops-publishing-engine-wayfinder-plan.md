@@ -35,6 +35,29 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 
 ---
 
+## ✅ RECONCILED AGAINST `main`, 2026-08-14 — **nothing changed. Phase 1 is still the frontier and still not started.**
+
+**Warwick, 2026-08-14: BUILD-006 is the NEXT ACTIVE BUILD.** Before dispatching, this map was reconciled
+against `main` — **only far enough to check that the night's estate reconciliation had not moved a
+prerequisite or already delivered part of Phase 1.** *No product decision in this map was reopened.*
+
+| checked by execution | result |
+|---|---|
+| `services/vlogops` on `main` | **ABSENT** — Phase 1 genuinely not begun |
+| the staged canonical source (§Source authority #3) | **present** — `Builds/BUILD-006-…/SOURCE-foundry-boundary-decision-2026-08-02.md` |
+| the superseded 2026-08-01 plan | **correctly marked** — carries its own ⛔ *"Do not follow this document. It is history"* and points here |
+| `services/control-plane/worker/` (§6 F4's reuse target) | **present and intact** |
+| estate | `main == origin/main`, clean, **primary worktree only**, 0 stashes, 0 open PRs |
+
+**The one item that must be RAISED at Phase 1 and not settled silently is unchanged: §6 F4's store choice —
+Postgres vs SQLite, with recorded priors on both sides.** *(For context, not as a decision: the night's
+reconciliation touched neither.)*
+
+**Programme order, unchanged and fixed by Warwick:** BUILD-019 Phases 1–3 ✅ → **BUILD-006 in full ← HERE**
+→ BUILD-019 Phase 4 → real end-to-end publication acceptance. **BUILD-006 CREATES the Publication Package;
+BUILD-019 CONSUMES it and returns Publication Receipts.** The website stays paused so Phase 4 resumes with
+a **real** producer and a **real** package rather than another synthetic fixture.
+
 ## 🔻 STATUS — Phase 0 ✅ PASS (accepted by Warwick). **Phase 1 — seed intake + the durable Content Seed store — IS THE FRONTIER.**
 
 | | |
