@@ -138,6 +138,12 @@ async function main() {
       onStage: async (stage) => {
         if (stage !== holdAt) return;
         process.stdout.write(`VLOGOPS_HELD_AT ${stage}\n`);
+        // An explicit keepalive rather than relying on the pool's socket to hold the event
+        // loop open. If the loop drained here the process would exit cleanly on its own and
+        // the kill test would be proving an ordinary shutdown instead of an abrupt death —
+        // a false pass that would look exactly like a real one.
+        const keepalive = setInterval(() => {}, 1000);
+        keepalive.ref();
         await new Promise(() => {});
       },
     }

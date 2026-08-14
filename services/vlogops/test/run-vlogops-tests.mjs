@@ -108,6 +108,11 @@ function runNodeTest(databaseUrl) {
 }
 
 async function main() {
+  // Check the suite is non-empty BEFORE provisioning anything. Discovered by mutation-testing
+  // this guard: it fired correctly, but only after initdb had built an entire cluster for a
+  // run with nothing to execute.
+  testFiles();
+
   if (process.env.REUSE_DATABASE_URL === '1') {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error('REUSE_DATABASE_URL=1 but DATABASE_URL is unset');
