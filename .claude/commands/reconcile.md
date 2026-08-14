@@ -21,28 +21,49 @@ executable form. **It defines nothing new.** ⛔ **If you find yourself building
 counter or control plane to run this, you have misread it** — the regrowth cap in `CLAUDE.md` applies at
 full force.
 
-## ⛔⛔ THE TERMINAL STATE — CORRECTED BY WARWICK, 2026-08-14. THIS IS LITERAL.
+## ⛔⛔ THE TERMINAL STATE — and Warwick CORRECTED HIS OWN CORRECTION on 2026-08-14. Read both.
 
-> **Warwick, verbatim, after the first run reported COMPLETE with branches still standing:** *"finish with
-> only `main` as the branch estate… The `/reconcile` command currently weakens that into 'no competing
-> source of truth' and permits retained feature/reference branches. That is not Warwick's intended terminal
-> state."*
+**FIRST he tightened it**, having found dozens of remote branches after a run reported COMPLETE: *"finish
+with only `main` as the branch estate… The `/reconcile` command currently weakens that into 'no competing
+source of truth'."*
 
-**COMPLETE means the branch estate contains `main` and NOTHING ELSE.** Unless Warwick **explicitly exempts
-a named ref for that specific reconciliation**:
+**THEN he checked the reconciliation record and reversed the over-correction, BEFORE anything was deleted:**
 
-- **remote branches: exactly `main`**
-- **local branches: exactly `main`**
-- **primary worktree only — no feature worktrees**
-- no unclassified stashes · no open PR carrying unique work · clean primary checkout ·
-  `main == origin/main` · no runtime consuming a retired or non-`main` checkout
+> *"Do NOT interpret 'main only' as authority to delete the deliberately retained reference/evidence
+> branches… They carry unique recoverable evidence/code and are not competing production truth… Do not
+> delete a retained reference merely to make the branch count equal one."*
+> And: *"Good catch before we turned 'tidy' into 'where the fuck did the evidence go?'"*
 
-**⛔ A FEATURE BRANCH IS NOT AN ARCHIVE.** Historical value, evidence value and "it might be useful" are
-**NOT** grounds for a branch to survive. ***"The four BUILD-015 branches holding Terra/agentic-vision
-experiments and the BUILD-020 tool do not get to remain merely because they are useful historical
-evidence."***
+**THE SETTLED TERMINAL STATE, and it is the one this command was originally designed to enforce:**
 
-### ⛔ AND DO NOT ACHIEVE IT BY DELETING UNIQUE WORK. For every remaining branch, in order:
+> **ONE ACTIVE CANONICAL SOURCE OF TRUTH — `main == origin/main`.**
+> **Reference and evidence refs MAY remain where they carry deliberate unique historical or recovery value
+> AND are consumed by nothing.**
+
+- clean primary checkout · canonical branch `main` · `main == origin/main`
+- **no runtime consuming a retired or non-`main` checkout**
+- no unclassified stashes · no open PR carrying unique work
+- **every OTHER branch retired — but only after content and ancestry PROOF that it is superseded**
+
+**⛔ THE TEST IS "IS IT A COMPETING PRODUCTION TRUTH", NOT "IS THE COUNT ONE".** A branch consumed by
+nothing, carrying unique unrecoverable evidence, deliberately named in a reconciliation record, **is not
+competing with anything.** Deleting it buys a cosmetically tidy branch list and pays for it in evidence.
+
+### 🔒 STANDING EXEMPTIONS — named by Warwick, 2026-08-14. **Do not retire these without his fresh word.**
+
+| ref | why it is exempt |
+|---|---|
+| `build-015/b15-28-agentic-vision-prototype-v2` | prototype, **frozen runs**, `pipeline/finalise`, and the **Lane J runner that proved the journey three times** |
+| `build-015/b15-39-browser-handoff` | same lineage plus unique handoff files |
+| `build-015/b15-38-terra-invention-analysis` | the Terra false-positive investigation lineage |
+| `build-015/b15-24-vision-pipeline` | the earlier vision-pipeline line |
+| `build-020/wo-readiness-validator` | two deliberately **unwired** BUILD-020 files |
+
+**They may only be retired if their exact recovery value is FIRST preserved by an equivalent mechanism AND
+there is a good reason to change it.** *(Bundles of all five were banked on `main` on 2026-08-14 and the
+restore was proven — that satisfies the first limb. It does not by itself satisfy the second.)*
+
+### ⛔ AND NEVER ACHIEVE CONVERGENCE BY DELETING UNIQUE WORK. For every branch you DO retire, in order:
 
 1. **Establish what, if anything, it contains that `main` does not** — by content, not by name.
 2. **If the content is still valuable, PRESERVE IT ON `main`** in the appropriate canonical or
@@ -144,10 +165,10 @@ Report **COMPLETE** only when all of these hold:
 - [ ] **zero open PRs carrying forgotten unique work**
 - [ ] **every retired worktree proven safe BEFORE removal**
 - [ ] **no active runtime depends on a retired or non-canonical checkout**
-- [ ] **remote branches: `main` ONLY — proven by a fresh `git ls-remote --heads origin`**
-- [ ] **local branches: `main` ONLY — proven by a fresh enumeration**
-- [ ] **every branch retired had its unique content PRESERVED ON `main` FIRST, and the preservation proven**
-- [ ] **any ref surviving is there because WARWICK EXPLICITLY EXEMPTED IT for this reconciliation, named**
+- [ ] **every branch NOT exempt is retired — after content/ancestry proof it is superseded**
+- [ ] **every branch retired had any unique content PRESERVED ON `main` FIRST, preservation PROVEN**
+- [ ] **every surviving ref is either `main`, or a STANDING EXEMPTION, or named in this run's record with
+      its unique value and proof that nothing consumes it**
 - [ ] **a fresh Larry can start from `main` and lose no genuine estate knowledge or implementation**
 
 **⛔ Anything not established by execution is reported as NOT established. Never rounded up.**
