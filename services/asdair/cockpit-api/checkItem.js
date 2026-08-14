@@ -17,6 +17,11 @@
 // A second matcher would be a second opinion about identity, which is the exact
 // drift commandSurface.js exists to prevent, one layer along.
 //
+// WP-B15-53 does NOT change that. The display-name duplicate check added there
+// runs ONLY after `resolveReading` has declined to name a product, so it can
+// widen the nudge's REACH and can never move a term the catalogue already
+// resolved. `display_name` still never reaches the resolver. See displayNameHit.
+//
 // ── ⛔ THE RESPONSE HAS NOWHERE TO PUT A QUESTION (AC2) ────────────────────
 //
 // Warwick, 2026-08-13: "I will deal with any questions and such through my
@@ -57,6 +62,11 @@ const resolver = require('../interpret/resolveByCatalogue.js');
 // WP-B15-51. What MUM READS. `displayNameFor` is the one rule for that, shared
 // with the write route so what Warwick types and what she reads cannot drift.
 const displayName = require('./displayName');
+
+// WP-B15-53. THE ESTATE'S ONE NORMALISER, borrowed read-only. Writing a second
+// one here would be a second opinion about what "the same words" means, which is
+// the drift this module's header already refuses for identity.
+const normaliseTerm = resolver.normaliseTerm;
 
 // ---------------------------------------------------------------------
 // The closed vocabulary. Frozen, and asserted against the check-item route
@@ -178,6 +188,64 @@ function chosenSet(chosen) {
   return set;
 }
 
+/** The display-name check found more than one product. Not a row, and never an id. */
+const AMBIGUOUS = Object.freeze({ ambiguous: true });
+
+/**
+ * ⭐ WP-B15-53. THE BANANAS GAP, AND THE WHOLE OF THIS WORK PACKAGE.
+ *
+ * PURE. Did she type the household's own word for something she already has?
+ *
+ * ── WHY THIS IS NEEDED AT ALL ─────────────────────────────────────────────
+ * The matcher reads `name` and `aka`, which is correct and stays that way. But
+ * the 55 products that needed a `display_name` are exactly the ones with NO
+ * `aka` - so for over half the catalogue the duplicate nudge could never fire.
+ * `POST /check-item {"text":"bananas"}` answered `unmatched_new_item` on live
+ * while the household had `ASDA 6 Bananas` displaying as "Bananas".
+ *
+ * ── ⛔ WHY IT CANNOT REDIRECT ANYTHING (AC2, AC4) ──────────────────────────
+ * This is not called until `resolveReading` has already returned NO IDENTITY.
+ * That is structural rather than a rule to remember: the only call site is
+ * inside the no-identity branch, so a term the catalogue resolves confidently
+ * never reaches here and cannot be moved onto another product. `display_name`
+ * is not passed to the resolver, is not read by it, and adding it to the
+ * regulars objects changed no verdict - checkItem.test.js's "a display name
+ * never becomes a matching term" is the executed pin on that.
+ *
+ * ── EXACT NORMALISED EQUALITY, AND NOTHING ELSE (AC1) ─────────────────────
+ * `normaliseTerm` is the estate's own normaliser, borrowed. There is no
+ * substring test, no token overlap, no score and no threshold, so there is no
+ * number here that a later change could loosen. An empty normal form matches
+ * NOTHING: "..." normalises to "" and a blank display name normalises to "",
+ * and letting those meet would name a product for punctuation.
+ *
+ * ── AMBIGUITY REFUSES, SILENTLY (AC3) ─────────────────────────────────────
+ * Two active regulars sharing a normalised display name is Warwick having
+ * named two things the same. The answer is that she is told nothing - the
+ * caller turns this into `needs_confirmation` with no name and no list. Mum is
+ * never asked a question.
+ *
+ * @param {*} text
+ * @param {Array<{id:*, display_name?:*}>} regulars
+ * @returns {object|null} the one matching row, AMBIGUOUS, or null
+ */
+function displayNameHit(text, regulars) {
+  const wanted = normaliseTerm(text);
+  if (wanted === '') return null;
+  let found = null;
+  let hits = 0;
+  for (let i = 0; i < regulars.length; i += 1) {
+    const r = regulars[i];
+    const raw = r && typeof r.display_name === 'string' ? r.display_name : '';
+    if (raw.trim() === '') continue;
+    if (normaliseTerm(raw) !== wanted) continue;
+    hits += 1;
+    if (found === null) found = r;
+  }
+  if (hits === 0) return null;
+  return hits > 1 ? AMBIGUOUS : found;
+}
+
 /**
  * PURE. Classify ONE thing she typed against the household catalogue.
  *
@@ -210,6 +278,42 @@ function classifyItem(input) {
   // here - unread, never copied, never counted. A status this module does not
   // recognise falls here too: an unknown verdict is not a licence to improvise.
   if (matchedId === null || CHECK_ITEM_STATUSES.indexOf(status) === -1 || status === 'needs_confirmation') {
+    // ── WP-B15-53. THE ONLY CALL SITE, AND ITS POSITION IS THE CONTROL ─────
+    //
+    // The catalogue has just declined to name a product. Only here - after
+    // that has happened, and never before it - may the household's own display
+    // names be consulted. AC4 ("the resolver still wins where it has an
+    // answer") is therefore a property of where this line sits rather than a
+    // condition anyone has to keep true.
+    const hit = displayNameHit(text, regulars);
+
+    // AC3. Warwick has named two things the same. She is told nothing, and the
+    // response has nowhere to put the question anyway.
+    if (hit === AMBIGUOUS) {
+      return sealed({
+        status: 'needs_confirmation',
+        matched_name: null,
+        matched_regular_id: null,
+        already_on_list: false
+      });
+    }
+
+    const hitId = hit === null ? null : idKey(hit.id);
+    if (hitId !== null) {
+      // The SAME already-on-list logic the resolver path uses. Two routes
+      // reaching one product must not tell her two different things about it.
+      const hitOnList = already.has(hitId);
+      return sealed({
+        status: hitOnList ? 'possible_duplicate' : 'matched',
+        // The hit condition IS a non-blank display_name, so this is that name.
+        // Routed through the one read rule regardless, so there is still only
+        // one place that decides what she reads.
+        matched_name: displayName.displayNameFor(hit, null),
+        matched_regular_id: Number(hitId),
+        already_on_list: hitOnList
+      });
+    }
+
     return sealed({
       status: status === 'unreadable' ? 'unreadable'
         : (status === 'needs_confirmation' ? 'needs_confirmation' : 'unmatched_new_item'),
@@ -307,6 +411,8 @@ module.exports = {
   _internal: {
     sealed: sealed,
     idKey: idKey,
-    chosenSet: chosenSet
+    chosenSet: chosenSet,
+    displayNameHit: displayNameHit,
+    AMBIGUOUS: AMBIGUOUS
   }
 };

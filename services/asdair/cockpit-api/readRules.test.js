@@ -96,8 +96,13 @@ test('the reader issues only SELECTs, inside a read-only transaction, and commit
   await readRules({ household_id: 1, client: client });
   // An injected client is used AS-IS: the caller owns the transaction, exactly
   // as readWorkspace.js behaves. So no BEGIN is issued here.
-  assert.equal(client.issued.length, 3, 'expected exactly three reads, got ' + client.issued.length);
+  // WP-B15-53: FOUR now, not three. The extra one is the optional-column probe
+  // that decides whether `display_name` may be selected - itself a SELECT
+  // against information_schema, asserted as such rather than merely counted.
+  assert.equal(client.issued.length, 4, 'expected exactly four reads, got ' + client.issued.length);
   for (const q of client.issued) assert.match(q.sql.trim(), /^SELECT\b/);
+  assert.match(client.issued[0].sql, /FROM information_schema\.columns/,
+    'the probe must run FIRST - the regulars SELECT is chosen from its answer');
 });
 
 // Scope stated plainly: this asserts the INJECTED-client contract, which is the
@@ -109,7 +114,9 @@ test('an injected client is used as-is — the reader never opens a transaction 
   const payload = await readRules({ household_id: 1, client: client });
   assert.equal(payload.ok, true);
   const verbs = client.issued.map((q) => q.sql.trim().split(/\s+/)[0].toUpperCase());
-  assert.deepEqual(verbs, ['SELECT', 'SELECT', 'SELECT'],
+  // WP-B15-53 added the optional-column probe, so four - and every one still a
+  // SELECT, which is the property this test is actually about.
+  assert.deepEqual(verbs, ['SELECT', 'SELECT', 'SELECT', 'SELECT'],
     'a BEGIN/COMMIT here would mean the reader hijacked a caller-owned transaction');
 });
 
@@ -147,6 +154,87 @@ test('an unrecognised directive is surfaced under "other", never silently folded
   assert.equal(other.count_display, '1');
   assert.equal(other.items[0].directive_known, false);
   assert.equal(other.items[0].directive_meaning, 'unknown', 'never guess what an unknown directive does');
+});
+
+// =====================================================================
+// WP-B15-53 - display_name reaches the payload Mum's page actually reads
+//
+// THE DEFECT. `display_name` was populated for 109 of 109 active regulars on
+// live and reached exactly ONE payload - check-item's `matched_name`. This
+// module's REGULARS_SQL did not select it and presentRegular() did not project
+// it, so the column Warwick edits was invisible to the surface that renders his
+// catalogue.
+//
+// ⛔ AND THE TRAP IN FIXING IT. Every string on this row goes through P.text(),
+// which turns a missing value into the LITERAL STRING "unknown". Projected that
+// way, a regular Warwick has not named yet arrives at the page as a TRUTHY
+// "unknown", passes every falsy guard, and renders as the product's name on
+// Mum's tile. So this one is RAW and NULLABLE, like `aka` beside it.
+// =====================================================================
+
+const REGULARS_WITH_DISPLAY = [
+  { id: 51, name: 'ASDA 6 Bananas', brand: null, category: 'Fruit', high_level_category: 'Food',
+    asda_product_id: '1000', asda_url: null, typical_qty: 1, aka: [], substitutes_allowed: false,
+    active: true, display_name: 'Bananas' },
+  // Warwick has not named this one. The column is NULL.
+  { id: 52, name: 'Sure Nonstop Protection Sport Cool Anti-Perspirant Aerosol 250 ml', brand: 'Sure',
+    category: 'Toiletries', high_level_category: 'Household', asda_product_id: '1001', asda_url: null,
+    typical_qty: 1, aka: [], substitutes_allowed: false, active: true, display_name: null },
+  // Whitespace-only is "not set" everywhere else; it must be here too.
+  { id: 53, name: 'Hovis soft white medium', brand: 'Hovis', category: 'Bakery',
+    high_level_category: 'Food', asda_product_id: '1002', asda_url: null, typical_qty: 1,
+    aka: ['bread'], substitutes_allowed: false, active: true, display_name: '   ' }
+];
+
+test('WP-B15-53: display_name is projected RAW and NULLABLE, and never as the string "unknown"', () => {
+  const p = assembleRules({ rules: [], rule_qa: [], regulars: REGULARS_WITH_DISPLAY });
+
+  const bananas = p.regulars.items.find((r) => r.id_display === '51');
+  assert.equal(bananas.display_name, 'Bananas');
+  assert.equal(bananas.has_display_name, true);
+  // ALONGSIDE, never instead - the official listing must still be available.
+  assert.equal(bananas.name_display, 'ASDA 6 Bananas');
+
+  // ⛔ THE WHOLE POINT. null, not "unknown". A truthy "unknown" here renders as
+  // the product's name on an 84-year-old's tile.
+  const sure = p.regulars.items.find((r) => r.id_display === '52');
+  assert.equal(sure.display_name, null);
+  assert.equal(sure.has_display_name, false);
+  assert.notEqual(sure.display_name, 'unknown');
+  assert.equal(Boolean(sure.display_name), false, 'an unset display name must be FALSY');
+  assert.match(sure.name_display, /^Sure Nonstop/, 'the catalogue string must still be there to fall back to');
+
+  const hovis = p.regulars.items.find((r) => r.id_display === '53');
+  assert.equal(hovis.display_name, null, 'whitespace-only is "not set", not a blank name on her screen');
+  assert.equal(hovis.has_display_name, false);
+});
+
+test('WP-B15-53: the display SELECT differs from the base one by exactly display_name, and is SELECT-only', () => {
+  const base = readRulesModule._internal.REGULARS_BASE_SQL;
+  const withDisplay = readRulesModule._internal.REGULARS_DISPLAY_SQL;
+  assert.match(withDisplay, /^SELECT /);
+  assert.doesNotMatch(withDisplay, /\b(insert|update|delete|drop|alter|truncate|grant)\b/i);
+  assert.equal(withDisplay, base.replace(' FROM asdair.regulars', ', display_name FROM asdair.regulars'));
+  assert.doesNotMatch(base, /display_name/, 'the base statement must stay safe on a schema without 021');
+});
+
+test('WP-B15-53: display_name is selected ONLY when the database reports the column', async () => {
+  // THE LIVE WINDOW THIS EXISTS FOR: migration 021 reaches live BY HAND after
+  // this merges, so between those two moments the schema genuinely has no
+  // display_name. A blind column list would take the whole rulebook read down.
+  const withoutColumn = fakeClient(SCRIPT);
+  await readRules({ household_id: 1, client: withoutColumn });
+  const chosenWithout = withoutColumn.issued.find((q) => /FROM asdair\.regulars/.test(q.sql));
+  assert.doesNotMatch(chosenWithout.sql, /display_name/,
+    'a schema with no display_name must not be asked for it');
+
+  const withColumn = fakeClient(Object.assign({}, SCRIPT, {
+    'information_schema.columns': [{ column_name: 'id' }, { column_name: 'display_name' }]
+  }));
+  await readRules({ household_id: 1, client: withColumn });
+  const chosenWith = withColumn.issued.find((q) => /FROM asdair\.regulars/.test(q.sql));
+  assert.match(chosenWith.sql, /, display_name FROM asdair\.regulars/,
+    'a schema that HAS the column must be asked for it, or Felix gets nothing');
 });
 
 test('a standing answer that never became a rule is counted as the gap it is', () => {
@@ -221,7 +309,16 @@ test('the rules read carries the household through and reports it back', async (
   const client = fakeClient(SCRIPT);
   const p = await readRules({ household_id: 1, client: client });
   assert.equal(p.household_id_display, '1');
-  for (const q of client.issued) assert.deepEqual(q.params, [1]);
+  // WP-B15-53: every read of an asdair table still carries the household, which
+  // is the property this test is about. The optional-column probe reads
+  // information_schema and is parameterised by TABLE NAME, so it is asserted
+  // separately rather than folded into the household claim.
+  const durable = client.issued.filter((q) => /FROM asdair\./.test(q.sql));
+  assert.equal(durable.length, 3, 'expected three household-scoped reads, got ' + durable.length);
+  for (const q of durable) assert.deepEqual(q.params, [1]);
+  const probe = client.issued.filter((q) => /FROM information_schema\.columns/.test(q.sql));
+  assert.equal(probe.length, 1);
+  assert.deepEqual(probe[0].params, ['regulars']);
 });
 
 // =====================================================================
