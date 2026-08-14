@@ -21,70 +21,79 @@ executable form. **It defines nothing new.** ⛔ **If you find yourself building
 counter or control plane to run this, you have misread it** — the regrowth cap in `CLAUDE.md` applies at
 full force.
 
-## ⛔⛔ THE TERMINAL STATE — and Warwick CORRECTED HIS OWN CORRECTION on 2026-08-14. Read both.
+## ⛔⛔ THE TERMINAL MODEL — **TWO CLASSES OF GIT STATE, AND NOTHING ELSE.** Warwick, 2026-08-14, final.
 
-**FIRST he tightened it**, having found dozens of remote branches after a run reported COMPLETE: *"finish
-with only `main` as the branch estate… The `/reconcile` command currently weakens that into 'no competing
-source of truth'."*
-
-**THEN he checked the reconciliation record and reversed the over-correction, BEFORE anything was deleted:**
-
-> *"Do NOT interpret 'main only' as authority to delete the deliberately retained reference/evidence
-> branches… They carry unique recoverable evidence/code and are not competing production truth… Do not
-> delete a retained reference merely to make the branch count equal one."*
-> And: *"Good catch before we turned 'tidy' into 'where the fuck did the evidence go?'"*
-
-**THE SETTLED TERMINAL STATE, and it is the one this command was originally designed to enforce:**
-
-> **ONE ACTIVE CANONICAL SOURCE OF TRUTH — `main == origin/main`.**
-> **Reference and evidence refs MAY remain where they carry deliberate unique historical or recovery value
-> AND are consumed by nothing.**
-
-- clean primary checkout · canonical branch `main` · `main == origin/main`
-- **no runtime consuming a retired or non-`main` checkout**
-- no unclassified stashes · no open PR carrying unique work
-- **every OTHER branch retired — but only after content and ancestry PROOF that it is superseded**
-
-**⛔ THE TEST IS "IS IT A COMPETING PRODUCTION TRUTH", NOT "IS THE COUNT ONE".** A branch consumed by
-nothing, carrying unique unrecoverable evidence, deliberately named in a reconciliation record, **is not
-competing with anything.** Deleting it buys a cosmetically tidy branch list and pays for it in evidence.
-
-### 🔒 STANDING EXEMPTIONS — named by Warwick, 2026-08-14. **Do not retire these without his fresh word.**
-
-| ref | why it is exempt |
-|---|---|
-| `build-015/b15-28-agentic-vision-prototype-v2` | prototype, **frozen runs**, `pipeline/finalise`, and the **Lane J runner that proved the journey three times** |
-| `build-015/b15-39-browser-handoff` | same lineage plus unique handoff files |
-| `build-015/b15-38-terra-invention-analysis` | the Terra false-positive investigation lineage |
-| `build-015/b15-24-vision-pipeline` | the earlier vision-pipeline line |
-| `build-020/wo-readiness-validator` | two deliberately **unwired** BUILD-020 files |
-
-**They may only be retired if their exact recovery value is FIRST preserved by an equivalent mechanism AND
-there is a good reason to change it.** *(Bundles of all five were banked on `main` on 2026-08-14 and the
-restore was proven — that satisfies the first limb. It does not by itself satisfy the second.)*
-
-### ⛔ AND NEVER ACHIEVE CONVERGENCE BY DELETING UNIQUE WORK. For every branch you DO retire, in order:
-
-1. **Establish what, if anything, it contains that `main` does not** — by content, not by name.
-2. **If the content is still valuable, PRESERVE IT ON `main`** in the appropriate canonical or
-   historical/evidence form.
-3. **If exact historical code is worth retaining, bank a durable archive, patch or evidence artefact ON
-   `main`** — a restorable bundle, not a pointer at a branch.
-4. **PROVE the preservation** — restore or verify the artefact by execution, and record the proof.
-5. **THEN retire the branch — locally AND remotely.**
-
-**Preserve what genuinely matters WITHOUT reactivating or redesigning the systems the branches came from.**
-Archiving a parked research prototype is not reopening it.
-
-## ⛔ THE ONE RULE THAT OVERRIDES EVERY OTHER
-
-> **NOTHING UNIQUE IS DELETED. EVER.**
+> ### 🔒 THE SAFETY INVARIANT — read this before anything else in this file
 >
-> **Convergence is never achieved by throwing work away.** Before removing any worktree, branch, stash or
-> ref, PROVE that everything worth retaining is either **already on canonical `main`** or **deliberately
-> preserved elsewhere with a durable recorded reason.**
+> **Reconciliation reduces COMPETING SOURCES OF TRUTH. It NEVER reduces RECOVERABILITY by destroying
+> unique valuable evidence.**
 >
-> **Ambiguous state is PRESERVED and INVESTIGATED. Never destroyed.**
+> Operationally: **MERGE CURRENT TRUTH. PRESERVE DELIBERATE EVIDENCE. RETIRE EVERYTHING ELSE ONLY AFTER
+> PROOF.**
+
+**This command was ambiguous twice in one night — first permitting too much residue, then read as licence
+to delete evidence. Both readings are now closed.** Warwick's own summary of the near-miss:
+*"Good catch before we turned 'tidy' into 'where the fuck did the evidence go?'"*
+
+**At completion the estate holds EXACTLY TWO CLASSES:**
+
+### CLASS 1 — ACTIVE CANONICAL STATE. **There is exactly ONE: `main`.**
+
+- primary working branch = **`main`** · **`main == origin/main`** · **clean primary checkout**
+- **all current/intended implementation, documentation, Wayfinders, assurance and durable estate truth
+  that belongs in the operating system is represented ON `main`**
+- **no live runtime depends on another `Fusion247PKA` branch or worktree**
+- no open PR carries forgotten required work
+- **no ordinary feature/work branch carries current work missing from `main`**
+
+### CLASS 2 — DELIBERATE REFERENCE / EVIDENCE STATE
+
+**A non-`main` ref survives ONLY if EXECUTION proves ALL EIGHT:**
+
+1. it contains **genuinely unique material**;
+2. that material is **deliberately historical, experimental, frozen evidence, a recovery asset, or an
+   executable harness** whose **exact historical form** has continuing evidential or recovery value;
+3. it is **NOT the current production implementation**;
+4. **no live runtime consumes it**;
+5. **no current Wayfinder depends on development continuing on it**;
+6. **merging it wholesale into `main` would incorrectly REACTIVATE, CONTAMINATE or MISREPRESENT**
+   historical or experimental work;
+7. **deleting it would destroy useful recoverability or exact evidence**;
+8. **its reason for retention is written durably in the reconciliation record.**
+
+**⛔ If ANY of the eight fails, it is NOT a reference branch.** Reconcile its useful content into `main`
+and retire it.
+
+### 🔒 THE PROTECTED-REFERENCE RULE
+
+**A deliberately retained reference/evidence ref is NOT "unreconciled work". It is a CLASSIFIED
+ARCHIVE/RECOVERY ARTEFACT**, and it does not count against convergence.
+
+**The five named in `Deliverables/2026-08-14-reconciliation-record.md` are EXAMPLES of this class and MUST
+NOT be deleted to hit a branch-count target** — the four BUILD-015 vision/prototype/harness refs and
+`build-020/wo-readiness-validator`.
+
+**⛔ But they are NOT permanent by naming.** Every future `/reconcile` **re-establishes their
+classification BY EXECUTION against the eight tests.** They survive only while their value is neither
+safely superseded nor preserved elsewhere.
+
+### THE ORDINARY BRANCH RULE — everything else gets reconciled
+
+For **every** local or remote non-`main` branch: **inspect ancestry AND content** · establish whether
+`main` already contains it · **rescue any genuinely useful unique files, knowledge or implementation into
+the correct canonical place on `main`** · **prove the preservation** · then retire it **locally AND
+remotely**.
+
+> **⛔ "Old", "merged-looking", "oddly named" or "previously ignored" is NEVER sufficient evidence for
+> DELETION.**
+> **⛔ "Useful someday" is NEVER sufficient evidence for RETENTION.**
+> **There must be a SPECIFIC recoverability or evidence reason, established by execution.**
+
+### WORKTREES — a reference branch does NOT justify a worktree
+
+**At completion there is NO dormant feature worktree merely because its branch is retained as evidence.**
+**Reference branches do not require live worktrees.** Retire every safe non-primary worktree **unless there
+is a current OPERATIONAL reason for that worktree itself to exist.**
 
 ## Rebuild the estate from reality. Never trust an old inventory.
 
@@ -152,32 +161,25 @@ routine cases these rules already govern.**
 **product-decision** · an **irreversible action outside existing authority** · or a conflict that **cannot
 be safely resolved from durable evidence**. The seven interrupt reasons in `CLAUDE.md` still bind.
 
-## COMPLETE — the proof, and every line must be established by execution
+## COMPLETE — and the report MUST distinguish these numbers. "N branches remain" is not a report.
 
-Report **COMPLETE** only when all of these hold:
+```
+ACTIVE branches                              : 1 — main
+DELIBERATE REFERENCE/EVIDENCE refs           : <names and reasons, or none>
+UNRECONCILED feature/work branches           : 0
+active feature worktrees                     : 0
+unexplained stashes                          : 0
+forgotten-work PRs                           : 0
+runtime dependencies on noncanonical checkouts: 0
+main == origin/main                          : YES
+```
 
-- [ ] primary checkout **clean**
-- [ ] canonical branch is **`main`**
-- [ ] **`main == origin/main`**
-- [ ] **zero unexplained commits unique to other active branches**
-- [ ] **zero unexplained dirty or untracked worktree state**
-- [ ] **zero unclassified stashes**
-- [ ] **zero open PRs carrying forgotten unique work**
-- [ ] **every retired worktree proven safe BEFORE removal**
-- [ ] **no active runtime depends on a retired or non-canonical checkout**
-- [ ] **every branch NOT exempt is retired — after content/ancestry proof it is superseded**
-- [ ] **every branch retired had any unique content PRESERVED ON `main` FIRST, preservation PROVEN**
-- [ ] **every surviving ref is either `main`, or a STANDING EXEMPTION, or named in this run's record with
-      its unique value and proof that nothing consumes it**
-- [ ] **a fresh Larry can start from `main` and lose no genuine estate knowledge or implementation**
-
+**That is Warwick's definition of a reconciled estate.** Every line established by execution.
 **⛔ Anything not established by execution is reported as NOT established. Never rounded up.**
-Where the estate is converged except for a named item, say so plainly and name it — a partial convergence
-honestly reported is worth more than a COMPLETE that is not true.
+A partial convergence honestly reported, with the blocker named, is worth more than a false COMPLETE.
 
 ## The record
 
-**Write one concise reconciliation record to `Deliverables/` so the proof survives the session** —
-what was inspected, what was found unique, what was integrated, what was retired and on what proof, what
-was deliberately retained and why, and what remains open. **Commit and push it.** Reference it from the
-active Wayfinder if one is in flight.
+**Write one concise reconciliation record to `Deliverables/`** — what was inspected, what was unique, what
+was integrated, what was retired and on what proof, **every Class-2 ref with the reason it passed all
+eight tests**, and what remains open. **Commit and push it.**
