@@ -46,6 +46,10 @@ Ordered steps (also bound in the active Wayfinder's START / RESUME block):
 6. If Warwick supplies a change, **update the ACTIVE SESSION WORK PACKAGE on the Wayfinder first**, then proceed.
 7. After confirmation, execute autonomously without repeatedly asking route questions.
 
+**⛔ SHELL COMMAND SHAPE — read before the first tool call of every session (Warwick, 2026-08-15, after being made to click approvals yet again: *"we go through this every fucking session"*).** The committed allow list in `.claude/settings.json` **prefix-matches the whole command string**, so **the FIRST token decides whether Warwick is interrupted.** **Never open a PowerShell command with `cd`, a variable assignment, `foreach` or `if`** — PowerShell has no `cd` grant (Bash does; they are gated separately), so `cd X; git commit …` prompts while `git -C X commit …` does not. **Start every command with a granted token** — `git `, `node `, `npm `, `npx `, `python `, `Get-`, `Select-`, `Measure-`, `Test-Path `, `New-Item ` — use `git -C <path>` instead of changing directory, and split unrelated command families into separate calls rather than chaining them with `;`.
+
+**⛔ AND KEEP EVERY COMMAND ON ONE LINE.** A multi-line command — above all a `@'…'@` here-string for a commit message — **does not match a `git *` allow rule across newlines and prompts even though it starts with `git`.** **Never pass a multi-line commit message through the shell.** Write the message to a file with the **Write tool** (which never prompts), then run the single line `git -C <path> commit -F <file>`. *(2026-08-15: fixing only the `cd` half of this left the here-string half firing on every commit, and Warwick had to say it twice.)* **The SessionStart banner reporting `PERMISSION INVARIANT: HOLDS` is TRUE and says nothing about this** — a green invariant beside a prompting session means the gate is fine and the caller is sloppy. Canonical detail: [[never-open-a-command-with-cd]].
+
 Where authority comes from, in precedence order:
 
 1. **The git plan or record is the authority** — the active Wayfinder under `Deliverables/`, including its ACTIVE SESSION WORK PACKAGE. Open it before acting on any summary of it.
@@ -228,6 +232,24 @@ Which requires that **every useful output belonging to the work has a final cano
 - Historical Git commits may remain as history. **History is not an active alternative source**, and history is **never** rewritten merely to make old bytes disappear.
 
 **DURABLE means canonical, remotely recoverable, and actually consumed from the canonical source where applicable.** *"Committed somewhere"*, *"pushed on some branch"*, *"preserved in a worktree"*, *"installed from old bytes"*, or *"works if Larry finds the right old checkout"* is **NOT durable.**
+
+##### ⛔ GIT CONVERGENCE IS NOT AUTOMATICALLY ASSURANCE CONVERGENCE. **Warwick, 2026-08-15 — his exact rule, added after BUILD-015 exposed the defect.**
+
+> **When `/reconcile` encounters consequential executable/product state that has moved beyond the last applicable internally and externally assured boundary, it must recognise the outstanding assurance debt before that state can be described as reconciled, closed, release-ready or equivalent.**
+
+**Every location above where this section says CONVERGED, CLOSED or DURABLE now carries this additional condition.** A tree can be perfectly converged in Git — one main, nothing stranded, no competing source — while the executable state on it has never been assured. **That estate is NOT reconciled, and reporting it as such is the defect this clause closes.**
+
+**What it does NOT mean, stated as loudly, because the opposite failure is the expensive one:**
+
+- **Codex does NOT run on every `/reconcile`.**
+- **Documentation-only, pointer-only or otherwise non-consequential reconciliation does NOT manufacture a Codex gate.** Receipts, plans, wording, formatting and clerical repair are not consequential state.
+- **No new control plane, watcher, registry, counter or QA system exists to administer this**, and building one is the diagnosis already rejected — the regrowth cap applies at full force.
+
+**What it DOES require:** `/reconcile` must **establish whether material executable/release state exists beyond the last applicable Veritas/Codex boundary.** Where it does, **the normal existing assurance route is owed** — functional outcome genuinely demonstrated → **Veritas** internal assurance where required → **Codex** external PR/release merge-class QA → **Warwick's** consequential merge/release authority.
+
+**And it binds regardless of how the work arrived:** direct integration to main · a local merge and push · standing merge authority · `/reconcile` itself · or any other path that did not happen to create the usual PR/Tower trigger. **A missing PR trigger must NEVER again mean a missing external gate.**
+
+*(The measured incident: no PR merged to `main` between 2026-08-09 and 2026-08-15, while 107 commits of executable change and four migrations reached it — and the estate was reported reconciled. Codex was working the whole time; nothing ever asked it.)*
 
 #### CLOSE — the boundary
 

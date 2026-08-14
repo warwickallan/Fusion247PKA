@@ -35,7 +35,20 @@ This is not Larry being unhelpful. An interrupted build is how BUILD-018 happene
 
 ---
 
-## ✅ RECONCILED AGAINST `main`, 2026-08-14 — **nothing changed. Phase 1 is still the frontier and still not started.**
+## ▶️ PHASE 1 IS ACTIVE AND UNDER IMPLEMENTATION — **superseded 2026-08-15. The reconciliation below is HISTORY, kept for provenance.**
+
+**Live state, established by execution:** Phase 1 is **ACTIVE**. Keel is implementing **WP-1**
+(`WO-2026-08-14-01`) on branch `build-006/b6-01-content-seed-store` in worktree
+`C:/Fusion247PKA-vlogops`. **Draft PR #105 is open and unmerged.** `services/vlogops` **exists** —
+schema, identity, all three intake routes, tests and CI, committed at `d55965a`, `ae318a0`, `71d9627`.
+Keel returned **PARTIAL** on the implementation: ten of ten acceptance criteria met with executed
+evidence, held back from complete because **CI is built but has never been observed running**.
+
+**The next boundary is NOT another dispatch.** It is: the real three-route Content Seed goal
+**demonstrated** → **Veritas** Gate 1 → **Codex** external merge-class QA → **Warwick's** merge decision
+(§9.2). **PR #105 stays draft until that route is satisfied.**
+
+### *(historical — the pre-implementation reconciliation of 2026-08-14)*
 
 **Warwick, 2026-08-14: BUILD-006 is the NEXT ACTIVE BUILD.** Before dispatching, this map was reconciled
 against `main` — **only far enough to check that the night's estate reconciliation had not moved a
@@ -43,7 +56,7 @@ prerequisite or already delivered part of Phase 1.** *No product decision in thi
 
 | checked by execution | result |
 |---|---|
-| `services/vlogops` on `main` | **ABSENT** — Phase 1 genuinely not begun |
+| `services/vlogops` on `main` | **ABSENT** — Phase 1 genuinely not begun *(true on 2026-08-14; superseded 2026-08-15 — it now exists on `build-006/b6-01-content-seed-store`, PR #105)* |
 | the staged canonical source (§Source authority #3) | **present** — `Builds/BUILD-006-…/SOURCE-foundry-boundary-decision-2026-08-02.md` |
 | the superseded 2026-08-01 plan | **correctly marked** — carries its own ⛔ *"Do not follow this document. It is history"* and points here |
 | `services/control-plane/worker/` (§6 F4's reuse target) | **present and intact** |
@@ -70,15 +83,18 @@ a **real** producer and a **real** package rather than another synthetic fixture
 | **Build** | BUILD-006 — VlogOps Publishing Engine. **THE ACTIVE BUILD.** |
 | **Promoted from** | IDEA-006 (Foundry), on Warwick's explicit instruction 2026-08-03 |
 | **Programme position** | BUILD-019 Phases 1–3 ✅ done → **BUILD-006 in full ← YOU ARE HERE** → BUILD-019 Phase 4 → the real end-to-end acceptance journey. Fixed by Warwick, 2026-08-03. |
-| **Current phase** | **Phase 1 — seed intake and the durable Content Seed store.** Phase 0 is PASS. |
+| **Current phase** | **Phase 1 — seed intake and the durable Content Seed store. ACTIVE, under implementation.** Phase 0 is PASS. |
+| **Live WP state** | **WP-1 `WO-2026-08-14-01` with Keel** — branch `build-006/b6-01-content-seed-store`, worktree `C:/Fusion247PKA-vlogops`, **draft PR #105 open and unmerged**. Implementation returned **PARTIAL** (all ten ACs evidenced; CI built but never observed running). |
+| **Exact next action (2026-08-15)** | **NOT another dispatch.** Demonstrate the real three-route Content Seed goal → **Veritas** Gate 1 → **Codex** external merge-class QA → **Warwick's** merge decision. See §9.2. |
 | **Current gate** | **All three intake routes land a durable Content Seed with stable identity; kill mid-intake and it recovers; identity survives restart.** (§10, Phase 1 row.) |
-| **Exact next action** | **Dispatch Phase 1 as a bounded Work Order.** Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are partly dry, so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
+| **Exact next action** *(SUPERSEDED 2026-08-15 by the row above — this dispatch HAPPENED; kept for the route detail it carries)* | ~~**Dispatch Phase 1 as a bounded Work Order.**~~ Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are INTERMITTENT — whole days carry zero session logs while being dense with other evidence — so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
 | **Model for Phase 1** | **Opus-high.** Durable state, identity, provenance and idempotency are the expensive things to get wrong, and everything downstream inherits them. |
 | **Depends on BUILD-019** | Only at Phase 7, and only through a **contract** — see §4. BUILD-006 develops against the accepted Publication Package contract without waiting for BUILD-019 Phases 4–7. |
 | **Open Warwick gates** | **None blocking Phase 1.** The §6 F4 store decision was raised and **SETTLED by Warwick on 2026-08-14 — Supabase.** Later: **spend** before any HeyGen render (§6 F1). |
+| **Assurance route — MANDATORY** | **§9.2.** Functional goal DEMONSTRATED → **Veritas** internal → **Codex** external merge-class QA → **Warwick's** merge decision. **Veritas does not replace Codex; Warwick's authority does not replace Codex; a green suite replaces neither.** The Codex gate does **not** disappear because work reached the boundary by a route that created no PR. **WP-1's PR #105 stays draft and unmerged until the route is satisfied.** |
 | **Store — settled** | **Supabase Postgres** (Warwick, 2026-08-14). Live state established the same day: the project holds `asdair.*` and `session_report.*`; there is **no `ops.*` schema in it**, so reusing `services/control-plane/worker` means applying its DDL to Supabase, not pointing at an existing live queue. |
 
-> **✅ WARWICK ACCEPTED THIS PLAN IN SUBSTANCE, 2026-08-03.** Phase 0 is closed. **Implementation of Phase 1 is authorised and has not begun** — it was deliberately not started in the session that wrote this map. This map and the staged canonical source are the only artefacts so far.
+> **✅ WARWICK ACCEPTED THIS PLAN IN SUBSTANCE, 2026-08-03.** Phase 0 is closed. **Implementation of Phase 1 is authorised and IS UNDER WAY** — dispatched to Keel 2026-08-14 as `WO-2026-08-14-01`, draft PR #105. *(This line read "has not begun" until 2026-08-15; it was true when written and is superseded by execution.)*
 
 ---
 
@@ -201,7 +217,7 @@ three seed routes
 Carried from the canonical source, because Phase 1 is the frontier and "three routes" alone is not implementable.
 
 **Route 1 — existing records.** Warwick selects a date, period, session, build or journal thread. **VlogOps snapshots the smallest sufficient evidence bundle into its own durable store.** *"Smallest sufficient"* is the design constraint — not everything in range.
-→ **See F3: the streams this route names are partly dry or outside Git.** `Deliverables/` and git history must be first-class here, not fallback.
+→ **See F3: the streams this route names are INTERMITTENT or outside Git** *(corrected 2026-08-14 — the earlier "dry" reading was measured false; the consequence is unchanged)*. `Deliverables/` and git history must be first-class here, not fallback.
 
 **Route 2 — promote another Fusion247 output.** Eligible Cockpit outputs expose a **Promote to VlogOps** action. **Promotion creates a durable Content Seed containing: a source snapshot · provenance · privacy state · origin · proposed angle.** Those five fields are the contract for this route.
 
@@ -258,8 +274,13 @@ Actions: add seed · promote to VlogOps · approve · request revision · park �
 
 **Connector-shaped, and now unreliable, for:** the **Daily Flight Recorder**, which lives as a **ClickUp Docs page** (`Team Knowledge/session-logs/2026/07/2026-07-15-16-00_larry_…md:47,53`). **Warwick's 2026-08-03 ruling makes ClickUp unreliable, and dispatched specialists have no MCP connectors, so a worker cannot read it at all.**
 
-> #### 🔴 THE FINDING THAT MATTERS MOST: **the named intake streams are dry.**
-> **There are ZERO session logs in `Team Knowledge/session-logs/2026/08/`.** Newest is `2026-07-30-23-16`. Established twice — by directory glob, and independently by a draft this morning that checked *"across all refs via `git log --all --diff-filter=A`"*. **The four most eventful days in this estate's history produced no entry in VlogOps' primary intake stream.**
+> #### 🟠 THE FINDING THAT MATTERS MOST — **CORRECTED BY MEASUREMENT, 2026-08-14. The stream is NOT dry. The requirement it produced survives anyway.**
+>
+> **As written on 2026-08-03 this said: "There are ZERO session logs in `Team Knowledge/session-logs/2026/08/`. Newest is `2026-07-30-23-16`." That was TRUE THE DAY IT WAS WRITTEN and is FALSE NOW.** Measured at `4135fd3` by `git ls-tree`: **16 session logs in that directory, earliest `2026-08-03-16-34`, latest `2026-08-14-21-00`.** Caught by Keel at the WP-1 read-back, against a Work Order in which **Larry had restated the stale claim as current fact** — he had collapsed two different true statements (this one, written eleven days ago, and last night's honest gap in *Larry's own close-session* entries for 11–13 August) into one false one.
+>
+> **What survives, and it is the part that mattered:** individual windows genuinely carry **zero** session logs while being dense with other evidence. Measured the same day: **2026-08-01, 2026-08-02, 2026-08-05 and 2026-08-07 each have zero session logs** — and 2026-08-05 alone carries **164 commits and 6 deliverables**. A Source Compiler reading only the stream the North Star names would still find nothing on those days.
+>
+> **Therefore the requirement is unchanged: `Deliverables/` and git history are FIRST-CLASS intake, not fallback.** What changes is the reason — not *"the stream is dry"*, but *"the stream is intermittent, and intermittence is indistinguishable from absence on any single window."*
 >
 > That same draft records the workaround it was forced into: the evidence window was rebuilt *"from git history, `Deliverables/`, the audits and the programme record — **not** from the stream the pipeline is designed around."*
 >
@@ -382,6 +403,89 @@ Warwick, 2026-08-03, on what happened next:
 - **Phase 5's single approval is taken on rung 1 and rung 2 together** — Warwick reads the package and sees it rendered — and **production is downstream of his approval, never a step within it.**
 - **Phase 7 publishes only what has passed both.** A destination adapter is not a preview.
 - **When a check fails, establish which rung failed and why before changing anything.** An auth failure, a 302, a protected URL and a missing environment are four different facts. Treating them as one is how a review step turns into a public deployment.
+
+---
+
+## 9.2 THE ASSURANCE ROUTE — Veritas then Codex then Warwick (Warwick, 2026-08-14)
+
+**§9.1 governs how human-facing CONTENT is reviewed. This section governs how WORK reaches a completion,
+closure or merge claim. They are different axes and neither substitutes for the other.**
+
+**The settled chain, and no step may be skipped or swapped:**
+
+```
+builder/team → the actual functional Work Package outcome, DEMONSTRATED
+             → Veritas internal Work Package / phase assurance
+             → Codex external PR/release merge-class QA
+             → Warwick's consequential merge/release decision
+```
+
+**The distinctions are mandatory, in Warwick's own framing:**
+
+- **VERITAS is INTERNAL assurance. CODEX is independent, different-model, EXTERNAL PR/release QA.**
+- **Veritas does NOT replace Codex.**
+- **Warwick's merge authority does NOT replace Codex.** Authority answers whether *he permits* a
+  consequential merge. Codex independently answers whether *the actual release state should pass external
+  QA.* **One is never a substitute for the other.**
+- **A green test suite replaces NEITHER.**
+- **A Work Package that has not met its functional goal is NOT thrown at Codex because its tests are green.**
+
+### The defect this closes — and it is narrow
+
+> **A required Codex release/merge-class gate must NOT disappear merely because work reached an integration
+> boundary through a route that happens not to create the usual PR-shaped trigger** — direct lane
+> integration, a locally-performed merge, `/reconcile`, or standing merge authority.
+
+**This is a rule about the OBLIGATION, not a new mechanism.** No tracker, no counter, no control plane, no
+checker exists to administer it, and building one is the diagnosis Warwick has already rejected.
+
+### The canonical route, established by execution 2026-08-14 — never re-derived from memory
+
+| | |
+|---|---|
+| **Reviewer-facing law** | `services/control-plane/review/prompts/tower-qa-skill.md` (v3, ratified, `governs_live: true`) **+** `reviewer-classification-amendment.md`, delivered together. **This is the single reviewer-facing contract. `CLAUDE.md` is NEVER injected into Codex.** |
+| **Bounded manual review** | `services/control-plane/tower-loop/reviewDiff.mjs --repo --base --head --claim <claim.json>` — **refuses without a real claim.** This is the route `CLAUDE.md` already names. |
+| **PR merge-class route** | `services/control-plane/tower-loop/mergeCheck.mjs` and `tower-loop/watcher.mjs` |
+| **⚠️ NOT the route** | `services/control-plane/tower/merge-check.mjs` — live-capable, loads **no ratified contract**, builds its own inline prompt, and uses a **different verdict vocabulary**. It is outside the contract's own declared scope list. **Never invoke it for an assurance gate.** Recorded as a finding for Warwick; not this build's to repair. |
+| **Verdicts** | `APPROVE · CORRECTIONS_REQUIRED · DECISION_REQUIRED · BLOCKED` — Codex returns a **technical** verdict; Warwick retains merge and final acceptance |
+| **Budget** | **Three executions per gate, never a fourth** — initial, one after genuine `BLOCKS_CURRENT_MERGE` corrections, one final confirmation |
+| **Authority to run** | **Warwick's explicit authority is required before any Codex run.** Unchanged. |
+
+**What Codex confirms about Veritas receipts** (contract §4, quoted not paraphrased): that the applicable
+committed receipt **exists**, that its verdict is **PASS**, that its **assured scope actually covers the
+thing being closed**, and that **no later material in-scope change invalidated it** without a newer
+applicable PASS. A missing, non-PASS, scope-mismatched or superseded receipt behind a closure claim is an
+active `BLOCKS_CURRENT_MERGE` finding.
+
+> ✅ **SETTLED BY WARWICK, 2026-08-15. The question is closed and must not be reopened.** He was shown the
+> diff in which he himself removed the `reviewed_sha` sub-check on 2026-08-07, and ruled:
+>
+> > *"The reviewed_sha decision is settled: retain the current scope-not-SHA model. reviewed_sha is
+> > provenance; assurance remains valid where its scope covers the claimed outcome and no later material
+> > in-scope change invalidates it. Do not restore exact SHA equality."*
+>
+> **The contract was never modified and needs no change.** Four receipt properties bind — exists · PASS ·
+> covers the claimed scope · not invalidated by later material in-scope change — and **SHA equality is
+> explicitly NOT a fifth.**
+
+### Enforcement, stated honestly
+
+**None of this is mechanically enforced, and no reply may imply otherwise.** Measured 2026-08-14: the Tower
+watcher is running and polling, but its **only** automatic trigger requires an **open PR carrying a
+hand-written `@tower … head:` comment**; there is **no branch protection on `main`**; no workflow, git hook
+or scheduled task notices work that reaches `main` without a PR; and the session-side ingest hook writes to
+a store the watcher does not read. **Nine days of continuous operation produced zero review events.** The
+obligation above therefore rests on discipline — which is exactly why it is written on the map a fresh
+Larry is required to open, rather than left in his head.
+
+### Applied to this build, concretely
+
+- **WP-1 (Phase 1) may not be reported complete, closed or merge-ready on a green suite.** The route is:
+  the three-route Content Seed goal **actually demonstrated** → **Veritas Gate 1** on the integrated
+  outcome → **Codex external QA** on the consequential PR/release state → **Warwick's merge decision**.
+- **PR #105 stays DRAFT and UNMERGED until that route is satisfied** (Warwick, 2026-08-14).
+- **Every later phase boundary inherits this**, and a phase marked **PASS** additionally requires the
+  Veritas receipt the §Wayfinder rules already demand.
 - **If the answer to a review problem is to build something, the diagnosis was rejected.** Same rule as everywhere else in this file; it simply gets broken here most often, because review feels like governance and governance is the thing this estate grows when it is anxious.
 
 ---
