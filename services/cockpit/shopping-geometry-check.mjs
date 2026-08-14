@@ -107,7 +107,15 @@ const rules = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.sample.json'), 'u
 // ⚠️ THE 41-CHARACTER MUTANT WAS NOT ENOUGH ON ITS OWN, and that is the durable lesson: it is
 // eighteen characters past the edge, so it proved the assertion FIRES without locating WHERE. The
 // 20-character case is the one that pins the boundary, and it took a sweep to find it.
-const rulesLarge = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.large.sample.json'), 'utf8'));
+// ⛔ VERITAS DEFECT 1, 2026-08-14: the large fixture is DETERMINISTIC, which is right for a gate —
+// and it meant the 109 REAL `display_name` values had never been through this sweep once. That is
+// the third time in this build a gate measured a place she is not standing. `COCKPIT_RULES_LARGE`
+// points the LARGE fixture at an exported payload so the same assertions can be run against live
+// names on demand. It is deliberately an OVERRIDE and not the default: a gate whose input changes
+// under it is not a regression gate.
+const LARGE_FIXTURE = process.env.COCKPIT_RULES_LARGE || path.join(FIX, 'rules.large.sample.json');
+const rulesLarge = JSON.parse(fs.readFileSync(LARGE_FIXTURE, 'utf8'));
+if (process.env.COCKPIT_RULES_LARGE) console.log('⚠️  LARGE fixture OVERRIDDEN -> ' + LARGE_FIXTURE);
 let servingLarge = false;
 const workspace = JSON.parse(fs.readFileSync(path.join(FIX, 'workspace.sample.json'), 'utf8'));
 
