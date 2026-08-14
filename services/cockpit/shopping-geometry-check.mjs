@@ -75,22 +75,27 @@ const rules = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.sample.json'), 'u
 // it changed — exactly the kind of stale number a later reader trusts instead of counting.
 // ONE row is deliberately unnamed, so the retailer-string fallback stays exercised. That is the
 // honest model of live, where 109 of 109 are named and only a brand-new regular falls back.
-// ONE row (index 23, mid-list) carries a display name at the LAYOUT boundary — 20 characters, the
-// current live maximum — so the gate holds that line the way the unnamed row holds the fallback path.
 //
-// ⛔ IT IS MID-LIST AND NOT ROW 0, AND THE REASON IS A DEFECT THIS GATE SHOULD NOT HIDE.
-// Putting it on the FIRST row failed at 512x300, and bisecting showed why: at that viewport the name
-// column is only 66px wide, so the longest name that stays on one line is FOUR CHARACTERS. Measured
-// widths, first-row .r-name, Chromium at her device classes:
-//     640x400   194px  -> 14 chars      300x512   118px -> 8 chars      512x300   66px -> 4 chars
-// The 46-row fixture passes at 512x300 today ONLY because row 0 happens to be "Milk". Any realistic
-// display name wraps to three or four lines there, the first row grows past 140px, and the sticky
-// footer covers her only tappable item. That is a ROW-LAYOUT defect at 512px width — the qty cluster
-// and the 88px tick leave almost nothing for the name — and NO display-name length an operator could
-// type would fix it. It is reported rather than papered over; pinning a 4-character name here would
-// have made the gate green while proving nothing.
-// So this row tests long-name RENDERING (wrap, row growth, overflow, footer clearance) where that is
-// the variable under test, and the landing-screen assertion continues to be carried by row 0.
+// ⛔ ROW 0 CARRIES A 20-CHARACTER DISPLAY NAME — THE CURRENT LIVE MAXIMUM — IN BOTH FIXTURES, AND IT
+// IS ROW 0 ON PURPOSE. The first row is the one the landing-screen assertion measures, so it is the
+// hardest place to put a long name and therefore the only honest place to pin the boundary.
+//
+// ⚠️ IT COULD NOT BE ROW 0 UNTIL THE ROW LAYOUT WAS FIXED, AND THAT SEQUENCE IS THE POINT.
+// This fixture used to pass at 512x300 only because row 0 happened to be "Milk". At that viewport
+// the name column was 66px — FOUR characters — because the horizontal rule at `max-height: 480`
+// switched off the wrapping that `max-width: 860` had introduced, and nobody had rendered the
+// intersection of narrow AND short. Any realistic name wrapped to three or four lines, the first row
+// grew past 140px, and the sticky footer covered her only tappable item.
+// A short name here would have made the gate green while proving nothing, so the defect was reported
+// instead of papered over. shopping.css now wraps the quantity cluster at that intersection, which
+// takes the name column from 66px to 273px, and row 0 can carry a real name:
+//     512x300   66px -> 273px    4 chars -> 21        640x400  194px  14 chars (unchanged)
+//
+// ⛔ AND THE ASSERTION IS PROVEN TO STILL FAIL, because a taller row could reintroduce the same
+// defect from the opposite direction. Measured by mutating row 0 in both fixtures:
+//     20 chars "Chicken pasta sachet"                      PASS  104 viewports / 0 violations
+//     41 chars "Chicken and bacon pasta sachet with beans"  FAIL  4 viewports, landing screen empty
+// A gate that only ever sees the passing case is not holding the line, it is decorating it.
 const rulesLarge = JSON.parse(fs.readFileSync(path.join(FIX, 'rules.large.sample.json'), 'utf8'));
 let servingLarge = false;
 const workspace = JSON.parse(fs.readFileSync(path.join(FIX, 'workspace.sample.json'), 'utf8'));

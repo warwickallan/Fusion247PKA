@@ -38,10 +38,9 @@
 
   // ⛔ HIGH-1, VERA — THE SERVER LIMIT AND THE LAYOUT LIMIT ARE NOT THE SAME NUMBER, AND NOTHING
   // ANYWHERE KNEW THE DIFFERENCE. 60 is what the DATABASE will accept. What MUM'S TILE can carry at
-  // her device class and zoom is about 20: past that the name wraps to a second line, every row
-  // grows, and at 640x400 / 512x300 / 300x512 her first tappable item leaves the landing screen
-  // altogether (Addendum B §6.1, §9). Vera measured it rather than reading the fixture — 15 and 20
-  // pass, 25 fails at all three viewports.
+  // her device class and zoom is around 20: past that the name wraps, every row grows, and her first
+  // tappable item can leave the landing screen altogether (Addendum B §6.1, §9). Vera measured it
+  // rather than reading the fixture, at 640x400 / 512x300 / 300x512.
   //
   // It was not theoretical. The longest name on live was 30 characters and ELEVEN were over 20, so
   // her landing screen was broken the day this shipped. Warwick could type a perfectly reasonable
@@ -50,18 +49,29 @@
   //
   // ⛔ A WARNING, NOT A SECOND HARD LIMIT, and that is deliberate. He is the operator and may have a
   // reason; the defect was that nobody TOLD him, not that he was permitted. It is worded as what it
-  // costs HER, because "over 14 characters" is a rule he must look up, while "wraps onto a second
-  // line on her tablet" is a consequence he can weigh in the moment.
+  // costs HER, because "over 20 characters" is a rule he must look up, while "can push the first
+  // thing she taps off her screen" is a consequence he can weigh in the moment.
   //
-  // ⚠️ 14 IS MEASURED, NOT CHOSEN. Rendered in Chromium at her device classes, the width of the name
-  // column and therefore the longest name that stays on ONE line is:
-  //     640x400 (her landscape at 200% zoom)   194px   14 characters
-  //     300x512 (Fire HD 8 portrait, zoomed)   118px    8 characters
-  //     512x300 (Fire HD 8 landscape, zoomed)   66px    4 characters
-  // 14 is the budget at the viewport she is most likely to be using. The two narrower ones cannot be
-  // served by ANY realistic name — see the note in shopping-geometry-check.mjs; that is a row-layout
-  // defect at those widths and is NOT something an operator can fix by typing shorter names.
-  var LAYOUT_SAFE_NAME = 14;
+  // ⚠️ 20 IS MEASURED, AND IT MOVED ONCE ALREADY — WHICH IS THE PART WORTH KEEPING. An earlier
+  // version of this line said 14, taken from the longest name that stayed on ONE line at 640x400.
+  // That was the budget of a layout that then changed underneath it: at narrow-and-short viewports
+  // the row now wraps its quantity cluster onto its own line (shopping.css, "THE TICK STAYS ON THE
+  // FIRST LINE"), which took the name column at 512x300 from 66px to 273px — four characters to
+  // twenty-one. A measured number is only true of the layout it was measured in.
+  //
+  // 20 is now proven end-to-end rather than inferred, by running the geometry gate with a 20-char
+  // name in ROW 0 of both fixtures — the first row, which carries the landing-screen assertion and
+  // is therefore the hardest place to put it:
+  //     20 chars "Chicken pasta sachet"                      PASS  104 viewports / 0 violations
+  //     41 chars "Chicken and bacon pasta sachet with beans"  FAIL  4 viewports, "THE LANDING
+  //                                                                 SCREEN CONTAINS NO TAPPABLE ITEM"
+  // So the assertion still catches an over-tall first row, and 20 sits inside the safe region rather
+  // than on its edge. A long name may still WRAP at her narrowest viewports — that costs height,
+  // which she can scroll. What it must never do is take her first tappable item off the screen.
+  //
+  // 20 also matches the current live maximum, and that is the point: Warwick sees no warning for a
+  // name he has already chosen, and sees one the moment he goes past what has been proven.
+  var LAYOUT_SAFE_NAME = 20;
 
   // ── THE 11 DECISIONS ───────────────────────────────────────────────────────────────────────────
   // Source: Deliverables/2026-08-13-mum-display-names-DECISIONS.md. 21 rows in 11 decisions, because

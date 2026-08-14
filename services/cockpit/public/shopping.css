@@ -1004,3 +1004,73 @@ body {
   .f-state .note { flex: 1 1 100%; }
   .f-state .confirm, .f-state .again { flex: 1 1 0; width: auto; min-width: 0; }
 }
+
+/* ── NARROW: THE NAME GETS ITS OWN LINE ──────────────────────────────────────────────────────────
+   ⛔ THE DEFECT THIS CLOSES, AND IT WAS AN INTERACTION BETWEEN TWO CORRECT RULES.
+   `max-width: 860` wraps the quantity cluster onto its own line because width is scarce.
+   `max-height: 480` unwraps it again because at 200% zoom HEIGHT is scarcer. Both are right, both
+   are documented above, and neither author measured the case where BOTH apply.
+   At 512x300 — Fire HD 8 landscape at 200% zoom, a device class Vera put on this list precisely
+   because defects hide there — the row is horizontal AND narrow, so after the 88px tick, the 24px
+   opposite-effect gutter and the quantity cluster, THE NAME COLUMN IS 66px. Measured, in Chromium:
+
+       viewport   name column   longest name on one line
+       512x300        66px          4 characters
+       300x512       118px          8 characters
+       640x400       194px         14 characters
+
+   Four characters. No display name Warwick could type fits — the fixture only passed there because
+   row 0 happened to be "Milk". Mum's first row rendered 146px tall and the sticky footer covered
+   the only thing she could tap.
+
+   ⛔ SO STOP SPENDING THE HORIZONTAL BUDGET. It does not exist at this width.
+   The name and its ASDA sub-line take the full row width on their own line; the tick and the
+   -/qty/+ cluster sit BENEATH, both still at the 88px floor, still separated by the row's own
+   `--m-gap-opposite` (the wrap gap and the tick-to-cluster gap are the same 24px declaration).
+
+   ⛔ THIS IS THE SAME NUMBER OF LINES AS THE 860px RULE ALREADY PRODUCED, not an extra one — that
+   rule put tick+name on line 1 and the cluster on line 2. All that changes is WHICH line the tick
+   is on, which is what hands the name the full width.
+
+   WHY NOT THE ALTERNATIVES, since both were considered and rejected on her behalf:
+     * shrinking the tick breaks the 88px floor — the one number on this surface that protects her
+       hands, and §5.1 calls it a floor for exactly this reason;
+     * truncating with an ellipsis hides the word she navigates by, which is the whole point of a
+       household display name;
+     * stacking costs VERTICAL space, which she can scroll, and scrolling is a gesture she already
+       uses on every screen. Height is the cheap axis here. Width is not.
+
+   ⚠️ 560px IS TAKEN FROM THE BOX, NOT CHOSEN. It sits between 512 (66px name column — unusable)
+   and 640 (194px — workable at 14 characters). Stacking at 640x400 as well was MEASURED AND
+   REJECTED: it moves the tick onto the second line, which pushes it from y~395 to y~455 in a 400px
+   viewport and empties the landing screen from the other direction — exactly the regression this
+   block exists to prevent. The scarce axis really does flip between those two viewports.
+
+   ⛔ `display: contents` ON .r-body IS LOAD-BEARING. It dissolves the wrapper so .tick and .r-text
+   become flex items of .row itself and can be ordered onto different lines. .r-body carries no role
+   and no semantics of its own, so nothing is removed from the accessibility tree; the row's
+   accessible name is pinned by its own aria-label (MEDIUM-3) and is unaffected. */
+/* ⛔ THE TICK STAYS ON THE FIRST LINE. THIS IS THE ONE THING THAT COULD NOT MOVE, AND IT WAS
+   MEASURED RATHER THAN ARGUED.
+   The first arrangement tried here was the obvious reading of "stack the row": name alone on line 1,
+   tick AND cluster together beneath. It hands the name the entire row width — 446px at 512x300,
+   thirty characters — and it FAILS, because moving the tick to the second line pushes it from
+   roughly y=395 to y=455 in a 400px viewport. Five viewports went red with the identical error this
+   block exists to prevent, "THE LANDING SCREEN CONTAINS NO TAPPABLE ITEM", arriving from the
+   opposite direction. Her first tappable thing must be near the TOP of the row, whatever else moves.
+   So only the QUANTITY CLUSTER goes down. The tick keeps its place beside the name and costs it
+   88px + the 24px gutter; the cluster's ~220px is what the name reclaims. That is the whole budget
+   that was missing, and it is enough:
+       512x300   name column 66px -> ~370px      4 chars -> 20+
+   This is the SAME arrangement `max-width: 860` already applies for wide-but-short screens. All this
+   block does is stop `max-height: 480` from switching it off when the screen is ALSO narrow — which
+   is the precise intersection nobody had rendered, and where the 66px column came from.
+   The height it costs is real and is the cheap axis: she scrolls on every screen already. The tick
+   does not move, so the landing-screen guarantee is untouched. */
+@media (max-height: 480px) and (max-width: 560px) {
+  .row { flex-wrap: wrap; }
+  .r-body { flex: 1 1 100%; }
+  /* Identical declaration to the 860px rule, including the vertical --m-gap-opposite that re-creates
+     the inert gutter between the row-select area and the first quantity control. */
+  .q { width: 100%; justify-content: flex-end; margin-top: var(--m-gap-opposite); }
+}
