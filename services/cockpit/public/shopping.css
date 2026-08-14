@@ -311,10 +311,15 @@ body {
    AND B §5.1's 22px FLOOR IS NOT BREACHED TO DO IT — this is --m-text-body, which IS the floor,
    exactly. "Small" is achieved as 22 against the name's 28 and 400 against its 700. The flagged
    conflict between Warwick's line and Vera's floor turns out not to exist.
-   ⛔ COLOUR IS --ink AND MUST NOT BE SOFTENED TO --ink2. --ink2 (#47566b) on --bg (#eef1f5) is
-   6.59:1, under this surface's 7:1 AAA bar (B §5.1/§11), and the header rule at the top of this
-   file is explicit: "on a screen built for poor eyesight, fading is never the answer. Hierarchy
-   here is carried by token, size and weight." --ink on --bg is 14.48:1, on --ok-w 14.39:1.
+   ⛔ COLOUR IS --ink AND MUST NOT BE SOFTENED TO --ink2 — AND THE REASON IS THE SELECTED ROW.
+   ⚠️ LOW-2, VERA. This comment used to justify that with "--ink2 on --bg is 6.59:1". THAT IS THE
+   WRONG SURFACE: a row is --panel, where --ink2 is 7.47:1 and WOULD clear the bar. Anyone
+   re-deriving the decision from that figure concludes --ink2 is fine here and ships it.
+   The rejection is still correct, for a reason the old arithmetic never gave: A SELECTED ROW IS
+   --ok-w, where --ink2 is 6.55:1 and genuinely fails this surface's 7:1 AAA bar (B §5.1/§11).
+   The header rule at the top of this file is also explicit: "on a screen built for poor eyesight,
+   fading is never the answer. Hierarchy here is carried by token, size and weight."
+   --ink is 14.48:1 on --bg, 14.39:1 on --ok-w — it clears on every surface a row can have.
    ONE LINE, ALWAYS. nowrap+ellipsis rather than a clamp: this must never wrap, because a
    two-line retailer string would push her 88px tap target down the page and change the row
    geometry the gate measures. Truncated orientation is the whole intent — it is a reference, and
@@ -527,8 +532,13 @@ body {
    and no longer part of the control that removes her item. The negative top margin pulls it up
    against the row it belongs to — the association is visual proximity, which costs nothing in
    markup, rather than containment, which cost her the item and cost the sentence its live region.
-   --ink on --bg = 14.48:1 (it used to be measured on --ok-w inside the row); the geometry gate
-   re-measures the composited pairing at every viewport, so this is verified rather than assumed. */
+   ⚠️ LOW-2, VERA — THE FIGURE HERE WAS STALE AND NAMED THE WRONG BACKGROUND. It read "--ink on
+   --bg = 14.48:1", which was true when this sentence sat directly on the page. It no longer does:
+   the amber treatment below gives it its own --warn-w surface, so the pairing that actually renders
+   is --ink on --warn-w = 14.06:1. Still comfortably over the 7:1 AAA bar, but the number a reader
+   would have checked was measuring a background this element has not had since.
+   The geometry gate re-measures the COMPOSITED pairing at every viewport, so the rendered figure is
+   verified rather than assumed — which is why the stale comment never showed up as a failure. */
 /* ⛔ AMBER WITH A RAIL, AND THE COLOUR IS A DECISION WARWICK MADE FROM A RENDERED COMPARISON.
    He tested the live page, typed "milk", got the nudge, and said it "is grey and doesn't really
    stand out" — it was --ink on the page background with no tint and no rail, which read as body

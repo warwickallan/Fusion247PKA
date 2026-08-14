@@ -141,6 +141,27 @@ async function until(expr, ms = 12000) {
   }
 }
 
+// ── CONTRAST, MEASURED ON THE RENDERED BOX ─────────────────────────────────────────────────────
+// WCAG 2.x relative luminance, applied to the rgb() the browser actually resolved — the same method
+// shopping-geometry-check.mjs uses. Declarations are not evidence: this whole section exists because
+// a declaration that reads `color: #fff` is correct in one scheme and catastrophic in the other.
+const lin = (v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const rgb = (s) => (String(s).match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number);
+
+/** The composited background behind an element — walks up past transparent ancestors. */
+const BG_WALK = '(() => { let e = document.querySelector(SEL); '
+  + 'while (e) { const c = getComputedStyle(e).backgroundColor; '
+  + 'if (c && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(c)) return c; e = e.parentElement; } '
+  + 'return "rgb(255,255,255)"; })()';
+
+async function measure(sel) {
+  const fg = await evalIn('getComputedStyle(document.querySelector(' + JSON.stringify(sel) + ')).color');
+  const bg = await evalIn(BG_WALK.split('SEL').join(JSON.stringify(sel)));
+  return { fg, bg, ratio: ratio(rgb(fg), rgb(bg)) };
+}
+
 const results = [];
 const check = (name, pass, detail) => {
   results.push({ name, pass, detail });
@@ -255,6 +276,60 @@ const linksOut = await evalIn('[...document.querySelectorAll("a[href]")].map(a=>
 check('⛔ the editor offers no link into shopping.html', !/shopping/.test(linksOut || ''),
   'links found: ' + (linksOut || '(none)'));
 
+// ── 8. ⛔ BOTH COLOUR SCHEMES, MEASURED — CRITICAL-1 ────────────────────────────────────────────
+// THE DEFECT THIS EXISTS TO CATCH, stated plainly so nobody removes it as ceremony:
+// `.nm-save` was `color: #fff` on `background: var(--accent-ink)`. In light that is 7.70:1 and
+// passes. names.html declares `color-scheme: light dark` and loads /styles.css, whose dark :root
+// flips --accent-ink from #0a5c64 to #6fd8dc — pale cyan. White on pale cyan is 1.68:1, the worst
+// rendered text pairing in the estate, and WARWICK'S PHONE DEFAULTS TO DARK. The page's only
+// primary action was effectively invisible to the one person who uses it.
+// GL-003 §2a says it outright under --accent-ink: "What it must NEVER be: a fill behind white text."
+//
+// ⛔ NOTHING IN THIS ESTATE HAD EVER RENDERED A SECOND COLOUR SCHEME — `grep -c setEmulatedMedia`
+// returned 0 across all three cockpit gates. A gate cannot see a defect in a scheme it never renders,
+// which is the same sentence this file's sibling already carries about viewport SIZE and about LIST
+// LENGTH. Three instances of one lesson.
+//
+// ⛔ AND IT IS MEASURED IN THE ENABLED STATE, WHICH IS THE OTHER HALF OF THE TRAP. Vera's first probe
+// read the DISABLED button and got a comfortable 7.08 — the disabled rule sets its own --ink2 on
+// --panel2 and hides the defect completely. So the field is dirtied first, and the button's own
+// `disabled` property is asserted false BEFORE the pairing is trusted.
+const SCHEMES = [
+  { name: 'light', features: [{ name: 'prefers-color-scheme', value: 'light' }] },
+  { name: 'dark', features: [{ name: 'prefers-color-scheme', value: 'dark' }] },
+];
+// Every pairing that renders text on this page. The button is the CRITICAL, the rest are the class.
+const PAIRS = [
+  ['.nm-save', 'the Save button — the page\'s only primary action', 4.5],
+  ['.nm-asda', 'the ASDA listing', 4.5],
+  ['.nm-input', 'the editable name field', 4.5],
+  ['.nm-id', 'the row id he tells similar rows apart by', 4.5],
+  ['.nm-flag strong', 'a flagged row\'s heading', 4.5],
+  ['.nm-long strong', 'the long-name warning', 4.5],
+];
+
+for (const scheme of SCHEMES) {
+  await cmd('Emulation.setEmulatedMedia', { features: scheme.features });
+  await cmd('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/names.html' });
+  await until('!!document.querySelector(".nm-row")');
+
+  // ⛔ ENABLE THE BUTTON AND PROVE IT IS ENABLED. Measuring the disabled state is how this was
+  // missed the first time, so the assertion is on the property, not on the intent.
+  await type('.nm-row .nm-input', 'A name long enough to warn');
+  const isEnabled = await evalIn('!document.querySelector(".nm-row .nm-save").disabled');
+  check('[' + scheme.name + '] the Save button is ENABLED before its contrast is read', isEnabled === true,
+    isEnabled ? 'measuring the live control, not the disabled one' : 'button still disabled — the reading below would be meaningless');
+
+  for (const [sel, label, floor] of PAIRS) {
+    const present = await evalIn('!!document.querySelector(' + JSON.stringify(sel) + ')');
+    if (!present) { check('[' + scheme.name + '] ' + label + ' is present to be measured', false, sel + ' rendered nothing'); continue; }
+    const m = await measure(sel);
+    check('[' + scheme.name + '] ' + label + ' clears ' + floor + ':1', m.ratio >= floor,
+      sel + '  ' + m.ratio.toFixed(2) + ':1   fg=' + m.fg + ' on ' + m.bg);
+  }
+}
+await cmd('Emulation.setEmulatedMedia', { features: [] });
+
 sock.close(); edge.kill(); srv.close();
 
 const failed = results.filter((r) => !r.pass);
@@ -263,5 +338,13 @@ if (failed.length) {
   process.exit(1);
 }
 console.log('\nNAMES-CHECK PASS — ' + results.length + ' assertions executed against the rendered editor in a real '
-  + 'browser: catalogue rendered, one save driven through a stub, saved / refused / cleared states all shown, '
-  + 'and `aka` proven absent from the DOM and from every request body.');
+  + 'browser, IN BOTH COLOUR SCHEMES: catalogue rendered, one save driven through a stub, saved / refused / '
+  + 'cleared states all shown, `aka` proven absent from the DOM and from every request body, and every text '
+  + 'pairing measured on the composited box under prefers-color-scheme light AND dark.');
+// ⛔ THE DARK ASSERTION IS MUTATION-PROVEN, and the figure is worth keeping here because a control
+// nobody has watched fail is not evidence. Reverting .nm-save to `#fff` on `var(--accent-ink)` and
+// re-running against that copy (COCKPIT_PUB) yields:
+//     ok    [light] .nm-save  7.70:1
+//     FAIL  [dark]  .nm-save  1.68:1   fg=rgb(255,255,255) on rgb(111,216,220)
+// which is Vera's CRITICAL-1 measurement reproduced exactly. The light pass in that same run is the
+// point: the defect is invisible to any check that renders one scheme.
