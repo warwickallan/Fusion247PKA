@@ -96,16 +96,21 @@
 //     (B §7.1.1) or her first tappable item (B §6.1), and both are asserted failures in
 //     shopping-geometry-check.mjs. Recorded as a divergence from B §9.3, not silently taken.
 //
-// ⛔ THE NAMING GAP, WHICH IS REAL AND IS NOT MINE TO CLOSE. Addendum B §6.3 forbids showing a
+// ✅ THE NAMING GAP IS CLOSED (WP-B15-52 / WP-B15-53, 2026-08-14). Addendum B §6.3 forbids showing a
 // catalogue string as a product name. asdair.regulars.name is retailer-shaped ("Example Brand Oat
-// Drink 1L" — brand and pack size baked in). The nearest household-language source is `aka`, which
-// is a MATCHING TERM rather than a curated display name, and it is absent on some rows. Both
-// Addendum B §12.1 and Addendum E criterion 2 predicted exactly this and asked that it be surfaced
-// before she is sat in front of it rather than after.
-// Larry's decision, 2026-08-13: build the documented fallback, state the derivation loudly, and
-// record that Addendum E criterion 2 CANNOT PASS until a curated display_name exists — which is a
-// column, not a component, and is backend work. householdName() below is that fallback and is the
-// only place the derivation happens.
+// Drink 1L" — brand and pack size baked in), and the stand-in used until now was `aka`, a MATCHING
+// TERM rather than a curated display name. Addendum B §12.1 and Addendum E criterion 2 both
+// predicted exactly that and asked for it to be surfaced before she was sat in front of it.
+// `display_name` now exists as a real column (migration 021), is populated for all 109 active
+// regulars, and — after WP-B15-53 — actually REACHES this page. So the `aka` fallback is retired:
+// householdName() reads display_name and falls back to the retailer string only for a row Warwick
+// has not named yet. Addendum E criterion 2 is now answerable rather than blocked.
+//
+// ⚠️ THE FIELD WAS POPULATED FOR A DAY BEFORE IT WAS READABLE, and that is worth remembering rather
+// than tidying away: migration 021 filled the column and the write route saved it, but the payload
+// this page reads (/api/asdair/rules) never selected it and readWorkspace.js selected it and then
+// dropped it at projection. A column can be live, correct and completely unreachable by the two
+// surfaces that need it, and nothing fails — the old fallback simply keeps answering.
 // ═════════════════════════════════════════════════════════════════════════════════════════════════
 (function () {
   'use strict';
@@ -132,20 +137,53 @@
     return v;
   }
 
-  // The naming fallback. Prefer her own words, fall back to the retailer string, invent NOTHING.
+  // ⛔ `name_display` REACHES THIS FILE THROUGH P.text(), WHICH RENDERS AN ABSENT STRING AS THE
+  // LITERAL WORD 'unknown' (services/asdair/cockpit-api/present.js). That is truthful and TRUTHY: it
+  // passes every falsy guard. sectionLabel() below already refuses it for headings, and a name is
+  // the one place it would be read as the product itself. So a P.text()-projected field is only
+  // trusted through here.
+  // `display_name` is NOT projected that way — WP-B15-53 delivers it raw and nullable precisely so
+  // that "not set" survives as null — which is why it is trimmed directly and not laundered here.
+  function realText(v) {
+    var s = typeof v === 'string' ? v.trim() : '';
+    return !s || s.toLowerCase() === 'unknown' ? '' : s;
+  }
+
+  // WHAT MUM READS. `display_name` is Warwick's curated household word and is the ONLY source for
+  // the large line. The retailer string is a LAST RESORT, for a row he has not named yet.
   // Returns null when there is no usable name at all — the caller omits the row and says how many
   // it omitted, rather than rendering a blank one or making a name up.
+  //
+  // ⛔ `aka` IS GONE FROM THIS FUNCTION AND MUST NOT COME BACK (WP-B15-52). It is a MATCHING TERM —
+  // the word that lets "choc yazoo" resolve to a catalogue row — and it stood in here only because
+  // no curated field existed when WP-B15-49 shipped. One now does: `display_name` is populated for
+  // all 109 active regulars and arrives raw and nullable (WP-B15-53).
+  // Rendering a matching term as a product name means HER SCREEN CHANGES WHENEVER THE MATCHER IS
+  // TAUGHT A NEW WORD — the direct opposite of the fixed, memorable surface B §6.1 requires, since
+  // her muscle memory for "the milk is near the top" is the accessibility feature being protected.
+  // It also leaked builder vocabulary onto her tile: `aka` is lowercase matching text, which is why
+  // this function used to have to capitalise it. Warwick's curated name is shown EXACTLY as he
+  // typed it, so nothing here re-cases anything.
   function householdName(reg) {
     if (!reg || typeof reg !== 'object') return null;
-    var aka = Array.isArray(reg.aka) ? reg.aka : [];
-    for (var i = 0; i < aka.length; i++) {
-      if (typeof aka[i] === 'string' && aka[i].trim()) {
-        var s = aka[i].trim();
-        return s.charAt(0).toUpperCase() + s.slice(1);
-      }
-    }
-    var n = typeof reg.name_display === 'string' ? reg.name_display.trim() : '';
-    return n ? n : null;
+    var d = typeof reg.display_name === 'string' ? reg.display_name.trim() : '';
+    if (d) return d;
+    return realText(reg.name_display) || null;
+  }
+
+  // THE ASDA LISTING — the small orientation line under the name. Warwick, on his own screen:
+  // "the official asda name quite small running in one line at the bottom of the tile, so its easy
+  // for me to see what it actually is." It is FOR HIM, not reading matter for her, which is why the
+  // template marks it aria-hidden and the CSS truncates it rather than letting it grow her row.
+  //
+  // Returns null when it would merely repeat the large line: an unnamed row already falls back to
+  // the retailer string, and printing the same words twice is noise rather than orientation.
+  function listingName(reg, shown) {
+    if (!reg || typeof reg !== 'object') return null;
+    var n = realText(reg.name_display);
+    if (!n) return null;
+    var s = typeof shown === 'string' ? shown.trim() : '';
+    return n.toLowerCase() === s.toLowerCase() ? null : n;
   }
 
   // The API says "unknown" when it does not hold a fact, and that is the right thing for it to do.
@@ -184,6 +222,7 @@
       bag[key].push({
         id: String(reg.id_display || ('r' + i)),
         name: name,
+        listing: listingName(reg, name),
         qty: clampQty(reg.typical_qty_display),
       });
     }
@@ -272,6 +311,7 @@
   if (typeof window !== 'undefined') {
     window.FUSION_SHOPPING = {
       clampQty: clampQty, householdName: householdName, buildSections: buildSections,
+      listingName: listingName, realText: realText,
       sectionLabel: sectionLabel, QTY_MIN: QTY_MIN, QTY_MAX: QTY_MAX, API: API, OTHER: OTHER,
       HOUSEHOLD: HOUSEHOLD, SEND_TIMEOUT_MS: SEND_TIMEOUT_MS, SEND_STATES: SEND_STATES,
       CHECK_TIMEOUT_MS: CHECK_TIMEOUT_MS, localDate: localDate, humanDate: humanDate,
@@ -1039,9 +1079,19 @@
       // The whole row is the select target (B §6.3) — the single largest accessibility win
       // available here. The tick is presentational because the ROW carries the checkbox role;
       // a nested control would be a second target inside the first.
+      // ⛔ THE ASDA LISTING IS aria-hidden AND THAT IS DELIBERATE, NOT AN OVERSIGHT.
+      // The row's accessible name is pinned to `it.name` by :aria-label above (MEDIUM-3), so the
+      // announcement stays "Bananas" and does not become "Bananas ASDA 6 Bananas". WCAG 2.5.3 Label
+      // in Name still holds: the accessible name IS the visible primary label. This line is
+      // orientation for WARWICK looking over her shoulder — "so its easy for me to see what it
+      // actually is" — and reading a retailer string aloud to her is the exact thing B §6.3 forbids.
+      // It renders only when it differs from the name; see listingName().
       '      <div class="r-body">',
       '        <span class="tick" aria-hidden="true">✓</span>',
-      '        <span class="r-name">{{ it.name }}</span>',
+      '        <span class="r-text">',
+      '          <span class="r-name">{{ it.name }}</span>',
+      '          <span v-if="it.listing" class="r-listing" aria-hidden="true">{{ it.listing }}</span>',
+      '        </span>',
       '      </div>',
       // The 24px inert gutter between the row body and the first quantity control is the flex gap
       // on .row. See the long note in shopping.css for why that pair, and not every pair, gets it.

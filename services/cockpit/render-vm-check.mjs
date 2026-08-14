@@ -1427,9 +1427,11 @@ function scenarios(render) {
 // and every value is invented (see the fixture header).
 const REG = (RULES.regulars && Array.isArray(RULES.regulars.items)) ? RULES.regulars.items : [];
 // A row the data layer cannot name in any form. Not hypothetical: householdName() returns null when
-// there is neither an alias nor a name, and the surface must then omit the row and SAY SO rather
-// than render a blank one or invent a name for it.
-const REG_NAMELESS = REG.concat([{ id_display: '99', aka: [], name_display: '', high_level_category_display: 'Chilled', typical_qty_display: '1', active: true }]);
+// there is neither a display name nor a retailer string, and the surface must then omit the row and
+// SAY SO rather than render a blank one or invent a name for it.
+// `display_name: null` is stated explicitly rather than left off: after WP-B15-52 that field is the
+// primary source, so a fixture that omitted it would be testing the fallback path by accident.
+const REG_NAMELESS = REG.concat([{ id_display: '99', display_name: null, aka: [], name_display: '', high_level_category_display: 'Chilled', typical_qty_display: '1', active: true }]);
 // ⛔ EVERY WRITABLE REF THE SURFACE OWNS IS RESET HERE, AND THE NEW ONES ARE NOT OPTIONAL.
 // `mumScenario` writes into ONE setup() instance that is shared by every scenario in this plan, so
 // any ref a scenario sets and this object does not reset LEAKS FORWARD. A later scenario would then
@@ -1697,13 +1699,53 @@ const MUM_PLAN = [
     ['a fractional value cannot land between whole items', () => SHOP.clampQty(2.4) === 2 && SHOP.clampQty(0.4) === 1],
   ], { pure: true }],
 
-  // The naming fallback Larry approved, executed rather than described — and the third assertion is
-  // the one that matters: no name in, NOTHING invented out.
-  ['MUM (the naming fallback, executed not rendered)', {}, [
-    ['her own words are preferred over the retailer string', () => SHOP.householdName({ aka: ['oat milk'], name_display: 'Example Brand Oat Drink 1L' }) === 'Oat milk'],
-    ['the retailer string is the fallback when she has no word for it', () => SHOP.householdName({ aka: [], name_display: 'Example Brand Oat Drink 1L' }) === 'Example Brand Oat Drink 1L'],
-    ['⛔ with neither, it returns nothing rather than inventing a name', () => SHOP.householdName({ aka: [], name_display: '' }) === null && SHOP.householdName(null) === null],
+  // The naming rule, executed rather than described — and the "nothing invented" assertion is still
+  // the one that matters most.
+  // ⛔ REWRITTEN AT WP-B15-52. These assertions used to encode the `aka` fallback, and they PASSED
+  // while doing it — which is the point worth keeping: a green gate proved the fallback worked, not
+  // that it was the right source. `aka` is a matching term; display_name is what she reads. The two
+  // `aka` assertions below now prove it is IGNORED rather than preferred.
+  ['MUM (the naming rule, executed not rendered)', {}, [
+    ['display_name is the name she reads', () => SHOP.householdName({ display_name: 'Bananas', name_display: 'ASDA 6 Bananas' }) === 'Bananas'],
+    ['⛔ aka is a MATCHING TERM and never reaches her screen', () => SHOP.householdName({ aka: ['oat milk'], display_name: 'Oat drink', name_display: 'Example Brand Oat Drink 1L' }) === 'Oat drink'],
+    ['⛔ aka is not a fallback either — an unnamed row shows the retailer string, not her matching word', () => SHOP.householdName({ aka: ['oat milk'], display_name: null, name_display: 'Example Brand Oat Drink 1L' }) === 'Example Brand Oat Drink 1L'],
+    ['the retailer string is the fallback for a row Warwick has not named yet', () => SHOP.householdName({ display_name: null, name_display: 'Example Brand Oat Drink 1L' }) === 'Example Brand Oat Drink 1L'],
+    ['a whitespace-only display name reads as not set', () => SHOP.householdName({ display_name: '   ', name_display: 'Example Brand Oat Drink 1L' }) === 'Example Brand Oat Drink 1L'],
+    ['⛔ with neither, it returns nothing rather than inventing a name', () => SHOP.householdName({ display_name: null, name_display: '' }) === null && SHOP.householdName(null) === null],
+    // The hazard Felix found in preflight and Keel closed at source. Belt and braces: if a future
+    // projection change ever routes display_name through P.text() again, this fails HERE rather than
+    // rendering the word "unknown" to an 84-year-old as the name of a product.
+    ['⛔ the API word "unknown" is never rendered as a product name', () => SHOP.householdName({ display_name: null, name_display: 'unknown' }) === null && SHOP.householdName({ display_name: null, name_display: 'UNKNOWN' }) === null],
     ['⛔ the API word "unknown" never becomes a section heading', () => SHOP.sectionLabel({ high_level_category_display: 'unknown' }) === SHOP.OTHER && SHOP.sectionLabel({}) === SHOP.OTHER],
+  ], { pure: true }],
+
+  // The ASDA sub-line. Warwick's orientation line, and the rule that stops it being noise.
+  ['MUM (the ASDA listing line, executed not rendered)', {}, [
+    ['the listing is the ASDA string when the tile shows a household name', () => SHOP.listingName({ display_name: 'Bananas', name_display: 'ASDA 6 Bananas' }, 'Bananas') === 'ASDA 6 Bananas'],
+    ['⛔ it is omitted when it would merely repeat the large line', () => SHOP.listingName({ display_name: null, name_display: 'Example Brand Oat Drink 1L' }, 'Example Brand Oat Drink 1L') === null],
+    ['the repeat check ignores case', () => SHOP.listingName({ name_display: 'Bananas' }, 'bananas') === null],
+    ['⛔ the word "unknown" is never shown as a listing either', () => SHOP.listingName({ name_display: 'unknown' }, 'Bananas') === null],
+    ['a missing name yields no line rather than a blank one', () => SHOP.listingName({ name_display: '' }, 'Bananas') === null && SHOP.listingName(null, 'Bananas') === null],
+  ], { pure: true }],
+
+  // buildSections is what actually feeds the template, so the two fields are proven to arrive
+  // TOGETHER on a row rather than only as separate helpers.
+  ['MUM (a built row carries both lines)', {}, [
+    ['a named row carries name and listing', () => {
+      const s = SHOP.buildSections([{ id_display: '60', display_name: 'Bananas', name_display: 'ASDA 6 Bananas', high_level_category_display: 'Fruit', typical_qty_display: '1', active: true }]);
+      const it = s.sections[0].items[0];
+      return it.name === 'Bananas' && it.listing === 'ASDA 6 Bananas';
+    }],
+    ['⛔ an unnamed row shows the retailer string ONCE, with no duplicate beneath it', () => {
+      const s = SHOP.buildSections([{ id_display: '61', display_name: null, name_display: 'Example Brand Oat Drink 1L', high_level_category_display: 'Chilled', typical_qty_display: '1', active: true }]);
+      const it = s.sections[0].items[0];
+      return it.name === 'Example Brand Oat Drink 1L' && it.listing === null;
+    }],
+    ['⛔ aka on the row changes nothing about either line', () => {
+      const s = SHOP.buildSections([{ id_display: '62', aka: ['choc yazoo'], display_name: 'Chocolate milkshake', name_display: 'Yazoo Choc 400ml', high_level_category_display: 'Chilled', typical_qty_display: '1', active: true }]);
+      const it = s.sections[0].items[0];
+      return it.name === 'Chocolate milkshake' && it.listing === 'Yazoo Choc 400ml';
+    }],
   ], { pure: true }],
 ];
 

@@ -1,0 +1,202 @@
+/* ═════════════════════════════════════════════════════════════════════════════════════════════════
+   WARWICK'S DISPLAY-NAME EDITOR — LAYOUT ONLY (WP-B15-52 AC3)
+
+   ⛔ NO COLOUR TOKENS ARE DECLARED HERE, DELIBERATELY. names.html loads /styles.css, which is
+   GL-003's own token file for the operator surface, and every colour below is a var() reference into
+   it. shopping.css re-declares the tokens because Mum's page must not share the operator's cached
+   stylesheet, and shopping-geometry-check.mjs pins that copy against drift. A THIRD copy would be a
+   third thing to keep in step and a second thing for that gate to have to learn about.
+
+   ⛔ THIS IS AN OPERATOR SURFACE AND USES OPERATOR SIZING. Addendum B's 22px floor and 88px targets
+   are requirements for MUM'S page, written for an 84-year-old with poor eyesight. They do not
+   transfer here: this is Warwick, on his own phone, looking at a dense catalogue of 109 rows. Sizing
+   below is still generous for a THUMB — 16px text, 48px targets, one column — because he is standing
+   in a kitchen holding a phone, not sitting at the operator console.
+   ═════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+.nm {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 16px 64px;
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+.nm-head h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  color: var(--ink);
+}
+.nm-sub {
+  margin: 0 0 20px;
+  font-size: 15px;
+  color: var(--ink2);
+}
+
+/* ── THE TOOLS ROW ───────────────────────────────────────────────────────────────────────────────
+   A search box and one toggle. 109 rows on a phone is a lot of scrolling to reach "Vanish", and the
+   11 flagged rows are the actual job of this page — hunting them out of the list by eye is the
+   difference between doing the job and not. Everything else a filter bar could offer was left out. */
+.nm-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+}
+.nm-field { display: flex; flex-direction: column; gap: 6px; }
+.nm-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.nm-id { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink3); }
+
+.nm-search, .nm-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  font-family: inherit;
+  /* 16px is not a style choice: iOS Safari zooms the whole page when a focused input is below 16px,
+     which on a one-column list means he loses his place every time he taps a field. */
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 2px solid var(--hair);
+  border-radius: 8px;
+}
+.nm-input { font-size: 17px; font-weight: 600; }
+.nm-search:focus-visible, .nm-input:focus-visible, .nm-save:focus-visible, .nm-toggle input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.nm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.nm-toggle input { width: 24px; height: 24px; accent-color: var(--accent); }
+
+.nm-count { margin: 0; font-size: 14px; color: var(--ink2); }
+
+/* ── A ROW ───────────────────────────────────────────────────────────────────────────────────────
+   One column, no table, no modal. He edits in place and saves without leaving the row — a modal on a
+   phone means losing sight of the ASDA string that tells him what the thing actually is. */
+.nm-row {
+  padding: 16px;
+  margin-bottom: 14px;
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+}
+/* A flagged row carries a left rail in the same amber this estate uses for "worth your attention,
+   not a fault" — the same reading as .note's middle state on Mum's surface. */
+.nm-row.flagged {
+  border-color: var(--warn);
+  border-left: 8px solid var(--warn);
+  background: var(--panel);
+}
+.nm-flag {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  margin-bottom: 14px;
+  font-size: 15px;
+  background: var(--warn-w);
+  border-radius: 8px;
+}
+.nm-flag strong { color: var(--ink); }
+.nm-flag span { color: var(--ink); }
+
+/* THE ASDA LISTING — read-only, and the one place the full catalogue string is shown UNTRUNCATED.
+   Mum's tile truncates it to a single line because it is orientation there; here it is the thing he
+   is identifying the product by, so it wraps and shows in full. */
+.nm-asda {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink2);
+  overflow-wrap: break-word;
+}
+
+.nm-act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.nm-save {
+  min-height: 48px;
+  min-width: 110px;
+  padding: 0 24px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent-ink);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+/* Disabled means "there is nothing to save" or "the server will refuse this". A recessed surface and
+   a muted token, never a fade — the same rule GL-003 sets for the operator surface. */
+.nm-save:disabled {
+  color: var(--ink2);
+  background: var(--panel2);
+  border: 1px solid var(--hair);
+  cursor: default;
+}
+
+/* ── THE OUTCOME, IN WORDS ───────────────────────────────────────────────────────────────────────
+   Colour is REINFORCEMENT and never the message (WCAG 1.4.1). Each of these reads correctly in
+   greyscale because the sentence differs, not the hue. There is no toast, no banner and no snackbar:
+   the result appears beside the button he pressed, on the row he changed. */
+/* ⛔ THE WORDS ARE --ink ON A TINT, NEVER COLOURED TEXT ON THE PANEL. This is not a preference; it
+   is the fix this estate has already had to make TWICE, and I reproduced the defect before checking.
+   Measured on --panel (#fff):
+     --ok   #1f9d57  3.49:1   ✗ under the 4.5 text floor  (styles.css D-11 records this exact figure)
+     --warn #b26a12  4.23:1   ✗ under the 4.5 text floor
+     --stop #c1453c  5.02:1   ✓ passes — but making one of the three an exception is how the other
+                                two got shipped in the first place
+   styles.css D-11 and D-14 both landed on the same rule after measuring: "the tint carries the tone,
+   --ink carries the words." Applied here, every state clears comfortably —
+     --ink on --ok-w 14.39:1 · --ink on --warn-w 14.06:1 · --ink on --stop-w 13.52:1
+   and all three survive greyscale, because the SENTENCE differs, not the hue (WCAG 1.4.1). */
+.nm-msg {
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  border-radius: 8px;
+  border-left: 4px solid var(--hair);
+}
+.nm-msg.ok { background: var(--ok-w); border-left-color: var(--ok); }
+.nm-msg.warn { background: var(--warn-w); border-left-color: var(--warn); }
+.nm-msg.fail { background: var(--stop-w); border-left-color: var(--stop); }
+.nm-hint { font-size: 15px; color: var(--ink2); }
+
+.nm-empty {
+  padding: 20px;
+  font-size: 16px;
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+}
+.nm-empty p { margin: 0; }
+
+/* Narrow phones: the button goes full width so it is never a small target beside a long message. */
+@media (max-width: 420px) {
+  .nm-act { align-items: stretch; }
+  .nm-save { width: 100%; }
+}
