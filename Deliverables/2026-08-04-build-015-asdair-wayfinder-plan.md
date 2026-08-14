@@ -2221,7 +2221,9 @@ output, rather than either architecture alone.
 
 ---
 
-## ⟦ACTIVE SESSION WORK PACKAGE⟧ 2026-08-13 (CURRENT) — **CONVERGE AND EXERCISE THE PRODUCT TRUTH.** Authorised by Warwick, explicitly and in full. **START HERE.**
+## ⛔ SUPERSEDED — ⟦former ACTIVE SESSION WORK PACKAGE⟧ 2026-08-13 (earlier) — **CONVERGE AND EXERCISE THE PRODUCT TRUTH.** Its six lanes all DELIVERED; retained for its detail. **It directs nothing — the CURRENT package is the four feature requests block below.**
+
+> **Veritas Defect 4, 2026-08-14: two blocks on this map both carried  and both said START HERE.** A fresh instance reading top-down would have taken this one. Superseded in place rather than appended to, per this map's own rule.
 
 > **Warwick, 2026-08-13, verbatim: _"STOP STOPPING."_** *"This is day 4 of week 4 and Warwick is sick of
 > being dragged back into engineering decisions that are already within the authority he has given you…
