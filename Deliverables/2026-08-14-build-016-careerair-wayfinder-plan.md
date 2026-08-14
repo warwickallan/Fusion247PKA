@@ -32,48 +32,81 @@ capability's internals is still a declaration of it."*
 
 # ⭐ THE ONE CURRENT DIRECTIVE BLOCK — **START HERE. Nothing else on this map directs anything.**
 
-## THE FRONTIER: **a decision, not a task.** And it is Warwick's.
+## ⛔ THE PREVIOUS FRONTIER IS SUPERSEDED BY EXECUTED EVIDENCE, 2026-08-14
 
-**⛔ THE RECORD DOES NOT GROUND AN IMPLEMENTATION NEXT ACTION, AND NONE HAS BEEN INVENTED TO FILL THE
-FIELD.** Two independent things block one:
+> **This map previously said Phase 1's completion state had "never been measured" and that the next action
+> was to measure whether the North Star journey had ever completed. BOTH ARE NOW FALSE.**
+>
+> **The census measured it. Evidence:** `Deliverables/2026-08-14-careerair-phase1-census.md`
+> *(absorbed by pointer — not duplicated here)*
 
-1. **The automatic-collection route is undecided**, and all candidate routes are mutually exclusive.
-2. **Phase 1's own completion state has never been measured.** Outcomes A–H and `AC-01`–`AC-13` have a
-   proof plan and **no recorded results anywhere**.
+**⭐ THE NORTH STAR JOURNEY HAS COMPLETED, END TO END, REPEATEDLY.** Real public job URL in → **8 of 8
+stages ran** → fit 9/10 → `ready_to_send` → **DOCX and PDF on disk with signatures matching the database
+byte-for-byte.** **Warwick saw and accepted one:** *"Yeah found that, look good. I'm happy with that."*
+**Confidence HIGH** — corroborated by the run record, the database rows, and the bytes on disk.
 
-### 🔴 THE EXACT NEXT ACTION — **ONE bounded Warwick decision, then one bounded Larry task.**
+**⚠️ The stale `not_started` rows were the illusion.** `careerair.acceptance_evidence` holds all 13 AC rows
+marked `not_started` with null proof — **while 158 journey runs, 92 CV artefacts, 178 verified exports and
+170 fit assessments sat underneath them.** *The results existed. The ledger was abandoned, not empty.*
 
-> ### FOR WARWICK — the single decision. **How should CareerAIR collect opportunity email?**
->
-> **The collector has been DOWN since 2026-08-07 with 757 suppressed alerts.** It is knowingly muted, and
-> the mute is self-documenting. **Nothing else can honestly proceed until this is settled**, because the
-> Phase 1 journey starts with intake.
->
-> | option | what it costs | what it buys |
-> |---|---|---|
-> | **A — reclassify as MANUAL** | Warwick forwards or pastes opportunities himself | **Zero spend, zero consent, available today.** The rest of Phase 1 becomes measurable immediately |
-> | **B — authorise Entra/Graph consent** | one consent action by Warwick | genuine automatic collection |
-> | **C — fund a paid Zapier trigger** | money | automatic collection without Graph |
->
-> **Larry's recommendation: A, and only as far as unblocking measurement.** It is the only option costing
-> nothing, and **the thing actually unmeasured is the journey, not the intake.** B and C can be chosen
-> later on evidence rather than now on speculation. *This is a genuine `product-decision`: the record
-> shows all three considered and none chosen.*
->
-> ⛔ **Do NOT re-present these as three fresh options in a future session.** They are the record's own
-> three, unchanged since 2026-08-06, and re-litigating them is the archaeology this map exists to end.
+## WHERE PHASE 1 ACTUALLY STANDS — 21 items, **ZERO UNKNOWN**
 
-> ### THEN, FOR LARRY — the one bounded task, and it is measurement, not building.
->
-> **Establish the true completion state of Phase 1 against the private tree:** Outcomes A–H, and
-> `AC-01`–`AC-13` against `LIVING-PLAN.md` §Acceptance evidence. **Record results. Build nothing.**
->
-> **Why this and not implementation:** a Wayfinder cannot record a frontier nobody has measured, and
-> **the estate's own bar is that a green suite proves capability, never completed automation.** Every
-> proven item in §2 below is capability. **Whether the North Star journey has EVER completed once is
-> unknown**, and that is the single most important unknown in this build.
+| | Outcomes A–H | AC-01…AC-13 | combined |
+|---|---|---|---|
+| **PASS** | 0 | **2** | **2** |
+| **PARTIAL** | **8** | 4 | **12** |
+| **FAIL** | 0 | **7** | **7** |
+| **UNKNOWN** | 0 | 0 | **0** |
 
----
+**The two PASSes are real and load-bearing:** **AC-04** — 20 durable stops below the 7/10 gate, a 6 halted
+before the expensive path, reproduced three times · **AC-07** — a genuinely expired advert (HTTP 410)
+stopped honestly with a non-empty route forward.
+
+**The seven FAILs, at summary level:** no authenticated acquisition route exists · no non-URL source has
+ever reached a fit assessment · the below-7 override is unreachable · duplicate opportunities never
+converge (`opportunity_link` = **0 rows**, ~196 rows for ~3 vacancies) · the privacy scan is red · one
+vacancy has ever reached `ready_to_send` · AC-13 regressed from a genuine PASS.
+
+## 🔴 THE NEW FRONTIER — derived from that evidence
+
+> **The product works. NOTHING IN PRODUCTION CALLS IT.**
+>
+> `runJourney` has **exactly two callers, and both are scripts a human types.** Every live intake surface —
+> the Cockpit, Telegram, the three scheduled email runs — **terminates at *"opportunity recorded"* and
+> stops.**
+
+**That single gap IS `FR-23`** (*"Larry is not the normal runtime operator"*), **IS** AC-01's one unmet
+clause (*"without a manual session"*), **IS** why two thirds of the bot's notification surface has nothing
+to fire from, and **IS** why AC-03 and AC-05 cannot be exercised through any real surface at all.
+
+**It is the estate's own bar failing on its plainest clause** — *code existence and a successful manual
+invocation prove capability only.*
+
+### 🎯 THE ONE NEXT ACTION FOR THE FUTURE CAREERAIR RESUME
+
+> **Dispatch, as a bounded Work Order, the wiring of ONE real production event to `runJourney`** — the
+> Cockpit intake panel is the cheapest candidate, since it already exists and already works.
+>
+> **⛔ IT NEEDS NO WARWICK DECISION.** The intake decision on this map governs *how opportunities arrive*;
+> this governs *what happens after one arrives*. **Do not reopen the intake question to reach it.**
+
+**The cheaper alternative if measurement is preferred first**, and it is a genuine option rather than a
+hedge: **run the existing acceptance runner against 3–5 more real vacancies**, including one paste and one
+below-7-then-proceed. **That moves eight measured items and builds nothing.**
+
+## ⛔ NOT DONE, DELIBERATELY, AND NOT TO BE PICKED UP AS DRIFT
+
+**Warwick, 2026-08-14: *"This is orientation hygiene only."*** No CareerAIR implementation has begun.
+**Explicitly NOT done, each on his instruction:** the journey runner is **not** wired · the privacy scanner
+is **not** wired · the email-address finding is **not** cleaned · the intake decision is **not** reopened ·
+the new frontier is **not** solved.
+
+**AC-10, corrected and proportionate** — Larry ran the scanner personally: **20 findings, 9 files, ONE
+term — an email address.** *Not* employer, salary, vacancy, recruiter or CV data. **The real defect is that
+the scanner is invoked by NOTHING** — no CI, no hook, no scheduled task — which is how a clean PASS on
+2026-07-30 regressed silently. **A control nothing runs is not a control.**
+
+**CareerAIR is PARKED AND READY. Resume from this block.**
 
 ## 1. GOAL AND NORTH STAR
 
@@ -156,9 +189,9 @@ receipts and outcomes are live; **fit results and document-ready are not** — t
 
 ## 6. ⛔ WHAT REMAINS UNPROVEN — the biggest item on this map
 
-**NO RECORD EXISTS OF PHASE 1'S OWN BAR BEING MET** — *"One real job completing the whole journey, from
+⛔ **SUPERSEDED 2026-08-14 — the bar WAS met and is evidenced; see the directive block. The sentence below was true when written and is retained only as the record of what changed.** ~~NO RECORD EXISTS OF PHASE 1'S OWN BAR BEING MET~~ — *"One real job completing the whole journey, from
 intake to a downloadable tailored CV."* `AC-01`–`AC-13` have a proof plan and **no recorded results**.
-`careerair.requirement_set` is **empty on live data** — *"no real journey run has adopted a version yet."*
+~~`careerair.requirement_set` is empty on live data~~ ⛔ **FALSE — measured 2026-08-14: 45 rows, 1 ADOPTED.** The claim traced to a note written 2026-07-29; a real run adopted a version the next day and the note went stale — *"no real journey run has adopted a version yet."*
 **Stated as absence of evidence after searching the repo, the private tree and all branches.**
 
 **The reboot path is unproven** — *"a manual `Start-ScheduledTask` exercises the registration but not the
