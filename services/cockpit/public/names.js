@@ -49,29 +49,48 @@
   //
   // ⛔ A WARNING, NOT A SECOND HARD LIMIT, and that is deliberate. He is the operator and may have a
   // reason; the defect was that nobody TOLD him, not that he was permitted. It is worded as what it
-  // costs HER, because "over 20 characters" is a rule he must look up, while "can push the first
+  // costs HER, because "over 14 characters" is a rule he must look up, while "can push the first
   // thing she taps off her screen" is a consequence he can weigh in the moment.
   //
-  // ⚠️ 20 IS MEASURED, AND IT MOVED ONCE ALREADY — WHICH IS THE PART WORTH KEEPING. An earlier
-  // version of this line said 14, taken from the longest name that stayed on ONE line at 640x400.
-  // That was the budget of a layout that then changed underneath it: at narrow-and-short viewports
-  // the row now wraps its quantity cluster onto its own line (shopping.css, "THE TICK STAYS ON THE
-  // FIRST LINE"), which took the name column at 512x300 from 66px to 273px — four characters to
-  // twenty-one. A measured number is only true of the layout it was measured in.
+  // ⚠️ 14 IS MEASURED AT 300x512 — THE WORST VIEWPORT, NOT THE ONE THE FIX WAS FOUND AT.
+  // This number has now been wrong twice, in opposite directions, and both times it was the same
+  // mistake. It was 14 (derived at 640x400), then 20 (re-derived at 512x300 after the row layout
+  // changed, where it has 31px to spare and looked comfortable). Vera swept it and found 20 leaves
+  // ONE PIXEL of headroom at 300x512 — Fire HD 8 PORTRAIT at 200% zoom.
+  // Her clause, and it belongs here: A MEASURED NUMBER IS ONLY TRUE OF THE LAYOUT IT WAS MEASURED
+  // IN — AND ONLY OF THE VIEWPORT IT WAS MEASURED AT.
+  // Validating with a 41-character mutant did not save me either: testing eighteen characters past
+  // the edge proves the assertion fires, it does not locate the edge.
   //
-  // 20 is now proven end-to-end rather than inferred, by running the geometry gate with a 20-char
-  // name in ROW 0 of both fixtures — the first row, which carries the landing-screen assertion and
-  // is therefore the hardest place to put it:
-  //     20 chars "Chicken pasta sachet"                      PASS  104 viewports / 0 violations
-  //     41 chars "Chicken and bacon pasta sachet with beans"  FAIL  4 viewports, "THE LANDING
-  //                                                                 SCREEN CONTAINS NO TAPPABLE ITEM"
-  // So the assertion still catches an over-tall first row, and 20 sits inside the safe region rather
-  // than on its edge. A long name may still WRAP at her narrowest viewports — that costs height,
-  // which she can scroll. What it must never do is take her first tappable item off the screen.
+  // Swept at 300x512. Headroom = viewport height minus the bottom of ROW 0's tick:
+  //      7 chars   1 line    28px
+  //     14 chars   2 lines   19px    <- this value
+  //     17 chars   3 lines    1px
+  //     20 chars   4 lines   -17px   FAIL — her first tappable item is off the screen
   //
-  // 20 also matches the current live maximum, and that is the point: Warwick sees no warning for a
-  // name he has already chosen, and sees one the moment he goes past what has been proven.
-  var LAYOUT_SAFE_NAME = 20;
+  // ⛔ CHARACTER COUNT IS ONLY A PROXY. WORD BOUNDARIES ARE WHAT ACTUALLY DECIDE.
+  // At 300x512 the name column is 118px — about seven characters a line — so where the spaces fall
+  // matters more than the length. TWO 20-CHARACTER NAMES DIFFER BY A WHOLE LINE:
+  //     "Chicken pasta sachet"   3 lines,    1px   passes
+  //     "Chicken and bacon pa"   4 lines,  -17px   fails
+  // The fixture's 20-char name was therefore passing on the luck of where its spaces fell.
+  //
+  // ⛔ AND NO CHARACTER COUNT CAN GUARANTEE A MARGIN HERE. THAT IS MEASURED, NOT CONCEDED.
+  // 14 was chosen to sit a full LINE below the cliff, and pinning the fixture to a 14-character name
+  // immediately disproved it:
+  //     "Chicken and ba"  14 chars, 2 words,  2 lines,  19px
+  //     "Bacon and eggs"  14 chars, 3 words,  3 lines,   1px
+  // At a 118px column, roughly seven characters a line, the LINE COUNT TRACKS THE NUMBER OF WORDS,
+  // and a threshold expressed in characters cannot see them. 14 is therefore an honest warning
+  // point — it fires before four lines, which is where the landing screen actually breaks — and it
+  // is NOT a guarantee of headroom. The residual 1px at three lines is a property of the vertical
+  // budget at 300x512, not of the name, and it is reported on every run rather than left implied:
+  // shopping-geometry-check.mjs prints `headroom=` beside every result and says so in words below 24px.
+  //
+  // ⚠️ 640x400 IS TIGHT FOR A REASON NO NAME CAN FIX, recorded so nobody re-derives there: it has
+  // 11px of headroom with a FOUR-character name and 3px with anything from 12 to 23 characters. That
+  // ceiling is the chrome above the list, not the name, and it does not fail in the swept range.
+  var LAYOUT_SAFE_NAME = 14;
 
   // ── THE 11 DECISIONS ───────────────────────────────────────────────────────────────────────────
   // Source: Deliverables/2026-08-13-mum-display-names-DECISIONS.md. 21 rows in 11 decisions, because
