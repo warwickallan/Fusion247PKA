@@ -218,3 +218,17 @@ deliberate Class-2 reference/evidence refs    : 5 — named, each with its durab
 
 **`/reconcile` is COMPLETE on every criterion within my authority.** The remote-ref retirement is
 outstanding behind a deliberate safety control.
+
+
+## The 37 remote refs — revalidation COMPLETE, classification banked and ready
+
+**Executed against the current head after the local retirements:**
+
+| result | count | meaning |
+|---|---|---|
+| **ancestors of `main`** | **36** | **every commit is already in `main`'s own history.** Removing the ref loses nothing — no bundle needed, no content anywhere else |
+| not an ancestor | **1** | `build-020/4f-control-cost-evidence` — 3 commits ahead. **Already rescued (257 lines at `62d7290`) and bundled with `verify` passing.** Its local ref is already retired |
+
+**All 37 are therefore PROVEN retire-safe.** The classification is complete and does not need redoing —
+**only the execution is blocked**, by the deterministic hook. When that guard is lifted for a bounded run,
+the retirement needs no further analysis.
