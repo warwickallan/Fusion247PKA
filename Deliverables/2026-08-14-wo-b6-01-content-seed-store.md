@@ -22,7 +22,8 @@ name: The durable Content Seed store on Supabase, and the three intake routes
 work_order_id: WO-2026-08-14-01
 build: BUILD-006
 wp_number: WP-1
-status: draft
+status: issued
+# read-back returned CLARIFY 2026-08-14; amended (Amendment 1) and issued the same day
 authorised_by: Warwick — plan accepted in substance 2026-08-03 (Wayfinder §STATUS); store settled 2026-08-14 ("supabase for this"); "nothing has changed" confirmed at this session's orientation
 authorised_date: 2026-08-14
 owner: keel
@@ -69,8 +70,9 @@ capability_evidence:
 # only route to a worker that inherits nothing else. Any deviation carries its escalation.
 credential_scope: none
 live_authority: none
-network: npm-registry-only
-# DEVIATION from standing default `none`. ESCALATION: Larry, 2026-08-14. BUILD-006 Wayfinder SS11 grants application architecture and durable store choice to Larry without Warwick; the store itself is Warwick's 2026-08-14 ruling (Supabase). Talking to Postgres requires the pg driver, which is the estate-wide convention (services/asdair/pipeline/deps.js, services/control-plane/worker/db.mjs), and installing it requires the npm registry. NO other runtime dependency and NO other network destination is permitted. live_authority remains none: Keel never touches the live Supabase project.
+network: npm-registry-only + github.com — git push and gh pr create/edit, for branch `build-006/b6-01-content-seed-store` ONLY
+# AMENDED 2026-08-14 (Amendment 1, C1) — the original value read `npm-registry-only` and its escalation said "NO other network destination is permitted", which forbade the push and draft PR that Sequencing 4 mandates. Keel refused to resolve the contradiction in its own favour and held. Correct behaviour; the defect was Larry's.
+# DEVIATION from standing default `none`. ESCALATION: Larry, 2026-08-14. BUILD-006 Wayfinder SS11 grants application architecture and durable store choice to Larry without Warwick; the store itself is Warwick's 2026-08-14 ruling (Supabase). Talking to Postgres requires the pg driver, which is the estate-wide convention (services/asdair/pipeline/deps.js, services/control-plane/worker/db.mjs), and installing it requires the npm registry. Publishing the branch and opening the draft PR requires github.com, and git_authority is GRANTED on the envelope. NO other runtime dependency and NO other network destination is permitted; no other branch may be pushed; main is never touched. live_authority remains none: Keel never touches the live Supabase project.
 dependency_policy: pg-only
 # DEVIATION from standing default `no-new-runtime-deps`. ESCALATION: Larry, 2026-08-14. BUILD-006 Wayfinder SS11 grants application architecture and durable store choice to Larry without Warwick; the store itself is Warwick's 2026-08-14 ruling (Supabase). Talking to Postgres requires the pg driver, which is the estate-wide convention (services/asdair/pipeline/deps.js, services/control-plane/worker/db.mjs), and installing it requires the npm registry. NO other runtime dependency and NO other network destination is permitted. live_authority remains none: Keel never touches the live Supabase project.
 private_surface: none
@@ -96,10 +98,15 @@ operational_handoff: none
 
 **AC1 — The schema exists, is forward-only and idempotent, and cannot touch anything else.**
 `services/vlogops/db/001_*.sql` creates schema `vlogops` and its tables. Applying it twice against a fresh
-cluster succeeds and leaves identical structure. A `teardown.sql` reverses it. **A test asserts the applied
-SQL contains no reference to `asdair`, `session_report`, `ops`, `tower` or `public`** — the store is
-Supabase, which is a live database holding real household data, and additive isolation is the whole reason
-this is safe. Start numbering at `001` in your own directory; **do not derive numbering from the Supabase
+cluster succeeds and leaves identical structure. A `teardown.sql` reverses it. **Isolation is proven two ways** *(AMENDED — Amendment 1, C2. The original text demanded a test that the
+applied SQL "contains no reference to … `public`", which collides with AC3 and AC5: `public` is the natural
+value of a privacy state, so `CHECK (privacy_state IN ('public', …))` would fail AC1's own test. Keel caught
+it and proposed strictly stronger evidence; authorised.)*: **(i)** a token scan with word boundaries over
+SQL **identifiers only**, after stripping comments and string literals; **and (ii)** a runtime proof —
+pre-create stub `asdair` and `session_report` schemas, apply the migration, assert the only schema created
+is `vlogops`, assert the stubs are untouched, tear down, and assert the stubs still survive. **(ii) is
+evidence about behaviour rather than about text, and it is the one that matters** — the store is Supabase,
+a live database holding real household data, and additive isolation is the whole reason this is safe. Start numbering at `001` in your own directory; **do not derive numbering from the Supabase
 migration ledger** (census §2 records why it is not a complete record).
 
 **AC2 — Identity is content-derived and stable.** The same source selected twice yields the same seed
@@ -116,9 +123,20 @@ rule, which is a hard architectural constraint, not a nicety.
 lands a seed whose evidence bundle is the **smallest sufficient** set — not everything in range. The
 selection rule is explicit in code and tested against a case where the range demonstrably contains more
 than the bundle. **`Deliverables/` and git history are FIRST-CLASS sources, not fallback: a Route 1 intake
-over a window containing ZERO session logs must still produce a non-empty bundle.** Use a real August 2026
-window as that test case — `Team Knowledge/session-logs/2026/08/` was empty until 2026-08-14, which is
-precisely the condition that would have made a session-log-only compiler useless.
+over a window containing ZERO session logs must still produce a non-empty bundle.** **The AC4 fixture window is `2026-08-05`** *(AMENDED — Amendment 1, M1)*.
+
+> ⚠️ **The original order stated `Team Knowledge/session-logs/2026/08/` "was empty until 2026-08-14". THAT
+> WAS FALSE.** Measured at the governance head by `git ls-tree`: **16 session logs, earliest
+> `2026-08-03-16-34`.** Larry had restated the Wayfinder's F3 finding — true when written on 2026-08-03 —
+> as current fact, and conflated it with last night's honest gap in *Larry's own close-session* entries for
+> 11–13 August. Two true statements collapsed into one false one. **Keel caught it at read-back; the map's
+> §6 F3 has been corrected by measurement.**
+>
+> **The requirement is unchanged, because the corrected measurement still supports it:** 2026-08-01,
+> 2026-08-02, **2026-08-05** and 2026-08-07 each carry **zero** session logs, and 2026-08-05 alone carries
+> **164 commits and 6 deliverables**. Use it, and name the reasoning beside it in code. The real risk was
+> never that the stream is dry — it is that the stream is **intermittent**, and on any single window
+> intermittence is indistinguishable from absence.
 
 **AC5 — Route 2, promotion.** A promotion creates a seed carrying all five contract fields — **source
 snapshot · provenance · privacy state · origin · proposed angle.** Missing any one is a **rejected**
@@ -205,6 +223,41 @@ ever read from a file inside this repository**, and nothing in the repo opens an
    a review nobody could have started sooner. **Do not merge. Do not touch `main`. Do not force-push.**
 5. **Return to Larry** with the evidence pasted in the same message as the claims, plus anything you had to
    decide that this order should have decided for you.
+
+---
+
+## AMENDMENT 1 — Larry, 2026-08-14, after Keel's read-back returned CLARIFY
+
+**The read-back found four defects in this order and one false fact. All are Larry's, none are Keel's, and
+holding rather than guessing was the correct call on every one.** The rows above are amended in place;
+this section records the adjudication and adds nothing that contradicts them.
+
+| # | Raised | Adjudication |
+|---|---|---|
+| **C1** | `network: npm-registry-only` forbade the push and draft PR that Sequencing 4 mandates | **UPHELD — a real contradiction.** Field amended to `npm-registry-only + github.com`, bounded to this one branch. Keel declined to resolve an authority contradiction in its own favour and did not even run `gh auth status`, because that would have used the network the order forbade. Exactly right. |
+| **C2** | AC1's literal string test fights AC3 and AC5 — `public` is a privacy-state value | **UPHELD, and the proposed substitute is stronger.** AC1 amended: identifier-token scan **plus** the runtime stub-schema proof. Behaviour beats text. |
+| **M1** | AC4's claim that August had no session logs is false | **UPHELD. Verified independently by Larry** (`git ls-tree` at `4135fd3` → 16 logs). AC4 amended, fixture window fixed at **2026-08-05**, and **the Wayfinder's §6 F3 corrected by measurement in the same change** — an amendment that left the body standing would be the exact CAPAE family on watch. |
+| **M2** | Versioning has no AC, though Wayfinder §10's Phase 1 row names it | **UPHELD — Larry's omission. AUTHORISED: add `selection_key char(64)` (indexed, non-unique) and the nullable `supersedes` self-FK.** Two columns and no machinery, which is what keeps Phase 2's door open. **Record them; build no versioning BEHAVIOUR on top — no supersession logic, no history walker, no reconciliation pass.** That boundary is the regrowth cap, and it is not negotiable at this phase. |
+| **M3** | Nothing gates `README.md`, `RUNBOOK.md`, `.env.example` | **ACKNOWLEDGED, deliberately ungated.** Write all three. They are not acceptance-bearing at Phase 1 and no AC is added for them. |
+| **M4** | `document_impact` is a `·`-separated string, not the template's mapping | **Clerical, non-blocking, PARKED** to the scheduled reconciliation. It identifies and marks ownership correctly; nothing turns on it. |
+
+**On the three assumptions Keel declared:** all three accepted as stated. **(1)** `child.kill()` on Windows
+maps to `TerminateProcess`, not a POSIX SIGKILL — **report both platforms and state the coverage split
+plainly; do not let the word "SIGKILL" stand unqualified in any evidence.** **(2)** Correct that the AC3
+mutate-then-delete proof runs against a temp fixture the test owns — **mutating a repository file would be
+writing outside the surface, and refusing to do it is the contract working.** **(3)** Correct that the
+scanner traverses `node_modules`; report the true file count, and any third-party hit is **reported, never
+edited or suppressed**.
+
+**On Keel's own disclosed error:** it piped a scanner probe into `tail` and read `$?` from `tail`, getting a
+false exit 0, then re-ran unpiped and got the true exit 2 — and **said so unprompted.** That is the
+`tee`-into-`head` hazard in another costume. Capturing every exit code unpiped is now an instruction, not a
+preference.
+
+**The `vlogops` posture Keel proposed is APPROVED as recorded:** no grants to `anon`, `authenticated` or
+`service_role`, so the new schema is invisible to the Data API; RLS untouched anywhere; `pg` in
+`dependencies` and not `devDependencies`. **PROCEED to implementation. No second read-back is required** —
+raise anything further as it arises rather than holding.
 
 ---
 

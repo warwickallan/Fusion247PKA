@@ -72,7 +72,7 @@ a **real** producer and a **real** package rather than another synthetic fixture
 | **Programme position** | BUILD-019 Phases 1–3 ✅ done → **BUILD-006 in full ← YOU ARE HERE** → BUILD-019 Phase 4 → the real end-to-end acceptance journey. Fixed by Warwick, 2026-08-03. |
 | **Current phase** | **Phase 1 — seed intake and the durable Content Seed store.** Phase 0 is PASS. |
 | **Current gate** | **All three intake routes land a durable Content Seed with stable identity; kill mid-intake and it recovers; identity survives restart.** (§10, Phase 1 row.) |
-| **Exact next action** | **Dispatch Phase 1 as a bounded Work Order.** Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are partly dry, so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
+| **Exact next action** | **Dispatch Phase 1 as a bounded Work Order.** Build the Content Seed store and the three intake routes to the detail in §5 — Route 1 *smallest sufficient* evidence bundle · Route 2's five-field promotion contract · Route 3's seed-plus-angle. **Read §6 F3 first: the streams the North Star names are INTERMITTENT — whole days carry zero session logs while being dense with other evidence — so `Deliverables/` and git history are first-class intake, not fallback.** §6 F4 names the orchestration substrates to reuse — **reuse, do not build a second framework.** |
 | **Model for Phase 1** | **Opus-high.** Durable state, identity, provenance and idempotency are the expensive things to get wrong, and everything downstream inherits them. |
 | **Depends on BUILD-019** | Only at Phase 7, and only through a **contract** — see §4. BUILD-006 develops against the accepted Publication Package contract without waiting for BUILD-019 Phases 4–7. |
 | **Open Warwick gates** | **None blocking Phase 1.** The §6 F4 store decision was raised and **SETTLED by Warwick on 2026-08-14 — Supabase.** Later: **spend** before any HeyGen render (§6 F1). |
@@ -201,7 +201,7 @@ three seed routes
 Carried from the canonical source, because Phase 1 is the frontier and "three routes" alone is not implementable.
 
 **Route 1 — existing records.** Warwick selects a date, period, session, build or journal thread. **VlogOps snapshots the smallest sufficient evidence bundle into its own durable store.** *"Smallest sufficient"* is the design constraint — not everything in range.
-→ **See F3: the streams this route names are partly dry or outside Git.** `Deliverables/` and git history must be first-class here, not fallback.
+→ **See F3: the streams this route names are INTERMITTENT or outside Git** *(corrected 2026-08-14 — the earlier "dry" reading was measured false; the consequence is unchanged)*. `Deliverables/` and git history must be first-class here, not fallback.
 
 **Route 2 — promote another Fusion247 output.** Eligible Cockpit outputs expose a **Promote to VlogOps** action. **Promotion creates a durable Content Seed containing: a source snapshot · provenance · privacy state · origin · proposed angle.** Those five fields are the contract for this route.
 
@@ -258,8 +258,13 @@ Actions: add seed · promote to VlogOps · approve · request revision · park �
 
 **Connector-shaped, and now unreliable, for:** the **Daily Flight Recorder**, which lives as a **ClickUp Docs page** (`Team Knowledge/session-logs/2026/07/2026-07-15-16-00_larry_…md:47,53`). **Warwick's 2026-08-03 ruling makes ClickUp unreliable, and dispatched specialists have no MCP connectors, so a worker cannot read it at all.**
 
-> #### 🔴 THE FINDING THAT MATTERS MOST: **the named intake streams are dry.**
-> **There are ZERO session logs in `Team Knowledge/session-logs/2026/08/`.** Newest is `2026-07-30-23-16`. Established twice — by directory glob, and independently by a draft this morning that checked *"across all refs via `git log --all --diff-filter=A`"*. **The four most eventful days in this estate's history produced no entry in VlogOps' primary intake stream.**
+> #### 🟠 THE FINDING THAT MATTERS MOST — **CORRECTED BY MEASUREMENT, 2026-08-14. The stream is NOT dry. The requirement it produced survives anyway.**
+>
+> **As written on 2026-08-03 this said: "There are ZERO session logs in `Team Knowledge/session-logs/2026/08/`. Newest is `2026-07-30-23-16`." That was TRUE THE DAY IT WAS WRITTEN and is FALSE NOW.** Measured at `4135fd3` by `git ls-tree`: **16 session logs in that directory, earliest `2026-08-03-16-34`, latest `2026-08-14-21-00`.** Caught by Keel at the WP-1 read-back, against a Work Order in which **Larry had restated the stale claim as current fact** — he had collapsed two different true statements (this one, written eleven days ago, and last night's honest gap in *Larry's own close-session* entries for 11–13 August) into one false one.
+>
+> **What survives, and it is the part that mattered:** individual windows genuinely carry **zero** session logs while being dense with other evidence. Measured the same day: **2026-08-01, 2026-08-02, 2026-08-05 and 2026-08-07 each have zero session logs** — and 2026-08-05 alone carries **164 commits and 6 deliverables**. A Source Compiler reading only the stream the North Star names would still find nothing on those days.
+>
+> **Therefore the requirement is unchanged: `Deliverables/` and git history are FIRST-CLASS intake, not fallback.** What changes is the reason — not *"the stream is dry"*, but *"the stream is intermittent, and intermittence is indistinguishable from absence on any single window."*
 >
 > That same draft records the workaround it was forced into: the evidence window was rebuilt *"from git history, `Deliverables/`, the audits and the programme record — **not** from the stream the pipeline is designed around."*
 >
