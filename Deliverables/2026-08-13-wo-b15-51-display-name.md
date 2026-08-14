@@ -88,7 +88,7 @@ contract_basis:
   - surface: services/asdair/cockpit-api/README.md
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Where Keel writes — `services/**`"
   - action: Apply migration 021 to the DISPOSABLE Postgres and prove the column exists and is nullable
-    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Method item 6 (Prove it by running it) and item 8 (test and script execution are yours), plus § Where Keel writes for forward-only Postgres migrations. RESOLVED BY LARRY, 2026-08-13; bounded by the authority defaults - DISPOSABLE Postgres only, loopback only."Critical rules\" scored higher (4) — read it must be read"
+    permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § Method item 6 (Prove it by running it) and item 8 (test and script execution are yours), plus § Where Keel writes for forward-only Postgres migrations. RESOLVED BY LARRY, 2026-08-13; bounded by the authority defaults - DISPOSABLE Postgres only, loopback only."
   - action: Prove display_name round-trips through the write route and is read back by a separate process
     permitted_by: "Team/Keel - Implementation Engineer/AGENTS.md § The integration role — durable and bounded (Warwick's ruling, 2026-08-02) — matched on: write, read"
 
