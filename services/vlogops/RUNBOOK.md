@@ -4,10 +4,15 @@
 
 > ## ⚠️ WHAT THIS SERVICE IS TODAY — read this first, it changes what you are expected to do
 >
-> **At Phase 2 there is still NO long-running service, NO daemon, NO scheduled task and NO
-> listening port.** VlogOps is a library, two database migrations and **two command-line
-> tools** — an intake and a compiler — each of which runs when a person runs it and exits when
-> it is done. Compilation is invoked for a seed exactly as intake is invoked for a window.
+> **At Phase 3 there is still NO long-running service, NO daemon, NO scheduled task and NO
+> listening port.** VlogOps is a library, three database migrations and **three command-line
+> tools** — an intake, a compiler and Scribe — each of which runs when a person runs it and
+> exits when it is done. Compilation is invoked for a seed exactly as intake is invoked for a
+> window, and drafting is invoked for a pack.
+>
+> **Scribe is the one that can reach the network**, and only when a gateway is configured for
+> it. Unconfigured, it refuses and exits `69` — see §5a. It never runs unattended, and nothing
+> retries it.
 >
 > **There is therefore nothing to supervise, nothing to keep alive, and no health endpoint to
 > poll.** If you are looking for a process to register with a supervisor, there isn't one yet
@@ -44,6 +49,23 @@ read from:
 the window; the pack holds what fits the story's budget, in chronological order, with the
 duplicates collapsed. **A pack that had to leave something out says so** — see §6.
 
+Then, once a pack exists, a third step turns it into the **Master Story Package**:
+
+| Step | Command | What it means |
+|---|---|---|
+| **status** | `vlogops-scribe status` | Which contract version is in force, and whether a model is configured. Needs no database. |
+| **draft** | `vlogops-scribe draft --pack <pack_id>` | Draft one canonical master (story question, beats, claims) and four siblings derived from it — script, blog, titles, thumbnail direction |
+| **verify** | `vlogops-scribe verify --package <package_id>` | Re-check that every sibling segment still traces to a master claim and to a real pack entry |
+
+**A package is a derivation, not a document.** There is no stored blog and no stored script:
+there are cited rows, and the readable siblings are projections of them. That is why a sibling
+cannot quietly acquire a claim the master never made — the database refuses the row.
+
+**⛔ A drafted package is NOT approved content.** Creative approval of any Master Story Package
+is Warwick's, once, at Phase 5. Nothing in this service asks for it, records it or implies it,
+and a package drafted with `--model stub` is mechanical placeholder text that is not written in
+anybody's voice.
+
 ## 2. Configuration
 
 One required environment variable, one optional.
@@ -52,6 +74,20 @@ One required environment variable, one optional.
 |---|---|---|
 | `VLOGOPS_DB_URL` | **yes** | Postgres connection string for the Content Seed store. The only database variable. |
 | `VLOGOPS_REPO_ROOT` | no | Which repository checkout Route 1 reads records from. Defaults to the one the service lives in. |
+| `VLOGOPS_MODEL_GATEWAY_URL` | for `scribe draft` only | The OpenAI-compatible gateway Scribe drafts through. **Not validated at startup** — see below. |
+| `VLOGOPS_MODEL_GATEWAY_KEY` | no | Bearer credential for that gateway. Read straight into the request header; never logged, never stored on a package. |
+| `VLOGOPS_SCRIBE_MODEL` | **whenever the gateway URL is set** | The model name to ask for. **There is no default and one must never be added.** |
+
+**Why the three Scribe variables are not checked at startup.** Intake and compile must keep
+working on a machine that has never had a model configured, so Scribe refuses at **call time**
+instead — loudly, by name, with exit `69`. A missing model is not a broken installation; it is
+a machine that cannot do one of the three jobs.
+
+**Why `VLOGOPS_SCRIBE_MODEL` has no default.** A sibling service once defaulted a role to an
+alias its gateway did not register and failed live with a `400`. The ruling was that a default
+model name the gateway does not provide must never survive preflight again. So a gateway URL
+with no model named is **also** a refusal. If you are tempted to add a default to make a command
+work, you are about to reintroduce that incident.
 
 **Values live outside this repository.** The estate convention is
 `node --env-file=<path outside the repo> …`. Nothing in the repository opens that file, and
@@ -120,9 +156,53 @@ same command again** — it will either complete the work or tell you it was alr
 |---|---|---|
 | **0** | Done. A seed was stored, or was already stored. | Nothing. |
 | **64** | The command line was wrong. | Read the usage it printed. |
-| **65** | The seed was **rejected** — a required field was missing. | Read the message; it names each missing field. This is the service refusing to store something incomplete, working as designed. **Do not try to force it through.** |
+| **65** | The input was **rejected** — a required field was missing, the named seed or pack does not exist, or a Scribe draft failed its citation rules. | Read the message; it names each problem. This is the service refusing to store something incomplete or untraceable, working as designed. **Do not try to force it through.** |
+| **69** | **Scribe has no model.** No gateway configured, or a gateway with no model named. | See §5a. This is a refusal, not a crash. |
 | **78** | Configuration is invalid or missing. | See §2. Every problem is listed. |
 | **1** | Something else failed — usually the database is unreachable. | See §7. |
+
+### 5a. "Scribe has no model" — exit 69
+
+```
+vlogops scribe: no language model is configured, so there is nothing to draft with.
+  - VLOGOPS_MODEL_GATEWAY_URL is unset — there is no gateway to call
+  - VLOGOPS_SCRIBE_MODEL is unset — this seam has NO default model name, on purpose.
+```
+
+**This is the seam working.** Scribe will not substitute a different model, a cached draft or a
+placeholder for a real one, because a Master Story Package must be attributable to whatever
+wrote it. Three ways forward, and only one of them is a fix:
+
+1. **Set both variables** to a gateway and a model that gateway actually registers. This is the
+   real fix, and it is a configuration change owned by whoever operates the service.
+2. **Ask for the deterministic stub explicitly:** `--model stub`. It calls no model and composes
+   mechanical placeholder text. The package records that permanently in `model_binding`, and the
+   rendered file carries a banner saying it is not Warwick's voice. Use it to exercise the
+   pipeline, **never** to produce anything anybody reads as writing.
+3. **Do neither.** A pack with no package is a perfectly safe state; nothing downstream is
+   waiting on a timer.
+
+**A `400` from a configured gateway** (exit `1`, message `gateway responded 400`) almost always
+means `VLOGOPS_SCRIBE_MODEL` names a model that gateway does not register. Ask the gateway what
+it has (`GET {gateway}/models`) rather than guessing another name.
+
+### 5b. "the draft is refused" — exit 65 from `scribe draft`
+
+The model produced something untraceable and **nothing was written**. The message lists every
+problem at once, each with a code:
+
+| Code | What the model did |
+|---|---|
+| `EVLOGOPSSCRIBEDRIFT` | A sibling asserted something the master does not — an unknown master claim, or evidence its own master does not rest on. |
+| `EVLOGOPSSCRIBEUNKNOWNCITATION` | It cited something that is not in the pack. A fabricated reference. |
+| `EVLOGOPSSCRIBEUNCITED` | A claim or segment carried no citation at all. |
+| `EVLOGOPSSCRIBEINCOMPLETE` | A missing story question, no beats, or a missing sibling. |
+| `EVLOGOPSSCRIBEREFUSED` | The **model** declined, saying the pack does not support a story. This is a correct outcome, not a fault. |
+| `EVLOGOPSSCRIBEUNPARSEABLE` | The output was not JSON. It is refused rather than repaired. |
+
+**Do not "fix" any of these by editing the data.** Re-run the draft, or accept that this pack
+does not support the story. There is deliberately no retry loop: retrying until something
+validates selects for output that satisfies the checker rather than the evidence.
 
 ## 6. Checking health
 
@@ -210,15 +290,40 @@ The three failures you will actually meet:
   unaffected by design. Confirm with `verify --pack` if you want the reassurance.
 
 **What you must never do:** do not `UPDATE` or `DELETE` rows in `vlogops.source_snapshot`,
-`vlogops.intake_run`, `vlogops.evidence_pack`, `vlogops.evidence_pack_entry` or
-`vlogops.compile_run`, or the identity columns of `vlogops.content_seed`. The database will
-refuse you — those tables are append-only by trigger, deliberately, because a later failure
-must never be able to rewrite what an earlier run captured. **If you find yourself wanting to
-edit one of these rows, escalate instead.**
+`vlogops.intake_run`, `vlogops.evidence_pack`, `vlogops.evidence_pack_entry`,
+`vlogops.compile_run`, `vlogops.story_package`, `vlogops.story_claim`,
+`vlogops.story_claim_citation` or `vlogops.story_segment`, or the identity columns of
+`vlogops.content_seed`. The database will refuse you — those tables are append-only by trigger,
+deliberately, because a later failure must never be able to rewrite what an earlier run
+captured. **If you find yourself wanting to edit one of these rows, escalate instead.**
 
 **Do not "fix" a pack by recompiling it either.** A pack's identity is its content, so a
 recompile of the same seed lands on the same pack. If you believe a pack is wrong, that is a
 finding for Larry, not an operation.
+
+**And do not try to correct a sibling by hand.** A sibling segment cannot be inserted unless it
+names a master claim of its own package and cites evidence that master rests on — four foreign
+keys enforce it, and they will refuse an edit that "just fixes the wording". A package you
+believe is wrong is a finding for Larry; the answer is a new draft, never a repaired row.
+
+**Reading a package's traceability without any application code:**
+
+```bash
+psql "$VLOGOPS_DB_URL" -c "
+  select s.sibling, s.ordinal, s.claim_id, s.source_ref
+    from vlogops.story_segment s where s.package_id = '<package_id>'
+   order by s.sibling, s.ordinal"
+
+# and the check that matters — this must return zero rows, always
+psql "$VLOGOPS_DB_URL" -c "
+  select s.sibling, s.ordinal from vlogops.story_segment s
+    left join vlogops.story_claim_citation cc
+      on cc.package_id = s.package_id and cc.claim_id = s.claim_id and cc.source_ref = s.source_ref
+    left join vlogops.evidence_pack_entry e
+      on e.pack_id = s.pack_id and e.source_ref = s.source_ref
+   where s.package_id = '<package_id>'
+     and (cc.claim_id is null or e.source_ref is null)"
+```
 
 ## 9. The database
 
@@ -227,10 +332,11 @@ any API role, so it is not reachable through the managed project's Data API — 
 direct connection with `VLOGOPS_DB_URL`.
 
 **Applying or changing the schema is not an operations task.** The migrations are
-`db/001_vlogops_content_seed.sql` and `db/002_vlogops_evidence_pack.sql`, applied in numeric
-order; applying them to the managed project is a live action owned by Larry, after review. Do
-not apply them, and do not run `db/teardown.sql` against anything that holds real seeds — it
-drops the whole `vlogops` schema, packs included.
+`db/001_vlogops_content_seed.sql`, `db/002_vlogops_evidence_pack.sql` and
+`db/003_vlogops_story_package.sql`, applied in numeric order; applying them to the managed
+project is a live action owned by Larry, after review. Do not apply them, and do not run
+`db/teardown.sql` against anything that holds real seeds — it drops the whole `vlogops` schema,
+packs and packages included.
 
 ## 10. Escalation
 
