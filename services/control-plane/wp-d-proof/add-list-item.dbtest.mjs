@@ -29,6 +29,11 @@ const MYPKA_DB = path.resolve(HERE, '..', 'db', 'mypka');
 const SCHEMA = path.join(ASDAIR_DB, '001_asdair_schema.sql');
 const M019 = path.join(ASDAIR_DB, '019_shopping_list_shop_identity.sql');
 const WITHOUT_019 = process.env.ASDAIR_DBTEST_WITHOUT_019 === '1';
+// CODEX F-1: same idiom as WITHOUT_019 above, for the grant the ownership guard needs on the
+// least-privilege role. Set ASDAIR_DBTEST_WITHOUT_290=1 to apply the chain WITHOUT migration 290 --
+// assertion (e) then fails with "permission denied for table shop", which DEMONSTRATES the grant's
+// necessity instead of asserting it. Never inverts a result; can never exit 0 on a failed assertion.
+const WITHOUT_290 = process.env.ASDAIR_DBTEST_WITHOUT_290 === '1';
 const PORT = Number(process.env.PGPORT || 0);
 if (!PORT) { console.error('set PGPORT (run via run-add-list-item-test.sh)'); process.exit(2); }
 const db = new pg.Client({ host: '127.0.0.1', port: PORT, user: 'postgres', database: 'postgres' });
@@ -239,6 +244,12 @@ async function main() {
       // guessing at the chain.
       await db.query(fs.readFileSync(path.join(MYPKA_DB, '030_command_request.sql'), 'utf8'));
       await db.query(fs.readFileSync(path.join(MYPKA_DB, '040_cockpit_grants.sql'), 'utf8'));
+      // 290 grants cp_worker `select (id, household_id) on asdair.shop` -- the ONE privilege the
+      // Codex F-1 ownership guard needs on this least-privilege role, and the reason (e) went red
+      // the moment the guard landed. Applied AFTER 040 because 040 revokes-then-grants; it does not
+      // name asdair.shop in its revoke block, so the order is safe either way.
+      if (WITHOUT_290) console.log('  *** ASDAIR_DBTEST_WITHOUT_290=1 -- migration 290 DELIBERATELY NOT APPLIED; (e) is EXPECTED to fail ***');
+      else await db.query(fs.readFileSync(path.join(MYPKA_DB, '290_cp_worker_shop_read.sql'), 'utf8'));
       await db.query(`alter role cp_worker login password '${pw}'`);
       worker = new pg.Client({ host: '127.0.0.1', port: PORT, user: 'cp_worker', password: pw, database: 'postgres' });
       await worker.connect();
