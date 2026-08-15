@@ -249,6 +249,28 @@ Which requires that **every useful output belonging to the work has a final cano
 
 **And it binds regardless of how the work arrived:** direct integration to main · a local merge and push · standing merge authority · `/reconcile` itself · or any other path that did not happen to create the usual PR/Tower trigger. **A missing PR trigger must NEVER again mean a missing external gate.**
 
+##### THE TWO INVOCATIONS THAT DELIVER THAT GATE — **named here because not naming them is what lost the route.** *(Warwick, 2026-08-15.)*
+
+**The BUILD-020 Tower route was never broken. It was never called.** Established 2026-08-15: the watcher runs from a byte-identical install (23 of 23 modules), polls every 60s with write-back on, and its Telegram credentials are provably loaded — yet **38,113 log lines contain zero review events**, because **nobody had posted the trigger since 2026-08-05.** The cause was documentary: `@tower head`, `@tower checkpoint` and `merge-check.mjs` appeared **nowhere** in this file, `AGENTS.md`, `.claude/` or `Team/`. **This clause mandated the gate and never named the lever.**
+
+**ROUTE A — the unattended PR ⇄ Tower round-trip.** Comment on an **OPEN** PR:
+
+```
+@tower head: <the PR's EXACT current 40-char head, re-read at the moment of posting>
+@tower checkpoint: <BUILD-REF>
+```
+
+**Both lines are required and the head must match the live API head exactly** — a mismatch is refused, and without `checkpoint:` no turn is created at all. The watcher then creates the turn, sends the `codex_qa_started` card to TowerBot, runs real Codex, **posts the verdict back onto the PR**, and notifies TowerBot.
+
+**ROUTE B — the Larry ⇄ Codex conversation, mirrored to TowerBot:**
+
+```
+node --env-file=C:/.fusion247/tower-baton.env \
+     services/control-plane/tower/merge-check.mjs --pr <N> --build <REF> --wp <REF> --claim "<the claim>"
+```
+
+**⛔ A MANUALLY STAGED `reviewDiff.mjs` PACKET IS NOT THE NORMAL OPERATING STATE** (Warwick, 2026-08-15). It is the fallback for a retrospective audit of state that never had a PR. **Where a real PR exists, the gate goes through Route A** — that is what produces the visible TowerBot conversation, the verdict on the PR, and the record in the Tower store.
+
 *(The measured incident: no PR merged to `main` between 2026-08-09 and 2026-08-15, while 107 commits of executable change and four migrations reached it — and the estate was reported reconciled. Codex was working the whole time; nothing ever asked it.)*
 
 #### CLOSE — the boundary
