@@ -1,15 +1,17 @@
-# VlogOps — the durable Content Seed store and the Source Compiler
+# VlogOps — the durable Content Seed store, the Source Compiler, Scribe and Verification
 
-**BUILD-006 Phases 1 and 2.** A seed comes in by one of three human-initiated routes and lands
-in Postgres in a form that cannot later be argued with. A **Source Compiler** then turns that
-seed into a bounded, ordered, provenance-complete **evidence pack**.
+**BUILD-006 Phases 1 to 4.** A seed comes in by one of three human-initiated routes and lands
+in Postgres in a form that cannot later be argued with. A **Source Compiler** turns that seed
+into a bounded, ordered, provenance-complete **evidence pack**. **Scribe** turns that pack into a
+versioned **Master Story Package**. **Verification** then stands between that package and
+everything downstream, and can **stop** it.
 
-These phases deliver a **library, two migrations and two CLIs**. There is no long-running
-service yet, no Cockpit UI, and no Scribe — those are Phases 3 to 7.
+These phases deliver a **library, four migrations and four CLIs**. There is no long-running
+service yet, no Cockpit UI and no publication — those are Phases 5 to 7.
 
-**Phase 2 is not a second component.** It imports Phase 1's modules, compiles seeds Phase 1's
-own intake routes created, and inherits Phase 1's identity, immutability and single-transaction
-guarantees rather than restating them. One growing spine, not two.
+**No phase here is a separate component.** Each imports the ones beneath it, works on rows they
+actually produced, and inherits their identity, immutability and single-transaction guarantees
+rather than restating them. One growing spine, not four.
 
 ## What "cannot later be argued with" means, concretely
 
@@ -131,13 +133,51 @@ deterministic stub. They establish the **contract** and the **plumbing**. They s
 about whether Scribe writes in Warwick's voice — that is a creative judgement, it is Warwick's
 alone, and it happens at **Phase 5**. See `samples/README.md`.
 
+## Phase 4 — verification that can BLOCK, in one paragraph
+
+Verification reads a stored package **from source** — the frozen snapshots, the compiled pack, the
+master claims, the citations and the sibling segments — and asks **five separate questions** of it:
+**fact · quotation · privacy · rights · cross-format consistency**. Each answers for itself with its
+own evidence **and its own coverage**, so a reader can see *which* one objected and *what it
+actually examined*. There is deliberately no aggregate boolean.
+
+**The verdict is not the mechanism.** A verifier that returns `false` cannot block anything — a
+caller is free not to ask, or to ask and ignore the answer. So a block is **rows**: an immutable
+`verification_run`, an immutable `verification_finding` per objection, and a `package_advance` gate
+whose `before insert` trigger refuses while any finding is undisposed. **Delete the CLI and the gate
+still holds.**
+
+| Property | How it is held |
+|---|---|
+| **A block survives a restart** | It is a row. Nothing is held in a process, so a restart has nothing to lose. |
+| **A block cannot be cleared by re-running the verifier** | The gate reads **every** run of a package, not the latest. A verdict is content-addressed, so a second identical run writes nothing. Fix the draft — which produces a different package — or record a decision. |
+| **An override is possible and cannot be silent** | `finding_disposition` names one finding, one person and one reason, all `NOT NULL` and non-empty, append-only. **No package-level override, no wildcard, no config flag.** |
+| **Overruling a failure ≠ answering a question** | Matched by foreign key on `(verification_id, ordinal, severity)`. The wrong pairing is not a writable row, and the CLI refuses the wrong act **before** writing anything. |
+| **An unanswered question stops the package too** | Severity `surface`. Wayfinder §11 makes publishing private or rights-encumbered material Warwick's decision, and a question nobody must answer is not a gate. |
+| **The header cannot misreport its body** | A `CHECK` ties `pass` to zero findings; a deferred constraint trigger ties the counts to the rows. |
+| **A ruleset change cannot rewrite an old verdict** | `ruleset_id` is the sha256 of `src/verify/contract/verification-v1.md`, and it participates in the verification's identity. |
+| **Privacy is a join, not a heuristic** | Phase 1 already stores `privacy_state` on every seed and snapshot. The pattern scan over publishable text is a second net, with a **closed** list. |
+| **Rights are declared or derived, never blurred** | `basis_source` records which. `warwick-supplied` is **never** derivable. |
+
+**The rules are documented for humans in `src/verify/contract/verification-v1.md`**, whose bytes
+are its identity. If you want to argue with a verdict, argue with the rule.
+
+**⛔ What Phase 4 does NOT claim.** It is **not a fact-checker** — it grounds numbers of two or more
+digits, money, percentages, dates, times and quotations against cited evidence, and reports how much
+of the package carried none of those. A rhetorical falsehood with no checkable token passes
+untouched, by construction. And the gate is structural **for the advance operation Phase 4 defines**:
+nothing here can force Phases 5–7 to write through it. **It must never be described as
+unbypassable.** See [DEMONSTRATION-PHASE4.md](DEMONSTRATION-PHASE4.md), which shows the whole thing
+being made to fail and made to pass.
+
 ## Layout
 
 ```
 db/001_vlogops_content_seed.sql   the seed schema — additive, idempotent, forward-only
 db/002_vlogops_evidence_pack.sql  the pack schema — same discipline, same namespace
 db/003_vlogops_story_package.sql  the package schema — traceability AS FOREIGN KEYS
-db/teardown.sql                   reverses all three, and nothing else
+db/004_vlogops_verification.sql   the verdict, the findings, the decisions AND THE GATE
+db/teardown.sql                   reverses all four, and nothing else
 src/config.mjs                    aggregated startup validation + the budgets + the version labels
 src/db.mjs                        lazy pool + the single-transaction seal
 src/identity.mjs                  canonical manifest, hashing, normalisation
@@ -154,11 +194,20 @@ src/scribe/proposal.mjs           the named-refusal layer, before anything is wr
 src/scribe/package.mjs            package identity + the sibling projection  (PURE)
 src/scribe/stub.mjs               the deterministic placeholder composer — NOT a model
 src/scribe/store.mjs              the draft seal, and the traceability read-back
+src/verify/contract/verification-v1.md  THE RULESET — every rule named, its bytes its identity
+src/verify/ruleset.mjs            loading and identifying a ruleset version
+src/verify/text.mjs               quotation, fact-token and private-pattern extraction  (PURE)
+src/verify/rules.mjs              THE FIVE DIMENSIONS  (PURE)
+src/verify/verifier.mjs           the verdict, and its content-derived identity  (PURE)
+src/verify/report.mjs             the verdict as a human reads it  (PURE)
+src/verify/store.mjs              the verdict seal, the decisions, and the advance gate
 bin/vlogops-intake.mjs            the intake CLI
 bin/vlogops-compile.mjs           the compiler CLI
 bin/vlogops-scribe.mjs            the Scribe CLI
+bin/vlogops-verify.mjs            the verification CLI — verify, override, answer, advance, rights
 samples/                          one real package, committed, labelled as stub output
 test/                             the proofs, and the runner that cannot go green on nothing
+DEMONSTRATION-PHASE4.md           verification driven end to end, made to fail and made to pass
 ```
 
 ## Running it
@@ -180,7 +229,24 @@ node bin/vlogops-compile.mjs verify  --pack <pack_id>
 node bin/vlogops-scribe.mjs status                        # which contract, and is a model configured
 node bin/vlogops-scribe.mjs draft  --pack <pack_id> --emit package.md
 node bin/vlogops-scribe.mjs verify --package <package_id>
+
+# then VERIFY it across the five dimensions — and it can BLOCK
+node bin/vlogops-verify.mjs status                        # which ruleset, and its id
+node bin/vlogops-verify.mjs verify  --package <package_id> --emit verdict.md   # exit 1 = blocked
+node bin/vlogops-verify.mjs state   --package <package_id>                     # exit 1 = cannot move
+node bin/vlogops-verify.mjs advance --package <package_id> --verification <id> --by <who>
+
+# rights, and the two human decisions
+node bin/vlogops-verify.mjs rights        --seed <seed_id> --ref <source_ref> --basis <basis> --by <who>
+node bin/vlogops-verify.mjs derive-rights  --seed <seed_id> --by <who>      # RIGHT-1 only
+node bin/vlogops-verify.mjs override --verification <id> --finding <n> --by <who> --reason "<why>"
+node bin/vlogops-verify.mjs answer   --verification <id> --finding <n> --by <who> --reason "<why>"
 ```
+
+`verify` **exits 1 when a package is blocked**, so a caller's `&&` chain cannot carry on as though
+it were clean. `override` clears a rule violation and `answer` clears a surfaced question; they are
+two commands rather than one flag because they are two different human decisions, and neither is
+possible without a reason.
 
 `draft` defaults to `--model gateway` and **refuses with exit `69`** when no gateway and model
 are configured. That default is deliberate: one that quietly stubbed would make every run a lie
@@ -195,8 +261,8 @@ a pre-existing `$DATABASE_URL` instead — that is the CI service-container path
 ## Applying the migration to the managed project
 
 **Not from here.** This service is proven entirely against a disposable local cluster and
-never connects to the managed project. Applying `db/001_*.sql`, `db/002_*.sql` or
-`db/003_*.sql` there is a live action that belongs to Larry, after review. Every one of them is
+never connects to the managed project. Applying `db/001_*.sql`, `db/002_*.sql`, `db/003_*.sql` or
+`db/004_*.sql` there is a live action that belongs to Larry, after review. Every one of them is
 additive, issues no grants, and touches no other namespace — and `db/teardown.sql` reverses
 exactly what they added.
 
