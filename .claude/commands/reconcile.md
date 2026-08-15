@@ -111,6 +111,14 @@ Inspect, by execution, at minimum:
 - **files and content unique outside `main`** — not merely commits
 - **any live service, scheduled task, watcher or installed component whose source path points at a
   worktree or a non-`main` checkout**
+- **every EXECUTABLE file this estate operates from OUTSIDE the repository** — the approved private store
+  ROOT `C:\.fusion247\` (root level, not its declared project subtrees), `~/.mypka/`, and **every off-repo
+  script named in `.claude/settings*.json` hooks or permissions**. **Enumerate and name them; open
+  nothing.** `GL-012` is NOT relaxed — this is a listing, not an inspection, and no secret is read.
+  *(Added 2026-08-15. Three executable `.mjs` files sat loose at the private-store root through two
+  convergence exercises that both reported CONVERGED. The pointers to them were inside the repository the
+  whole time, in `.claude/settings.local.json`, as standing permission entries — unread, because a
+  permission entry is not a Git object and not a bad source path.)*
 
 ## Classify every non-`main` source into exactly one of five
 
@@ -148,6 +156,12 @@ How to establish it — cheaply, with what already exists:
    ordinary case and it must stay cheap.
 4. **If it is non-empty, that is ASSURANCE DEBT.** Name it explicitly in the report and in the record.
    The estate is **NOT** reconciled while it stands, however clean the Git tree is.
+5. **Establish BY EXECUTION that the route which PRODUCES that boundary is still the route in use — name
+   the last review it actually produced, and when.** A proven review route that has silently stopped is
+   assurance debt, not convergence. *(Added 2026-08-15: the BUILD-020 TowerBot review journey stopped
+   being the observed route and no convergence exercise noticed, because a route that has quietly stopped
+   creates no branch, no worktree, no stash, no PR and no bad source path — it creates NOTHING, and
+   nothing is exactly what an enumeration-based scoreboard cannot count.)*
 
 ⛔ **This does NOT make Codex run on every `/reconcile`.** Documentation-only, pointer-only, receipt-only
 and other non-consequential reconciliation **manufactures no gate at all** — do not open one.
@@ -167,6 +181,16 @@ Establish whether any live runtime, scheduled task, watcher, service or installe
 feature worktree, a retired branch, or bytes that differ from canonical `main`. **Where an
 already-authorised and understood realignment makes the runtime consume canonical `main`, perform it and
 VERIFY it by execution.** ⛔ **Do not invent unrelated deployment work.**
+
+> **⛔ COMPARE CONTENT, NOT RAW BYTES — the obvious method LIES.** `core.autocrlf=true` with no root
+> `.gitattributes` means the working tree holds CRLF and git blobs hold LF. A raw `Get-FileHash` of an
+> install against the **working tree** falsely reports a difference; against the **blob** it falsely
+> reports a difference for anything installed from the working tree. **Normalise line endings and compare
+> content**, or compare against the exact blob the install was made from — the install's own
+> `INSTALLED-FROM.txt` records which. *(2026-08-15: Larry hit this and reported 7 of 10 governor modules
+> stale. All ten were content-identical. `tools/governor/convergence-runtime-check.ps1` compares raw
+> hashes against the working tree and reproduces the same false positive — a recorded defect in that
+> script, not in the runtime.)*
 
 ## Safety rules — each one is a past failure
 
@@ -204,7 +228,17 @@ runtime dependencies on noncanonical checkouts: 0
 main == origin/main                          : YES
 ASSURANCE DEBT (executable state beyond the
   last applicable Veritas/Codex boundary)    : NONE — or the exact base..head and what it contains
+executable code OUTSIDE the repository       : <n> — each path named and dispositioned
+proven review/assurance routes NOT observed  : NONE — or each named with its last actual output
 ```
+
+**⛔ THE TWO LINES ABOVE EXIST BECAUSE AN INSTRUCTION WITH NO REPORT LINE IS INERT, AND THAT IS DEMONSTRATED
+HERE RATHER THAN ASSERTED.** The runtime rule below has carried the words *"or bytes that differ from
+canonical `main`"* since this command's FIRST commit, and produced an answer **zero times** across three
+report blocks — because no line ever asked for it. Every other line in this block is a **count over an
+enumerated set**, so no line can be non-zero for something that was never enumerated: *"converged" gets
+computed from what was inspected rather than from what exists.* **That is the failure these two lines
+close, and adding an instruction without its line would repeat it.**
 
 **⛔ The assurance line is NOT optional and NOT roundable.** `NONE` is earned by running the restricted
 diff above, never assumed from a clean tree. **If it is anything other than `NONE`, the estate is NOT
