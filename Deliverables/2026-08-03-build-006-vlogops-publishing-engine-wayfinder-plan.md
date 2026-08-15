@@ -558,8 +558,8 @@ It is a **hypothesis about route, not law**. It gets corrected at phase boundari
 | Phase | Status | Model | Evidence |
 |---|---|---|---|
 | 0 — Promotion + Wayfinder map | ✅ **PASS** — **Warwick accepted in substance, 2026-08-03** | Opus-high + Warwick | This map; `Builds/BUILD-006-vlogops-publishing-engine/SOURCE-foundry-boundary-decision-2026-08-02.md` staged from Drive `1TxdOJKCY3IRVNyncc1gRGOhW2Qv5F2S2`; START/RESUME block proven byte-identical (927 bytes, sha256 `2c615931…dc4c51`, `diff` exit 0, mutation-tested exit 1); Pax findings F1–F5 absorbed into §6 |
-| 1 — Seed intake + Content Seed store | ⬜ **NOT STARTED — THE FRONTIER. Authorised; begin here.** | **Opus-high** | — |
-| 2 — Source Compiler | ⬜ NOT STARTED | Opus-high / routine | — |
+| 1 — Seed intake + Content Seed store | 🔵 **IMPLEMENTED · VERITAS GATE 1 PASS (all ten ACs) · NOT YET PASS AS A PHASE.** Row re-cut 2026-08-15 — it read "NOT STARTED — THE FRONTIER" while three other sections of this same map recorded Phase 1 active at PR #105. Caught by Veritas (D-3), not by its author. **Phase PASS is withheld deliberately: the store is Supabase by Warwick's decision and migration 001 has never been applied to the live project, so this is capability completely proven, not yet the human outcome.** | **Opus-high** | `Builds/BUILD-006-vlogops-publishing-engine/Assurance/veritas-wp-1-c35e4f9.md` · PR #105 (draft) · `services/vlogops/DEMONSTRATION.md` · CI `31852566925` green at the reviewed head, POSIX SIGKILL delivered, 45 executed subtests |
+| 2 — Source Compiler | 🔵 **IMPLEMENTED — awaiting assurance.** Real Phase 1 seed compiled to a real bounded pack; nine ACs evidenced by the builder. | Opus-high / routine | PR #107 (draft, based on Phase 1's branch) · commit `86e498d9` · CI `vlogops-proofs` green, **71 executed subtests** |
 | 3 — Scribe + Master Story Package | ⬜ NOT STARTED | Opus-high | — |
 | 4 — Verification | ⬜ NOT STARTED | Opus-high + Codex | — |
 | 5 — Cockpit + single approval | ⬜ NOT STARTED | Mixed | — |
