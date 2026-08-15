@@ -92,6 +92,14 @@ siblings"* — and admitting them would make this dimension fire on nearly every
 single digit still counts when it carries a unit: `£3`, `3%`, a date or a time. Another declared
 false negative.
 
+**A token a privacy rule also matched is recorded MASKED, never as a value.** Where an ungrounded
+token sits inside something the PRIVACY patterns matched in the same text — the digit groups of a
+phone number, for example — the FACT finding records the privacy rule, the length and a masked
+shape, exactly as a `PRIV-4` finding does, and the value goes nowhere. **Masking is a property of
+the run, not of one dimension:** the privacy dimension masking perfectly is worth nothing if the
+dimension beside it writes the same digits verbatim into a table that refuses `UPDATE` and
+`DELETE`, and from there into a document in a public repository.
+
 **What FACT does not catch, stated so nobody reads more into a pass than is there:** a false
 statement containing no number or date. "This was the moment everything changed" is not checkable
 against bytes and this dimension does not pretend otherwise. A `pass` from FACT means *the

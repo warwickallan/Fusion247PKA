@@ -36,7 +36,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { REPO_ROOT, SERVICE_ROOT, databaseUrl, freshSchema, newPool } from './helpers/harness.mjs';
-import { plantedModelClient } from './helpers/planted-drafts.mjs';
+import { PLANTED_PRIVATE_FRAGMENTS, plantedModelClient } from './helpers/planted-drafts.mjs';
 import { suppliedPackage, workingText } from './helpers/phase4-chain.mjs';
 import { ENV_GATEWAY_KEY, ENV_GATEWAY_URL, ENV_MODEL } from '../src/scribe/model.mjs';
 import { draftStoryPackage } from '../src/scribe/store.mjs';
@@ -223,9 +223,10 @@ test('AC3.2 — a planted PRIVATE DETAIL is caught and BLOCKS', async () => {
   process.stdout.write(`\n[AC3.2] package_id=${pkg.packageId} verdict=${out.verdict} rules=${out.findings.map((f) => f.rule).join(',')}\n\n`);
 });
 
-test('AC3.2b — a private detail planted in the PUBLISHABLE TEXT is caught, and never recorded', async () => {
+test('AC3.2b — a private detail planted in the PUBLISHABLE TEXT is caught, and NOTHING ANYWHERE records it', async () => {
   const packageId = await plantedPackage('private-detail');
 
+  // Compact output on purpose: `--json` pretty-prints, and the whole of stdout is swept below.
   const r = runCli(VERIFY_CLI, ['verify', '--package', packageId]);
   const out = lastJson(r.stdout);
 
@@ -234,15 +235,76 @@ test('AC3.2b — a private detail planted in the PUBLISHABLE TEXT is caught, and
   assert.ok(rules.includes('PRIV-4/email'), `no email finding: ${rules.join(',')}`);
   assert.ok(rules.includes('PRIV-4/phone'), `no phone finding: ${rules.join(',')}`);
 
-  // The finding must not carry the value it exists to suppress — into this table, this report, or
-  // the demonstration document that renders it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // THE PROPERTY, NOT THE DIMENSION — finding D-1.
+  //
+  // The previous version of this assertion scoped itself to `rule like 'PRIV-4%'`. It therefore
+  // proved that the dimension somebody was THINKING about masked correctly, and proved nothing
+  // about the property being claimed. In the same run, over the same sentence, the FACT dimension
+  // recorded the phone number's digit groups VERBATIM — as a token in a FACT-2 row and in the
+  // stored run manifest. Every Phase 4 table refuses UPDATE and DELETE, so that value was
+  // UNREMOVABLE, and it reached a demonstration document in a public repository.
+  //
+  // The masking gap was the defect. THE TEST SCOPING IS WHAT LET IT THROUGH. So this now sweeps
+  // EVERY stored column of the whole run and the entire CLI output, for every fragment of the
+  // planted value — including each digit group on its own, which no search for the full phone
+  // number would ever have found.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+
   const stored = await pool.query(
-    `select detail, evidence::text from vlogops.verification_finding
-      where verification_id = $1 and rule like 'PRIV-4%'`, [out.verification_id],
+    `select r.verification_id::text          as run_id,
+            r.manifest::text                 as manifest,
+            r.dimensions::text               as dimensions,
+            coalesce(string_agg(f.detail, ' | '), '')        as details,
+            coalesce(string_agg(f.evidence::text, ' | '), '') as evidences,
+            coalesce(string_agg(coalesce(f.rule,''), ' | '), '') as rules,
+            coalesce(string_agg(coalesce(f.claim_id,'') || ' ' || coalesce(f.sibling,'') || ' '
+                                || coalesce(f.source_ref,''), ' | '), '') as locators
+       from vlogops.verification_run r
+       left join vlogops.verification_finding f on f.verification_id = r.verification_id
+      where r.package_id = $1
+      group by r.verification_id, r.manifest, r.dimensions`,
+    [packageId],
   );
+  assert.ok(stored.rowCount > 0, 'no verification run was stored, so this proof would be vacuous');
+
+  const surfaces = [];
   for (const row of stored.rows) {
-    assert.ok(!row.detail.includes('example.invalid'), 'a privacy finding recorded the private value');
-    assert.ok(!row.evidence.includes('example.invalid'), 'a privacy finding recorded the private value');
+    for (const [column, value] of Object.entries(row)) {
+      surfaces.push([`verification_run/${column}`, String(value ?? '')]);
+    }
+  }
+  surfaces.push(['cli stdout', r.stdout], ['cli stderr', r.stderr]);
+
+  // The sweep must have something to sweep — a green over empty strings would be the same class
+  // of false assurance as the scoping this replaces.
+  const scanned = surfaces.filter(([, v]) => v.length > 0);
+  assert.ok(scanned.length >= 5, `only ${scanned.length} non-empty surfaces were swept`);
+
+  for (const fragment of PLANTED_PRIVATE_FRAGMENTS) {
+    for (const [where, value] of scanned) {
+      assert.ok(
+        !value.includes(fragment),
+        `${where} contains the planted private fragment "${fragment}". A value written to an `
+        + 'append-only table cannot be removed afterwards.',
+      );
+    }
+  }
+
+  // And the masking is POSITIVELY evidenced, not merely inferred from an absence: the FACT
+  // dimension must say it withheld something, and the withheld findings must carry a mask.
+  const factWithheld = out.findings.filter((f) => f.dimension === 'fact');
+  assert.ok(
+    factWithheld.length > 0,
+    'the FACT dimension raised nothing here, so this proof no longer exercises the cross-dimension '
+    + 'masking it exists to check — re-check the plant',
+  );
+  assert.equal(
+    out.dimensions.fact.coverage.tokens_withheld_as_private, factWithheld.length,
+    'the FACT dimension did not report withholding every private token it raised',
+  );
+  for (const f of factWithheld) {
+    assert.match(f.detail, /shown masked as/, 'a FACT finding over a private value carried no mask');
   }
 });
 

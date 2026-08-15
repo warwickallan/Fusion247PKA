@@ -204,24 +204,66 @@ $ node <driver> $PACK private-detail
 
 $ node bin/vlogops-verify.mjs verify --package $P2 --json
 EXIT_UNPIPED=1
- - block FACT-2:        blog[0] asserts number "01632", which appears in none of the evidence its
-                        master claim "beat-1" rests on
- - block FACT-2:        blog[0] asserts number "960111", which appears in none of the evidence its
-                        master claim "beat-1" rests on
+ - block FACT-2:        blog[0] asserts an ungrounded number that ALSO matches PRIV-4/phone —
+                        12 characters, shown masked as "0**********1". The value is deliberately
+                        not recorded here, by either dimension.
+ - block FACT-2:        blog[0] asserts an ungrounded number that ALSO matches PRIV-4/phone —
+                        12 characters, shown masked as "0**********1". The value is deliberately
+                        not recorded here, by either dimension.
  - block PRIV-4/email:  blog[0] contains a email — 33 characters, shown masked as "n************d".
                         The value is deliberately not recorded here.
  - block PRIV-4/phone:  blog[0] contains a phone — 12 characters, shown masked as "0**********1".
                         The value is deliberately not recorded here.
+
+fact coverage: tokens_checked=35 tokens_withheld_as_private=2
 ```
 
-**Read the last two lines carefully.** The finding names the rule, the length and a masked shape —
-**never the value.** A privacy finding that copied the offending detail into the findings table,
-and from there into this document and into a public repository, would have spread the exact thing
-it exists to stop.
+**Read all four lines carefully, and note that two of them are not from the privacy dimension.**
+Each finding names the rule, the length and a masked shape. The value goes nowhere — and *"nowhere"*
+includes the dimension standing next to the one that caught it.
 
-*(The two `FACT-2` findings are the phone number's digits, correctly reported as numbers that
-appear in no cited evidence. Each finding is individually true; a planted detail tripping two
-dimensions is noise worth knowing about rather than a defect.)*
+```
+$ psql -tAc "sweep every stored run and finding for any fragment of the planted value"
+rows_containing_planted_fragments=0
+```
+
+> ### This is the correction of finding D-1, and it is worth reading rather than skipping
+>
+> **The first version of this document had the phone number's digit groups printed here, verbatim,
+> in two `FACT-2` findings — three lines above a sentence claiming that could not happen.**
+>
+> The privacy dimension masked perfectly. The FACT dimension, in the same run over the same
+> sentence, recorded **both digit groups of that phone number** as ordinary ungrounded numeric
+> tokens — into a `verification_finding` row, into `verification_run.manifest`, and from there into
+> this file. **Every Phase 4 table refuses `UPDATE` and `DELETE`, so a value written there cannot be
+> corrected afterwards.**
+>
+> Nothing escaped: those digits are Ofcom's reserved drama range and the address is on the reserved
+> `.invalid` TLD. But a real private detail in a real package — a family phone number, a home
+> address — would have been written verbatim and unremovably by the dimension beside the one built
+> to prevent exactly that.
+>
+> **The masking gap was the defect. The TEST SCOPING is what let it through.** The proof asserting
+> "the value is never recorded" scoped itself to `where rule like 'PRIV-4%'`, so it checked the
+> dimension somebody was thinking about instead of the property being claimed. It now sweeps every
+> stored column of the whole run and the entire CLI output, for **every fragment including each
+> digit group on its own** — which no search for the full phone number would have found.
+>
+> **Masking is now a property of the RUN, not of one dimension.** Any dimension about to record a
+> value asks first whether a privacy rule matched it.
+
+**The residual limits, stated plainly rather than as a more careful guarantee:**
+
+- **Masking fires where a privacy PATTERN matched.** The pattern list is closed and named. A
+  private value no pattern recognises — an unusual number format, a person's name — is not masked,
+  because nothing identified it as private in the first place. That is the same limit `PRIV-4`
+  already has, inherited rather than added.
+- **`QUOT-1` still records a 60-character head of a mismatched quotation** in its evidence, so a
+  quoted private passage could be recorded that way. That is a different dimension and a different
+  finding; it is **reported, not fixed here**, because this correction is bounded to D-1.
+- **Ordinary factual errors are still recorded as values**, and must be: masking every number would
+  make a factual finding unreadable. `tokens_withheld_as_private=2` above says exactly how many
+  were withheld, out of 35 checked.
 
 ---
 
@@ -435,6 +477,10 @@ Stated plainly, because a demonstration that only lists its successes is adverti
 - **`QUOT-2` — an unverifiable quotation — is proven at the rule level only.** No current intake
   route produces a snapshot whose bytes are absent, so that path could not be exercised end to end
   here.
+- **Masking covers the FACT dimension, not every dimension.** `QUOT-1` still records a
+  60-character head of a mismatched quotation in its evidence, so a quoted private passage could be
+  stored that way. Reported, not fixed: the D-1 correction was deliberately bounded to the
+  fact/privacy overlap it named.
 - **The gate binds the advance operation Phase 4 defines**, and cannot bind stages that do not
   exist yet. See the box in §6.
 - **Nothing here is operational acceptance.** This is a disposable local cluster. The first live

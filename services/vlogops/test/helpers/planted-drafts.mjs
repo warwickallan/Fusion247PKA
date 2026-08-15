@@ -75,6 +75,34 @@ export function nearMiss(quote) {
   return words.join(' ');
 }
 
+// ── the planted private values, DEFINED ONCE ────────────────────────────────────────────────
+//
+// The plant and the assertion that hunts for it read the SAME constants, so they cannot drift
+// apart. That drift is finding D-1's real mechanism: the proof asserting "the value is never
+// recorded" scoped itself to `rule like 'PRIV-4%'`, so it checked the dimension somebody was
+// thinking about rather than the property being claimed — and the FACT dimension, writing the same
+// digits verbatim in the same run, went unnoticed.
+//
+// Reserved-for-fiction values throughout: Ofcom's 01632 960xxx drama range, and the reserved
+// `.invalid` TLD. Nothing here can ever reach a real person.
+export const PLANTED_PHONE = '01632 960111';
+export const PLANTED_EMAIL = 'not.a.real.person@example.invalid';
+
+/**
+ * Every fragment of a planted private value that must never appear in stored state or output.
+ *
+ * The digit GROUPS are listed separately on purpose: the whole point of D-1 is that a second
+ * dimension recorded `960111` and `01632` as bare numeric tokens, which no search for the full
+ * phone number would ever have found.
+ */
+export const PLANTED_PRIVATE_FRAGMENTS = Object.freeze([
+  PLANTED_PHONE,
+  PLANTED_EMAIL,
+  ...PLANTED_PHONE.split(' '),
+  PLANTED_EMAIL.split('@')[0],
+  PLANTED_EMAIL.split('@')[1],
+]);
+
 const PLANTS = {
   // ── AC3 · a FACTUAL ERROR ────────────────────────────────────────────────────────────────
   // A claim that contradicts the evidence entry it cites. The number is large and specific so it
@@ -93,8 +121,8 @@ const PLANTS = {
   // exists to prevent.
   'private-detail': (proposal) => {
     const seg = proposal.siblings.blog[0];
-    seg.text = `${seg.text} Contact the household directly on 01632 960111 or at `
-      + 'not.a.real.person@example.invalid for the full unredacted version.';
+    seg.text = `${seg.text} Contact the household directly on ${PLANTED_PHONE} or at `
+      + `${PLANTED_EMAIL} for the full unredacted version.`;
     return proposal;
   },
 

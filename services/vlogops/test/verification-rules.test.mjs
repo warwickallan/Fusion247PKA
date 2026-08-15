@@ -161,6 +161,43 @@ test('FACT grounds a token that names an evidence entry, rather than calling it 
     'naming the span of its own evidence was reported as a factual error');
 });
 
+test('FACT masks a token a PRIVACY rule also matched, and reports that it withheld it', () => {
+  // Finding D-1. The privacy dimension masked this phone number perfectly while FACT, in the same
+  // run over the same sentence, recorded its digit groups verbatim into an append-only table.
+  // Masking is a property of the RUN, not of one dimension.
+  const view = makeView({
+    claims: [claim('beat-1', 'a beat', ['repo:a.md'])],
+    segments: [segment('blog', 0, 'call the household on 01632 960111 today', 'beat-1', 'repo:a.md')],
+    entries: [{ source_ref: 'repo:a.md', text: 'nothing numeric in here at all' }],
+  });
+
+  const result = checkFact(view);
+  assert.ok(result.findings.length > 0, 'FACT raised nothing, so this proves nothing');
+  assert.equal(result.coverage.tokens_withheld_as_private, result.findings.length);
+
+  const serialised = JSON.stringify(result);
+  for (const fragment of ['01632 960111', '01632', '960111']) {
+    assert.ok(!serialised.includes(fragment),
+      `the FACT dimension recorded "${fragment}", which a privacy rule had already matched`);
+  }
+  for (const f of result.findings) {
+    assert.match(f.detail, /ALSO matches PRIV-4\/phone/);
+    assert.match(f.detail, /shown masked as/);
+    assert.equal(f.evidence.withheld, true);
+    assert.equal(f.evidence.token, undefined, 'a masked finding still carried a `token` field');
+  }
+});
+
+test('FACT still records an ORDINARY ungrounded number as a value — masking is not blanket', () => {
+  const result = checkFact(makeView({
+    claims: [claim('beat-1', 'there were 9999417 of them', ['repo:a.md'])],
+    entries: [{ source_ref: 'repo:a.md', text: 'no such number here' }],
+  }));
+  assert.equal(result.coverage.tokens_withheld_as_private, 0);
+  assert.match(result.findings[0].detail, /"9999417"/,
+    'an ordinary factual error was masked, which would make the finding unreadable');
+});
+
 test('FACT reports COVERAGE, including what it did not examine', () => {
   const result = checkFact(makeView({
     claims: [

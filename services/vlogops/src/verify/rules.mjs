@@ -27,6 +27,8 @@ import {
   extractFactTokens,
   extractQuotedSpans,
   flatten,
+  privacyCoverFor,
+  privateMatchesRaw,
   scanPrivatePatterns,
   tokenIsGrounded,
 } from './text.mjs';
@@ -110,12 +112,62 @@ function groundingTextFor(view, sourceRefs) {
 // everything changed" is not checkable against bytes and nothing here pretends otherwise. A pass
 // from FACT means the checkable tokens were grounded over the coverage reported — never that the
 // package is true.
+//
+// ⛔ AND IT NEVER RECORDS A VALUE A PRIVACY RULE MATCHED — finding D-1 ⛔
+// A token that sits inside something the privacy patterns matched in the same text is recorded
+// MASKED, in the same shape a privacy finding uses. Masking is a property of the RUN, not of one
+// dimension: the privacy dimension masking perfectly is worth nothing if the dimension beside it
+// writes the same digits verbatim into an append-only table that cannot be corrected afterwards.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * One FACT finding, with the value withheld wherever a privacy rule matched it.
+ *
+ * The two branches produce the same SHAPE of finding — rule, location, what was wrong — and differ
+ * only in whether the value or a masked form of it is recorded. A reader can still find the token
+ * in the package; nothing downstream ever receives it.
+ */
+function factFinding({ rule, where, locator, cited, token, privacyHits, maskedCount }) {
+  const cover = privacyCoverFor(token.raw, privacyHits);
+
+  if (cover === null) {
+    return {
+      f: finding(
+        'fact', 'block', rule,
+        `${where} asserts ${token.kind} "${token.raw}", which appears in none of the evidence cited`,
+        locator,
+        { token: token.raw, kind: token.kind, cited },
+      ),
+      masked: maskedCount,
+    };
+  }
+
+  return {
+    f: finding(
+      'fact', 'block', rule,
+      `${where} asserts an ungrounded ${token.kind} that ALSO matches ${cover.rule} — `
+      + `${cover.length} characters, shown masked as "${cover.redacted}". The value is deliberately `
+      + 'not recorded here, by either dimension.',
+      locator,
+      {
+        kind: token.kind,
+        cited,
+        withheld: true,
+        privacy_rule: cover.rule,
+        matched_length: cover.length,
+        masked: cover.redacted,
+      },
+    ),
+    masked: maskedCount + 1,
+  };
+}
+
 export function checkFact(view) {
   const findings = [];
   let claimsWithTokens = 0;
   let segmentsWithTokens = 0;
   let tokensChecked = 0;
+  let maskedTokens = 0;
 
   for (const claim of view.claims) {
     const tokens = extractFactTokens(claim.text);
@@ -123,16 +175,22 @@ export function checkFact(view) {
     claimsWithTokens += 1;
 
     const grounding = groundingTextFor(view, claim.citations);
+    const privacyHits = privateMatchesRaw(claim.text);
+
     for (const token of tokens) {
       tokensChecked += 1;
       if (tokenIsGrounded(token, grounding)) continue;
-      findings.push(finding(
-        'fact', 'block', 'FACT-1',
-        `master claim "${claim.claim_id}" asserts ${token.kind} "${token.raw}", which appears in `
-        + `none of the ${claim.citations.length} evidence entr${claim.citations.length === 1 ? 'y' : 'ies'} it cites`,
-        { claim_id: claim.claim_id },
-        { token: token.raw, kind: token.kind, cited: claim.citations },
-      ));
+      const built = factFinding({
+        rule: 'FACT-1',
+        where: `master claim "${claim.claim_id}"`,
+        locator: { claim_id: claim.claim_id },
+        cited: claim.citations,
+        token,
+        privacyHits,
+        maskedCount: maskedTokens,
+      });
+      maskedTokens = built.masked;
+      findings.push(built.f);
     }
   }
 
@@ -148,17 +206,24 @@ export function checkFact(view) {
     // number would fail correct drafts. It still cannot reach outside its master's evidence.
     const refs = citationsByClaim.get(seg.claim_id) ?? [seg.source_ref];
     const grounding = groundingTextFor(view, new Set([seg.source_ref, ...refs]));
+    const privacyHits = privateMatchesRaw(seg.text);
 
     for (const token of tokens) {
       tokensChecked += 1;
       if (tokenIsGrounded(token, grounding)) continue;
-      findings.push(finding(
-        'fact', 'block', 'FACT-2',
-        `${seg.sibling}[${seg.ordinal}] asserts ${token.kind} "${token.raw}", which appears in `
-        + `none of the evidence its master claim "${seg.claim_id}" rests on`,
-        { sibling: seg.sibling, segment_ordinal: seg.ordinal, claim_id: seg.claim_id, source_ref: seg.source_ref },
-        { token: token.raw, kind: token.kind, cited: [...new Set([seg.source_ref, ...refs])] },
-      ));
+      const built = factFinding({
+        rule: 'FACT-2',
+        where: `${seg.sibling}[${seg.ordinal}]`,
+        locator: {
+          sibling: seg.sibling, segment_ordinal: seg.ordinal, claim_id: seg.claim_id, source_ref: seg.source_ref,
+        },
+        cited: [...new Set([seg.source_ref, ...refs])],
+        token,
+        privacyHits,
+        maskedCount: maskedTokens,
+      });
+      maskedTokens = built.masked;
+      findings.push(built.f);
     }
   }
 
@@ -172,8 +237,10 @@ export function checkFact(view) {
       segments_carrying_checkable_tokens: segmentsWithTokens,
       segments_not_mechanically_checkable: view.segments.length - segmentsWithTokens,
       tokens_checked: tokensChecked,
+      tokens_withheld_as_private: maskedTokens,
       note: 'Checkable = number (2+ digits), currency, percentage, date or time, grounded against '
-        + 'the cited evidence. Text carrying none of those was NOT examined by this dimension.',
+        + 'the cited evidence. Text carrying none of those was NOT examined by this dimension. A '
+        + 'token a privacy rule also matched is recorded MASKED, never as a value.',
     },
   };
 }

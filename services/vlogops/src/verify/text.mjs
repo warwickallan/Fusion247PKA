@@ -246,14 +246,14 @@ function luhnValid(digits) {
 }
 
 /**
- * Scan publishable text for the named private-detail patterns.
+ * INTERNAL. Every private-detail match in a piece of text, WITH the matched value.
  *
- * ⛔ THE MATCH IS NEVER RETURNED IN FULL. A privacy finding that copied the offending value into
- * the findings table — and from there into a report, a demonstration document or a pull request —
- * would have spread the exact thing it exists to stop. What comes back is the rule, the length,
- * and a short masked shape. That is enough for a human to find it in the package and decide.
+ * ⛔ THE RAW VALUE MUST NEVER LEAVE THE PROCESS. ⛔ It exists here for exactly one purpose: so
+ * that another dimension can recognise a value as private and mask it too. Nothing may put a
+ * `raw` from this function into a finding, an evidence object, a manifest, a log line or stdout.
+ * `scanPrivatePatterns` below is the safe view and is what callers should reach for.
  */
-export function scanPrivatePatterns(text) {
+export function privateMatchesRaw(text) {
   const src = flatten(text);
   const hits = [];
 
@@ -263,13 +263,57 @@ export function scanPrivatePatterns(text) {
     while (m !== null) {
       const raw = m[0];
       if (!luhn || luhnValid(raw)) {
-        hits.push({ rule, redacted: redact(raw), length: raw.length });
+        hits.push({ rule, raw, redacted: redact(raw), length: raw.length });
       }
       m = re.exec(src);
     }
   }
 
   return hits;
+}
+
+/**
+ * Scan publishable text for the named private-detail patterns.
+ *
+ * ⛔ THE MATCH IS NEVER RETURNED IN FULL. A privacy finding that copied the offending value into
+ * the findings table — and from there into a report, a demonstration document or a pull request —
+ * would have spread the exact thing it exists to stop. What comes back is the rule, the length,
+ * and a short masked shape. That is enough for a human to find it in the package and decide.
+ */
+export function scanPrivatePatterns(text) {
+  return privateMatchesRaw(text).map(({ rule, redacted, length }) => ({ rule, redacted, length }));
+}
+
+/**
+ * Does this factual token sit INSIDE something a privacy rule matched in the same text?
+ *
+ * ⛔ WHY THIS EXISTS, AND IT IS THE WHOLE OF FINDING D-1 ⛔
+ *
+ * The privacy dimension masked correctly. The FACT dimension, in the same run, over the same
+ * sentence, recorded the digit groups of a planted phone number VERBATIM — as a token in a FACT-2
+ * finding and in the stored run manifest. Every Phase 4 table refuses UPDATE and DELETE, so a
+ * value written there is UNREMOVABLE; from there it reached a demonstration document committed to
+ * a PUBLIC repository, three lines above the sentence claiming it could not happen.
+ *
+ * Nothing had escaped — the planted values are reserved fakes. But a real private detail in a real
+ * package would have been written verbatim into an append-only table by the dimension standing
+ * next to the one built to stop exactly that.
+ *
+ * So masking is a property of the RUN, not of one dimension. Any dimension about to record a
+ * value asks this first.
+ *
+ * Returns the matching hit (rule, redacted, length) or `null`. **The raw value is never returned.**
+ */
+export function privacyCoverFor(tokenRaw, hits) {
+  const bare = String(tokenRaw).replace(/[,\s]/g, '');
+  if (bare === '') return null;
+
+  const hit = hits.find((h) => {
+    const hay = h.raw;
+    return hay.includes(tokenRaw) || hay.replace(/[,\s]/g, '').includes(bare);
+  });
+
+  return hit === undefined ? null : { rule: hit.rule, redacted: hit.redacted, length: hit.length };
 }
 
 /** First character, last character, everything between them masked. Never the value. */
