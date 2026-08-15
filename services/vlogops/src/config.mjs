@@ -53,6 +53,25 @@ export const PACK_SELECTION_RULE_VERSION = 'pack-class-coverage-then-rank-v1';
 /** What order they are presented in. Bump it if that rule changes. */
 export const PACK_ORDERING_RULE_VERSION = 'pack-chronological-occurred-at-v1';
 
+// ── Phase 3: Scribe and the Master Story Package ───────────────────────────────────────
+// Module constants for the same reason every budget above is one. In particular
+// SCRIBE_PROMPT_EXCERPT_CHARS participates in the derivation identity: an environment
+// variable that could widen it would silently change what question was asked of the model
+// while the derivation_id claimed the question was the same.
+//
+// The CONTRACT's version is deliberately NOT here — it is the sha256 of the contract file's
+// bytes, resolved in src/scribe/contract.mjs, because a version label in a constant can be
+// left alone while the file it names changes underneath it.
+
+/** Scribe's own generator label, written into every package and participating in its identity. */
+export const SCRIBE_VERSION = 'vlogops-scribe-v1';
+/** How a package is derived from a pack + a contract. Bump it if that rule changes. */
+export const SCRIBE_DERIVATION_RULE_VERSION = 'scribe-master-then-derived-siblings-v1';
+/** How much of each entry's frozen bytes reaches the prompt. Deterministic, and bounded. */
+export const SCRIBE_PROMPT_EXCERPT_CHARS = 4000;
+/** The four siblings, in canonical order. A package carries all four or it is not a package. */
+export const SCRIBE_SIBLINGS = Object.freeze(['script', 'blog', 'titles', 'thumbnail-direction']);
+
 function requireDsn(env, name, errors) {
   const raw = env[name];
   if (!raw || raw.trim() === '') {
