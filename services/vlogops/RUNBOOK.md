@@ -4,11 +4,15 @@
 
 > ## ⚠️ WHAT THIS SERVICE IS TODAY — read this first, it changes what you are expected to do
 >
-> **At Phase 3 there is still NO long-running service, NO daemon, NO scheduled task and NO
-> listening port.** VlogOps is a library, three database migrations and **three command-line
-> tools** — an intake, a compiler and Scribe — each of which runs when a person runs it and
-> exits when it is done. Compilation is invoked for a seed exactly as intake is invoked for a
-> window, and drafting is invoked for a pack.
+> **At Phase 4 there is still NO long-running service, NO daemon, NO scheduled task and NO
+> listening port.** VlogOps is a library, four database migrations and **four command-line
+> tools** — an intake, a compiler, Scribe and a verifier — each of which runs when a person runs
+> it and exits when it is done. Compilation is invoked for a seed exactly as intake is invoked
+> for a window, drafting is invoked for a pack, and verification is invoked for a package.
+>
+> **Verification is the one that can STOP something.** It is not automatic and does not run
+> unattended, but the state it writes is durable: a package it blocks cannot be advanced by
+> anybody until a named person records a decision. See §11.
 >
 > **Scribe is the one that can reach the network**, and only when a gateway is configured for
 > it. Unconfigured, it refuses and exits `69` — see §5a. It never runs unattended, and nothing
@@ -65,6 +69,23 @@ cannot quietly acquire a claim the master never made — the database refuses th
 is Warwick's, once, at Phase 5. Nothing in this service asks for it, records it or implies it,
 and a package drafted with `--model stub` is mechanical placeholder text that is not written in
 anybody's voice.
+
+Then, once a package exists, a fourth step decides whether it may go anywhere:
+
+| Step | Command | What it means |
+|---|---|---|
+| **status** | `vlogops-verify status` | Which ruleset is in force, and its id. Needs no database. |
+| **verify** | `vlogops-verify verify --package <package_id>` | Check the package across five dimensions — fact, quotation, privacy, rights, cross-format. **Exit 1 means BLOCKED.** |
+| **state** | `vlogops-verify state --package <package_id>` | Where a package stands, read from the store. **Exit 1 means it cannot move.** |
+| **rights** | `vlogops-verify rights --seed … --ref … --basis … --by …` | Record what a source actually is, so the rights dimension can answer |
+| **derive-rights** | `vlogops-verify derive-rights --seed … --by …` | Record the estate-owned basis of this repository's own material (`RIGHT-1` only) |
+| **override** | `vlogops-verify override --verification … --finding … --by … --reason …` | Overrule one **rule violation**, on the record |
+| **answer** | `vlogops-verify answer --verification … --finding … --by … --reason …` | Answer one **surfaced question**, on the record |
+| **advance** | `vlogops-verify advance --package … --verification … --by …` | Move a package on. **Refused by the database while any finding is undisposed.** |
+
+**A block is durable, not advisory.** It is rows: it survives the process, it survives a database
+restart, and re-running the verifier does not clear it. **There is no flag that disables
+verification.** See §11 for what to do about a blocked package.
 
 ## 2. Configuration
 
@@ -154,12 +175,12 @@ same command again** — it will either complete the work or tell you it was alr
 
 | Code | Meaning | What to do |
 |---|---|---|
-| **0** | Done. A seed was stored, or was already stored. | Nothing. |
-| **64** | The command line was wrong. | Read the usage it printed. |
-| **65** | The input was **rejected** — a required field was missing, the named seed or pack does not exist, or a Scribe draft failed its citation rules. | Read the message; it names each problem. This is the service refusing to store something incomplete or untraceable, working as designed. **Do not try to force it through.** |
+| **0** | Done. A seed was stored, or was already stored. From `verify`: the package **passed**. | Nothing. |
+| **64** | The command line was wrong, **or a decision was asked for in the wrong form** — an override with no reason, or an `override` aimed at a surfaced question. | Read the usage or the message. **Nothing was written.** |
+| **65** | The input was **rejected** — a required field was missing, the named seed, pack, package or finding does not exist, or a Scribe draft failed its citation rules. | Read the message; it names each problem. This is the service refusing to store something incomplete or untraceable, working as designed. **Do not try to force it through.** |
 | **69** | **Scribe has no model.** No gateway configured, or a gateway with no model named. | See §5a. This is a refusal, not a crash. |
 | **78** | Configuration is invalid or missing. | See §2. Every problem is listed. |
-| **1** | Something else failed — usually the database is unreachable. | See §7. |
+| **1** | From `verify` or `state`: the package is **BLOCKED** — this is the verifier working, not a fault. From `advance`: the gate refused. Otherwise something failed, usually an unreachable database. | See §11 for a blocked package, §7 otherwise. |
 
 ### 5a. "Scribe has no model" — exit 69
 
@@ -333,10 +354,10 @@ direct connection with `VLOGOPS_DB_URL`.
 
 **Applying or changing the schema is not an operations task.** The migrations are
 `db/001_vlogops_content_seed.sql`, `db/002_vlogops_evidence_pack.sql` and
-`db/003_vlogops_story_package.sql`, applied in numeric order; applying them to the managed
+`db/003_vlogops_story_package.sql` and `db/004_vlogops_verification.sql`, applied in numeric order; applying them to the managed
 project is a live action owned by Larry, after review. Do not apply them, and do not run
 `db/teardown.sql` against anything that holds real seeds — it drops the whole `vlogops` schema,
-packs and packages included.
+packs, packages and every verification verdict included.
 
 ## 10. Escalation
 
@@ -350,7 +371,59 @@ packs and packages included.
 **Operational defects never go straight to the engineer.** They go to Larry, who decides
 whether they become authorised work.
 
-## 11. What this runbook does not yet cover
+## 11. A BLOCKED package — what it means and what to do
+
+`verify` exiting **1** is the verifier doing its job. A blocked package is a normal, safe state:
+nothing is broken, nothing is waiting on a timer, and nothing needs repairing.
+
+**Where a package stands, in one query — no code required:**
+
+```bash
+psql "$VLOGOPS_DB_URL" -c \
+  "select left(package_id,12) as package, undisposed_blocks, undisposed_surfaced,
+          advanced, advanced_by, advanceable
+     from vlogops.package_verification_state"
+```
+
+Or, per package: `node bin/vlogops-verify.mjs state --package <package_id>` (exit **1** means it
+cannot move).
+
+**Two kinds of objection, and they need different human acts:**
+
+| Severity | Means | Cleared by |
+|---|---|---|
+| **`block`** | A rule in the ruleset was broken. | `override … --by <who> --reason "<why>"` |
+| **`surface`** | A question was raised that this machinery is **not entitled to answer** — most often unclassified privacy or undeclared rights. | `answer … --by <who> --reason "<why>"` |
+
+**Both stop the package.** A question nobody is forced to answer is not a gate.
+
+**⛔ THREE THINGS NOT TO DO:**
+
+1. **Do not re-run `verify` hoping for a different answer.** A verdict is content-addressed and
+   the gate reads every run of a package, so a second run adds a row and clears nothing. This is
+   deliberate.
+2. **Do not edit rows to clear a finding.** Every Phase 4 table refuses `UPDATE` and `DELETE`;
+   attempting it fails, and it would be the silent override the design forbids.
+3. **Do not look for a flag to switch verification off.** There isn't one, by design.
+
+**The correct fixes, in order of preference:**
+
+- **Fix the draft.** Re-draft the package. A corrected package has a *different* `package_id`,
+  because a package is immutable and its identity is its content — so it is a genuinely different
+  thing, verified on its own terms.
+- **Record the missing fact.** Most surfaced questions are answered by supplying what nobody had
+  supplied yet: `vlogops-verify rights …` for an undeclared rights basis, or re-taking the seed
+  with an explicit `--privacy` state. *(A seed taken with no `--privacy` is stored `unclassified`,
+  and raises `PRIV-3` every time. That is the gap becoming visible, not a bug in the verifier.)*
+- **Overrule it.** Warwick owns the product. `override` or `answer`, with a reason, on the record,
+  permanently.
+
+**Reading a finding.** Each names the rule that raised it — `FACT-1`, `PRIV-4/email`, `RIGHT-2`,
+`XF-3` and so on. Every rule is written out in plain English in
+`src/verify/contract/verification-v1.md`. **Argue with the rule, not with the machine.** A privacy
+finding deliberately shows a masked shape rather than the value it matched; that is not an error.
+
+## 12. What this runbook does not yet cover
 
 Phase 6 adds durable production orchestration — long-running work, retries, callbacks and
 asset versions. **That is when this service becomes something to supervise**, and this runbook
