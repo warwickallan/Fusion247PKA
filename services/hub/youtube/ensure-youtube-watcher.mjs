@@ -155,14 +155,19 @@ export function defaultStartWatcher({
 /**
  * Escalation transport. The SAME route the STUCK nudge already uses (watch-captures.mjs) — one
  * notification path, not a second one (AC6). Best-effort: a failed send must never break recovery.
+ *
+ * The route is the CANONICAL governor ding at `~/.mypka/governor/ding.mjs` (source of truth:
+ * `tools/governor/ding.mjs`), not the loose out-of-version-control script this used to spawn —
+ * WO-2026-08-15-06, Warwick's decision 2026-08-15. It must stay identical to the invocation in
+ * watch-captures.mjs, which carries the full reasoning including why there is no `--env-file`.
+ * Credentials still live outside Git; ding.mjs reads them itself and only a path literal is here.
  */
 export function defaultNotify(message) {
   const tmp = path.join(os.tmpdir(), `yt-watcher-escalation-${Date.now()}.txt`);
+  const ding = path.join(os.homedir(), '.mypka', 'governor', 'ding.mjs');
   try {
     fs.writeFileSync(tmp, message);
-    const r = spawnSync(process.execPath,
-      ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', tmp],
-      { encoding: 'utf8', windowsHide: true });
+    const r = spawnSync(process.execPath, [ding, tmp], { encoding: 'utf8', windowsHide: true });
     return r.status === 0;
   } catch {
     return false;

@@ -70,13 +70,30 @@ function gatewayDsn() {
 // Warwick reads these on a phone, and a second notification route is explicitly out of scope. Both the
 // STUCK nudge and the capture briefing go through here. Best-effort by construction: a failed send must
 // never break a scan pass.
+//
+// THE SEND PATH IS THE CANONICAL GOVERNOR ding, NOT a loose script (WO-2026-08-15-06, Warwick's
+// decision 2026-08-15). This used to spawn a loose ding script that lived outside version control
+// under the private runtime home (WO-2026-08-15-06 names the exact path; it is deliberately not
+// repeated here, so that a grep for it stays a true test of whether any caller remains). A send path
+// Warwick's acceptance depends on must not be able to change with nothing in Git recording it.
+// The canonical implementation is `tools/governor/ding.mjs`, installed at
+// `~/.mypka/governor/ding.mjs`, and root CLAUDE.md § Rule 4a names that installed path as THE delivery
+// route. Credentials did not move and never will: ding.mjs reads them itself, at runtime, from the
+// approved file under the secrets store. Only a path literal is in Git.
+//
+// NO `--env-file`, DELIBERATELY — do not "restore" it. Rule 4a: "it loads its own credentials; no
+// `--env-file`, no shell preparation." ding.mjs ignores an inherited TELEGRAM_BOT_TOKEN by design, so
+// the flag never fed it anything. It was also actively harmful: measured on node v22.18.0,
+// `--env-file=<missing file>` kills the child with exit 9 BEFORE the script runs, so a missing config
+// produced NO durable line in the ding record — defeating the load-bearing half of ding.mjs, which
+// exists to make "exited having sent nothing, silently" impossible. Without the flag that same case
+// exits 2 and writes the record.
 export function defaultSendDing(message, tag = 'yt') {
   const tmp = path.join(os.tmpdir(), `${tag}-${Date.now()}.txt`);
+  const ding = path.join(os.homedir(), '.mypka', 'governor', 'ding.mjs');
   try {
     fs.writeFileSync(tmp, message);
-    const r = spawnSync(process.execPath,
-      ['--env-file=C:/.fusion247/fusion-capture-gateway.env', 'C:/.fusion247/larry-ding.mjs', tmp],
-      { encoding: 'utf8', windowsHide: true });
+    const r = spawnSync(process.execPath, [ding, tmp], { encoding: 'utf8', windowsHide: true });
     return r.status === 0;
   } catch {
     return false;
