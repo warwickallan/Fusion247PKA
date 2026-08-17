@@ -1,5 +1,67 @@
 # BUILD-015 AsdAIr — Wayfinder plan
 
+> # 🔴🔴🔴 STOP. READ THIS BLOCK BEFORE ANY OTHER LINE OF THIS MAP.
+>
+> ## ⚑ THE NORTH STAR CHANGED ON 2026-08-17. WARWICK'S PRODUCT RULING. THE MAP IS RE-CUT AROUND IT.
+>
+> **AsdAIr is Mum's autonomous AI shopping operator.** Mum supplies her normal input; from that point
+> **AsdAIr owns the task end to end** — understand it · use household history, catalogue, rules and prior
+> decisions as context · inspect live ASDA where necessary · resolve products semantically · **ask Warwick
+> only genuine shopping decisions that cannot safely be resolved** · construct the intended shop ·
+> **operate the live ASDA browser** · **search for and evaluate products it has never seen before** · add
+> correct products and quantities · reconcile the trolley against the intended shop · **leave the correct
+> trolley ready at the deliberate checkout/payment boundary.**
+>
+> **CANONICAL, and NOT restated here:**
+> [`Builds/BUILD-015-.../BUILD-015-goal-contract.md`](../Builds/BUILD-015-asdair-durable-household-shopping-steward/BUILD-015-goal-contract.md)
+> — **re-cut whole on 2026-08-17.** It carries the North Star, the agentic authorisation, the acceptance
+> table, the product boundaries and the full named supersession register (S-1 … S-12). **Open it before
+> acting on anything in this map.**
+>
+> ### The four things that change how you read every section below
+>
+> 1. **The SUPERVISED bar is GONE.** Any text on this map — or anywhere in the estate — saying the bar is
+>    *"supervised, not hands-off"*, that *"a HUMAN logs into Asda"*, that the basket writer is *"Sonnet in
+>    Claude for Chrome"*, or that *"an unattended ASDA browser"* is deferred, **is SUPERSEDED as of
+>    2026-08-17.** Goal contract § "What this ruling supersedes, by name".
+> 2. **CDP IS AUTHORISED.** The 2026-08-04 exclusion and the live-account testing prohibition are
+>    **LIFTED** — Warwick has confirmed that exclusion was an internal architecture decision, not his.
+> 3. **THE AI IS THE OPERATOR, NOT THE FALLBACK.** A capable reasoning model in normal production is the
+>    authorised architecture. A deterministic executor may perform mechanical browser actions *underneath*
+>    an AI; **it must never be the semantic decision-maker.** **Do not preserve a failed architecture for
+>    sunk cost.** Terra optional · CDP optional · Sonnet optional · stored ASDA ids are an optimisation.
+> 4. **WARWICK AND LARRY ARE BOTH OUTSIDE THE RUNTIME.** Warwick may be asked only for a genuinely
+>    ambiguous shopping question, a trolley review, and checkout/payment. **Larry is not in the weekly
+>    runtime at all.**
+>
+> **The single test that settles anything this map does not name:**
+> **«Does it help AsdAIr autonomously complete Mum's shop?» If yes, use it. If no, remove it from the
+> runtime.**
+>
+> ### ⛔ What this ruling does NOT authorise
+>
+> **No new governance programme. No control plane. No registry, tracker, validator or state machine built
+> in response to it.** The regrowth cap (root `CLAUDE.md`) applies at full force. **The ruling removes
+> architecture; it does not commission machinery.**
+
+## ⚑ WORK CLASSIFICATION — read this before the detail *(per [[Templates/wayfinder-plan]])*
+
+| | Work type | Outcome | Owner | Model / effort | Blocks what | Done when |
+|---|---|---|---|---|---|---|
+| **FRONTIER** | **REMEDIATE** | **The agentic runtime.** AsdAIr resolves Mum's input and operates the live ASDA browser itself — including products it has never seen — with no Larry in the runtime and no Warwick technical intervention. Correcting the demonstrated 2026-08-16/17 failure: the capable model was engineered out of the loop and replaced by weak deterministic components. | Larry (build) · Warwick (product decisions) | Opus-class; multi-session. **Recalculate at the next class change — do not inherit this figure.** | Everything. There is no downstream product until the operator exists. | **A real weekly shop completes all nine acceptance requirements in the goal contract's acceptance table** — Mum's ordinary input, no Larry, no Warwick technical intervention, correct interpretation, known AND unseen products handled, only genuine ambiguity asked, live trolley built, contents and quantities reconciled, Warwick takes over only at checkout. |
+| **NEXT** | **ACCEPT** | **The ordinary week.** The same journey repeats in normal weekly use without special handling. | Larry (operate) · Mum + Warwick (use) | Low per run; the cost is elapsed weeks, not tokens. | Any claim that BUILD-015 is complete, durable or closed. | **Repeated successful weekly runs**, each meeting the same nine requirements, with no manual rescue in between. |
+| **SIDECAR / NON-BLOCKING** | **ADMIN** | Evidence filing, receipts, session logs, the parked-tangent list, defect-ledger housekeeping. | Larry | | | |
+| **PARKED** | **BUILD** | Budget band (rule 7 — structurally unevaluable, no price source) · `previously_ordered` / `command_request` schema drift · the banana↔strawberry directive question · the live data conflicts (Arla BOB, the Sure variant, the `next_week_draft` test row). | Warwick decides; Larry establishes. | | | |
+
+> **⛔ THE CELLS STATE CLASS, OUTCOME AND A FALSIFIABLE `DONE WHEN` — NEVER THE DAY'S PROGRESS.** This
+> block is updated only at a phase boundary. A cell that reads like a status report has been filled in
+> wrongly.
+
+**Why the frontier is REMEDIATE and not BUILD:** the capability was built and certified component by
+component, and **the real run of 2026-08-16/17 demonstrated it does not deliver the outcome.** Naming that
+BUILD would hide a demonstrated failure inside "remaining work". Goal contract § "Why the old architecture
+failed".
+
 > ## ⭐ RECONCILED 2026-08-08 — BUILD-020 Sub-phase 4E (`BUILD-015-PREJUMP-WAYFINDER-HANDOVER`)
 >
 > **This map was reconciled against current repository, runtime and evidence truth on 2026-08-08,
@@ -80,7 +142,26 @@ of them first and must learn from that one which document it is allowed to act o
 
 ---
 
-## 🚦 THE BUILD-015 EXECUTION VIEW — FOUR LANES. **Read this first. Everything below is detail.**
+## 🚦 THE BUILD-015 EXECUTION VIEW — FOUR LANES. ~~**Read this first.**~~ **⛔ BOUNDED 2026-08-17 — read the ⚑ WORK CLASSIFICATION block at the top of this map first. This lane view is DIAGNOSTIC DETAIL, dated 2026-08-09, and is no longer the top of the map.**
+
+> **⛔ THREE THINGS IN THE LANES BELOW ARE SUPERSEDED BY THE 2026-08-17 RULING. Do not act on them:**
+>
+> 1. **Lane C's *"no Larry-less claimer BY DESIGN"*** (`stages.js:85`: *"waitsFor: the supervised browser
+>    runner (Larry, at the keyboard)"*) — ⛔ **that design is REVERSED.** A Larry-less claimer is now
+>    **required**. This is a defect to fix, not a boundary to respect.
+> 2. **Every lane's implied basket-writer** — Sonnet in Claude for Chrome, or a supervised session. ⛔
+>    **AsdAIr operates the browser itself and chooses its own mechanism. CDP is authorised.**
+> 3. **Lane statuses generally** — these were true on 2026-08-09 and several have since moved in both
+>    directions. **Resolve status by execution, not from this table.**
+>
+> **What survives and is still binding:** Warwick's **Ruling 2** (household identity and ASDA retrieval are
+> separate concerns; search is retrieval, not redefinition; several plausible survivors → stop and ask) —
+> now doubly load-bearing · the **never-substitute** and **never-checkout** boundaries · the **search
+> heuristic** (*when a module looks complete, find its production caller*) · the **standing safety
+> constraint** on order-confirmation forwarding · the **PARALLEL PREPARATION, SERIAL PRODUCT TRUTH**
+> operating rule.
+
+**Everything below is detail.**
 
 > **Warwick's operating rule, 2026-08-09: PARALLEL PREPARATION. SERIAL PRODUCT TRUTH.**
 > The **live journey stays waterfall** — a downstream stage must never run on semantically invalid
@@ -272,29 +353,60 @@ silently discharged here.
 
 ---
 
-## 1. GOAL CONTRACT AND NORTH STAR
+## 1. GOAL CONTRACT AND NORTH STAR — **RE-CUT 2026-08-17**
 
-**Canonical: `Builds/BUILD-015-asdair-durable-household-shopping-steward/BUILD-015-goal-contract.md`.**
-Not restated here. The North Star, in Warwick's terms:
+**Canonical: `Builds/BUILD-015-asdair-durable-household-shopping-steward/BUILD-015-goal-contract.md`,
+re-cut whole on 2026-08-17. Not restated here.** The compact form:
 
-> **Send Mum's list to ShopperBot and have the shopping sorted, without disturbing Warwick or Larry
-> while other work is in flight.**
+> **AsdAIr is Mum's autonomous AI shopping operator.** Mum supplies her normal input; AsdAIr owns the
+> task end to end, through to a correct trolley left ready at the checkout/payment boundary.
 
-The formal contract's north star is a genuinely durable, spawnable household-shopping specialist
-that orients from committed function plus Supabase state, plans correctly, asks for decisions when
-required, persists outcomes and learning safely, and survives fresh runtime instances.
+**AsdAIr must be AGENTIC.** A capable reasoning model in normal production is the authorised
+architecture — it inspects the image, inspects its own durable state, queries catalogue/history/rules,
+reasons across them, uses tools, searches, inspects pages, compares candidates semantically, makes
+ordinary shopping judgements, drives browser automation, recovers and retries, and chooses its own
+execution mechanism. **AI judgement is part of the product contract, not a fallback.** A previously
+unseen product is a **normal case it resolves itself**; only several materially plausible survivors
+become a Warwick question.
 
-**The accepted bar is SUPERVISED, not hands-off** (Warwick, 2026-07-28). Fully hands-off shopping
-was descoped 2026-07-21. **Warwick remains the checkout and payment gate, permanently.**
+**⛔ THE FOLLOWING TEXT STOOD HERE AND IS SUPERSEDED 2026-08-17 — struck, not appended to:**
 
-**The failure this build exists to close:** the method lived only in machine-local memory and
-per-session scratchpads, and the three loop tables had zero writers anywhere in the repo. Each week
-started no better informed than the last.
+> ~~"**The accepted bar is SUPERVISED, not hands-off** (Warwick, 2026-07-28). Fully hands-off shopping was
+> descoped 2026-07-21."~~
 
-**Larry is outside the weekly operating path.** AsdAIr must run with zero Claude Code involvement;
-model calls go through `FUSION_GATEWAY_URL`.
+**That descope is REVERSED.** Autonomous operation of the live ASDA browser is in scope and required.
+**Checkout and payment remain Warwick's, permanently; the supervised browser session does not.** Register
+entries S-11 and S-1 through S-4 in the goal contract.
 
-### ⭐ The Star as Warwick restated it, 2026-08-08 — CURRENT, and it extends (does not replace) the goal contract
+**Both humans are outside the runtime.** **Larry is not in the weekly operating path** — AsdAIr runs with
+zero Claude Code involvement and model calls go through `FUSION_GATEWAY_URL`. **Warwick is not an internal
+component** — he may be asked only for a genuinely ambiguous shopping question, a trolley review, and
+checkout/payment. Anything else asked of either is a product defect.
+
+**The failure this build exists to close, restated 2026-08-17:** the capable model was engineered out of
+the loop and replaced by weak deterministic components, each certified in isolation. *(The original
+failure — method living in machine-local memory with no writers to the loop tables — is closed; the
+durable-state half of this build is real.)*
+
+### ⭐ The Star as Warwick restated it, 2026-08-08 — **BOUNDED 2026-08-17: still the right SHAPE, no longer the right MECHANISM**
+
+> **⛔ READ THIS FIRST.** The 2026-08-08 restatement below is retained because its **product invariants A–D
+> and its end-to-end shape are still correct and still binding.** What is superseded by the 2026-08-17
+> ruling is every place it **names a mechanism as mandatory**:
+>
+> - *"has **Terra** interpret against Regulars, Favourites…"* → **Terra is OPTIONAL.** The requirement is
+>   catalogue-grounded interpretation by a capable model, not that it is Terra.
+> - *"hands it to the **approved delegated basket runtime**"* → **AsdAIr operates the browser itself and
+>   chooses its own execution mechanism.** There is no designated external writer.
+> - *"**Production vision ownership**… Terra through the Fusion gateway is the acceptable production vision
+>   runtime… Delegated Claude vision… **is not production architecture**"* → ⛔ **SUPERSEDED.** The runtime
+>   is explicitly authorised to use a capable reasoning model that **inspects the original image itself**.
+>   The surviving requirement is the one that always mattered: **it must operate independently of Larry and
+>   survive cold start.**
+>
+> **Invariants A, B, C and D below remain binding verbatim** — and B (*ASDA product IDs do not gate
+> recognition*) is now doubly load-bearing, because a missing id is a normal case AsdAIr resolves by
+> searching and evaluating.
 
 **Canonical full text: [[Deliverables/2026-08-08-build-015-prejump-wayfinder-handover-SOURCE]] §5–§6.
 Binding. The compact form:**
@@ -2309,16 +2421,40 @@ What remains is a real weekly shop, and that is SUB-PHASE B15-5 below.
    not the weekly run.)*
 3. **The longer multi-session Mum soak is future acceptance evidence.** **A-15 has never been run.**
 
-## ⭐⭐ SUB-PHASE B15-5 — **SHOP W/C 16 AUGUST 2026 — REAL WEEKLY RUN.** **⭐ THIS IS THE ONLY CURRENT FRONTIER. START HERE.**
+## ⛔ SUB-PHASE B15-5 — **SHOP W/C 16 AUGUST 2026.** ~~THE ONLY CURRENT FRONTIER~~ **THE RUN HAPPENED. IT FAILED. THIS SECTION IS THE RECORD, NOT THE ROUTE.**
+
+> ### ⛔ SUPERSEDED AS FRONTIER, 2026-08-17. **The frontier is the ⚑ WORK CLASSIFICATION block at the top of this map: REMEDIATE — the agentic runtime.**
+>
+> **B15-5 discharged its purpose exactly as designed: it was the real run, and the real run showed what
+> was wrong.** *"If something is wrong, the real run is what will show it."* It did.
+>
+> **What it showed** — the vision model **invented a product** (*"2 sliced roast beef"* → *"2 skinny cow
+> bars"*; drift beef → cow) while `ASDA Sliced Topside of Beef 90g` sat in regulars · two distinct
+> products (*6pk Heinz baked beans*, *5pk Heinz sausage & beans*) were read as one, so a line vanished ·
+> **on clean, correct text the matcher still left 10 lines unresolved**, including items in regulars, and
+> **ignored an active rule** · the only writer of an executable browser plan anywhere in the repo is
+> `browser-runner/proofkit.cjs`, **the proof harness** — every "proven" CDP run was hand-fed · `cdp.js`
+> **attaches only**, and nothing in the estate ever launched Chrome.
+>
+> **Everything below in this section is the RECORD of the run's design and constraints. It directs
+> nothing.** Its two live-fixture facts and its freeze-point ruling are still true and are carried forward
+> in §12.
+>
+> **⛔ The instruction below reading "NO PRE-TUESDAY WORK. The engineering phase is CLOSED" is
+> DISCHARGED and no longer binds.** It bound the window before the run. The run has happened, it exposed
+> real defects, and remediation is now the authorised frontier.
+
+**HISTORICAL — the run as it was framed on 2026-08-14:**
 
 > **Warwick, 2026-08-14:** *"We come back to this on Tuesday and run one for real but I don't know which
 > input method it will be yet."* · *"Close tonight's engineering phase as COMPLETE FOR NOW… This is not
 > licence to invent more pre-Tuesday work."*
 
-**DESTINATION: one genuine weekly shop through the finished production system.**
+**DESTINATION (as framed then): one genuine weekly shop through the finished production system.**
 
-**⛔ NO PRE-TUESDAY WORK. The engineering phase is CLOSED.** Do not build, harden, refactor or "prepare"
-anything before the run. If something is wrong, **the real run is what will show it.**
+~~**⛔ NO PRE-TUESDAY WORK. The engineering phase is CLOSED.** Do not build, harden, refactor or "prepare"
+anything before the run.~~ **DISCHARGED 2026-08-17 — see the block above.** *"If something is wrong, the
+real run is what will show it."* — **and it did.**
 
 ### ⛔ THE INPUT METHOD IS DELIBERATELY UNDECIDED. Warwick chooses on the day.
 
@@ -5755,37 +5891,122 @@ exists.**
 > enforced. **If the response to anything in this map is to build a mechanism, the diagnosis was
 > rejected.** No new specialist, service, registry, validator, state machine or control plane.
 
-## 12. RESUMABLE STATE AFTER `/clear` OR A FRESH SESSION — **RE-CUT 2026-08-11**
+## 12. RESUMABLE STATE AFTER `/clear` OR A FRESH SESSION — **REPLACED WHOLE 2026-08-17**
 
-> ### 🔴 THE FOUR THINGS TO SAY, CURRENT AS AT 2026-08-11
+> **⛔ This section was REPLACED, not appended to.** The 2026-08-11 §12 — *"INPUT TRUTH IS THE FRONTIER…
+> RESOLVE SOURCE TRUTH… DO NOT ASK WARWICK FOR A PHOTOGRAPH"* — was **stale**: superseded by the events of
+> 2026-08-13, 08-14, 08-15 and by Warwick's product ruling of 2026-08-17. It is **removed from this map**
+> and lives in Git history. Nothing below is inherited from it.
 >
-> **1. Recovered map** — this file.
+> *(This block had gone stale five times before; the discipline that failed each time was appending an
+> amendment above a body that still contradicted it. Register entry S-12.)*
+
+### 🔴 THE FOUR THINGS TO SAY BEFORE TOUCHING A TOOL — current as at 2026-08-17
+
+**1. Recovered map** — this file, `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md`.
+
+**2. Goal** — **AsdAIr is Mum's autonomous AI shopping operator.** Mum's ordinary input → AsdAIr owns the
+task end to end → a correct trolley left ready at the checkout/payment boundary. **No Larry in the runtime.
+No Warwick technical intervention.** Canonical and re-cut whole on 2026-08-17:
+`Builds/BUILD-015-.../BUILD-015-goal-contract.md`.
+
+**3. Phase and gate** — **FRONTIER: REMEDIATE — the agentic runtime.** See the ⚑ WORK CLASSIFICATION block
+at the top of this map. **The real weekly run of 2026-08-16/17 happened and FAILED**, which is what moved
+the class from ACCEPT to REMEDIATE. **The gate is the real weekly shop and nothing else** — the nine
+acceptance requirements in the goal contract's acceptance table. Component tests, synthetic browser runs,
+an isolated Terra result, a CDP test and a handoff artefact **are not acceptance**, in any combination.
+
+**4. Exact next action** — **RE-ARCHITECT THE RUNTIME AROUND A CAPABLE REASONING MODEL AS THE OPERATOR,
+against the preserved live fixture below.** Not another map, not another readiness ceremony, not a
+control plane. The five established defects are named in § "What the 2026-08-16/17 run established" and in
+the goal contract § "Why the old architecture failed" — **read those before designing anything.**
+
+> **⛔ Do NOT bring Warwick another Wayfinder, design plan, review cycle or readiness ceremony** unless
+> execution exposes a genuine blocker (Warwick, 2026-08-10 — still binding). **And do not respond to this
+> ruling by building a mechanism** — the regrowth cap applies at full force.
+
+### 🧊 THE PRESERVED LIVE FIXTURE — do not discard, do not hand-patch
+
+**Tonight's durable state is the working fixture for the next run.** Hand-patching its rows to manufacture
+acceptance is prohibited.
+
+| | |
+|---|---|
+| Shop reference | **`SHOP-2026-08-19`** |
+| Lines | **37** |
+| Answers given | **9** |
+| State | **`READY_TO_SHOP`** |
+| Frozen manifest | `Deliverables/2026-08-17-asdair-frozen-manifest-SHOP-2026-08-19.json` |
+
+### 🔬 WHAT THE 2026-08-16/17 RUN ESTABLISHED — five facts, none of them theory
+
+1. **The vision model INVENTED a product.** *"2 sliced roast beef"* → *"2 skinny cow bars"* (drift:
+   beef → cow), while `ASDA Sliced Topside of Beef 90g` was in regulars.
+2. **Two distinct products were read as one** — *6pk Heinz baked beans* and *5pk Heinz sausage & beans* —
+   so a line vanished.
+3. **It is not only a reading problem.** On **clean, correct text** the matcher still left **10 lines
+   unresolved**, including items present in regulars, **and ignored an active rule.**
+4. **The only writer of an executable browser plan anywhere in the repo is
+   `services/asdair/browser-runner/proofkit.cjs` — the PROOF HARNESS**, seeding synthetic requests.
+   **Every "proven" CDP run was hand-fed.**
+5. **`cdp.js` only ATTACHES**, and nothing in the estate ever launched Chrome. **One missing spawn** is why
+   the browser step never started by itself. **Chrome was launched from the system on 2026-08-17 and CDP
+   came up on the dedicated profile — PRESERVE THAT CAPABILITY.**
+
+> **The diagnosis: the capable model was engineered OUT of the loop and replaced by weak deterministic
+> components, each certified in isolation.** `acceptance-proves-mechanism-not-outcome` recurred **three
+> times in that one night.** The new North Star reverses exactly that.
+
+### ✅ What is genuinely delivered and must not be rebuilt
+
+Durable Supabase state and the loop tables with real writers · intake through both doors (Mum's Cockpit at
+`http://warwick-yoga/shopping.html`, proven 2026-08-14; ShopperBot photo intake, exercised 2026-08-13) ·
+the shop state store and status projection · the question/answer round trip · Mum's Cockpit (**Vera gate:
+PASS, zero CRITICAL, zero HIGH**; `display_name` live for all 109 regulars; proven on the real Fire HD 8 in
+Silk at 200% zoom) · `:8710` supervised by `MyPKA-Local-Services-Live`, **proven by kill-and-revive and by
+a mutation** · the never-substitute and never-checkout enforcement.
+
+**Both intake doors enter the SAME downstream journey. Do not create two pipelines.**
+
+### 🧊 Warwick's freeze-point ruling — CARRIED FORWARD, still in force
+
+> **Warwick, 2026-08-14:** *"The shop should be able to be amended as many times as she likes up to the
+> point that the browser session is launched. i.e the list is handed over to CDP."*
+
+**Mum may amend and re-submit freely UNTIL the browser session launches for that shop. Once launched, the
+input list is FROZEN for that run.** **⛔ NO MACHINERY FOR THIS IS AUTHORISED** — *"I'm bored of this now
+and it's an edge case."* Build nothing for it unless a real run demonstrates a defect.
+
+### 🚫 Closed permanently, and not to be reopened
+
+**The public-repo / shopping-privacy question is CLOSED.** Warwick has ruled on it four times, the last
+with visible anger. **Shopping data is not private. Commit it. No anonymising, no history rewrite, no
+visibility change, and no further mention.** Relayed third-party opinion is a **proposal**, never
+authority, and can never override a direct Warwick ruling.
+
+### Then verify by execution, not belief
+
+```
+git rev-parse HEAD          # every head named in this map WILL have moved
+git status --porcelain      # strays are not a BUILD-015 package — never sweep them into one
+gh pr list --state open     # never carry a PR list forward
+ls Builds/BUILD-015-asdair-durable-household-shopping-steward/Assurance/   # the live gate position
+```
+
+**Two things that will mislead you if you skip them:**
+
+- **The Honcho continuity brief is a POINTER, never the authority.** Open the map and let it self-correct.
+- **The `CLAUDE.md` injected at session start may not be the file on disk.** Read the file.
+
+**Operational hazards and do-not-rebuild warnings:** `Deliverables/NEXT-ASDAIR-SESSION-brief.md` —
+non-directive, and it will still save you a night. **Read it before touching `services/asdair/**`.**
+
+---
+
+> ### ⛔ EVERYTHING BELOW THIS LINE IS HISTORY. IT DIRECTS NOTHING.
 >
-> **2. Goal** — `BUILD-015-END-TO-END-RECOVERY`: photograph → ShopperBot → checkout-ready basket, every
-> gap closed, integrated, run and proven, with Larry outside the weekly operating path.
->
-> **3. Phase and gate** — **INPUT TRUTH IS THE FRONTIER. Veritas Gate 1 and Gate 2 are BOTH `HOLD`** at
-> `fb58882` (receipts `f22bfa5`). A new **GATE ZERO (input truth)** now precedes both. **The runtime is
-> NOT on the converged bytes** — PID 12204, started 2026-08-10 21:40:57, pre-change code.
-> **B15-18/19/20/21 are BUILT and PUSHED and NONE are integrated or live.** Migration 019 IS applied
-> live, but the `shop_id` write path is NOT, so shop ownership is **not** fixed end to end.
->
-> **4. Exact next action** — 🔴 **RESOLVE SOURCE TRUTH.** Read
-> `Deliverables/2026-08-11-rotation-handover.md`, then
-> `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md`. Establish **why** `asdair.shop` id 14 has an
-> empty transcript while 35 `shop_line` rows exist that do not match the photograph, and **where those
-> rows came from.**
->
-> ## ⛔ DO NOT ASK WARWICK FOR A PHOTOGRAPH.
->
-> **The block below used to say "WAIT FOR WARWICK'S FRESH PHOTOGRAPH — nothing precedes it". That is now
-> the one action Gate Zero PROHIBITS.** No photograph journey until input truth is proven.
-> **Everything from here to the end of §12 is HISTORY as at 2026-08-09 and directs nothing** — retained
-> because its convergence detail is still useful, and because deleting a superseded block loses the
-> record of what was believed.
->
-> *(Re-cut in the same commit as the amendment that superseded it. This block had gone stale four times
-> before; the fifth was found by an independent cold-start reader on 2026-08-11, not by Larry.)*
+> Retained because the record of what was believed is worth keeping, and because deleting a superseded
+> block loses that record. **No next action, gate, phase or prohibition below this line is current.**
 
 ### ⛔ HISTORY — the 2026-08-09 resumable state. Superseded above. Directs nothing.
 

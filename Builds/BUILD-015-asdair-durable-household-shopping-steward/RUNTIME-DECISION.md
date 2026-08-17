@@ -1,5 +1,34 @@
 # BUILD-015 — RUNTIME DECISION: who writes the live ASDA basket
 
+> # 🔴🔴 SUPERSEDED AS A RUNTIME DECISION — 2026-08-17, Warwick's product ruling.
+>
+> **This document no longer decides who writes the live ASDA basket. AsdAIr does.**
+>
+> **Canonical:** `BUILD-015-goal-contract.md`, re-cut whole 2026-08-17 — § "What this ruling supersedes,
+> by name", register entries **S-7, S-8, S-9**.
+>
+> **The three clauses struck:**
+>
+> 1. ⛔ *"**The Stage 1 live basket writer is Sonnet in Claude for Chrome**"* — **SUPERSEDED.** AsdAIr
+>    operates the live ASDA browser itself and **chooses its own execution mechanism.** Sonnet in Claude
+>    for Chrome is optional; it is not the designated writer.
+> 2. ⛔ *"**prohibited from further live-account testing without fresh authority from Warwick**"* and
+>    *"excluded from the live route"* — **LIFTED. Warwick has confirmed that exclusion was an INTERNAL
+>    ARCHITECTURE DECISION, not his, and has now AUTHORISED CDP.** *(Chrome was launched from the system
+>    on 2026-08-17 and CDP came up on the dedicated profile. That capability is preserved.)*
+> 3. ⛔ *"**THERE IS NO PROGRAMMATIC SONNET TRIGGER HERE, AND THAT IS NOT AN OMISSION**"* (stated in
+>    `services/asdair/handoff/README.md`, resting on open consideration 2 below) — **SUPERSEDED AS AN
+>    ARCHITECTURAL CONCLUSION.** The underlying fact stands: Claude for Chrome has no programmatic
+>    invocation surface. **The conclusion does not: under the new North Star, a route that cannot be
+>    invoked by the system is DISQUALIFIED from the runtime.**
+>
+> **What this document is still good for:** the honest account of the 2026-08-03 incident, the measured
+> cost figures, the corrected evidential record on bulk add, and the boundary statement (never book a slot,
+> never check out, never pay, never enter a password, never auto-substitute — **all unchanged**).
+>
+> **A deterministic executor may perform mechanical browser actions UNDERNEATH an AI. It must never be the
+> semantic decision-maker. Do not preserve a failed architecture for sunk cost.**
+
 > ## ⛔ SCOPE CORRECTION — Larry, 2026-08-09. Read this before the Status line below.
 >
 > **The words "Supersedes every conflicting statement anywhere in this repository" overreach and are
@@ -40,13 +69,16 @@ every document listed under "Documents this correction reaches" below.
 
 ---
 
-## The decision, in one paragraph
+## ~~The decision, in one paragraph~~ ⛔ SUPERSEDED 2026-08-17 — HISTORICAL RECORD OF THE 2026-08-04 RULING
 
-**The Stage 1 live basket writer is Sonnet in Claude for Chrome, using the proven supervised
+> **The current answer is: AsdAIr writes the basket, and chooses its own execution mechanism. CDP is
+> authorised.** The paragraph below is the 2026-08-04 ruling as it stood, retained as record.
+
+~~**The Stage 1 live basket writer is Sonnet in Claude for Chrome, using the proven supervised
 process.** It is **not** Larry, **not** a Claude Code subagent, and **not** the custom
 Node/CDP browser runner at `services/asdair/browser-runner/`. That runner is now
 **experimental, deferred, not the live default, not a blocker to Stage 1, and prohibited
-from further live-account testing without fresh authority from Warwick.**
+from further live-account testing without fresh authority from Warwick.**~~
 
 ## Why this ruling exists — the honest account
 
@@ -116,12 +148,21 @@ open consideration below.
 
 ## Status of the custom CDP browser runner
 
-`services/asdair/browser-runner/` is **not deleted and not condemned.** It is:
+> ### ⛔ RE-CUT 2026-08-17. **CDP IS AUTHORISED.** The four bullets below are the 2026-08-04 position and
+> are **no longer in force.** Warwick has confirmed the exclusion was an internal architecture decision,
+> not his. **The runner may be used, live-tested and developed** — as the mechanical arm underneath an AI
+> operator, never as the semantic decision-maker. Its known genuine strengths (single-writer lease with
+> fencing, atomic claim proven against real Postgres, idempotent `step_id` replay, three-layer
+> forbidden-operation enforcement) are assets under the new star. **Its known gap is that nothing ever
+> launched Chrome and no production writer of an executable plan exists** — `proofkit.cjs` is the proof
+> harness, and every "proven" run was hand-fed.
 
-- **experimental** — retained, its tests kept green, its proofs kept;
-- **not the live default** — it does not write Warwick's weekly basket;
-- **not a blocker to Stage 1** — Stage 1 acceptance does not depend on it;
-- **prohibited from further live-account testing** without fresh authority from Warwick.
+`services/asdair/browser-runner/` is **not deleted and not condemned.** ~~It is:~~
+
+- ~~**experimental** — retained, its tests kept green, its proofs kept;~~
+- ~~**not the live default** — it does not write Warwick's weekly basket;~~
+- ~~**not a blocker to Stage 1** — Stage 1 acceptance does not depend on it;~~
+- ~~**prohibited from further live-account testing** without fresh authority from Warwick.~~
 
 Its genuine, evidenced strengths are worth keeping on the record because they may justify
 revisiting it later: the single-writer lease with fencing, the atomic claim proven against

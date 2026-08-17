@@ -4,14 +4,30 @@
 artefact, wraps the supervised browser step in a single-writer claim/progress/completion
 lifecycle, and ingests what Sonnet reports back into the reconciler's input.
 
-> **Read `Builds/BUILD-015-.../RUNTIME-DECISION.md` first.** The Stage 1 live basket writer is
-> **Sonnet in Claude for Chrome**. Not Larry, not a Claude Code subagent, and **not** the custom
-> CDP runner at `services/asdair/browser-runner/`, which is excluded from the live route and
-> prohibited from further live-account testing. This module imports nothing from it.
+> # 🔴🔴 SUPERSEDED 2026-08-17 — Warwick's product ruling. **Read the goal contract first, not this file.**
+>
+> **Canonical:** `Builds/BUILD-015-.../BUILD-015-goal-contract.md`, re-cut whole 2026-08-17 — register
+> entries **S-9** and **S-10**.
+>
+> **AsdAIr is Mum's autonomous AI shopping operator. It operates the live ASDA browser itself and chooses
+> its own execution mechanism. CDP is AUTHORISED.** There is no designated external basket writer.
+>
+> ⛔ ~~"The Stage 1 live basket writer is **Sonnet in Claude for Chrome**. Not Larry, not a Claude Code
+> subagent, and **not** the custom CDP runner at `services/asdair/browser-runner/`, which is excluded from
+> the live route and prohibited from further live-account testing."~~ — **SUPERSEDED. The CDP exclusion is
+> LIFTED.** *(The statement that this module imports nothing from the runner remains a true fact about the
+> code.)*
 
 ---
 
-## THERE IS NO PROGRAMMATIC SONNET TRIGGER HERE, AND THAT IS NOT AN OMISSION
+## ~~THERE IS NO PROGRAMMATIC SONNET TRIGGER HERE, AND THAT IS NOT AN OMISSION~~ ⛔ SUPERSEDED AS AN ARCHITECTURAL CONCLUSION, 2026-08-17
+
+> **The FACT below stands: Claude for Chrome has no programmatic invocation surface.**
+>
+> **The CONCLUSION does not.** Under the 2026-08-17 North Star, **a route that cannot be invoked by the
+> system is DISQUALIFIED from the runtime.** An un-invokable route is not an honest compromise — it is a
+> route that fails the product contract. The heading was right about the mechanism and wrong about what
+> follows from it.
 
 **Claude for Chrome has no programmatic invocation surface. This module does not invent one and
 makes no claim of unattended browser execution.**
@@ -28,8 +44,12 @@ that removes Larry completely.** One durable artefact, ready before Warwick open
 nobody has to explain, sort, translate or reconstruct. Warwick opens Sonnet, pastes or points it at
 the artefact, and the shop runs. A fake "trigger" would be worse than building nothing.
 
-**What is still human, stated plainly:** starting the browser session, giving Sonnet the artefact,
-and the substitution pass before purchase. **What is no longer human:** preparing, ordering,
+⛔ **SUPERSEDED 2026-08-17 (register entry S-10). None of the three is acceptable as the normal path.**
+Starting the browser session and driving it are **AsdAIr's**. The substitution pass is governed by the
+never-auto-substitute rule plus ask-Warwick-on-genuine-ambiguity — **not by a standing human step.**
+
+~~**What is still human, stated plainly:** starting the browser session, giving Sonnet the artefact,
+and the substitution pass before purchase.~~ **What is no longer human:** preparing, ordering,
 validating, tracking and reconciling the work.
 
 ---
