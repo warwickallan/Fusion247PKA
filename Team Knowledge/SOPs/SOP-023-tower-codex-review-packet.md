@@ -17,9 +17,22 @@ line of product code.** Every rule below is a mistake already paid for.
 **one disposition per finding**. A second PR's round overwrites the first's and invalidates both. Serialise
 in merge order.
 
-**2. Retarget first.** After the parent phase merges, retarget the stacked PR to `main` before reviewing.
-The staged diff **truncates at 60,000 bytes**; retargeting collapses the delta and usually removes the
-problem. (#107: 180,555 truncated → 12 files complete.)
+**2. Retarget first, then MEASURE — do not assume the retarget fixed it.** After the parent merges,
+retarget the stacked PR to `main`. The staged diff **truncates at 60,000 bytes**, and retargeting reduces
+it — but **GitHub's PR view is not what gets staged.** The watcher stages `merge-base..head`. Measure it:
+
+```
+git merge-base origin/main <head>
+git diff <merge-base> <head> | wc -c
+```
+
+*(2026-08-17: #107 showed "12 files, +2,150" in the PR view and Larry reported the truncation solved. The
+real staged diff was **110,903 bytes** — still nearly double the cap. The claim was withdrawn mid-review.
+**A file count is not a byte count.**)*
+
+**If the measured diff exceeds 60,000 bytes, say so in the packet and mark the truncation finding
+`remains_open`.** Do not issue APPROVE FOR MERGE on a packet the reviewer cannot see; that is a release
+decision for Warwick, not a wording problem.
 
 **3. Collect the open finding ids at the current head.**
 ```
