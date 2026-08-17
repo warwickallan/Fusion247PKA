@@ -640,9 +640,23 @@ export const GROUNDING_EVIDENCE = 'groundingEvidence';
  */
 export async function recordGroundingEvidence(deps, {
   shopId, householdId, sourceKind, catalogueCandidates, promptChars, readingsReturned,
-  lineNos = [], matchedRegularIds = [],
+  lineNos = [], matchedRegularIds = [], imagePreparation = null,
 }) {
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  // ── THE PIXELS, ALONGSIDE THE GROUNDING (2026-08-17) ──────────────────────
+  // The catalogue was supplied correctly on 17 August and the read was still
+  // wrong, because the IMAGE carried about 34 pixels per handwritten line and
+  // nothing recorded that. Dimensions and a scale factor only - it stays inside
+  // the sanitisation rule above, since an image size is not household data.
+  const prep = imagePreparation && typeof imagePreparation === 'object' ? {
+    source_width: num(imagePreparation.source_width),
+    source_height: num(imagePreparation.source_height),
+    scale: num(imagePreparation.scale),
+    width: num(imagePreparation.width),
+    height: num(imagePreparation.height),
+    prepared: imagePreparation.prepared === true,
+    floor: num(imagePreparation.floor),
+  } : null;
   return insertOneShot(deps, {
     shopId,
     name: GROUNDING_EVIDENCE,
@@ -653,6 +667,7 @@ export async function recordGroundingEvidence(deps, {
       // The grounding that was SUPPLIED.
       catalogue_candidates: num(catalogueCandidates),
       prompt_chars: num(promptChars),
+      image_preparation: prep,
       // What came BACK. A skipped call cannot produce these.
       readings_returned: num(readingsReturned),
       line_nos: lineNos.map(num).filter((n) => n !== null),

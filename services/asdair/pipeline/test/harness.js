@@ -157,6 +157,24 @@ export function makeHarness(script = {}) {
      * not a newly-injected uncertainty none of them asked for. A test that
      * wants to exercise the gate sets `confidence` (and/or `status`)
      * explicitly on its own `modelLines` entries, which this never overrides. */
+    /** The image-preparation step, faked. It touches no file: what matters to
+     *  the pipeline is that the step HAPPENS before the model is asked, and
+     *  that its provenance reaches the grounding record. The real arithmetic is
+     *  proven against Mum's actual photograph in transcribe/prepareImage.test.js.
+     *  Bound here rather than left undefined on purpose - a `deps.X` that
+     *  nothing binds is undefined at runtime while every stubbed test passes,
+     *  which is the exact defect this build has already paid for three times. */
+    async prepareImage(imagePath) {
+      calls.push({ dep: 'prepareImage', imagePath });
+      return {
+        dataUrl: 'data:image/jpeg;base64,ZmFrZQ==',
+        provenance: script.imagePreparation || {
+          source_width: 720, source_height: 1280, scale: 2, width: 1440, height: 2560,
+          prepared: true, floor: 1440,
+        },
+      };
+    },
+
     async interpretPhoto({ catalogue: cat, prompt }) {
       calls.push({ dep: 'interpretPhoto', promptChars: prompt.length, candidates: cat.candidates.length });
       if (script.modelThrows) throw new Error(script.modelThrows);
@@ -178,9 +196,12 @@ export function makeHarness(script = {}) {
       });
     },
 
-    resolveAll(lines, regulars) {
-      calls.push({ dep: 'resolveAll', lines: lines.length, regulars: regulars.length });
-      return resolveAll(lines, regulars);
+    resolveAll(lines, regulars, opts) {
+      // `opts` is passed THROUGH, not dropped: stepInterpret hands the household's
+      // rules here, and a harness that swallowed them would make a rule look
+      // wired in production while every test proved nothing about it.
+      calls.push({ dep: 'resolveAll', lines: lines.length, regulars: regulars.length, rules: (opts && opts.rules && opts.rules.length) || 0 });
+      return resolveAll(lines, regulars, opts);
     },
 
     /** WP-B15-22 (Gate Zero): the resolved vision model id, faked as a fixed,

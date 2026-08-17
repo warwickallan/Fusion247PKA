@@ -205,6 +205,18 @@ async function realVisionModel() {
 }
 
 /**
+ * Prepare the photograph for ONE vision request, and report what was done.
+ *
+ * Lazily imported for the same reason `pg` is: the pure command surface and the
+ * whole offline suite must stay loadable on a box where no dependency has been
+ * installed. `jimp` is only reached when a real photograph is really being read.
+ */
+async function realPrepareImage(imagePath) {
+  const { prepareImage } = await import('../transcribe/prepareImage.js');
+  return prepareImage(imagePath);
+}
+
+/**
  * ONE grounded vision request. Not a daemon, not a conversation, not an agent.
  *
  * The prompt is built from the catalogue by groundedPrompt.js and asks the model
@@ -215,14 +227,21 @@ async function realVisionModel() {
  * A single strict-JSON retry is allowed, and no more. That is a formatting
  * repair, not a second opinion.
  */
-async function realInterpretPhoto({ prompt, imagePath }) {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
-  const ext = path.extname(imagePath).toLowerCase();
-  const mime = MIME[ext];
-  if (!mime) throw new Error(`pipeline: unsupported image type ${ext}`);
-  const dataUrl = `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`;
+async function realInterpretPhoto({ prompt, imagePath, imageDataUrl = null }) {
+  // ── THE PIXELS THE MODEL IS GIVEN ARE PART OF THE REQUEST ────────────────
+  // Telegram's largest size for Mum's list is 720 x 1280 - roughly 34 pixels
+  // per handwritten line - and at that size the model stopped failing honestly
+  // and produced a plausible product instead: "2 sliced roast beef" came back
+  // as "2 skinny cow bars". transcribe/prepareImage.js lifts the short edge
+  // over a MEASURED floor and never rotates; the arm-by-arm measurement,
+  // including the rotation arms that LOST whole lines, is in its header.
+  //
+  // stepInterpret normally prepares the image itself, so that what was done can
+  // be recorded durably. Preparing again here when it did not is deliberate:
+  // there is exactly ONE way an image reaches the model, and no caller can send
+  // raw 720px pixels by forgetting a step.
+  const dataUrl = imageDataUrl
+    || (await (await import('../transcribe/prepareImage.js')).prepareImage(imagePath)).dataUrl;
 
   const { vision } = await import('../../obsidiwikai/src/core/models.mjs');
   const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
@@ -240,6 +259,14 @@ async function realInterpretPhoto({ prompt, imagePath }) {
     line_no: l.line_no ?? i + 1,
     raw_reading: String(l.raw_reading ?? '').trim(),
     quantity: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : null,
+    // ── THE PACK SIZE, WHICH IS NOT AN ORDER QUANTITY (2026-08-17) ───────
+    // "2 x 4pk orange sport Lucozade" carries TWO numbers meaning different
+    // things, and collapsing them cost half of Mum's drinks. The prompt now
+    // asks for them separately, so this carries the second one through rather
+    // than leaving every downstream reader to re-derive it from prose.
+    // IDENTITY uses it - a 6pk of beans is not a single tin - and the order
+    // quantity never does. Pass-through only: no default, no inference.
+    pack_size: Number.isInteger(l.pack_size) && l.pack_size > 1 ? l.pack_size : null,
     // ── GATE ZERO (WP-B15-22) ────────────────────────────────────────────
     // groundedPrompt.js EXPLICITLY asks for these two fields per line
     // (confidence 0.0-1.0, and status "unreadable" when the model cannot
@@ -772,6 +799,12 @@ export function createDeps(overrides = {}) {
     // interpretation - catalogue FIRST, always
     loadCatalogue: realLoadCatalogue,
     buildGroundedPrompt,
+    // MAKE THE HANDWRITING RESOLVABLE BEFORE ANYTHING READS IT. A container
+    // member rather than a detail inside interpretPhoto, because stepInterpret
+    // has to record WHAT WAS DONE - on 17 August nobody could tell a good read
+    // from a lucky one, since nothing anywhere recorded the pixels the model
+    // was actually given.
+    prepareImage: realPrepareImage,
     interpretPhoto: realInterpretPhoto,
     visionModel: realVisionModel,
     resolveAll,
