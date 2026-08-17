@@ -1,0 +1,107 @@
+name: vlogops-tests
+
+# CI for BUILD-006 Phase 1 — the durable Content Seed store and the three intake routes.
+#
+# The proofs are DB-GATED: every one of them runs against a real Postgres and asserts real
+# behaviour — primary-key dedupe, CHECK constraints, immutability triggers, and what a
+# transaction does when the process holding it is killed outright. A fake database would
+# model the assumptions and then prove the assumptions.
+#
+# TWO WAYS THIS WORKFLOW REFUSES TO GO GREEN WITHOUT RUNNING, both of which this estate has
+# already been burned by:
+#
+#   1. THE PATH FILTER INCLUDES ITSELF. `build-002-tests.yml:23-27` records a migration-only
+#      change that "went green BY NEVER RUNNING" because the filter did not cover the paths
+#      that changed. A filter that omits the workflow file has the same hole one edit later:
+#      an absent run is indistinguishable from a passing one at a glance.
+#
+#   2. THE RUNNER FAILS ON ZERO EXECUTED SUBTESTS, and on zero test files. `node --test` with
+#      a glob matching nothing exits 0 on this Node, and a DB-gated suite whose connection
+#      string never reached the child prints `# pass 0` and exits 0 as well. Both are
+#      treated as failures by test/run-vlogops-tests.mjs, loudly.
+#
+# The target is a throwaway service container: no real project, no personal data, no
+# credentials. The migration is NEVER applied to the managed project by this workflow.
+
+on:
+  push:
+    paths:
+      - 'services/vlogops/**'
+      - '.github/workflows/vlogops-tests.yml'
+  pull_request:
+    paths:
+      - 'services/vlogops/**'
+      - '.github/workflows/vlogops-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  vlogops-proofs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/vlogops
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Disposable CI service container. The proofs drop and recreate the `vlogops` schema
+      # themselves at the start of each proof file.
+      REUSE_DATABASE_URL: '1'
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # FULL HISTORY IS LOAD-BEARING, not a default worth inheriting. Route 1 treats git
+          # history as a first-class intake source and its fixture window is 2026-08-05 — a
+          # day with zero session logs and 164 commits. Under the default shallow clone
+          # those commits are absent, the bundle would come back thinner or empty, and the
+          # proof would fail for a reason that has nothing to do with the code.
+          fetch-depth: 0
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Secret scan over the committed vlogops surface
+        # DELIBERATELY BEFORE `npm ci`, and the ordering is the whole point.
+        #
+        # This step asserts something about the code this repository actually carries. Run
+        # after dependency install, it would instead be scanning `node_modules/` — and it
+        # would FAIL, because `pg-connection-string`'s own README documents example DSNs of
+        # the shape `postgres://user:password@host/db`, which is exactly what a
+        # connection-string detector is built to notice. Measured locally: 3 content hits,
+        # all of them third-party documentation, none of them ours, none of them committed
+        # (`node_modules/` is gitignored).
+        #
+        # Suppressing those hits would be the wrong fix twice over: it would weaken a
+        # control to make a run green, and it would put a permanent exception in the path of
+        # a detector whose whole value is that it has no exceptions. Scanning the committed
+        # surface — before anything is vendored into it — asks the honest question instead.
+        working-directory: .
+        run: bash scripts/secret-scan.sh --surface services/vlogops .github/workflows/vlogops-tests.yml
+
+      - name: Install dependencies (pg driver, for the live Postgres proofs)
+        run: npm ci
+
+      - name: Proofs against real Postgres
+        # run-vlogops-tests.mjs. With REUSE_DATABASE_URL=1 it runs against the service
+        # container above rather than provisioning its own cluster, and it FAILS on 0
+        # executed subtests and on 0 test files.
+        #
+        # AC7's kill proof runs here on Linux, where child.kill('SIGKILL') is a genuine
+        # POSIX SIGKILL — the developer machine is Windows, where the same call maps to
+        # TerminateProcess. Both are abrupt terminations; only this one is the signal.
+        run: npm test

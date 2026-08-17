@@ -1,0 +1,18 @@
+{
+  "name": "vlogops",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BUILD-006 Phase 1 — the durable Content Seed store and the three human-initiated intake routes. A seed's identity is a function of its content and nothing else; captured source bytes are frozen at intake so a source edited, corrupted or deleted afterwards cannot rewrite history; the same source taken in twice yields one seed; and an intake killed mid-flight recovers to exactly one correct state with nobody re-running it. Additive-only `vlogops` schema — it never touches asdair, session_report, ops, tower or any other namespace.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node test/run-vlogops-tests.mjs",
+    "intake": "node bin/vlogops-intake.mjs",
+    "scan": "bash ../../scripts/secret-scan.sh --surface services/vlogops .github/workflows/vlogops-tests.yml"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
+  }
+}
