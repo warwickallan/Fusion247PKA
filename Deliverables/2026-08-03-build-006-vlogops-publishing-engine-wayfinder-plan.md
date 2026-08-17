@@ -86,8 +86,17 @@ a **real** producer and a **real** package rather than another synthetic fixture
 
 | | Work type | Outcome | Owner | Model / effort | Blocks what | Done when |
 |---|---|---|---|---|---|---|
-| **FRONTIER** | **BUILD** | **#109 / Phase 3 — Scribe + Master Story Package.** Its code is implemented with Gate 1 PASS on nine ACs, so the outstanding work is the **voice half**, which no assurance pass has been able to grade: every word is `deterministic-stub-v1` and **no model has ever been called.** | Larry → Keel; Warwick owns the merge decision | **Opus-high — RECALCULATED for this item, not inherited from the ACCEPT frontier.** The ACCEPT work was measurement, where care mattered more than capability. This is the product's creative core (§10) and the one dimension a component pass cannot certify. | Phases 4–7 | Per the §10 Phase 3 gate: a package a human recognises as Warwick's voice, with siblings provably derived from one truth. |
+> ## ⛔ THIS ENTIRE BUILD IS PARKED — Warwick, 2026-08-17, at the clean Phase-2 → Phase-3 boundary.
+>
+> **Phases 1 and 2 are PASS, banked, pushed and clean. There is no unfinished business and nothing in flight.** Warwick changed programme priority: **1. AsdAIr — the real weekly shop. 2. CareerAIR — after the shop is safely complete and banked. 3. VlogOps — returns here, at the frontier preserved below.**
+>
+> **Do NOT begin Phase-3 Scribe/voice work and do NOT advance #109** until Warwick reopens this build. A fresh session that reads the row below and starts building has misread it: the row records the *next* work, not permission to do it.
+
+| | Work type | Outcome | Owner | Model / effort | Blocks what | Done when |
+|---|---|---|---|---|---|---|
+| **NEXT — PARKED, NOT ACTIVE** | **BUILD** | **Phase 3 / #109.** Replace the current `deterministic-stub-v1` creative path with the **real Scribe / Master Story Package capability**, and **prove the human voice half of the phase.** The code is implemented with Gate 1 PASS on nine ACs; the voice is the outstanding half, and no assurance pass has been able to grade it because no model has ever been called. | Larry → Keel; Warwick owns the merge decision | **OPUS HIGH** — recalculated for this item, not inherited from the ACCEPT work. | Phases 4–7 | Per the §10 Phase 3 gate: a package a human recognises as Warwick's voice, with siblings provably derived from one truth. |
 | **CLOSED** | **ACCEPT** | ✅ Phases 1 and 2 genuinely PASS against managed Supabase — **achieved 2026-08-17**, Gate 1 PASS 9/9 and Gate 2 PASS at `35ce064`. | — | — | — | Done. |
+| **PARKED** | **REMEDIATE** | #106, #108, #111 — see **PARKED, NOT FORGOTTEN** below. **Warwick, 2026-08-17: these must NOT expand into a general cleanup ahead of the shop.** Surface one only if it directly blocks the real AsdAIr journey. | Warwick schedules | — | — | — |
 | **SIDECAR / NON-BLOCKING** | **ADMIN** | Pax/CAPAE banking · the Wayfinder template graduation · the CLAUDE.md classification redline. Collected opportunistically; **never interrupts the frontier** unless it exposes a genuine blocker. | Larry | — | — | — |
 | **PARKED** | **REMEDIATE** | #106, #108, #111 — see **PARKED, NOT FORGOTTEN** below, which carries the substance. Plus two parked database questions: where `VLOGOPS_DB_URL` should live, and whether VlogOps keeps connecting as schema owner (`RUNBOOK.md` §2). | Warwick schedules | — | — | — |
 
@@ -97,7 +106,7 @@ a **real** producer and a **real** package rather than another synthetic fixture
 | **Build** | BUILD-006 — VlogOps Publishing Engine. **THE ACTIVE BUILD.** |
 | **Promoted from** | IDEA-006 (Foundry), on Warwick's explicit instruction 2026-08-03 |
 | **Programme position** | BUILD-019 Phases 1–3 ✅ done → **BUILD-006 in full ← YOU ARE HERE** → BUILD-019 Phase 4 → the real end-to-end acceptance journey. Fixed by Warwick, 2026-08-03. |
-| **Current phase** | ✅ **Phases 1 and 2 are BOTH PASS — 2026-08-17.** Built, merged, live-accepted on managed Supabase, and assured: **Veritas Gate 1 PASS (9 of 9) and Gate 2 PASS** at `35ce064`. Phase 0 is PASS. **The frontier moves to Phase 3.** *(Row re-cut twice on 2026-08-17: it read "Phase 1 ACTIVE, under implementation" while three sibling rows contradicted it, then "Awaiting Veritas Gate 1 + Gate 2" after the gates returned PASS — the second was Veritas finding D-10 against me.)* |
+| **Current phase** | ⛔ **BUILD PARKED 2026-08-17 at the Phase-2 → Phase-3 boundary** (Warwick). ✅ **Phases 0, 1 and 2 are all PASS** — Phases 1 and 2 assured by Veritas Gate 1 PASS 9/9 and Gate 2 PASS at `35ce064`. **Phase 3 / #109 is NEXT and PARKED, not active.** Programme priority moved to AsdAIr, then CareerAIR, then a return here. |
 | **Live WP state** | **No WP is in flight.** WP-1 (`WO-2026-08-14-01`) and the Phase-2 chain are complete and merged — **#105 merged at `c35e4f9`; #112 + #114 + #115 merged.** *(Row re-cut 2026-08-17: it read "draft PR #105 open and unmerged", contradicting the Release-train row below. Superseded by execution, not by preference.)* |
 | **Current gate** | **All three intake routes land a durable Content Seed with stable identity; kill mid-intake and it recovers; identity survives restart.** (§10, Phase 1 row.) |
 | **Depends on BUILD-019** | Only at Phase 7, and only through a **contract** — see §4. BUILD-006 develops against the accepted Publication Package contract without waiting for BUILD-019 Phases 4–7. |
