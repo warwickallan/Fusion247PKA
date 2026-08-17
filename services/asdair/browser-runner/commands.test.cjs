@@ -3,12 +3,17 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const C = require('./commands.cjs');
 
+// `read_regulars` was added on 2026-08-18 (WO-2026-08-18-B15-RUNTIME, gap 1).
+// It is a READ, and the test below still pins the write set at four - so this
+// literal widened by exactly one non-mutating command and the surface that can
+// change the trolley did not move at all. That separation is the point of
+// keeping the two assertions apart.
 test('the allowlist is exactly the agreed command surface - nothing more', () => {
   assert.deepStrictEqual(C.ALLOWED, [
     'add_known_product', 'add_to_favourites', 'locate_product', 'open_groceries',
     'open_regulars', 'open_trolley', 'pause', 'read_basket_line_count',
-    'read_estimated_total', 'read_quantity', 'report_unavailable', 'resume',
-    'search', 'select_search_result', 'set_quantity', 'stop_at_basket_ready',
+    'read_estimated_total', 'read_quantity', 'read_regulars', 'report_unavailable',
+    'resume', 'search', 'select_search_result', 'set_quantity', 'stop_at_basket_ready',
   ]);
 });
 

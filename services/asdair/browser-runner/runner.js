@@ -438,6 +438,7 @@ class Runner {
       case 'open_groceries': return s.open_groceries();
       case 'open_trolley': return s.open_trolley();
       case 'open_regulars': return s.open_regulars();
+      case 'read_regulars': return s.read_regulars();
       case 'locate_product': return s.locate_product(step.product_ref);
       case 'add_known_product': return s.add_known_product(step.product_ref);
       case 'search': return s.search(step.term);

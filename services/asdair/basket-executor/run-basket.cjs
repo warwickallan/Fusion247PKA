@@ -44,7 +44,9 @@ const { Session, ReauthRequiredError, RateLimitedError, sleep } = require('../br
 const { ensureChrome, LauncherConfigError } = require('./launcher.cjs');
 const { buildPlan, planSummary } = require('./plan.cjs');
 const { judgeLine } = require('./judge.cjs');
-const { writeReconciliation, writeHarvest } = require('./reconcile.cjs');
+const { writeReconciliation, writeHarvest, reconcile } = require('./reconcile.cjs');
+const { methodPolicy, methodReport, rulesForRun } = require('./method.cjs');
+const { resolveLine, UNRESOLVED } = require('./resolve.cjs');
 
 const HERE = __dirname;
 const REPO = path.resolve(HERE, '..', '..', '..');
@@ -55,7 +57,8 @@ const REPO = path.resolve(HERE, '..', '..', '..');
 
 function parseArgs(argv) {
   const a = {
-    manifest: null, chrome: null, profile: null, port: null,
+    manifest: null, cataloguePath: null, rulesPath: null, outDir: null,
+    chrome: null, profile: null, port: null,
     state: null, log: null, reconciliation: null, harvest: null,
     lines: null, dryRun: false, reconcileOnly: false, leaseMs: 45_000,
   };
@@ -63,6 +66,9 @@ function parseArgs(argv) {
     const k = argv[i];
     const next = () => argv[i += 1];
     if (k === '--manifest') a.manifest = next();
+    else if (k === '--catalogue') a.cataloguePath = next();
+    else if (k === '--rules') a.rulesPath = next();
+    else if (k === '--out') a.outDir = next();
     else if (k === '--chrome') a.chrome = next();
     else if (k === '--profile') a.profile = next();
     else if (k === '--port') a.port = next();
@@ -191,8 +197,23 @@ async function withRateLimitRetry(fn, log, attempts = 2) {
   }
 }
 
+/**
+ * One manifest line: IDENTIFY it, then ADD it.
+ *
+ * The identification half now lives entirely in resolve.cjs, which walks
+ * Warwick's settled ladder - stored id, then the Favourites/Regulars grid by
+ * canonical ASDA description, then live search, then the model over real
+ * candidates. What used to be here was rung 1 followed immediately by rung 3,
+ * which is the defect of 2026-08-17: a free search per line for products that
+ * were on the Favourites page all along.
+ *
+ * The ADD half is unchanged in every respect that matters for safety. A
+ * reference that came from search is still added through
+ * `select_search_result`, which re-runs the search and refuses any reference
+ * not in the live result set - the invention guard stays in the path.
+ */
 async function runLine(session, steps, ctx) {
-  const { log, progress, harvest, outcomes } = ctx;
+  const { log, progress, harvest, outcomes, policy, favourites, catalogue } = ctx;
   const first = steps[0];
   const lineNo = first.line;
   const done = new Set(P.completedStepIds(progress));
@@ -201,88 +222,68 @@ async function runLine(session, steps, ctx) {
     outcomes.push({ line: lineNo, product: first.product, qty: first.qty, status, ...detail });
   };
 
-  // ---- an unresolvable line: no id, and no legal search term ----------
-  if (first.unresolvable) {
-    P.markHeld(progress, first, 'no ASDA id and no usable search term could be derived from the manifest text');
-    record('ambiguous', { reason: 'no-usable-search-term', candidates: [] });
+  const findStep = steps.find((s) => s.command === 'search') || first;
+
+  // ---- IDENTIFY -------------------------------------------------------
+  const id = await withRateLimitRetry(() => resolveLine(first, {
+    session, policy, favourites, catalogue, log,
+    judge: (line, candidates) => judgeLine(line, candidates, { log }),
+  }), log);
+
+  if (!id.resolved) {
+    // GAP 6. The two states are kept apart all the way out to the report,
+    // because they need opposite handling: an absence is recorded and dropped,
+    // an ambiguity stops the line and asks.
+    if (id.kind === UNRESOLVED.UNAVAILABLE) {
+      P.markUnavailable(progress, findStep, id.reason);
+      record('out_of_stock', { reason: id.reason, why: id.why, search_term: id.search_term || null });
+      return;
+    }
+    P.markHeld(progress, findStep, `${id.reason}: ${id.why || ''}`);
+    record('ambiguous', {
+      reason: id.reason,
+      why: id.why,
+      search_term: id.search_term || null,
+      answerable_by_warwick: id.answerable_by_warwick !== false,
+      candidates: id.candidates || [],
+    });
     return;
   }
 
-  let ref = first.product_ref || null;
-  let matchedName = null;
-  let via = ref ? 'stored-id' : null;
+  const ref = id.product_ref;
+  let matchedName = id.name;
+  const via = id.via;
+  log(`line ${lineNo}: identity via ${via} -> ${ref}${matchedName ? ` (${matchedName})` : ''}`);
 
-  // ---- resolve the reference -----------------------------------------
-  if (!ref) {
-    const findStep = steps.find((s) => s.command === 'search');
-    let candidates = [];
-    let usedTerm = null;
+  // ---- ADD ------------------------------------------------------------
+  const addStep = steps.find((s) => s.command === 'add_known_product') || findStep;
+  if (!done.has(addStep.step_id)) {
+    const add = id.search_term
+      ? await withRateLimitRetry(() => session.select_search_result(id.search_term, ref), log)
+      : await withRateLimitRetry(() => session.add_known_product(ref), log);
+    matchedName = add.name || matchedName;
 
-    for (const term of findStep.terms) {
-      const found = await withRateLimitRetry(() => session.search(term), log);
-      usedTerm = term;
-      candidates = found.results || [];
-      log(`line ${lineNo}: search "${term}" -> ${candidates.length} candidate(s)`);
-      if (candidates.length > 0) break;
+    if (add.added !== true) {
+      if (add.reason === 'unavailable' || add.reason === 'product-not-found') {
+        P.markUnavailable(progress, addStep, add.reason);
+        record('out_of_stock', { product_ref: ref, name: matchedName, via, reason: add.reason });
+        return;
+      }
+      if (add.reason !== 'already-in-trolley') {
+        P.markFailed(progress, addStep, add.reason || 'add-failed');
+        record('failed', { product_ref: ref, name: matchedName, via, reason: add.reason || 'add-failed' });
+        return;
+      }
     }
+    P.markCompleted(progress, addStep, add);
 
-    const verdict = await judgeLine(first, candidates, { log });
-    if (!verdict.resolved) {
-      P.markHeld(progress, findStep, `${verdict.reason}: ${verdict.why}`);
-      record('ambiguous', {
-        reason: verdict.reason,
-        why: verdict.why,
-        search_term: usedTerm,
-        candidates: (verdict.candidates || []).map((c) => ({ product_ref: c.product_ref, name: c.name })),
+    // Harvest is an OPTIMISATION and is recorded as one. The line was bought
+    // on its description; storing the reference only makes next week faster.
+    if (id.harvest) {
+      harvest.push({
+        line: lineNo, manifest_product: first.product, asda_product_id: ref,
+        name_on_site: add.name || matchedName, qty: first.qty, search_term: id.search_term || null,
       });
-      return;
-    }
-
-    ref = verdict.product_ref;
-    matchedName = verdict.name;
-    via = 'searched';
-    log(`line ${lineNo}: resolved to ${ref} (${matchedName}) - ${verdict.why}`);
-
-    // The add MUST go through select_search_result: it re-runs the search and
-    // refuses any reference not in the live result set. That is the invention
-    // guard, and it stays in the path even though the reference came from the
-    // candidate list a moment ago.
-    if (!done.has(findStep.step_id)) {
-      const add = await withRateLimitRetry(() => session.select_search_result(usedTerm, ref), log);
-      if (add.added !== true) {
-        if (add.reason === 'unavailable' || add.reason === 'product-not-found') {
-          P.markUnavailable(progress, findStep, add.reason);
-          record('out_of_stock', { product_ref: ref, name: matchedName, reason: add.reason });
-          return;
-        }
-        if (add.reason !== 'already-in-trolley') {
-          P.markFailed(progress, findStep, add.reason || 'add-failed');
-          record('failed', { product_ref: ref, name: matchedName, reason: add.reason || 'add-failed' });
-          return;
-        }
-      }
-      P.markCompleted(progress, findStep, add);
-      harvest.push({ line: lineNo, manifest_product: first.product, asda_product_id: ref, name_on_site: add.name || matchedName, qty: first.qty, search_term: usedTerm });
-    }
-  } else {
-    // ---- stored id: add it directly ----------------------------------
-    const addStep = steps.find((s) => s.command === 'add_known_product');
-    if (addStep && !done.has(addStep.step_id)) {
-      const add = await withRateLimitRetry(() => session.add_known_product(ref), log);
-      matchedName = add.name || null;
-      if (add.added !== true) {
-        if (add.reason === 'unavailable' || add.reason === 'product-not-found') {
-          P.markUnavailable(progress, addStep, add.reason);
-          record('out_of_stock', { product_ref: ref, name: matchedName, reason: add.reason });
-          return;
-        }
-        if (add.reason !== 'already-in-trolley') {
-          P.markFailed(progress, addStep, add.reason || 'add-failed');
-          record('failed', { product_ref: ref, name: matchedName, reason: add.reason || 'add-failed' });
-          return;
-        }
-      }
-      P.markCompleted(progress, addStep, add);
     }
   }
 
@@ -332,37 +333,109 @@ async function runBasket(args = {}) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const shopRef = manifest.shop_ref || 'SHOP-UNKNOWN';
 
+  // ── PER-RUN ARTEFACT PATHS. THE OVERWRITE BUG, CLOSED. ────────────────────
+  //
+  // These three files used to default to fixed per-date paths in Deliverables/,
+  // so EVERY invocation silently replaced the previous one's record. On
+  // 2026-08-17 that destroyed the record of the real full run: what survived on
+  // disk is a later 2-line invocation reporting "Added 2 - not attempted 35",
+  // and three different totals for one shop were reported from it in good
+  // faith. An artefact that can be overwritten by the next run is not evidence.
+  //
+  // The run id is time-ordered and unique, so runs sort and none collides.
+  const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}`;
+  const outDir = args.outDir || path.join(HERE, 'state', 'runs', shopRef, runId);
   const stateFile = args.state || path.join(HERE, 'state', `run-${shopRef}.json`);
-  const logFile = args.log || path.join(REPO, 'Deliverables', '2026-08-17-asdair-basket-run-log.json');
-  const reconFile = args.reconciliation || path.join(REPO, 'Deliverables', '2026-08-17-asdair-trolley-reconciliation.md');
-  const harvestFile = args.harvest || path.join(REPO, 'Deliverables', '2026-08-17-asdair-regulars-harvest.json');
+  const logFile = args.log || path.join(outDir, 'basket-run-log.json');
+  const reconFile = args.reconciliation || path.join(outDir, 'trolley-reconciliation.md');
+  const harvestFile = args.harvest || path.join(outDir, 'regulars-harvest.json');
+
+  // ── THE HOUSEHOLD CONTEXT ────────────────────────────────────────────────
+  // Supplied by the caller (the runtime reads it from the durable rows) or by
+  // path for a hand-run. ABSENT IS LOGGED LOUDLY: with no catalogue there is no
+  // bridge from Mum's wording to the canonical ASDA description, so the
+  // Favourites rung degrades to the manifest text alone - which is exactly the
+  // silent degradation that must never look like a normal run.
+  const catalogue = args.catalogue
+    || (args.cataloguePath ? JSON.parse(fs.readFileSync(args.cataloguePath, 'utf8')) : null);
+  const rules = args.rules
+    || (args.rulesPath ? JSON.parse(fs.readFileSync(args.rulesPath, 'utf8')) : null);
+
+  // ── GAP 10. WHICH METHOD IS THIS RUN OBEYING? ────────────────────────────
+  const policy = methodPolicy(args.browserMethod);
+  const method = methodReport(args.browserMethod);
+  const ruleSet = rulesForRun(rules);
 
   const plan = buildPlan(manifest);
   const summary = planSummary(manifest);
-  log(`manifest ${shopRef}: ${summary.line_count} lines - ${summary.with_stored_id} with a stored id, ${summary.needing_search} needing search`);
+  log(`manifest ${shopRef}: ${summary.line_count} lines - ${summary.with_stored_id} with a stored id, ${summary.needing_search} to be identified`);
+  log(`browser method v${method.instructions_version}: ${method.delivered} instructions delivered, ${method.implemented_here} implemented by this executor`);
+  log(`  Favourites-first: ${policy.favouritesFirst ? 'ON' : 'OFF'} · trolley reconciliation from the quantity field: ${policy.reconcileFromQuantityField ? 'ON' : 'OFF'}`);
+  if (method.delivered_but_not_implemented_here.length) {
+    log(`  delivered but NOT performed here: ${method.delivered_but_not_implemented_here.join(', ')}`);
+  }
+  log(`household rules active: ${ruleSet.count}${ruleSet.count ? ` (${ruleSet.ids.join(', ')})` : ' - NONE SUPPLIED, so no household rule reached this run'}`);
+  const catalogueRows = catalogue ? ((catalogue.rows || catalogue).length || 0) : 0;
+  log(catalogue
+    ? `household catalogue: ${catalogueRows} rows - canonical ASDA descriptions available for identity`
+    : 'household catalogue: NONE SUPPLIED - identity falls back to the manifest wording alone');
   log(`plan: ${plan.length} steps`);
+  log(`run artefacts: ${outDir}`);
 
-  const progress = loadState(stateFile);
+  // ── GAP 7. DURABLE PROGRESS COMES FROM THE CALLER WHEN THERE IS ONE ──────
+  //
+  // A local JSON file beside the source is fine for a hand-run and is NOT a
+  // durable dependency: a resumed run on a fresh checkout, another working
+  // directory or another machine would find nothing and re-add the lot. When
+  // the runtime invokes this it passes the progress it read out of the durable
+  // request row, and that wins - the file is then only a local convenience.
+  const progress = args.resumeFrom ? P.normalise(args.resumeFrom) : loadState(stateFile);
   progress.plan = plan;
   const alreadyDone = P.completedStepIds(progress).length;
-  if (alreadyDone) log(`resuming: ${alreadyDone} step(s) already completed in ${stateFile}`);
+  if (alreadyDone) {
+    log(`resuming: ${alreadyDone} step(s) already completed${args.resumeFrom ? ' (carried in the durable request row)' : ` in ${stateFile}`}`);
+  }
+
+  // Flush after every line. `saveState` keeps the local file; this is what
+  // makes the progress survive the process, and a failure to flush is LOUD
+  // rather than silent - an unflushed step is a step that will be re-added.
+  const flush = async () => {
+    saveState(stateFile, progress);
+    if (typeof args.onProgress === 'function') {
+      try { await args.onProgress(progress); } catch (e) { log(`DURABLE PROGRESS FLUSH FAILED: ${e.message} - a restart will re-do work from here`); }
+    }
+  };
 
   const outcomes = [];
   const harvest = [];
   let basket = null;
+  let favourites = [];
+  let favouritesRead = null;
   let substitutions = null;
   let fatal = null;
 
   const writeLog = (status) => {
+    // ONE reconciliation, from the page, and the run log carries the SAME
+    // object the report renders. Two derivations of "what is in the basket"
+    // is how three totals were reported for one shop.
+    const truth = basket ? reconcile({ manifest, outcomes, basket, catalogue }) : null;
     const payload = {
-      work_order: 'WO-2026-08-17-B15-BASKET',
+      work_order: 'WO-2026-08-18-B15-RUNTIME',
       shop_ref: shopRef,
+      run_id: runId,
       started, finished: new Date().toISOString(),
       status,
       manifest: manifestPath,
+      browser_method: method,
+      method_policy: policy,
+      household_rules: { count: ruleSet.count, ids: ruleSet.ids },
+      household_catalogue_rows: catalogueRows,
+      favourites_read: favouritesRead,
       plan_summary: summary,
       progress_summary: P.summary(progress),
-      shortfall: P.basketShortfall(plan, progress),
+      // The single count. Derived from the trolley, or absent - never guessed.
+      reconciliation: truth ? { summary: truth.summary, ready: truth.ready } : null,
+      basket_ready: truth ? truth.ready.ready : false,
       outcomes,
       harvested_ids: harvest,
       basket,
@@ -379,8 +452,8 @@ async function runBasket(args = {}) {
     log('DRY RUN - no browser, no gateway, no trolley. Plan built and validated only.');
     P.setRunnerState(progress, 'dry_run');
     saveState(stateFile, progress);
-    writeLog('dry-run');
-    return 0;
+    const dry = writeLog('dry-run');
+    return { exitCode: 0, runId, outDir, shopRef, basketReady: false, blockers: [{ kind: 'dry-run', detail: 'no browser, no gateway, no trolley' }], reconciliation: dry.reconciliation, artefacts: { log: logFile } };
   }
 
   // ---- the browser ----------------------------------------------------
@@ -388,7 +461,12 @@ async function runBasket(args = {}) {
   try {
     chrome = await ensureChrome({ chromePath: args.chrome, profileDir: args.profile, port: args.port }, { log });
   } catch (e) {
-    if (e instanceof LauncherConfigError) { log(`LAUNCHER CONFIG ERROR: ${e.message}`); fatal = { kind: 'launcher-config', message: e.message }; writeLog('failed'); return 2; }
+    if (e instanceof LauncherConfigError) {
+      log(`LAUNCHER CONFIG ERROR: ${e.message}`);
+      fatal = { kind: 'launcher-config', message: e.message };
+      writeLog('failed');
+      return { exitCode: 2, runId, outDir, shopRef, basketReady: false, blockers: [{ kind: 'launcher-config', detail: e.message }], reconciliation: null, artefacts: { log: logFile } };
+    }
     throw e;
   }
   process.env.ASDAIR_CDP_ENDPOINT = chrome.endpoint;
@@ -412,20 +490,52 @@ async function runBasket(args = {}) {
     P.setRunnerState(progress, 'running');
 
     if (!args.reconcileOnly) {
+      // ── THE FAVOURITES GRID, READ ONCE, BEFORE ANY LINE IS TOUCHED ───────
+      //
+      // One navigation for the whole shop. `one_session_one_page_context` says
+      // "the whole speed of this method is many items from one page" and rule
+      // 40 says the DEFAULT is a full pass over Regulars, not a hunt per line.
+      // Reading it up front is what turns those from instructions into
+      // behaviour: every line below is then matched against a list already in
+      // memory, at no further page cost.
+      if (policy.favouritesFirst) {
+        try {
+          const grid = await withRateLimitRetry(() => session.read_regulars(), log);
+          favourites = grid.items || [];
+          favouritesRead = {
+            count: favourites.length,
+            with_reference: favourites.filter((f) => f.product_ref).length,
+            bulk_control_present: grid.bulk_control_present,
+            checkbox_count: grid.checkbox_count,
+          };
+          log(`Favourites/Regulars: ${favourites.length} product(s) read from one page (${favouritesRead.with_reference} carrying an ASDA reference)`);
+        } catch (e) {
+          if (e instanceof ReauthRequiredError) throw e;
+          // A grid that will not load is a DEGRADED run, not a failed one: the
+          // ladder still has search and the model beneath it. It is recorded
+          // so nobody reads the resulting search count as normal.
+          favouritesRead = { count: 0, error: e.message.slice(0, 200) };
+          log(`Favourites/Regulars could NOT be read (${e.message}) - every line now falls through to search. This run is DEGRADED.`);
+        }
+      } else {
+        favouritesRead = { count: 0, skipped: 'the pinned browser method does not carry regulars_favourites_first' };
+        log('Favourites-first is OFF for this run because the pinned browser method does not carry regulars_favourites_first');
+      }
+
       const filter = parseLineFilter(args.lines);
       const groups = groupByLine(plan);
       for (const [lineNo, steps] of groups) {
         if (filter && !filter.has(lineNo)) continue;
         log(`--- line ${lineNo}: ${steps[0].product} (qty ${steps[0].qty}) ---`);
         try {
-          await runLine(session, steps, { log, progress, harvest, outcomes });
+          await runLine(session, steps, { log, progress, harvest, outcomes, policy, favourites, catalogue });
         } catch (e) {
           if (e instanceof ReauthRequiredError) throw e;
           log(`line ${lineNo} ERRORED: ${e.message}`);
           P.markFailed(progress, steps[0], e.message.slice(0, 200));
           outcomes.push({ line: lineNo, product: steps[0].product, qty: steps[0].qty, status: 'failed', reason: e.message.slice(0, 200) });
         }
-        saveState(stateFile, progress);
+        await flush();
       }
     }
 
@@ -453,12 +563,34 @@ async function runBasket(args = {}) {
   }
 
   const payload = writeLog(fatal ? 'failed' : 'completed');
-  writeReconciliation(reconFile, { manifest, outcomes, basket, substitutions, progress, plan, payload });
+  writeReconciliation(reconFile, { manifest, outcomes, basket, substitutions, progress, plan, payload, catalogue });
   writeHarvest(harvestFile, { manifest, harvest });
   log(`wrote ${logFile}`);
   log(`wrote ${reconFile}`);
   log(`wrote ${harvestFile}`);
-  return exitCode;
+
+  // ── THE ANNOUNCEMENT GATE ────────────────────────────────────────────────
+  //
+  // Warwick: "'Mum's basket is ready' may not be issued until that
+  // reconciliation is truthful. A total and item count are insufficient."
+  //
+  // So the phrase is returned as a FIELD the caller may only pass on when the
+  // gate is open. It is deliberately not a log line the caller could scrape,
+  // and it is deliberately not computed twice.
+  const ready = payload.reconciliation ? payload.reconciliation.ready : { ready: false, blockers: [{ kind: 'trolley-not-read', detail: 'no reconciliation was produced' }] };
+  if (ready.ready) log('RECONCILED and truthful: Mum\'s basket is ready.');
+  else log(`NOT announceable: ${ready.blockers.length} blocker(s) - ${ready.blockers.map((b) => b.kind).join(', ')}`);
+
+  return {
+    exitCode,
+    runId,
+    outDir,
+    shopRef,
+    basketReady: ready.ready,
+    blockers: ready.blockers,
+    reconciliation: payload.reconciliation,
+    artefacts: { log: logFile, reconciliation: reconFile, harvest: harvestFile },
+  };
 }
 
 /** The shell adapter. Parses argv and hands off to the real entry point. */
@@ -466,7 +598,7 @@ async function main(argv) { return runBasket(parseArgs(argv)); }
 
 if (require.main === module) {
   main(process.argv.slice(2))
-    .then((code) => { process.exitCode = code; })
+    .then((r) => { process.exitCode = r && typeof r === 'object' ? r.exitCode : r; })
     .catch((e) => { console.error('FATAL', e.stack || e.message); process.exitCode = 1; });
 }
 
