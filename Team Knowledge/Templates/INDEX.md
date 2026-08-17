@@ -37,16 +37,22 @@ Structurally separate from the eight PKM templates above — these back `Client 
 | [[Templates/work-package]] | Work Package | `Client Delivery/<engagement-slug>/Work Packages/<engagement-slug>-wp-<NNN>-<slug>.md` |
 | [[Templates/register-item]] | Register Item (risk/issue/change/decision) | `Client Delivery/<engagement-slug>/Risk-Issue-Change-Decision Register/<engagement-slug>-reg-<NNN>.md` |
 
-### Delegation templates
+### Planning and delegation templates
 
-Not a PKM or Client Delivery entity — this one backs the team's own operating machinery. It is the
-canonical shape of a bounded Work Order, and the reason it lives here rather than inside a specialist's
-contract is that a template owned by one reader drifts from every other reader.
+Not PKM or Client Delivery entities — these back the team's own operating machinery. The reason they
+live here rather than inside a specialist's contract is that a template owned by one reader drifts from
+every other reader.
 
 | Template | Artefact | Goes under |
 |---|---|---|
+| [[Templates/wayfinder-plan]] | Wayfinder implementation plan (**mandatory before any build begins**) | `Deliverables/YYYY-MM-DD-<build-slug>-wayfinder-plan.md` |
 | [[Templates/work-order]] | Work Order (bounded dispatch to a specialist) | `Builds/<BUILD-ID>/Work Packages/<wp-slug>.md`, or `Deliverables/YYYY-MM-DD-<slug>-work-order.md` when standalone |
 | [[Templates/veritas-receipt]] | Veritas assurance receipt (one per review, against one exact head) | `Builds/<BUILD-ID>/Assurance/veritas-<wp-or-phase>-<sha7>.md`, or `Deliverables/YYYY-MM-DD-veritas-<scope>-receipt.md` when standalone |
+
+The Wayfinder template carries the **⚑ WORK CLASSIFICATION** block (Warwick, 2026-08-17): every map must
+show at a glance what kind of work is happening — **BUILD / ACCEPT / REMEDIATE / ADMIN** — split into
+**FRONTIER / NEXT / SIDECAR / PARKED**, with owner, model/effort, what it blocks and what done looks
+like. The mandate for the map itself remains canonical in root `CLAUDE.md` §"Wayfinder".
 
 The lifecycle it enforces is mandatory, and the procedure that runs against it is
 [[SOP-022-work-order-preflight]]:
