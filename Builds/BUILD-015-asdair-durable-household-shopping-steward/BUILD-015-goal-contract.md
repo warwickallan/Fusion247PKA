@@ -174,7 +174,23 @@ materially plausible choices survive reasonable inspection does it ask Warwick.*
 | **Terra** (gateway vision) | **OPTIONAL.** A useful capability. Not the required reader of the photograph. |
 | **CDP / `browser-runner`** | **OPTIONAL, and AUTHORISED.** The 2026-08-04 exclusion is lifted (see below). |
 | **Sonnet in Claude for Chrome** | **OPTIONAL.** No longer the designated basket writer. |
-| **Stored ASDA product ids** | **A USEFUL OPTIMISATION.** Never a precondition for buying a known household item. |
+| **Stored ASDA product ids** | **A USEFUL OPTIMISATION.** Never a precondition for buying a known household item. **See the ruling immediately below — the ASDA PRODUCT NAME is the identity.** |
+
+### ⛔ THE ASDA PRODUCT NAME IS THE IDENTITY. THE PRODUCT ID IS NOT. — Warwick, 2026-08-17
+
+> **His words, and he has said this repeatedly before tonight:** *"not all items have visible IDs — I keep telling you this — and we should be working off the ASDA item name. I don't give a fuck about product id, each ASDA description is unique."*
+
+**Every ASDA product description is unique. That is the identity AsdAIr matches on.** A stored `asda_product_id` is a shortcut that makes a known item faster to add. **It is never what makes an item buyable, and its absence is never a reason a line cannot be shopped.**
+
+**What this rules out, permanently:**
+
+- **"No stored id" must NEVER block a line.** Tonight 16 of 37 lines were unbuyable for this reason alone, and **none of them was a new product** — they are ordinary household items Mum buys every week.
+- **"Harvest the missing ids" is not the fix, and treating it as the fix is the recurring error.** It is a performance optimisation worth doing opportunistically. The estate has carried "45 regulars have no id" as a blocking problem **for weeks**, when the correct response was to match on the name.
+- **A command surface keyed exclusively on `product_ref`** — as `browser-runner/commands.cjs` is — **makes the id load-bearing by construction.** That is an implementation choice that contradicted this ruling, and implementation is subordinate to the outcome. Any executor must be able to act on a line whose only identity is its ASDA name.
+
+**The correct resolution order for any line:** stored id if present (fast path) → **otherwise search ASDA and match on the unique product description** → select when clear → abstain only on genuine ambiguity. **Harvest the id afterwards as a by-product, never as a prerequisite.**
+
+*(Recorded here because this instruction has been given more than once and repeatedly failed to reach the implementation. If a future reader finds the estate again treating missing ids as a blocker, this clause is the answer and no new decision is required.)*
 | Rules, catalogue, Supabase, execution packets, handoff artefacts, reconciliation | **SUPPORTING CAPABILITIES.** Kept where they serve the outcome. |
 
 **Two structural rules:**
