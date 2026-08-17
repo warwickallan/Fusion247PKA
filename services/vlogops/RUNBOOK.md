@@ -65,18 +65,35 @@ operator to a person instead of to the product. That was a real defect, found by
 The approved credentials file for this estate's managed Postgres is
 `C:/.fusion247/fusion-capture-gateway.env`, and it is the same fixed path
 `tools/session-report/populate.mjs` uses. **It supplies the connection string under the name
-`DATABASE_URL`, while this service requires `VLOGOPS_DB_URL`** — so the name must be mapped
-when you run a command:
+`DATABASE_URL`, while this service requires `VLOGOPS_DB_URL`** — so the name must be mapped.
+
+**Copy this line. It is the whole answer, and it has been executed exactly as printed.** Run it
+from the repository root; put your own subcommand and flags after the closing quote:
 
 ```bash
-# Bash: map the approved file's variable to the one this service requires.
-export VLOGOPS_DB_URL="$DATABASE_URL"   # after sourcing the approved file, or:
 node --env-file=C:/.fusion247/fusion-capture-gateway.env \
-  -e "process.env.VLOGOPS_DB_URL=process.env.DATABASE_URL" # …then spawn the bin
+  -e "const r=require('child_process').spawnSync(process.execPath,['services/vlogops/bin/vlogops-intake.mjs',...process.argv.slice(1)],{stdio:'inherit',env:{...process.env,VLOGOPS_DB_URL:process.env.DATABASE_URL}});process.exit(r.status??1)" \
+  records --from 2026-08-05 --to 2026-08-05
 ```
 
-Simplest reliable form, and the one the acceptance evidence used: run the bin as a child with
-the variable set from `DATABASE_URL`, so the real entry point runs unchanged.
+For the compiler, change `vlogops-intake.mjs` to `vlogops-compile.mjs` and pass `compile --seed …`
+or `verify --pack …`.
+
+It spawns the real entry point unchanged, and **it forwards the child's exit code**, so §5 still
+means what it says — verified: `64` for a bad command line, `1` for a missing pack, `0` on success.
+
+> **⚠️ Two forms that look right and DO NOT WORK. Both were printed here before and both were
+> caught by assurance actually running them — which is the only reason this section is now correct.**
+>
+> - `node --env-file=<file> bin/vlogops-intake.mjs records …` → **exit 78**, *"VLOGOPS_DB_URL is
+>   required … unset or empty"*. `--env-file` supplies `DATABASE_URL`; this service reads the other
+>   name and does not fall back.
+> - `node --env-file=<file> -e "process.env.VLOGOPS_DB_URL=process.env.DATABASE_URL"` → **exit 0
+>   and nothing runs at all.** It sets a variable in a process that then exits. It never launches
+>   the service, and its success is silent, which is worse than the failure above.
+>
+> `export VLOGOPS_DB_URL="$DATABASE_URL"` also works **only after you have loaded the approved file
+> into the shell yourself.** If you have not, `$DATABASE_URL` is empty and you get exit 78.
 
 **Do not copy the connection string into a new file to avoid the mapping.** Two files holding
 one credential means a rotation silently leaves one stale.

@@ -123,3 +123,25 @@ $ node bin/vlogops-intake.mjs records --from 2026-07-01 --to 2026-08-16
 [ASSERT] refused=20 permitted=0 of 20 -> PASS
 [ASSERT] harness proven able to observe a success: true
 [ASSERT] rollbacks left NO trace: {"tamper_traces":"0","md5_traces":"0","seeds":"7"}
+
+## F2-5 — mid-COMPILE SIGKILL. This capture was ABSENT from the first discharge; Veritas held F2-5 for it.
+# captured Mon Aug 17 2026 11:33:14 GMT+0100 (British Summer Time)Z. Seed fbe257f38d2cb9c65b76c756a848eea9bc06962a35494a89998ef79a8c93b290 has never been compiled, so a completing run must report deduplicated:false.
+# Invariant: "nothing at all, or all of it". A PARTIAL pack — entries without a pack, a pack with no
+# entries, or a pack whose entry_count disagrees with its stored entries — is the ONLY failure.
+[state before] {"packs":"3","entries":"24","compile_runs":"5","orphan_entries":"0","packs_without_entries":"0","packs_miscounting_entries":"0","stuck_txns":"0"}
+
+### killed mid-compile
+$ node bin/vlogops-compile.mjs compile --seed fbe257f38d2cb9c65b76c756a848eea9bc06962a35494a89998ef79a8c93b290   [SIGKILL after 350ms]
+[exit] status=null signal=SIGKILL
+[state after kill] {"packs":"3","entries":"24","compile_runs":"5","orphan_entries":"0","packs_without_entries":"0","packs_miscounting_entries":"0","stuck_txns":"0"}
+[branch] the kill landed PRE-commit (no pack was printed)
+[ASSERT] PRE-commit branch: nothing may have been written, INCLUDING the compile_run attempt row. unchanged=true (expected TRUE) -> PASS
+[ASSERT] THE INVARIANT — no partial pack, either branch: orphan_entries=0 packs_without_entries=0 packs_miscounting_entries=0 stuck_txns=0 -> PASS
+
+### same compile completes on re-run
+$ node bin/vlogops-compile.mjs compile --seed fbe257f38d2cb9c65b76c756a848eea9bc06962a35494a89998ef79a8c93b290
+{"pack_id":"6c5be03ad6db129d31a0b1574938defbd59e7273dd10f8d84b17ae29dc3c44bf","seed_id":"fbe257f38d2cb9c65b76c756a848eea9bc06962a35494a89998ef79a8c93b290","deduplicated":false,"entries":8,"entry_bytes":680128,"bounded":true,"omitted":4,"candidates":12}
+[exit] status=0 signal=none
+[ASSERT] re-run resolves to exactly one correct state: deduplicated=false (false expected — the killed work was absent) -> PASS
+[state final] {"packs":"4","entries":"32","compile_runs":"6","orphan_entries":"0","packs_without_entries":"0","packs_miscounting_entries":"0","stuck_txns":"0"}
+[ASSERT] the completing compile wrote one pack and its entries: packs 3->4, entries 24->32

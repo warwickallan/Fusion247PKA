@@ -44,8 +44,21 @@ Every command in `live-proofs-raw.txt` is a real `bin/` entry point with `VLOGOP
 
 The third harness detects which branch occurred and asserts the correct expectation for it. That is the one to read; the first two are kept for provenance and because the second is an honest record of my own harness being wrong.
 
+## The mid-COMPILE kill (F2-5) — added in the second pass, and it was MISSING from the first
+
+**Veritas held F2-5 alone at the first confirmation, and it was right: there was no mid-compile kill capture in this directory at all.** Four `F1-4`-family captures and a controls run, and not one of them killed a *compile*. Worse, the section above — whose entire job is naming absent proofs — listed the two superseded intake kills and **did not mention the F2-5 capture that did not exist.** A clean store afterwards proves nothing damaged it; it does not prove a kill was survived. Recorded here because it is the third occurrence of the `acceptance-proves-mechanism-not-outcome` family and the pattern is the point, not the individual miss.
+
+`## F2-5` in `live-proofs-raw.txt` now carries it, on the same branch-detecting pattern:
+
+- seed `fbe257f3…`, never compiled before, SIGKILL at 350 ms;
+- landed **PRE-commit** — nothing written, **including the `compile_run` attempt row** (packs 3, entries 24, compile_runs 5, unchanged);
+- **no partial pack** — zero orphan entries, zero packs without entries, and zero packs whose `entry_count` disagrees with their stored entries, which is the check that would actually catch a half-written pack;
+- the re-run completed with `deduplicated:false`, proving the killed work was genuinely absent, and wrote exactly one pack with its eight entries (packs 3→4, entries 24→32).
+
 ## What this evidence still does NOT establish
 
 - **It is still single-actor.** Larry ran these captures. What changed is that the *store's own output* is now committed and re-checkable by anyone with access, rather than a summary being the only artefact. An independent reviewer without a credential still cannot re-execute — that limit is structural under GL-012 §4 and is named in both receipts.
 - **The two earliest kill tests** (500 ms and 5,500 ms on genuinely new windows, both reporting `deduplicated:false` on completion) exist only in the session transcript. They are **not** re-captured here; the corrected 1,500 ms capture above supersedes them as the fresh pre-commit proof.
+- **No capture of a POST-commit mid-compile kill.** The F2-5 capture landed pre-commit. The post-commit compile branch is therefore evidenced only by the structural argument that the pack, its entries and its ledger row commit in one transaction, plus the F1-4 post-commit intake capture showing that branch behaving correctly for intake. **Stated because the section above exists to name absent proofs and failed to do so once already.**
+- **How to tell what is actually here:** the section headers in `live-proofs-raw.txt` are the index. If a requirement has no header naming it, there is no capture for it — do not infer one from a clean store.
 - **No Phase PASS.** These are inputs to Veritas, not a verdict.
