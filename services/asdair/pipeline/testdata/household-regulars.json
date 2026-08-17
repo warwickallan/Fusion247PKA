@@ -1,0 +1,1387 @@
+{
+  "_note": "The household catalogue. The ASDA product NAME is the identity; asda_product_id is an optimisation and is null for many rows. A line must be buyable without one.",
+  "captured_from": "asdair (household 1)",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
+      "display_name": "Gourmet cat food",
+      "brand": "Gourmet",
+      "category": "Premium Wet Cat Food",
+      "aka": [
+        "gourmet cat food",
+        "gourmet"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "4996753",
+      "active": true
+    },
+    {
+      "id": "2",
+      "name": "ASDA British Milk Semi Skimmed 6 Pints",
+      "display_name": "6pt milk",
+      "brand": "ASDA",
+      "category": "Semi Skimmed Milk",
+      "aka": [
+        "6pt milk",
+        "6pts milk",
+        "6 pint milk",
+        "franks 6 pint"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "166556",
+      "active": true
+    },
+    {
+      "id": "3",
+      "name": "Lucozade Sport Drink Orange 4 x 500ml",
+      "display_name": "Lucozade orange",
+      "brand": "Lucozade",
+      "category": "Sports Drinks",
+      "aka": [
+        "lucozade orange sport",
+        "lucozade orange"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "4801401",
+      "active": true
+    },
+    {
+      "id": "4",
+      "name": "Cravendale Arla  Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+      "display_name": "Arla 4pt milk",
+      "brand": "Cravendale",
+      "category": "Semi Skimmed Milk",
+      "aka": [
+        "arla 4pt milk",
+        "arla 4pt",
+        "arla 4pts",
+        "arla semi",
+        "4pt milk",
+        "milk"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "489747",
+      "active": true
+    },
+    {
+      "id": "5",
+      "name": "Lenor Outdoorable Spring Awakening Fabric Conditioner 86 Washes",
+      "display_name": "Lenor outdoor",
+      "brand": "Lenor",
+      "category": "Fabric Conditioner Softeners",
+      "aka": [
+        "lenor outdoor",
+        "lenor"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9230530",
+      "active": true
+    },
+    {
+      "id": "6",
+      "name": "Walkers Cheese & Onion Multipack Crisps 6x25g",
+      "display_name": "Cheese onion crisps",
+      "brand": "Walkers",
+      "category": "Small Multipack Crisps 4 8 Packs",
+      "aka": [
+        "cheese onion crisps",
+        "cheese and onion crisps"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "5017321",
+      "active": true
+    },
+    {
+      "id": "7",
+      "name": "ASDA Crispy Skin-On Fries 750g",
+      "display_name": "Chips",
+      "brand": "ASDA",
+      "category": "Frozen Chips Fries",
+      "aka": [
+        "chips"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6966614",
+      "active": true
+    },
+    {
+      "id": "8",
+      "name": "Lucozade Sport Drink Raspberry 4 x 500ml",
+      "display_name": "Lucozade sport",
+      "brand": "Lucozade",
+      "category": "Sports Drinks",
+      "aka": [
+        "lucozade raspberry sport",
+        "lucozade raspberry"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "4801403",
+      "active": true
+    },
+    {
+      "id": "9",
+      "name": "Princes Lean Corned Beef 200g",
+      "display_name": "Lean corned beef",
+      "brand": "Princes",
+      "category": "Cold Meats Corned Beef",
+      "aka": [
+        "lean corned beef",
+        "corned beef"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "391036",
+      "active": true
+    },
+    {
+      "id": "10",
+      "name": "Yazoo Banana Milk Drink 400ml",
+      "display_name": "Banana yazoo",
+      "brand": "Yazoo",
+      "category": "Milk Drinks",
+      "aka": [
+        "banana yazoo"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "7689977",
+      "active": true
+    },
+    {
+      "id": "11",
+      "name": "ASDA British Double Gloucester 400g",
+      "display_name": "Double gloucester",
+      "brand": "ASDA",
+      "category": "Red Leicester Gloucester",
+      "aka": [
+        "double gloucester"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6793866",
+      "active": true
+    },
+    {
+      "id": "12",
+      "name": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
+      "display_name": "Dreamies cheese",
+      "brand": "Dreamies",
+      "category": "Cat Biscuit Treats",
+      "aka": [
+        "dreamies cheese",
+        "dreamies"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6325769",
+      "active": true
+    },
+    {
+      "id": "13",
+      "name": "Kleenex Original Tissues - Twin Pack",
+      "display_name": "Tissues",
+      "brand": "Kleenex",
+      "category": "View All Cough Cold Flu",
+      "aka": [
+        "tissues"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "7151000",
+      "active": true
+    },
+    {
+      "id": "14",
+      "name": "Batchelors Pasta 'n' Sauce Cheese, Leek & Ham Flavour Pasta Sachet 99g",
+      "display_name": "Pasta bake",
+      "brand": "Batchelors",
+      "category": "Pasta Sauce",
+      "aka": [
+        "pasta cheese leek ham",
+        "pasta cheese leek and ham",
+        "cheese leek ham"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6456641",
+      "active": true
+    },
+    {
+      "id": "15",
+      "name": "Yazoo Chocolate Milk Drink 400ml",
+      "display_name": "Chocolate yazoo",
+      "brand": "Yazoo",
+      "category": "Milk Drinks",
+      "aka": [
+        "chocolate yazoo",
+        "choc yazoo",
+        "choc yazoos"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "5277567",
+      "active": true
+    },
+    {
+      "id": "16",
+      "name": "ASDA Shortbread Fingers 210g",
+      "display_name": "Shortbread fingers",
+      "brand": "ASDA",
+      "category": "Shortbread Biscuits",
+      "aka": [
+        "shortbread fingers"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "421000",
+      "active": true
+    },
+    {
+      "id": "17",
+      "name": "TRESemme Rich Moisture HAIR CONDITIONER 680 ml",
+      "display_name": "Hair conditioner",
+      "brand": "TRESemme",
+      "category": "Conditioner",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "18",
+      "name": "Sure Nonstop Protection Sport Cool Anti-Perspirant Aerosol 250 ml",
+      "display_name": "Deodorant — Sport",
+      "brand": "Sure",
+      "category": "Men S Spray Deodorant",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "19",
+      "name": "Birds Eye 4 Classic Beef Burgers with Onion 227g",
+      "display_name": "Burgers",
+      "brand": "Birds",
+      "category": "Frozen Burgers",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "20",
+      "name": "Andrex Ultimate Quilts Toilet Tissue 9 Rolls",
+      "display_name": "Toilet roll",
+      "brand": "Andrex",
+      "category": "Quilted Toilet Roll",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "7462703",
+      "active": true
+    },
+    {
+      "id": "21",
+      "name": "Sure Nonstop Protection Bright Bouquet Anti-Perspirant Aerosol 250 ml",
+      "display_name": "Sure female",
+      "brand": "Sure",
+      "category": "Women S Spray Deodorant",
+      "aka": [
+        "sure female"
+      ],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "22",
+      "name": "Robinsons Double Strength Summer Fruits No Added Sugar Squash 1.75L",
+      "display_name": "Squash",
+      "brand": "Robinsons",
+      "category": "Other Fruit Flavoured Squash",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "23",
+      "name": "Rustlers All Day Breakfast Sausage Muffin 155g",
+      "display_name": "Sausage baps",
+      "brand": "Rustlers",
+      "category": "Microwaveable Snacks",
+      "aka": [
+        "sausage baps",
+        "sausage bap"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6185988",
+      "active": true
+    },
+    {
+      "id": "24",
+      "name": "McCain Air Fryer Hash Brown Bites 600g",
+      "display_name": "Hash browns",
+      "brand": "McCain",
+      "category": "Frozen Hash Browns Croquettes Onion Rings",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9297593",
+      "active": true
+    },
+    {
+      "id": "25",
+      "name": "Sure Nonstop Protection Quantum Dry Anti-Perspirant Aerosol 250 ml",
+      "display_name": "Deodorant — Quantum",
+      "brand": "Sure",
+      "category": "Men S Spray Deodorant",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "7358307",
+      "active": true
+    },
+    {
+      "id": "26",
+      "name": "Weetabix Protein 24 pack cereal",
+      "display_name": "Weetabix protein",
+      "brand": "Weetabix",
+      "category": "Wheat Biscuits Mini Wheats",
+      "aka": [
+        "weetabix protein"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "5324639",
+      "active": true
+    },
+    {
+      "id": "27",
+      "name": "ASDA 12 Free Range Large Eggs",
+      "display_name": "Eggs — box of 12",
+      "brand": "ASDA",
+      "category": "Free Range Eggs",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "166781",
+      "active": true
+    },
+    {
+      "id": "28",
+      "name": "The BAKERY at ASDA Sultana & Cherry Cake",
+      "display_name": "Cherry cake",
+      "brand": "The",
+      "category": "Loaf Cakes",
+      "aka": [
+        "sultana and cherry cake",
+        "sultana & cherry cake"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "5233810",
+      "active": true
+    },
+    {
+      "id": "29",
+      "name": "Vanish Oxi Action Laundry Whitener and Stain Remover Powder, 450g",
+      "display_name": "Vanish white",
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "aka": [
+        "vanish white"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6016742",
+      "active": true
+    },
+    {
+      "id": "30",
+      "name": "Febreze Fabric Freshener Spray Lenor Spring Awakening 385ML",
+      "display_name": "Fabric freshener",
+      "brand": "Febreze",
+      "category": "Undefined",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "31",
+      "name": "Smart Litter Wood Pellet Litter 10 Litres",
+      "display_name": "Cat litter",
+      "brand": "Smart",
+      "category": "Cat Litter Accessories",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "3104303",
+      "active": true
+    },
+    {
+      "id": "32",
+      "name": "ASDA Free Range 6 Large Eggs",
+      "display_name": "Eggs — box of 6",
+      "brand": "ASDA",
+      "category": "Free Range Eggs",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "33",
+      "name": "ASDA Dairy Toffee 180g",
+      "display_name": "Dairy toffee",
+      "brand": "ASDA",
+      "category": "Jelly Chewy Sweets",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "34",
+      "name": "Canderel Granular Low Calorie Sweetener 75g",
+      "display_name": "Canderel",
+      "brand": "Canderel",
+      "category": "Sweetener",
+      "aka": [
+        "canderel"
+      ],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "35",
+      "name": "Sweetex Calorie Free Sweeteners 600 Tablets",
+      "display_name": "Sweeteners",
+      "brand": "Sweetex",
+      "category": "Sweetener",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "36",
+      "name": "Ariel 4in1 PODS®, Washing Capsules 33",
+      "display_name": "Ariel pods",
+      "brand": "Ariel",
+      "category": "Washing Capsules Pods",
+      "aka": [
+        "ariel pods"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9102576",
+      "active": true
+    },
+    {
+      "id": "37",
+      "name": "Calgon washing machine cleaner tablets limescale protection 15 tablets",
+      "display_name": "Calgon",
+      "brand": "Calgon",
+      "category": "Washing Machine Cleaners Limescale Protection",
+      "aka": [
+        "calgon",
+        "calgon tablets",
+        "washing machine cleaner"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "2174822",
+      "active": true
+    },
+    {
+      "id": "38",
+      "name": "ASDA Apple Slices 80g",
+      "display_name": "Apple slices",
+      "brand": "ASDA",
+      "category": "Apples",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "4740761",
+      "active": true
+    },
+    {
+      "id": "39",
+      "name": "Silver Spoon Granulated Sugar 1kg",
+      "display_name": "Sugar",
+      "brand": "Silver",
+      "category": "Granulated Sugar",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "40",
+      "name": "Tetley 240 Original Tea Bags 750g",
+      "display_name": "Tea bags",
+      "brand": "Tetley",
+      "category": "Everyday Tea",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "41",
+      "name": "ASDA Sausages with Buttery Mash 400g",
+      "display_name": "Sausage and mash",
+      "brand": "ASDA",
+      "category": "British",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "42",
+      "name": "ASDA Cottage Pie 400g",
+      "display_name": "Cottage pie",
+      "brand": "ASDA",
+      "category": "British",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "6581910",
+      "active": true
+    },
+    {
+      "id": "43",
+      "name": "Vanish Gold Oxi Action Stain Remover Powder for clothes 450g",
+      "display_name": "Vanish powder",
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "4550391",
+      "active": true
+    },
+    {
+      "id": "44",
+      "name": "Febreze Air Freshener Sun-Kissed Vanilla 185ML",
+      "display_name": "Air freshener",
+      "brand": "Febreze",
+      "category": "Febreze",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "45",
+      "name": "Ambrosia Rice Pudding Dessert Snack Pots Multipack 4 x 120g",
+      "display_name": "Rice pudding x4",
+      "brand": "Ambrosia",
+      "category": "Pudding Pots",
+      "aka": [
+        "rice pudding x4",
+        "rice pudding",
+        "x4 rice pudding"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9188516",
+      "active": true
+    },
+    {
+      "id": "46",
+      "name": "Dylon Colour Catcher Protection 40 Laundry Sheets",
+      "display_name": "Colour catchers",
+      "brand": "Dylon",
+      "category": "Stain Remover For Colours Colour Catchers",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9095268",
+      "active": true
+    },
+    {
+      "id": "47",
+      "name": "Tropicana Smooth Orange Fruit Juice 1.5L",
+      "display_name": "Smooth orange juice",
+      "brand": "Tropicana",
+      "category": "Bigger Pack Juice",
+      "aka": [
+        "smooth orange juice",
+        "smooth oj"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9086917",
+      "active": true
+    },
+    {
+      "id": "48",
+      "name": "Nescafe Americano Instant Coffee 140g",
+      "display_name": "Coffee",
+      "brand": "Nescafe",
+      "category": "Premium Instant Coffee",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "49",
+      "name": "ASDA Toffee Assortment 200g",
+      "display_name": "Toffee assortment",
+      "brand": "ASDA",
+      "category": "Toffee Fudge Liquorice",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "50",
+      "name": "Ariel 4in1 PODS®, Washing Capsules 22",
+      "display_name": "Ariel pods",
+      "brand": "Ariel",
+      "category": "Washing Capsules Pods",
+      "aka": [
+        "ariel pods"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9102567",
+      "active": true
+    },
+    {
+      "id": "51",
+      "name": "Always Discreet Incontinence Pads Women Normal 39 Count",
+      "display_name": "Pads",
+      "brand": "Always",
+      "category": "Pads",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9302469",
+      "active": true
+    },
+    {
+      "id": "52",
+      "name": "Persil Wonder Wash Bio Liquid Detergent Ultra Care 837 ml (31 washes)",
+      "display_name": "Washing liquid",
+      "brand": "Persil",
+      "category": "Washing Liquid Gel",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9102336",
+      "active": true
+    },
+    {
+      "id": "53",
+      "name": "ASDA 20 Medium Zip Seal Food & Freezer Bags",
+      "display_name": "Freezer bags",
+      "brand": "ASDA",
+      "category": "Food Bags Tubs",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9023250",
+      "active": true
+    },
+    {
+      "id": "54",
+      "name": "Sure Nonstop Protection Invisible Pure Anti-Perspirant Aerosol 250 ml",
+      "display_name": "Deodorant plain",
+      "brand": "Sure",
+      "category": "Women S Spray Deodorant",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "55",
+      "name": "Lure Beauty Travel Vent Brush",
+      "display_name": "Hairbrush",
+      "brand": "Lure",
+      "category": "Hair Brushes Combs",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "56",
+      "name": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
+      "display_name": "Vanish pink",
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "aka": [
+        "vanish pink"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6016740",
+      "active": true
+    },
+    {
+      "id": "57",
+      "name": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "display_name": "Paracetamol",
+      "brand": "ASDA",
+      "category": "Paracetamol",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "58",
+      "name": "Fairy Max Power Washing Up Liquid 545ML",
+      "display_name": "Fairy max",
+      "brand": "Fairy",
+      "category": "Washing Up Liquid",
+      "aka": [
+        "fairy max"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9227130",
+      "active": true
+    },
+    {
+      "id": "59",
+      "name": "Yazoo Strawberry Milk Drink 400ml",
+      "display_name": "Strawberry yazoo",
+      "brand": "Yazoo",
+      "category": "Milk Drinks",
+      "aka": [
+        "strawberry yazoo"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "5277569",
+      "active": true
+    },
+    {
+      "id": "60",
+      "name": "ASDA 6 Bananas",
+      "display_name": "Bananas",
+      "brand": "ASDA",
+      "category": "Bananas",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9084493",
+      "active": true
+    },
+    {
+      "id": "61",
+      "name": "VO5 Volume Boost Gel Spray 165g",
+      "display_name": "Hair gel",
+      "brand": "VO5",
+      "category": "Hair Wax Putty Gels",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "62",
+      "name": "Vanish Pre-Treat Gel",
+      "display_name": "Vanish gel",
+      "brand": "Vanish",
+      "category": "Stain Remover For Whites",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "63",
+      "name": "Heinz Baked Beans & Richmond Pork Sausages 200g",
+      "display_name": "Beans and sausages",
+      "brand": "Heinz",
+      "category": "Baked Beans",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9190635",
+      "active": true
+    },
+    {
+      "id": "64",
+      "name": "Kellogg's Frosties Breakfast Cereal 925g",
+      "display_name": "Frosties",
+      "brand": "Kellogg's",
+      "category": "Cornflakes Honey Nut",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "65",
+      "name": "ASDA Malted Milk Biscuits 200g",
+      "display_name": "Malted milk biscuits",
+      "brand": "ASDA",
+      "category": "Plain Biscuits",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "66",
+      "name": "Carnation Evaporated Milk 170g Tin",
+      "display_name": "Evaporated milk",
+      "brand": "Carnation",
+      "category": "Evaporated Condensed Milk",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "67",
+      "name": "Viakal Fresh Limescale Remover Spray 500ML",
+      "display_name": "Viakal large",
+      "brand": "Viakal",
+      "category": "Bathroom Cleaning Spray Wipes",
+      "aka": [
+        "viakal large",
+        "viakal"
+      ],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "68",
+      "name": "Dove Nourishing Body Wash 720 ml",
+      "display_name": "Body wash",
+      "brand": "Dove",
+      "category": "Shower Gel Body Wash",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "69",
+      "name": "Arla BOB Semi-Skimmed Milk 2L That Tastes Like Whole",
+      "display_name": "BOB milk",
+      "brand": "Arla",
+      "category": "Semi Skimmed Milk",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "7613274",
+      "active": true
+    },
+    {
+      "id": "70",
+      "name": "John West Tuna Chunks in Brine 4 x 132g",
+      "display_name": "Tuna",
+      "brand": "John",
+      "category": "Tuna",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "9108853",
+      "active": true
+    },
+    {
+      "id": "71",
+      "name": "Hovis Soft White Medium 800g",
+      "display_name": "Bread",
+      "brand": "Hovis",
+      "category": "White Bread",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "72",
+      "name": "Exceptional by ASDA Creamy Mashed Potato 400g",
+      "display_name": "Mashed potato",
+      "brand": "Exceptional",
+      "category": "Prepared Vegetables",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "73",
+      "name": "ASDA 10 Slices Honey Roast Dry Cured Ham 250g",
+      "display_name": "Ham",
+      "brand": "ASDA",
+      "category": "Ham Pork Slices",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "7741435",
+      "active": true
+    },
+    {
+      "id": "74",
+      "name": "Voltarol Joint & Back Pain Relief 2.32% Gel 50g",
+      "display_name": "Voltarol",
+      "brand": "Voltarol",
+      "category": "Rubs Gel Pads Sprays",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "75",
+      "name": "Batchelors Pasta 'n' Sauce Mac 'n' Cheese Pasta Sachet 99g",
+      "display_name": "Macaroni cheese",
+      "brand": "Batchelors",
+      "category": "Pasta Sauce",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "76",
+      "name": "Pepsi Max No Sugar Cola Bottle 2L",
+      "display_name": "Pepsi Max",
+      "brand": "Pepsi",
+      "category": "Sugar Free Diet Cola",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "77",
+      "name": "Batchelors Pasta 'n' Sauce Roast Chicken & Bacon Flavour Instant Pasta Sachet 99g",
+      "display_name": "Chicken pasta",
+      "brand": "Batchelors",
+      "category": "Pasta Sauce",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "78",
+      "name": "ASDA Toffee Cheesecakes 2 x 100g (200g)",
+      "display_name": "Toffee cheesecakes",
+      "brand": "ASDA",
+      "category": "Cheesecakes",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "79",
+      "name": "Heinz Tinned Baked Beans in a Rich Tomato Sauce 6 x 200g",
+      "display_name": "Baked beans",
+      "brand": "Heinz",
+      "category": "Baked Beans",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "7670627",
+      "active": true
+    },
+    {
+      "id": "80",
+      "name": "ASDA Sliced Topside of Beef 90g",
+      "display_name": "Sliced beef",
+      "brand": "ASDA",
+      "category": "Beef Slices",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "81",
+      "name": "Exceptional by ASDA Roast Topside of Beef 90g",
+      "display_name": "Roast beef",
+      "brand": "Exceptional",
+      "category": "Beef Slices",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "82",
+      "name": "ASDA Citrus Burst Thick Bleach 750ml",
+      "display_name": "Bleach",
+      "brand": "ASDA",
+      "category": "Bleach Disinfectants",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": "6360226",
+      "active": true
+    },
+    {
+      "id": "83",
+      "name": "Twix Caramel Multipack Chocolate Bars 40g x 9",
+      "display_name": "Twix",
+      "brand": "Twix",
+      "category": "Multipack Biscuits",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "84",
+      "name": "Walkers Salt & Vinegar Multipack Crisps 6x25g",
+      "display_name": "Salt & vinegar crisp",
+      "brand": "Walkers",
+      "category": "Small Multipack Crisps 4 8 Packs",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "85",
+      "name": "Richmond 12 Skinless Pork Sausages 319g",
+      "display_name": "Richmond sausages",
+      "brand": "Richmond",
+      "category": "Sausages",
+      "aka": [
+        "richmond pork sausages",
+        "richmond skinless pork sausages",
+        "richmond sausages"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "1141046",
+      "active": true
+    },
+    {
+      "id": "86",
+      "name": "TGI Fridays BBQ Pulled Pork 400g",
+      "display_name": "Pulled pork",
+      "brand": "TGI",
+      "category": "Marinated Pork",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "87",
+      "name": "Bloo Spa Moments Toilet Rim Block - Vitality 50g",
+      "display_name": "Toilet block",
+      "brand": "Bloo",
+      "category": "Toilet Cleaners Rimblocks Gels",
+      "aka": [],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "88",
+      "name": "Warburtons Danish Lighter White Bread 400g",
+      "display_name": "Warburtons danish",
+      "brand": "Warburtons",
+      "category": "Small Bread Loaves",
+      "aka": [
+        "warburtons danish",
+        "danish bread"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "139863",
+      "active": true
+    },
+    {
+      "id": "89",
+      "name": "Lurpak Slightly Salted Butter 200g",
+      "display_name": "Lurpak",
+      "brand": "Lurpak",
+      "category": "Block Butter",
+      "aka": [
+        "lurpak",
+        "lurpak butter"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "7731768",
+      "active": true
+    },
+    {
+      "id": "90",
+      "name": "ASDA Minced Beef Hotpot 400g",
+      "display_name": "Mince hotpot",
+      "brand": null,
+      "category": "Ready Meals",
+      "aka": [
+        "mince hotpot",
+        "minced beef hotpot",
+        "beef hotpot"
+      ],
+      "typical_qty": null,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "91",
+      "name": "ASDA Chicken Hotpot 400g",
+      "display_name": "Chicken hotpot",
+      "brand": null,
+      "category": "Ready Meals",
+      "aka": [
+        "chicken hotpot"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6596864",
+      "active": true
+    },
+    {
+      "id": "102",
+      "name": "Wall's 4 Pork Sausage Rolls 220g",
+      "display_name": "Walls sausage rolls",
+      "brand": "Wall's",
+      "category": "Party Food Pies Salads Dips",
+      "aka": [
+        "walls sausage rolls",
+        "walls sausage roll",
+        "wall's sausage rolls",
+        "sausage rolls"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "103",
+      "name": "Milky Way Multipack Chocolate Bars 10 x 21.5g",
+      "display_name": "Milky way",
+      "brand": "Milky Way",
+      "category": "Multipack Chocolate",
+      "aka": [
+        "milky way",
+        "milky way multipack",
+        "pk milky way"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "104",
+      "name": "Mars Caramel Multipack Chocolate Bars 8 x 34.5g",
+      "display_name": "Mars bars",
+      "brand": "Mars",
+      "category": "Multipack Chocolate",
+      "aka": [
+        "mars bars",
+        "small mars bars",
+        "mars multipack",
+        "pk small mars bars"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "105",
+      "name": "TRESemme Rich Moisture HAIR SHAMPOO 680 ml",
+      "display_name": "Tresemme shampoo",
+      "brand": "TRESemme",
+      "category": "Shampoo",
+      "aka": [
+        "tresemme shampoo",
+        "tresemme blue",
+        "tresemme blue label",
+        "tresseme shampoo"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "106",
+      "name": "COOK by ASDA Cook Ground Black Pepper 25g",
+      "display_name": "Black pepper",
+      "brand": "COOK by ASDA",
+      "category": "Herbs Spices",
+      "aka": [
+        "black pepper",
+        "ground black pepper",
+        "pepper"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": null,
+      "active": true
+    },
+    {
+      "id": "107",
+      "name": "ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets",
+      "display_name": "Hayfever tabs",
+      "brand": "ASDA",
+      "category": "Hayfever Allergy",
+      "aka": [
+        "hayfever tabs",
+        "hay fever tabs",
+        "hayfever tablets",
+        "hay fever tablets"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "7417854",
+      "active": true
+    },
+    {
+      "id": "108",
+      "name": "Heinz Tinned Baked Beans in a Rich Tomato Sauce 6 x 415g",
+      "display_name": "Large heinz beans",
+      "brand": "Heinz",
+      "category": "Baked Beans",
+      "aka": [
+        "large heinz beans",
+        "heinz beans large",
+        "6pk large heinz beans"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "3707569",
+      "active": true
+    },
+    {
+      "id": "109",
+      "name": "Nescafe Azera Americano Intense Instant Coffee 140g",
+      "display_name": "Azera",
+      "brand": "Nescafe",
+      "category": "Premium Instant Coffee",
+      "aka": [
+        "azera",
+        "nescafe azera",
+        "azera coffee",
+        "bottle azera coffee"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9353862",
+      "active": true
+    },
+    {
+      "id": "110",
+      "name": "Aquafresh Complete Care Whitening Toothpaste 75ml",
+      "display_name": "Toothpaste",
+      "brand": "Aquafresh",
+      "category": "Toothpaste",
+      "aka": [
+        "toothpaste",
+        "aquafresh"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9222131",
+      "active": true
+    },
+    {
+      "id": "111",
+      "name": "George Home Tea Towels",
+      "display_name": "Tea towels",
+      "brand": "George Home",
+      "category": "Tea Towels",
+      "aka": [
+        "tea towels",
+        "tea towel",
+        "pk tea towels",
+        "pkt tea towels"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "9086725",
+      "active": true
+    },
+    {
+      "id": "112",
+      "name": "Sudocrem Antiseptic Cream 125g",
+      "display_name": "Sudocrem",
+      "brand": "Sudocrem",
+      "category": "Antiseptic Cream",
+      "aka": [
+        "sudocrem",
+        "antiseptic cream",
+        "sudocrem antiseptic"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "6316368",
+      "active": true
+    },
+    {
+      "id": "113",
+      "name": "Saxa Ground White Pepper 25g",
+      "display_name": "White pepper",
+      "brand": "Saxa",
+      "category": "Herbs Spices",
+      "aka": [
+        "white pepper",
+        "ground white pepper"
+      ],
+      "typical_qty": null,
+      "asda_product_id": "1352764",
+      "active": true
+    },
+    {
+      "id": "114",
+      "name": "Twix Chocolate & Caramel Ice Cream 4pk",
+      "display_name": "Twix ice cream bars",
+      "brand": "Twix",
+      "category": "Ice Cream",
+      "aka": [
+        "twix ice cream bars",
+        "twix icecream bars",
+        "twix ice creams"
+      ],
+      "typical_qty": 2,
+      "asda_product_id": "7725445",
+      "active": true
+    },
+    {
+      "id": "115",
+      "name": "Twix Multipack Chocolate Biscuit & Caramel Bars 9x20g",
+      "display_name": "Twix",
+      "brand": "Twix",
+      "category": "Multipack Biscuits",
+      "aka": [
+        "twix choc biscuit bars",
+        "twix biscuit bars",
+        "twix chocolate biscuit bars"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "9107788",
+      "active": true
+    },
+    {
+      "id": "116",
+      "name": "Loctite Super Glue Original 3g",
+      "display_name": "Loctite super glue",
+      "brand": "Loctite",
+      "category": "Glues, Tapes & Adhesives",
+      "aka": [
+        "loctite super glue",
+        "loctite superglue",
+        "super glue"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "6755212",
+      "active": true
+    },
+    {
+      "id": "117",
+      "name": "ASDA Sliced Ham on the Bone 400g",
+      "display_name": "Ham on the bone",
+      "brand": "ASDA",
+      "category": "Ham & Pork Slices",
+      "aka": [
+        "ham on the bone",
+        "1 pkt ham on the bone",
+        "pkt ham on the bone"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "7604423",
+      "active": true
+    },
+    {
+      "id": "118",
+      "name": "ASDA 4 Beef Quarter Pounders 454g",
+      "display_name": "Beef burgers",
+      "brand": "ASDA",
+      "category": "Frozen Burgers",
+      "aka": [
+        "beef quarter pounders",
+        "quarter pounders",
+        "asda beef quarter pounder",
+        "4pk quarter pounders"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "1552738",
+      "active": true
+    },
+    {
+      "id": "119",
+      "name": "Dettol Antibacterial All in One Disinfectant Spray Orchard Blossom 300ml",
+      "display_name": "Dettol spray",
+      "brand": "Dettol",
+      "category": "Bleach & Disinfectants",
+      "aka": [
+        "dettol spray",
+        "can dettol spray",
+        "dettol disinfectant spray"
+      ],
+      "typical_qty": 1,
+      "asda_product_id": "9060220",
+      "active": true
+    }
+  ]
+}

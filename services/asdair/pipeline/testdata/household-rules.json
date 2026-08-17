@@ -1,0 +1,202 @@
+{
+  "_note": "Active shopping rules. The runtime must OBEY these, not merely be able to read them. Rule 34 mandates trolley reconciliation; rule 40 mandates the Favourites/Regulars Brand A-Z pass; rule 33 maps Fruit Splits to ice lollies.",
+  "captured_from": "asdair (household 1)",
+  "rows": [
+    {
+      "id": "10",
+      "category": "dairy",
+      "rule_text": "Milk means Cravendale Arla; never a Best-of-Both / BOB variant (short shelf life).",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "11",
+      "category": "confectionery",
+      "rule_text": "Toffees with no qualifier means ASDA Dairy Toffee 180g; mixed/assorted only if explicitly stated.",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "12",
+      "category": "coffee",
+      "rule_text": "Nescafe means Azera only; add only if on offer, otherwise flag the full price and do not add.",
+      "directive": "needs_decision",
+      "active": true
+    },
+    {
+      "id": "13",
+      "category": "toiletries",
+      "rule_text": "Sure deodorant: male = blue variant, female = white variant.",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "14",
+      "category": "condiments",
+      "rule_text": "Tomato sauce means Heinz Tomato Ketchup 910g.",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "15",
+      "category": "toiletries",
+      "rule_text": "Toothpaste means Aquafresh, cheapest size available (100ml does not exist; 75ml is the standard size).",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "16",
+      "category": "confectionery",
+      "rule_text": "Picnic Bars means Cadbury Picnic Chocolate Bar 4 Pack Multipack.",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "17",
+      "category": "drinks",
+      "rule_text": "Yazoo: NEVER buy Banana (hard rule, Warwick 2026-07-18; disliked). Exclude on sight; Chocolate/Strawberry are the accepted flavours.",
+      "directive": "exclude",
+      "active": true
+    },
+    {
+      "id": "18",
+      "category": "dairy",
+      "rule_text": "Frank's 6-pint means 1x ASDA British Milk Semi Skimmed 6 Pints (one pack), not 6 packs.",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "19",
+      "category": "laundry",
+      "rule_text": "Vanish Pink = Oxi Action Stain Remover Powder (no Whitener wording, pink tub); Vanish White = Oxi Action Whitener & Stain Remover Powder (Whiter Whites badge).",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "20",
+      "category": "meat",
+      "rule_text": "Richmond sausages: pick the closest single Regulars match, e.g. Richmond 12 Skinless Pork Sausages 319g.",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "22",
+      "category": "health",
+      "rule_text": "Hay fever tablets means an antihistamine (loratadine), e.g. ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets.",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "23",
+      "category": "toiletries",
+      "rule_text": "Sure deodorant male trigger: map \"Sure male\" to the blue variant. Companion directive row for parent rule 13 (Sure: male=blue, female=white).",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "24",
+      "category": "toiletries",
+      "rule_text": "Sure deodorant female trigger: map \"Sure female\" to the white variant. Companion directive row for parent rule 13 (Sure: male=blue, female=white).",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "25",
+      "category": "coffee",
+      "rule_text": "Nescafe generic-phrasing trigger: flag for a human because Azera is added only if on offer and the plan cannot know offer state. Companion alias row for parent rule 12.",
+      "directive": "needs_decision",
+      "active": true
+    },
+    {
+      "id": "26",
+      "category": "drinks",
+      "rule_text": "Yazoo Banana alias: NEVER buy (hard rule, Warwick 2026-07-18). Exclude on sight. Companion alias of rule 17.",
+      "directive": "exclude",
+      "active": true
+    },
+    {
+      "id": "27",
+      "category": "breakfast",
+      "rule_text": "Mum's \"Sausage Baps\" = Rustlers All Day Breakfast Sausage Muffin (Warwick 2026-07-21).",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "28",
+      "category": "dessert",
+      "rule_text": "ASDA DISCONTINUED the combined custard & jelly pots (was a limited-time offer). Mum keeps listing them - do NOT add; note as discontinued. Supersedes rule 21 (Warwick 2026-07-21).",
+      "directive": "exclude",
+      "active": true
+    },
+    {
+      "id": "29",
+      "category": "bakery",
+      "rule_text": "Mum's \"Wall's sausage rolls (1 pack)\" = the 4-pack (Warwick 2026-07-21).",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "30",
+      "category": "toiletries",
+      "rule_text": "Mum's \"Soooo perfume\" = So...? body mist; 2026-07 scent chosen = Honey Oud (Warwick).",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "33",
+      "category": "frozen",
+      "rule_text": "Mum's \"Fruit Splits\" = fruit-flavour ICE LOLLIES (NOT the BEAR dried-fruit snack). If unavailable, use Just Essentials by ASDA Fruit Flavour Lollies 8x35ml (Warwick 2026-07-21).",
+      "directive": "map",
+      "active": true
+    },
+    {
+      "id": "34",
+      "category": "process",
+      "rule_text": "MANDATORY FINAL STEP before handover: reconcile the built trolley against the ORIGINAL list — confirm every item is present, the correct product, and the correct QUANTITY. Agents repeatedly get QUANTITIES wrong (happened this week and last). Do this line-by-line check and fix before telling Warwick the basket is ready. (Warwick 2026-07-21)",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "35",
+      "category": "process",
+      "rule_text": "2ND-TO-LAST STEP: on View Trolley, the \"Allow substitutions for all\" checkbox must ALWAYS be left UNTICKED. Set substitutions PER-ITEM from each product's substitutes_allowed flag (Warwick 2026-07-21).",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "37",
+      "category": "offer",
+      "rule_text": "Sure \"any 2 for £X\": round qty UP to an even number to capture every pair; add a FEMALE variant to complete the last pair (Mum 3 male -> add 1 female = 4). Combines with the rotate-variant rule (Warwick 2026-07-21).",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "38",
+      "category": "stock",
+      "rule_text": "REAL cause of \"add to trolley\" failing = the item is OUT OF STOCK, NOT an expired slot. OOS items still appear in Favourites/Regulars but silently reject the add (Lucozade Orange 4x500 was OOS tonight). If an add fails -> item likely OOS: drop it or use an approved alternative (Warwick 2026-07-21).",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "39",
+      "category": "map",
+      "rule_text": "Mum \"3 Mince Hotpot\" = ASDA hotpot ready meals: 2 beef + 1 chicken (Warwick 2026-07-21). NOT in regulars - missed this week because it needs a search and the agent silently dropped it.",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "40",
+      "category": "process",
+      "rule_text": "ADD STRATEGY: DEFAULT = FULL pass. Sort Regulars by BRAND A-Z, tick every matching item, and bulk \"Add selected to trolley\" in ONE go. Two-at-a-time is ONLY the FALLBACK: if the bulk add errors, an item in the batch is almost certainly OUT OF STOCK (that was the real cause tonight, NOT batch size - the OOS Lucozade Orange kept being included). Then split the batch only to isolate + drop the OOS item, and resume the full pass. Do NOT scroll-hunt or switch views mid-pass. (Warwick 2026-07-21)",
+      "directive": "info",
+      "active": true
+    },
+    {
+      "id": "50",
+      "category": "toiletries",
+      "rule_text": "Sure deodorant male: ALWAYS take Sure Nonstop Protection Quantum Dry Anti-Perspirant Aerosol 250 ml (regular 25). FIXED CHOICE - do NOT rotate, do NOT offer variants, do NOT ask. Warwick, 2026-08-17, verbatim: \"Ffs sick to death of the sure debate. I don't care! Pick one, make rule always this type of sure and not the other\". SUPERSEDES rule 32 (rotate weekly), now inactive - rotation was unenforceable anyway because order lines only ever recorded \"Sure male\" and never the variant. Quantum Dry chosen because it is the only male variant carrying a real asda_product_id, so it adds reliably from Favourites. Female variant (regular 21) remains valid only when the list explicitly says female.",
+      "directive": "map",
+      "active": true
+    }
+  ]
+}
