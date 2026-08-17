@@ -49,3 +49,37 @@ cheaper to fix.
 
 **NOTHING FIXED. NOTHING DISPATCHED.** Warwick is driving the run himself and is on the third attempt.
 **Recorded so the evidence survives the session** — the disposition is his.
+
+---
+
+# ⭐ ATTEMPT 3 SUCCEEDED — `SHOP-2026-08-19` reached the freeze point
+
+**The ingestion half of B15-5's acceptance spine is PROVEN on a real weekly shop.**
+
+```
+SHOP-2026-08-19 · id 35 · source: text · READY_TO_SHOP / READY_FOR_WARWICK
+18:45:38 created → 18:50 questions answered → 18:51 "re-planning with the answers in place"
+18:52:37 PROCESSING → READY_TO_SHOP  "every line is resolved"
+18:53:47 "browser build requested"            ← Warwick, one minute later
+```
+
+| | |
+|---|---|
+| shop lines | **37, every one resolved** |
+| questions | **9 of 9 answered** |
+| **the binding** | **CORRECT this time** — *"Sweetex"* → `Sweetex Calorie Free Sweeteners 600 Tablets`, *"toffee"* → `ASDA Dairy Toffee 180g` |
+
+**Against the B15-5 acceptance spine:** real chosen input → grounded shopping truth → amendments permitted
+→ **questions handled by Warwick through his existing process** → durable real shop → **browser/CDP
+handoff, the freeze point. ALL REACHED.** What remains is the basket workflow beyond the handoff.
+
+## ⚠️ What this does and does NOT settle about the three defects above
+
+- **Defect 2 (mis-bound answers) did NOT recur** — 9 of 9 bound correctly. **But attempt 3 was `text` and
+  the failure was on `photo`.** *Not the same path. This is not a fix and must not be recorded as one.*
+- **Defect 1 (Terra invention) was NOT exercised at all** — a text list involves no vision reading.
+- **Defect 3 (first-answer-wins as a trap) was not reached**, because nothing needed correcting.
+
+> **The honest reading: the TEXT door completed the journey. The PHOTO door failed on a real shop and
+> its three defects remain entirely open.** Warwick reached a working weekly shop by changing door, which
+> is a legitimate route to a shop and is **not** evidence that the photo path works.
