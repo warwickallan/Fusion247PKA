@@ -26,6 +26,12 @@ git merge-base origin/main <head>
 git diff <merge-base> <head> | wc -c
 ```
 
+**⛔ USE A BYTE-ACCURATE INSTRUMENT. `wc -c` or `Buffer.byteLength` — NEVER PowerShell's
+`Measure-Object -Character`,** which undercounts and will tell you a diff fits when it does not.
+*(2026-08-17: `Measure-Object -Character` reported #113 at 57,146. The true size was **60,859** — 859 over
+the cap. Codex approved a packet with ~1.4% invisible to it, on Larry's assurance that it was complete.
+The PR was closed unmerged and re-cut. **Two wrong instruments in one day, both reported as fact.**)*
+
 *(2026-08-17: #107 showed "12 files, +2,150" in the PR view and Larry reported the truncation solved. The
 real staged diff was **110,903 bytes** — still nearly double the cap. The claim was withdrawn mid-review.
 **A file count is not a byte count.**)*
