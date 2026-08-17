@@ -977,7 +977,9 @@
       "display_name": "Roast beef",
       "brand": "Exceptional",
       "category": "Beef Slices",
-      "aka": [],
+      "aka": [
+        "roast topside"
+      ],
       "typical_qty": null,
       "asda_product_id": null,
       "active": true
@@ -1211,7 +1213,9 @@
       "aka": [
         "large heinz beans",
         "heinz beans large",
-        "6pk large heinz beans"
+        "6pk large heinz beans",
+        "heinz baked beans 415g",
+        "large heinz beans 415g"
       ],
       "typical_qty": null,
       "asda_product_id": "3707569",

@@ -200,6 +200,21 @@ jobs:
         working-directory: services/asdair/browser-runner
         run: node --test
 
+      # The basket executor is the module that actually operates Warwick's live
+      # trolley, and until 2026-08-18 NOTHING RAN ITS TESTS ON PUSH. That is the
+      # inverse of the browser-runner's position above: the deferred adapter was
+      # guarded while the live one was not. Its proofs cover the resolution
+      # ladder (Favourites before search), the wake path, and the trolley-derived
+      # reconciliation that gates "Mum's basket is ready" — the three things whose
+      # absence produced the 2026-08-17 failure.
+      - name: Install dependencies for the basket executor
+        working-directory: services/asdair/basket-executor
+        run: npm ci
+
+      - name: Run the basket executor suite (offline, no browser, no gateway)
+        working-directory: services/asdair/basket-executor
+        run: node --test
+
   integration:
     runs-on: ubuntu-latest
     defaults:

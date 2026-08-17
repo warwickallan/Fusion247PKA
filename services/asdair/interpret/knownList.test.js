@@ -38,7 +38,13 @@ function run() {
 
 test('the fixture is the household catalogue and Mum\'s whole list', () => {
   assert.equal(catalogue.regulars.length, 109, 'all 109 active regulars');
-  assert.equal(catalogue.rules.length, 28, 'all 28 active rules');
+  // 28 until 2026-08-18. Two corrections raised it, and both matter:
+  // the dump query was fixed to include the GLOBAL (household_id IS NULL) rules
+  // that loadCatalogue actually reads — a fixture without them was quietly a
+  // different rulebook from production — and rules 51/52 were added to settle
+  // the Heinz-size and beef-identity ties that would otherwise reach Warwick
+  // every week.
+  assert.equal(catalogue.rules.length, 39, 'all 39 active rules');
   assert.equal(known.lines.length, 37, 'all 37 lines of the list');
   assert.equal(known.line_count, 37);
   // 45 rows have no ASDA product id and that must never matter to identity.

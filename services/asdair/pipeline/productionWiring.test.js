@@ -172,7 +172,21 @@ let bust = 0;
 /** Load models.mjs under a controlled environment - the same technique
  *  services/asdair/transcribe/visionRole.test.js already uses. */
 async function loadModels(env) {
-  const keys = ['FUSION_GATEWAY_URL', 'FUSION_GATEWAY_KEY', 'FUSION_MODEL_ANSWER'];
+  // THE ROLE-ALIAS KEYS ARE CLEARED HERE FOR A REASON, ADDED 2026-08-18.
+  //
+  // This helper used to clear only the three keys below the marker. ROLE_ALIAS
+  // is built from process.env AT IMPORT, so any ambient FUSION_MODEL_* on the
+  // running box silently became "the default" as far as every assertion here
+  // was concerned. That is exactly how `vision: 'fusion.vision'` — an alias the
+  // gateway does not register — sat green in CI (no override, pin matched the
+  // dead literal) and red on Warwick's machine (override masked it), i.e.
+  // passing where broken and failing where working. A defaults test that cannot
+  // see the defaults proves nothing, and this one shipped for a fortnight.
+  const keys = [
+    'FUSION_GATEWAY_URL', 'FUSION_GATEWAY_KEY', 'FUSION_MODEL_ANSWER',
+    'FUSION_MODEL_EXTRACT', 'FUSION_MODEL_KEYWORD', 'FUSION_MODEL_QUERY',
+    'FUSION_MODEL_REASON', 'FUSION_MODEL_EMBED', 'FUSION_MODEL_VISION',
+  ];
   const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   for (const k of keys) delete process.env[k];
   Object.assign(process.env, env);
@@ -339,8 +353,39 @@ test('TERRA: ROLE_ALIAS is byte-identical - the out-of-surface pin still holds',
     query: 'fusion.query',
     reason: 'fusion.reason',
     embed: 'fusion.embed',
-    vision: 'fusion.vision',
+    vision: 'gpt-5.6-terra',
   });
+});
+
+// THIS TEST EXISTS BECAUSE THE ONE ABOVE PINNED A BROKEN VALUE FOR A FORTNIGHT.
+//
+// `vision` defaulted to `fusion.vision`, an alias the gateway does not register.
+// D-2026-08-03-05 had already found that, and Warwick had already ruled: "A
+// default model name that the gateway does not provide must never survive
+// preflight again." The fix reached answerModel() and not ROLE_ALIAS.vision —
+// and the assertion above then pinned the DEAD NAME, so the guard asserted the
+// defect was correct and could never catch it. It went red only on the one
+// machine whose ambient FUSION_MODEL_VISION masked the fault, i.e. exactly
+// backwards: green where broken, red where working.
+//
+// So this asserts the PROPERTY the ruling is about, not a literal: every role
+// default must be a name the gateway's own /models probe returned. A future
+// alias that the gateway does not provide fails here even if someone updates
+// the literal above to match it.
+test('every role default is a model the gateway actually registers (D-2026-08-03-05)', async () => {
+  // The registered set, from a real GET {gateway}/models probe on 2026-08-17.
+  const REGISTERED = new Set([
+    'fusion.reason', 'fusion.query', 'fusion.extract', 'fusion.keyword', 'fusion.embed',
+    'gpt-5.6-terra', 'gpt-5-mini', 'gpt-5-nano', 'text-embedding-3-large',
+  ]);
+  const m = await loadModels({});
+  for (const [role, alias] of Object.entries(m.ROLE_ALIAS)) {
+    assert.ok(
+      REGISTERED.has(alias),
+      `role "${role}" defaults to "${alias}", which the gateway does not register — `
+      + 'this is the D-2026-08-03-05 failure and it must not survive preflight again',
+    );
+  }
 });
 
 test('TERRA: provenance agrees with the path invoked - interpreted_by terra is now TRUE', () => {

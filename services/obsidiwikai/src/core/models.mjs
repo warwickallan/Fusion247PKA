@@ -17,7 +17,16 @@ export const ROLE_ALIAS = {
   query: process.env.FUSION_MODEL_QUERY || 'fusion.query',
   reason: process.env.FUSION_MODEL_REASON || 'fusion.reason',
   embed: process.env.FUSION_MODEL_EMBED || 'fusion.embed',
-  vision: process.env.FUSION_MODEL_VISION || 'fusion.vision',
+  // 2026-08-18: was `|| 'fusion.vision'`, which the gateway DOES NOT REGISTER.
+  // The precedent below (D-2026-08-03-05) had already established that and
+  // carried Warwick's ruling — "A default model name that the gateway does not
+  // provide must never survive preflight again" — yet the fix was applied to
+  // answerModel() only and this line was left carrying the dead alias. It
+  // survived because the ONLY thing keeping vision working was an ambient
+  // FUSION_MODEL_VISION on one machine; a clean box gets a 400. Probed live on
+  // 2026-08-17: the gateway registers gpt-5.6-terra and does not register
+  // fusion.vision. Still overridable, deliberately, and read at call time.
+  vision: process.env.FUSION_MODEL_VISION || 'gpt-5.6-terra',
 };
 
 /**

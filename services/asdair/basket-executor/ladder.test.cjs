@@ -69,7 +69,7 @@ test('the fixtures are the real ones, or every assertion below is theatre', () =
   assert.strictEqual(rows.length, 109, 'the committed household catalogue is 109 rows');
   assert.strictEqual(rows.filter((r) => !r.asda_product_id).length, 45, '45 of them carry no ASDA id');
   const active = (RULES.rows || RULES).filter((r) => r.active !== false);
-  assert.strictEqual(active.length, 28);
+  assert.strictEqual(active.length, 39, 'the committed rulebook is 39 active rows - it was 28 until the fixture query was corrected to include the GLOBAL (household_id IS NULL) rows loadCatalogue actually reads, plus rules 51/52 which close the Heinz-size and beef-identity ties');
   for (const id of ['33', '34', '40']) {
     assert.ok(active.some((r) => String(r.id) === id), `rule ${id} must be in the active fixture`);
   }

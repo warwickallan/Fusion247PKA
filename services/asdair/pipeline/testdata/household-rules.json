@@ -3,10 +3,103 @@
   "captured_from": "asdair (household 1)",
   "rows": [
     {
+      "id": "1",
+      "category": "quantity",
+      "rule_text": "Quantities on the list are item counts, not pack sizes.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "2",
+      "category": "quantity",
+      "rule_text": "An item with no quantity specified defaults to 1.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "3",
+      "category": "quantity",
+      "rule_text": "Duplicate entries for the same item are deduped to a single line.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "4",
+      "category": "sourcing",
+      "rule_text": "Requested items are expected to be found in the Favourites or Regulars pages.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "5",
+      "category": "scope",
+      "rule_text": "Nothing is added to the basket unless it is explicitly on the list.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "6",
+      "category": "substitution",
+      "rule_text": "If an item is out of stock, suggest alternatives for a human to choose; NEVER auto-substitute.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "7",
+      "category": "budget",
+      "rule_text": "A normal shop is GBP 120-150 excluding delivery; flag the basket if it falls outside this band.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "8",
+      "category": "process",
+      "rule_text": "The goal is a checkout-ready basket; NEVER place the order.",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "9",
+      "category": "process",
+      "rule_text": "ALWAYS open both the Favourites AND Regulars pages before working the list (non-optional; missed once).",
+      "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
       "id": "10",
       "category": "dairy",
       "rule_text": "Milk means Cravendale Arla; never a Best-of-Both / BOB variant (short shelf life).",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -14,6 +107,9 @@
       "category": "confectionery",
       "rule_text": "Toffees with no qualifier means ASDA Dairy Toffee 180g; mixed/assorted only if explicitly stated.",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -21,6 +117,9 @@
       "category": "coffee",
       "rule_text": "Nescafe means Azera only; add only if on offer, otherwise flag the full price and do not add.",
       "directive": "needs_decision",
+      "match_term": "Nescafe Azera",
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -28,6 +127,9 @@
       "category": "toiletries",
       "rule_text": "Sure deodorant: male = blue variant, female = white variant.",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -35,6 +137,9 @@
       "category": "condiments",
       "rule_text": "Tomato sauce means Heinz Tomato Ketchup 910g.",
       "directive": "map",
+      "match_term": "Tomato sauce",
+      "match_category": null,
+      "matched_product": "Heinz Tomato Ketchup 910g",
       "active": true
     },
     {
@@ -42,6 +147,9 @@
       "category": "toiletries",
       "rule_text": "Toothpaste means Aquafresh, cheapest size available (100ml does not exist; 75ml is the standard size).",
       "directive": "map",
+      "match_term": "Toothpaste",
+      "match_category": null,
+      "matched_product": "Aquafresh (75ml, cheapest size)",
       "active": true
     },
     {
@@ -49,6 +157,9 @@
       "category": "confectionery",
       "rule_text": "Picnic Bars means Cadbury Picnic Chocolate Bar 4 Pack Multipack.",
       "directive": "map",
+      "match_term": "Picnic Bars",
+      "match_category": null,
+      "matched_product": "Cadbury Picnic Chocolate Bar 4 Pack Multipack",
       "active": true
     },
     {
@@ -56,6 +167,9 @@
       "category": "drinks",
       "rule_text": "Yazoo: NEVER buy Banana (hard rule, Warwick 2026-07-18; disliked). Exclude on sight; Chocolate/Strawberry are the accepted flavours.",
       "directive": "exclude",
+      "match_term": "banana yazoo",
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -63,6 +177,9 @@
       "category": "dairy",
       "rule_text": "Frank's 6-pint means 1x ASDA British Milk Semi Skimmed 6 Pints (one pack), not 6 packs.",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -70,6 +187,9 @@
       "category": "laundry",
       "rule_text": "Vanish Pink = Oxi Action Stain Remover Powder (no Whitener wording, pink tub); Vanish White = Oxi Action Whitener & Stain Remover Powder (Whiter Whites badge).",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -77,6 +197,9 @@
       "category": "meat",
       "rule_text": "Richmond sausages: pick the closest single Regulars match, e.g. Richmond 12 Skinless Pork Sausages 319g.",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -84,6 +207,9 @@
       "category": "health",
       "rule_text": "Hay fever tablets means an antihistamine (loratadine), e.g. ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets.",
       "directive": "map",
+      "match_term": "Hay fever tablets",
+      "match_category": null,
+      "matched_product": "ASDA Allergy & Hayfever Relief 10mg Loratadine 30 Tablets",
       "active": true
     },
     {
@@ -91,6 +217,9 @@
       "category": "toiletries",
       "rule_text": "Sure deodorant male trigger: map \"Sure male\" to the blue variant. Companion directive row for parent rule 13 (Sure: male=blue, female=white).",
       "directive": "map",
+      "match_term": "Sure male",
+      "match_category": null,
+      "matched_product": "Sure Men Anti-Perspirant Deodorant (blue variant)",
       "active": true
     },
     {
@@ -98,6 +227,9 @@
       "category": "toiletries",
       "rule_text": "Sure deodorant female trigger: map \"Sure female\" to the white variant. Companion directive row for parent rule 13 (Sure: male=blue, female=white).",
       "directive": "map",
+      "match_term": "Sure female",
+      "match_category": null,
+      "matched_product": "Sure Women Anti-Perspirant Deodorant (white variant)",
       "active": true
     },
     {
@@ -105,6 +237,9 @@
       "category": "coffee",
       "rule_text": "Nescafe generic-phrasing trigger: flag for a human because Azera is added only if on offer and the plan cannot know offer state. Companion alias row for parent rule 12.",
       "directive": "needs_decision",
+      "match_term": "Nescafe",
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -112,6 +247,9 @@
       "category": "drinks",
       "rule_text": "Yazoo Banana alias: NEVER buy (hard rule, Warwick 2026-07-18). Exclude on sight. Companion alias of rule 17.",
       "directive": "exclude",
+      "match_term": "yazoo banana",
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -119,6 +257,9 @@
       "category": "breakfast",
       "rule_text": "Mum's \"Sausage Baps\" = Rustlers All Day Breakfast Sausage Muffin (Warwick 2026-07-21).",
       "directive": "map",
+      "match_term": "sausage baps",
+      "match_category": null,
+      "matched_product": "Rustlers All Day Breakfast Sausage Muffin 155g",
       "active": true
     },
     {
@@ -126,6 +267,9 @@
       "category": "dessert",
       "rule_text": "ASDA DISCONTINUED the combined custard & jelly pots (was a limited-time offer). Mum keeps listing them - do NOT add; note as discontinued. Supersedes rule 21 (Warwick 2026-07-21).",
       "directive": "exclude",
+      "match_term": "custard jelly",
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -133,6 +277,9 @@
       "category": "bakery",
       "rule_text": "Mum's \"Wall's sausage rolls (1 pack)\" = the 4-pack (Warwick 2026-07-21).",
       "directive": "map",
+      "match_term": "walls sausage rolls",
+      "match_category": null,
+      "matched_product": "Wall's Sausage Rolls 4 Pack",
       "active": true
     },
     {
@@ -140,6 +287,9 @@
       "category": "toiletries",
       "rule_text": "Mum's \"Soooo perfume\" = So...? body mist; 2026-07 scent chosen = Honey Oud (Warwick).",
       "directive": "map",
+      "match_term": "soooo perfume",
+      "match_category": null,
+      "matched_product": "So...? Honey Oud Body Mist 150ml",
       "active": true
     },
     {
@@ -147,6 +297,9 @@
       "category": "frozen",
       "rule_text": "Mum's \"Fruit Splits\" = fruit-flavour ICE LOLLIES (NOT the BEAR dried-fruit snack). If unavailable, use Just Essentials by ASDA Fruit Flavour Lollies 8x35ml (Warwick 2026-07-21).",
       "directive": "map",
+      "match_term": "fruit splits",
+      "match_category": null,
+      "matched_product": "Fruit ICE LOLLIES (fallback: JUST ESSENTIALS by ASDA Fruit Flavour Lollies 8x35ml)",
       "active": true
     },
     {
@@ -154,6 +307,9 @@
       "category": "process",
       "rule_text": "MANDATORY FINAL STEP before handover: reconcile the built trolley against the ORIGINAL list — confirm every item is present, the correct product, and the correct QUANTITY. Agents repeatedly get QUANTITIES wrong (happened this week and last). Do this line-by-line check and fix before telling Warwick the basket is ready. (Warwick 2026-07-21)",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -161,6 +317,9 @@
       "category": "process",
       "rule_text": "2ND-TO-LAST STEP: on View Trolley, the \"Allow substitutions for all\" checkbox must ALWAYS be left UNTICKED. Set substitutions PER-ITEM from each product's substitutes_allowed flag (Warwick 2026-07-21).",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -168,6 +327,9 @@
       "category": "offer",
       "rule_text": "Sure \"any 2 for £X\": round qty UP to an even number to capture every pair; add a FEMALE variant to complete the last pair (Mum 3 male -> add 1 female = 4). Combines with the rotate-variant rule (Warwick 2026-07-21).",
       "directive": "info",
+      "match_term": "sure male",
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -175,6 +337,9 @@
       "category": "stock",
       "rule_text": "REAL cause of \"add to trolley\" failing = the item is OUT OF STOCK, NOT an expired slot. OOS items still appear in Favourites/Regulars but silently reject the add (Lucozade Orange 4x500 was OOS tonight). If an add fails -> item likely OOS: drop it or use an approved alternative (Warwick 2026-07-21).",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -182,6 +347,9 @@
       "category": "map",
       "rule_text": "Mum \"3 Mince Hotpot\" = ASDA hotpot ready meals: 2 beef + 1 chicken (Warwick 2026-07-21). NOT in regulars - missed this week because it needs a search and the agent silently dropped it.",
       "directive": "info",
+      "match_term": "mince hotpot",
+      "match_category": null,
+      "matched_product": "ASDA Minced Beef Hotpot / ASDA Chicken Hotpot (ready meals)",
       "active": true
     },
     {
@@ -189,6 +357,9 @@
       "category": "process",
       "rule_text": "ADD STRATEGY: DEFAULT = FULL pass. Sort Regulars by BRAND A-Z, tick every matching item, and bulk \"Add selected to trolley\" in ONE go. Two-at-a-time is ONLY the FALLBACK: if the bulk add errors, an item in the batch is almost certainly OUT OF STOCK (that was the real cause tonight, NOT batch size - the OOS Lucozade Orange kept being included). Then split the batch only to isolate + drop the OOS item, and resume the full pass. Do NOT scroll-hunt or switch views mid-pass. (Warwick 2026-07-21)",
       "directive": "info",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     },
     {
@@ -196,6 +367,29 @@
       "category": "toiletries",
       "rule_text": "Sure deodorant male: ALWAYS take Sure Nonstop Protection Quantum Dry Anti-Perspirant Aerosol 250 ml (regular 25). FIXED CHOICE - do NOT rotate, do NOT offer variants, do NOT ask. Warwick, 2026-08-17, verbatim: \"Ffs sick to death of the sure debate. I don't care! Pick one, make rule always this type of sure and not the other\". SUPERSEDES rule 32 (rotate weekly), now inactive - rotation was unenforceable anyway because order lines only ever recorded \"Sure male\" and never the variant. Quantum Dry chosen because it is the only male variant carrying a real asda_product_id, so it adds reliably from Favourites. Female variant (regular 21) remains valid only when the list explicitly says female.",
       "directive": "map",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "51",
+      "category": "condiments",
+      "rule_text": "Heinz baked beans with no size stated means the 6 x 415g pack (regular 108, ASDA id 3707569), NOT the 6 x 200g (regular 79). Warwick, 2026-08-17, answering the question board verbatim: \"6 pack heinz beans 415g\". Recorded as a rule because the bare wording \"6pk heinz beans\" ties between the two catalogue rows and the executor correctly refuses to settle a household data question silently - so without this rule it becomes a question to Warwick every single week. Sausage-and-beans is a DIFFERENT product (regular 63) and is never a substitute for either.",
+      "directive": "map",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
+      "active": true
+    },
+    {
+      "id": "52",
+      "category": "meat",
+      "rule_text": "Mum's \"sliced roast beef\" means Exceptional by ASDA Roast Topside of Beef 90g (regular 81), NOT ASDA Sliced Topside of Beef 90g (regular 80). Settled from the household's own purchase history: regular 81 is what was actually bought on 2026-08-11 and accepted without complaint, and Warwick's 2026-08-17 frozen manifest names 81 with 80 as the near-miss. Recorded as a RULE rather than an alias because her wording contains the distinctive word of BOTH rows, so any alias ties the two and the executor correctly refuses to settle a household data question silently - which turns this into a question to Warwick every single week.",
+      "directive": "map",
+      "match_term": null,
+      "match_category": null,
+      "matched_product": null,
       "active": true
     }
   ]
