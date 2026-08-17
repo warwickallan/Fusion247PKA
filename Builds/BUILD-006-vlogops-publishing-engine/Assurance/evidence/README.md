@@ -48,7 +48,24 @@ The third harness detects which branch occurred and asserts the correct expectat
 
 **Veritas held F2-5 alone at the first confirmation, and it was right: there was no mid-compile kill capture in this directory at all.** Four `F1-4`-family captures and a controls run, and not one of them killed a *compile*. Worse, the section above — whose entire job is naming absent proofs — listed the two superseded intake kills and **did not mention the F2-5 capture that did not exist.** A clean store afterwards proves nothing damaged it; it does not prove a kill was survived. Recorded here because it is the third occurrence of the `acceptance-proves-mechanism-not-outcome` family and the pattern is the point, not the individual miss.
 
-`## F2-5` in `live-proofs-raw.txt` now carries it, on the same branch-detecting pattern:
+### ⛔ The FIRST F2-5 capture (350 ms) is SUPERSEDED AND WORTHLESS. Read `## F2-5 (SECOND ATTEMPT)` instead.
+
+**Veritas measured what killed it, and the measurement is the lesson.** The compile CLI needs **~327 ms (measured 327 / 317 / 337) merely to reach its first connection attempt.** A kill at 350 ms therefore left 13–33 ms for a TLS handshake, auth, `BEGIN`, the seed select, twelve snapshot rows (~680 KB), the pack insert, eight entry inserts and the ledger row. **The signal almost certainly landed before the transaction opened — plausibly before the connection existed.** "Store unchanged" and `deduplicated:false` are then *trivially* true of a process killed during startup, and my harness printed the identical `PRE-commit` line for that as it would for a kill after eight inserts. **It proved neither the requirement nor the mechanism.** It is kept below for provenance only.
+
+### `## F2-5 (SECOND ATTEMPT)` — killed INSIDE the open transaction, and proven so from the server
+
+The product already contained the right facility and no capture had used it: `bin/vlogops-compile.mjs` implements `--hold-at`, and `src/compiler.mjs` emits `transaction-open`, `pack-inserted`, `entry-written` and `pre-commit` **inside the open transaction**, printing `VLOGOPS_HELD_AT <stage>` with a keepalive — its own comment saying it exists to park a real process inside a real open transaction so an external kill lands in a known window.
+
+- held at **`entry-written`** — the marker appeared after **675 ms**, i.e. ~350 ms clear of the boot floor, so the window is measured rather than hoped;
+- **the server confirmed it independently: `pg_stat_activity` reported 1 session `idle in transaction` at the moment of the kill.** That does not depend on my harness's interpretation of its own stdout;
+- SIGKILL delivered only *after* both of those facts were established;
+- the aborted transaction wrote **nothing** — packs 4, entries 32, compile_runs 6, all unchanged;
+- **no partial pack** — zero orphan entries, zero packs without entries, zero packs whose `entry_count` disagrees with their stored entries;
+- the re-run completed `deduplicated:false`, so the killed work was genuinely absent, and wrote exactly one pack with its eight entries (packs 4→5, entries 32→40).
+
+**This is the capture that carries F2-5.** The 350 ms one does not, and saying otherwise was my third occurrence of `acceptance-proves-mechanism-not-outcome` in a single boundary.
+
+The superseded first attempt, for provenance:
 
 - seed `fbe257f3…`, never compiled before, SIGKILL at 350 ms;
 - landed **PRE-commit** — nothing written, **including the `compile_run` attempt row** (packs 3, entries 24, compile_runs 5, unchanged);

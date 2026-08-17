@@ -145,3 +145,31 @@ $ node bin/vlogops-compile.mjs compile --seed fbe257f38d2cb9c65b76c756a848eea9bc
 [ASSERT] re-run resolves to exactly one correct state: deduplicated=false (false expected — the killed work was absent) -> PASS
 [state final] {"packs":"4","entries":"32","compile_runs":"6","orphan_entries":"0","packs_without_entries":"0","packs_miscounting_entries":"0","stuck_txns":"0"}
 [ASSERT] the completing compile wrote one pack and its entries: packs 3->4, entries 24->32
+
+## F2-5 (SECOND ATTEMPT — killed INSIDE the open transaction, via the product's own --hold-at)
+# captured Mon Aug 17 2026 11:46:42 GMT+0100 (British Summer Time)Z. Seed 0618c483058eb6d70a745ba63318a1ed869c551e5e575328169ba0b5ecc2e88e, never compiled. Hold stage: entry-written.
+# The FIRST F2-5 capture (350 ms) is superseded and worthless: the CLI needs ~327 ms just to
+# reach its first connection attempt, so that kill landed during startup, not inside a
+# transaction. Measured by Veritas. This capture waits for VLOGOPS_HELD_AT before killing,
+# which is the product's own facility for putting a kill in a KNOWN window.
+[state before] {"packs":"4","entries":"32","compile_runs":"6","orphan_entries":"0","packs_without_entries":"0","packs_miscounting_entries":"0","idle_in_txn":"0"}
+
+### killed after the hold marker
+$ node bin/vlogops-compile.mjs compile --seed 0618c483058eb6d70a745ba63318a1ed869c551e5e575328169ba0b5ecc2e88e --hold-at entry-written   [SIGKILL only once VLOGOPS_HELD_AT is observed]
+[observed] "VLOGOPS_HELD_AT entry-written" after 675 ms — the transaction is OPEN and rows are inserted
+[server-side] sessions idle in transaction at the moment of the kill: 1
+[action] SIGKILL -> pid 24064
+[stdout] VLOGOPS_HELD_AT entry-written
+[exit] status=null signal=SIGKILL
+[ASSERT] the kill landed INSIDE the open transaction, proven by the marker: TRUE (stage=entry-written)
+[state after kill] {"packs":"4","entries":"32","compile_runs":"6","orphan_entries":"0","packs_without_entries":"0","packs_miscounting_entries":"0","idle_in_txn":"0"}
+[ASSERT] the aborted transaction wrote NOTHING — packs/entries/compile_runs unchanged: PASS
+[ASSERT] THE INVARIANT — no partial pack: orphan_entries=0 packs_without_entries=0 packs_miscounting_entries=0 -> PASS
+
+### same compile completes on re-run
+$ node bin/vlogops-compile.mjs compile --seed 0618c483058eb6d70a745ba63318a1ed869c551e5e575328169ba0b5ecc2e88e
+{"pack_id":"9649891cf5e605a8bf91e8b77dfc667bed1937862934b4eea70505957ffda43c","seed_id":"0618c483058eb6d70a745ba63318a1ed869c551e5e575328169ba0b5ecc2e88e","deduplicated":false,"entries":8,"entry_bytes":694475,"bounded":true,"omitted":4,"candidates":12}
+[exit] status=0
+[ASSERT] the killed work was genuinely ABSENT, not half-present — deduplicated:false: PASS
+[state final] {"packs":"5","entries":"40","compile_runs":"7","orphan_entries":"0","packs_without_entries":"0","packs_miscounting_entries":"0","idle_in_txn":"0"}
+[ASSERT] the completing compile wrote exactly one pack with its entries: packs 4->5, entries 32->40
