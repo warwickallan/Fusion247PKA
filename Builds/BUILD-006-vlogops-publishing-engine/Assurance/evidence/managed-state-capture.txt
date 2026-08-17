@@ -1,0 +1,249 @@
+# BUILD-006 managed-Supabase RAW CAPTURE
+# connected as postgres / db=postgres / postgres 17.6 / captured Mon Aug 17 2026 11:12:56 GMT+0100 (British Summer Time)Z
+# READ-ONLY. No statement below writes. The connection string is never printed.
+
+### F1-1 / F2-1 — schema fingerprint
+select
+  (select count(*) from information_schema.schemata where schema_name='vlogops') as schema_exists,
+  (select count(*) from information_schema.tables where table_schema='vlogops') as tables,
+  (select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname='vlogops' and not t.tgisinternal) as triggers,
+  (select count(*) from pg_constraint co join pg_class c on c.oid=co.conrelid join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname='vlogops') as constraints,
+  (select count(*) from pg_indexes where schemaname='vlogops') as indexes
+--> [
+  {
+    "schema_exists": "1",
+    "tables": "6",
+    "triggers": "7",
+    "constraints": "44",
+    "indexes": "15"
+  }
+]
+
+### F1-1 / F2-1 — table inventory
+select table_name from information_schema.tables where table_schema='vlogops' order by 1
+--> [
+  {
+    "table_name": "compile_run"
+  },
+  {
+    "table_name": "content_seed"
+  },
+  {
+    "table_name": "evidence_pack"
+  },
+  {
+    "table_name": "evidence_pack_entry"
+  },
+  {
+    "table_name": "intake_run"
+  },
+  {
+    "table_name": "source_snapshot"
+  }
+]
+
+### F1-1 / F2-1 — migration ledger rows
+select version, name from supabase_migrations.schema_migrations where name like 'vlogops%' order by 1
+--> [
+  {
+    "version": "20260817120000",
+    "name": "vlogops_001_content_seed"
+  },
+  {
+    "version": "20260817120001",
+    "name": "vlogops_002_evidence_pack"
+  }
+]
+
+### Design property — no grants, no RLS, nothing outside vlogops
+select
+  (select count(*) from information_schema.role_table_grants
+     where table_schema='vlogops' and grantee in ('anon','authenticated','service_role','PUBLIC')) as api_role_grants,
+  (select string_agg(distinct grantee, ',') from information_schema.role_table_grants where table_schema='vlogops') as vlogops_grantees,
+  (select bool_or(has_table_privilege('anon', c.oid, 'SELECT')) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname='vlogops' and c.relkind='r') as anon_can_select_any,
+  (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname='vlogops' and c.relkind='r' and c.relrowsecurity) as vlogops_rls_enabled,
+  (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+     where n.nspname in ('asdair','session_report') and c.relkind='r' and c.relrowsecurity) as other_schema_rls_enabled
+--> [
+  {
+    "api_role_grants": "0",
+    "vlogops_grantees": "postgres",
+    "anon_can_select_any": false,
+    "vlogops_rls_enabled": "0",
+    "other_schema_rls_enabled": "0"
+  }
+]
+
+### F1-2 — a seed from each of the three routes, landed durably
+select route, count(*) as seeds, min(created_at) as first_seen from vlogops.content_seed group by 1 order by 1
+--> [
+  {
+    "route": "promotion",
+    "seeds": "1",
+    "first_seen": "2026-08-17T10:38:23.802Z"
+  },
+  {
+    "route": "records",
+    "seeds": "3",
+    "first_seen": "2026-08-17T10:37:37.768Z"
+  },
+  {
+    "route": "supplied",
+    "seeds": "1",
+    "first_seen": "2026-08-17T10:39:10.760Z"
+  }
+]
+
+### F1-2 / F1-3 — every seed, with its identity and member count
+select c.seed_id, c.route, c.status, c.manifest_algo,
+       (select count(*) from vlogops.source_snapshot s where s.seed_id = c.seed_id) as snapshots
+  from vlogops.content_seed c order by c.created_at
+--> [
+  {
+    "seed_id": "0c19424eb5c8b518a6434e8d9afe495587bde8183991b165843e651e5cff03d3",
+    "route": "records",
+    "status": "sealed",
+    "manifest_algo": "sha256-canonical-json-v1",
+    "snapshots": "12"
+  },
+  {
+    "seed_id": "39c4428b94269f5272742da9499f37c347c007b4655192673f61240d7d7a7f0b",
+    "route": "promotion",
+    "status": "sealed",
+    "manifest_algo": "sha256-canonical-json-v1",
+    "snapshots": "1"
+  },
+  {
+    "seed_id": "3439b2cd69e64bdcc919ae6c7dcb22f86c171c354c1661bd37fe36d12ceed3f0",
+    "route": "supplied",
+    "status": "sealed",
+    "manifest_algo": "sha256-canonical-json-v1",
+    "snapshots": "1"
+  },
+  {
+    "seed_id": "70a439615cf016f335cbd36f6fbf059b2f7f8efa9d8ea55d2d6b1a4b0e78ad3f",
+    "route": "records",
+    "status": "sealed",
+    "manifest_algo": "sha256-canonical-json-v1",
+    "snapshots": "12"
+  },
+  {
+    "seed_id": "e8a5fb303887bbdab130cf589a7038ca10bb0b3aacc719e46d0043dfa08aaa44",
+    "route": "records",
+    "status": "sealed",
+    "manifest_algo": "sha256-canonical-json-v1",
+    "snapshots": "12"
+  }
+]
+
+### F1-3 — intake_run ledger: attempts EXCEED seeds, which is the dedupe record
+select (select count(*) from vlogops.intake_run) as intake_runs,
+       (select count(*) from vlogops.content_seed) as seeds
+--> [
+  {
+    "intake_runs": "8",
+    "seeds": "5"
+  }
+]
+
+### F1-4 / F2-5 — integrity invariants: partial state would show here
+select
+  (select count(*) from vlogops.content_seed where status <> 'sealed') as unsealed_seeds,
+  (select count(*) from vlogops.source_snapshot s
+     where not exists (select 1 from vlogops.content_seed c where c.seed_id = s.seed_id)) as orphan_snapshots,
+  (select count(*) from vlogops.content_seed c
+     where not exists (select 1 from vlogops.source_snapshot s where s.seed_id = c.seed_id)) as seeds_without_snapshots,
+  (select count(*) from vlogops.evidence_pack_entry e
+     where not exists (select 1 from vlogops.evidence_pack p where p.pack_id = e.pack_id)) as orphan_entries,
+  (select count(*) from vlogops.evidence_pack p
+     where not exists (select 1 from vlogops.evidence_pack_entry e where e.pack_id = p.pack_id)) as packs_without_entries,
+  (select count(*) from pg_stat_activity where state = 'idle in transaction') as stuck_transactions
+--> [
+  {
+    "unsealed_seeds": "0",
+    "orphan_snapshots": "0",
+    "seeds_without_snapshots": "0",
+    "orphan_entries": "0",
+    "packs_without_entries": "0",
+    "stuck_transactions": "0"
+  }
+]
+
+### F2-2 — every pack: bounded, with what it omitted and why
+select p.pack_id, p.seed_id, p.entry_count, p.bounded,
+       jsonb_array_length(p.omitted) as omitted,
+       (select count(*) from vlogops.evidence_pack_entry e where e.pack_id = p.pack_id) as entries_stored
+  from vlogops.evidence_pack p order by p.created_at
+--> [
+  {
+    "pack_id": "45c7ad3da180aa069c3faf33d672d1c2515896b45e0f40410fe014d77cc1c728",
+    "seed_id": "0c19424eb5c8b518a6434e8d9afe495587bde8183991b165843e651e5cff03d3",
+    "entry_count": 8,
+    "bounded": true,
+    "omitted": 4,
+    "entries_stored": "8"
+  },
+  {
+    "pack_id": "4c57f579c7f181322abce7bb5a49d1ada9e100185ae545f097d51e46ec16f68c",
+    "seed_id": "e8a5fb303887bbdab130cf589a7038ca10bb0b3aacc719e46d0043dfa08aaa44",
+    "entry_count": 8,
+    "bounded": true,
+    "omitted": 4,
+    "entries_stored": "8"
+  },
+  {
+    "pack_id": "c3606ddd7db89c03fcd0f05e9eec804246f1c8d830066993993eb3788bc6623c",
+    "seed_id": "70a439615cf016f335cbd36f6fbf059b2f7f8efa9d8ea55d2d6b1a4b0e78ad3f",
+    "entry_count": 8,
+    "bounded": true,
+    "omitted": 4,
+    "entries_stored": "8"
+  }
+]
+
+### F2-2 — provenance completeness: an entry with no frozen snapshot would show here
+select count(*) as entries_without_snapshot
+  from vlogops.evidence_pack_entry e
+ where not exists (select 1 from vlogops.source_snapshot s
+                    where s.seed_id = e.seed_id and s.source_ref = e.source_ref)
+--> [
+  {
+    "entries_without_snapshot": "0"
+  }
+]
+
+### F2-2 — the omission reasons actually recorded
+select p.pack_id, o->>'reason' as reason, count(*)
+  from vlogops.evidence_pack p, jsonb_array_elements(p.omitted) o
+ group by 1,2 order by 1,2
+--> [
+  {
+    "pack_id": "45c7ad3da180aa069c3faf33d672d1c2515896b45e0f40410fe014d77cc1c728",
+    "reason": "over-budget",
+    "count": "4"
+  },
+  {
+    "pack_id": "4c57f579c7f181322abce7bb5a49d1ada9e100185ae545f097d51e46ec16f68c",
+    "reason": "over-budget",
+    "count": "4"
+  },
+  {
+    "pack_id": "c3606ddd7db89c03fcd0f05e9eec804246f1c8d830066993993eb3788bc6623c",
+    "reason": "over-budget",
+    "count": "4"
+  }
+]
+
+### F2-3 — compile_run ledger: attempts EXCEED packs, which is the dedupe record
+select (select count(*) from vlogops.compile_run) as compile_runs,
+       (select count(*) from vlogops.evidence_pack) as packs
+--> [
+  {
+    "compile_runs": "4",
+    "packs": "3"
+  }
+]

@@ -53,10 +53,39 @@ One required environment variable, one optional.
 | `VLOGOPS_DB_URL` | **yes** | Postgres connection string for the Content Seed store. The only database variable. |
 | `VLOGOPS_REPO_ROOT` | no | Which repository checkout Route 1 reads records from. Defaults to the one the service lives in. |
 
-**Values live outside this repository.** The estate convention is
-`node --env-file=<path outside the repo> …`. Nothing in the repository opens that file, and
-the service never reads a value from any file inside the repository. `.env.example` documents
+**Values live outside this repository.** Nothing in the repository opens that file, and the
+service never reads a value from any file inside the repository. `.env.example` documents
 names only.
+
+### Where the value actually comes from — the managed project
+
+**This section previously stopped at "values live outside this repository", which sent the
+operator to a person instead of to the product. That was a real defect, found by assurance.**
+
+The approved credentials file for this estate's managed Postgres is
+`C:/.fusion247/fusion-capture-gateway.env`, and it is the same fixed path
+`tools/session-report/populate.mjs` uses. **It supplies the connection string under the name
+`DATABASE_URL`, while this service requires `VLOGOPS_DB_URL`** — so the name must be mapped
+when you run a command:
+
+```bash
+# Bash: map the approved file's variable to the one this service requires.
+export VLOGOPS_DB_URL="$DATABASE_URL"   # after sourcing the approved file, or:
+node --env-file=C:/.fusion247/fusion-capture-gateway.env \
+  -e "process.env.VLOGOPS_DB_URL=process.env.DATABASE_URL" # …then spawn the bin
+```
+
+Simplest reliable form, and the one the acceptance evidence used: run the bin as a child with
+the variable set from `DATABASE_URL`, so the real entry point runs unchanged.
+
+**Do not copy the connection string into a new file to avoid the mapping.** Two files holding
+one credential means a rotation silently leaves one stale.
+
+> **⛔ OPEN DECISION — Warwick's, and PARKED by him. Do not act on it and do not raise it again.**
+> Whether to add `VLOGOPS_DB_URL` to the approved file, or give VlogOps a dedicated role and
+> location, is his call and is explicitly **non-blocking**. Until he rules, the mapping above
+> is the route. The related question of whether this service should keep connecting as the
+> schema owner is parked with it.
 
 **The service refuses to start on bad configuration, and tells you everything that is wrong
 at once** — not just the first problem:
@@ -88,6 +117,11 @@ Success prints one line of JSON and exits **0**:
 - `deduplicated: true` — **this is a normal, successful outcome, not an error.** It means this
   exact source was already stored, so nothing needed writing. Running the same intake twice is
   safe and is expected.
+
+> **The managed store already holds seeds, so `deduplicated: true` with no new row is a likely
+> FIRST experience — and it is the system working.** Re-taking a source that has not changed is
+> meant to produce one seed, not a second copy. You have done nothing wrong and there is nothing
+> to clean up. Only a *new or changed* source produces `deduplicated: false`.
 
 Compiling that seed is the same shape — one command, one line of JSON, exit **0**:
 

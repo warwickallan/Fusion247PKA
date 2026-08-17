@@ -1,0 +1,125 @@
+# BUILD-006 managed-Supabase RAW BEHAVIOURAL PROOFS
+# as postgres, captured Mon Aug 17 2026 11:13:49 GMT+0100 (British Summer Time)Z. Real exit codes, unedited output.
+
+## F1-4 — mid-intake SIGKILL on a NEW window (fresh capture, not transcript-quoted)
+[state before kill] {"seeds":"5","snapshots":"38","intake_runs":"8","packs":"3","entries":"24","compile_runs":"4","unsealed":"0","orphan_snapshots":"0","stuck_txns":"0"}
+
+### F1-4a killed mid-intake
+$ node bin/vlogops-intake.mjs records --from 2026-08-01 --to 2026-08-16   [SIGKILL after 400ms]
+[exit] status=null signal=SIGKILL
+[state after kill] {"seeds":"5","snapshots":"38","intake_runs":"8","packs":"3","entries":"24","compile_runs":"4","unsealed":"0","orphan_snapshots":"0","stuck_txns":"0"}
+[ASSERT] store unchanged by the kill: TRUE
+[ASSERT] no partial state: unsealed=0 orphan_snapshots=0 stuck_txns=0
+
+### F1-4b same command completes on re-run
+$ node bin/vlogops-intake.mjs records --from 2026-08-01 --to 2026-08-16
+{"seed_id":"e8a5fb303887bbdab130cf589a7038ca10bb0b3aacc719e46d0043dfa08aaa44","deduplicated":true,"members":12}
+[exit] status=0 signal=none
+[state after completing re-run] {"seeds":"5","snapshots":"38","intake_runs":"9","packs":"3","entries":"24","compile_runs":"4","unsealed":"0","orphan_snapshots":"0","stuck_txns":"0"}
+
+## F1-3 — identity survives restart (fresh processes, expect deduplicated:true and the SAME seed_id)
+
+### F1-3 route records
+$ node bin/vlogops-intake.mjs records --from 2026-08-05 --to 2026-08-05
+{"seed_id":"0c19424eb5c8b518a6434e8d9afe495587bde8183991b165843e651e5cff03d3","deduplicated":true,"members":12}
+[exit] status=0 signal=none
+
+### F1-3 route promote
+$ node bin/vlogops-intake.mjs promote --origin AsdAIr weekly shop pipeline — BUILD-015 live run --angle What a deterministic household pipeline taught me about trusting automation --file DEMONSTRATION.md
+{"seed_id":"39c4428b94269f5272742da9499f37c347c007b4655192673f61240d7d7a7f0b","deduplicated":true,"members":1}
+[exit] status=0 signal=none
+
+### F1-3 route supplied
+$ node bin/vlogops-intake.mjs supplied --angle Why the durable middle of a publishing pipeline is the part nobody sees --file RUNBOOK.md
+{"seed_id":"3439b2cd69e64bdcc919ae6c7dcb22f86c171c354c1661bd37fe36d12ceed3f0","deduplicated":true,"members":1}
+[exit] status=0 signal=none
+
+## F2-3 — determinism: a third independent compile must land on the SAME pack and emit identical bytes
+
+### F2-3 third compile
+$ node bin/vlogops-compile.mjs compile --seed 0c19424eb5c8b518a6434e8d9afe495587bde8183991b165843e651e5cff03d3 --emit C:\Fusion247PKA\Builds\BUILD-006-vlogops-publishing-engine\Assurance\evidence\pack-45c7ad3d-c.json
+{"pack_id":"45c7ad3da180aa069c3faf33d672d1c2515896b45e0f40410fe014d77cc1c728","seed_id":"0c19424eb5c8b518a6434e8d9afe495587bde8183991b165843e651e5cff03d3","deduplicated":true,"entries":8,"entry_bytes":232356,"bounded":true,"omitted":4,"candidates":12}
+[exit] status=0 signal=none
+
+## F2-4 — verify reads only frozen snapshots
+
+### F2-4a verify normally
+$ node bin/vlogops-compile.mjs verify --pack 45c7ad3da180aa069c3faf33d672d1c2515896b45e0f40410fe014d77cc1c728
+{"pack_id":"45c7ad3da180aa069c3faf33d672d1c2515896b45e0f40410fe014d77cc1c728","ok":true,"entry_count":8,"entries_verified":8,"bounded":true,"problems":[]}
+[exit] status=0 signal=none
+[setup] VLOGOPS_REPO_ROOT points at an EMPTY directory (0 children) — the original sources are unreachable
+
+### F2-4b verify with sources unreachable
+$ node bin/vlogops-compile.mjs verify --pack 45c7ad3da180aa069c3faf33d672d1c2515896b45e0f40410fe014d77cc1c728
+{"pack_id":"45c7ad3da180aa069c3faf33d672d1c2515896b45e0f40410fe014d77cc1c728","ok":true,"entry_count":8,"entries_verified":8,"bounded":true,"problems":[]}
+[exit] status=0 signal=none
+[state final] {"seeds":"5","snapshots":"38","intake_runs":"12","packs":"3","entries":"24","compile_runs":"5","unsealed":"0","orphan_snapshots":"0","stuck_txns":"0"}
+
+## F1-4 (STRONGER) — mid-intake SIGKILL near commit, on a window with NO existing seed
+# captured Mon Aug 17 2026 11:14:53 GMT+0100 (British Summer Time)Z. Window 2026-07-20..2026-08-16 has never been intaken; a completing run must say deduplicated:false.
+[state before] {"seeds":"5","snapshots":"38","intake_runs":"12","unsealed":"0","orphan_snapshots":"0","stuck_txns":"0"}
+
+### killed near commit
+$ node bin/vlogops-intake.mjs records --from 2026-07-20 --to 2026-08-16   [SIGKILL after 5000ms]
+{"seed_id":"fbe257f38d2cb9c65b76c756a848eea9bc06962a35494a89998ef79a8c93b290","deduplicated":false,"members":12}
+[exit] status=null signal=SIGKILL
+[state after kill] {"seeds":"6","snapshots":"50","intake_runs":"13","unsealed":"0","orphan_snapshots":"0","stuck_txns":"0"}
+[ASSERT] store COMPLETELY unchanged by the kill (incl. the intake_run attempt ledger): FALSE
+[ASSERT] no partial state: unsealed=0 orphan_snapshots=0 stuck_txns=0
+
+### same command completes on re-run
+$ node bin/vlogops-intake.mjs records --from 2026-07-20 --to 2026-08-16
+{"seed_id":"fbe257f38d2cb9c65b76c756a848eea9bc06962a35494a89998ef79a8c93b290","deduplicated":true,"members":12}
+[exit] status=0 signal=none
+[ASSERT] the killed work was genuinely ABSENT, not half-present — completing run reports deduplicated:false: FALSE
+[state after completion] {"seeds":"6","snapshots":"50","intake_runs":"14","unsealed":"0","orphan_snapshots":"0","stuck_txns":"0"}
+[ASSERT] completion wrote a seed and its snapshots: seeds 5->6, snapshots 38->50
+
+## F1-4 (CORRECTED ASSERTIONS) — mid-intake SIGKILL, invariant = "nothing, or all of it"
+# captured Mon Aug 17 2026 11:15:54 GMT+0100 (British Summer Time)Z. Window 2026-07-01..2026-08-16, never intaken. Kill at 1500ms.
+# A kill may land either side of the commit. BOTH are permitted outcomes; only a PARTIAL row set fails.
+[state before] {"seeds":"6","snapshots":"50","intake_runs":"14","unsealed":"0","orphan_snapshots":"0","seeds_without_snapshots":"0","stuck_txns":"0"}
+
+### killed mid-intake
+$ node bin/vlogops-intake.mjs records --from 2026-07-01 --to 2026-08-16   [SIGKILL after 1500ms]
+[exit] status=null signal=SIGKILL
+[state after kill] {"seeds":"6","snapshots":"50","intake_runs":"14","unsealed":"0","orphan_snapshots":"0","seeds_without_snapshots":"0","stuck_txns":"0"}
+[branch] the kill landed PRE-commit (no result was printed)
+[ASSERT] PRE-commit branch: nothing may have been written. store unchanged=true (expected TRUE) -> PASS
+[ASSERT] THE INVARIANT — no partial state, either branch: unsealed=0 orphan_snapshots=0 seeds_without_snapshots=0 stuck_txns=0 -> PASS
+
+### same command completes on re-run
+$ node bin/vlogops-intake.mjs records --from 2026-07-01 --to 2026-08-16
+{"seed_id":"0618c483058eb6d70a745ba63318a1ed869c551e5e575328169ba0b5ecc2e88e","deduplicated":false,"members":12}
+[exit] status=0 signal=none
+[ASSERT] re-run resolves to exactly one correct state: deduplicated=false (false expected — the killed work was absent) -> PASS
+[state final] {"seeds":"7","snapshots":"62","intake_runs":"15","unsealed":"0","orphan_snapshots":"0","seeds_without_snapshots":"0","stuck_txns":"0"}
+
+## APPEND-ONLY CONTROLS — mutation-tested live, every attempt rolled back
+# captured Mon Aug 17 2026 11:16:39 GMT+0100 (British Summer Time)Z. A refusal is the PASS. A permitted mutation is a real finding.
+  refused  source_snapshot UPDATE (any) — vlogops: source_snapshot is append-only; UPDATE refused
+  refused  source_snapshot DELETE — vlogops: source_snapshot is append-only; DELETE refused
+  refused  intake_run UPDATE (any) — vlogops: intake_run is append-only; UPDATE refused
+  refused  intake_run DELETE — vlogops: intake_run is append-only; DELETE refused
+  refused  content_seed.seed_id CHANGE — vlogops: content_seed.seed_id is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.selection_key CHANGE — vlogops: content_seed.selection_key is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.route CHANGE — vlogops: content_seed.route is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.angle CHANGE — vlogops: content_seed.angle is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.origin CHANGE — vlogops: content_seed.origin is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.manifest CHANGE — vlogops: content_seed.manifest is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.manifest_algo CHANGE — vlogops: content_seed.manifest_algo is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.selection CHANGE — vlogops: content_seed.selection is identity-bearing and immutable; UPDATE refused
+  refused  content_seed.created_at CHANGE — vlogops: content_seed.created_at is identity-bearing and immutable; UPDATE refused
+  refused  content_seed DELETE — vlogops: content_seed is append-only; DELETE refused
+  refused  evidence_pack UPDATE (any) — vlogops: evidence_pack is append-only; UPDATE refused
+  refused  evidence_pack DELETE — vlogops: evidence_pack is append-only; DELETE refused
+  refused  evidence_pack_entry UPDATE (any) — vlogops: evidence_pack_entry is append-only; UPDATE refused
+  refused  evidence_pack_entry DELETE — vlogops: evidence_pack_entry is append-only; DELETE refused
+  refused  compile_run UPDATE (any) — vlogops: compile_run is append-only; UPDATE refused
+  refused  compile_run DELETE — vlogops: compile_run is append-only; DELETE refused
+
+  [harness control] a NON-identity update was PERMITTED on 7 row(s) — the harness can observe a success, so the refusals above are real
+
+[ASSERT] refused=20 permitted=0 of 20 -> PASS
+[ASSERT] harness proven able to observe a success: true
+[ASSERT] rollbacks left NO trace: {"tamper_traces":"0","md5_traces":"0","seeds":"7"}
