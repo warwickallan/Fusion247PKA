@@ -12,5 +12,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "jimp": "^1.6.1"
   }
 }

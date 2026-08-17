@@ -688,15 +688,37 @@ async function stepInterpret(deps, snapshot) {
   let readings;
   // The SIZE of the prompt, never the prompt. See recordGroundingEvidence below.
   let promptChars = null;
+  // The PIXELS the model was given: dimensions and a scale factor, never the
+  // photograph. Null for a typed list, which was never read by anything.
+  let imagePreparation = null;
   if (shop.source_kind === 'photo') {
     if (!shop.raw_media_path) {
       throw new Error(`runPipeline: shop ${shop.shop_ref} is a photo shop with no raw_media_path - the raw evidence is missing`);
     }
     const prompt = deps.buildGroundedPrompt(catalogue);
     promptChars = String(prompt).length;
+
+    // ── MAKE THE HANDWRITING RESOLVABLE BEFORE ASKING (2026-08-17) ─────────
+    // Mum's list arrives from Telegram at 720 x 1280 - roughly 34 pixels per
+    // handwritten line. At that size the model did not fail honestly: it
+    // returned a plausible product that was never on the paper ("2 sliced
+    // roast beef" -> "2 skinny cow bars"). Upscaling to a measured floor fixed
+    // it with every line intact. ⛔ NEVER ROTATE - the rotation arms of the
+    // same experiment lost five and three lines respectively.
+    //
+    // Prepared HERE rather than deep inside interpretPhoto so that what was
+    // done is RECORDED below. A read nobody can audit afterwards is how a
+    // 34-pixel line became a shopping decision without anyone noticing.
+    const prepared = await deps.prepareImage(shop.raw_media_path);
+    imagePreparation = prepared.provenance || null;
+
     // ONE SHOT. Not a loop, not a daemon, not a conversation.
     const modelLines = await deps.interpretPhoto({
-      catalogue, prompt, imagePath: shop.raw_media_path, householdId: shop.household_id,
+      catalogue,
+      prompt,
+      imagePath: shop.raw_media_path,
+      imageDataUrl: prepared.dataUrl,
+      householdId: shop.household_id,
     });
     if (!Array.isArray(modelLines)) {
       throw new Error('runPipeline: the grounded interpreter must return an array of { raw_reading, quantity } lines');
@@ -789,6 +811,10 @@ async function stepInterpret(deps, snapshot) {
     sourceKind: shop.source_kind,
     catalogueCandidates: catalogue.candidates.length,
     promptChars,
+    // WHAT THE MODEL WAS ACTUALLY SHOWN. Dimensions and a scale factor - never
+    // the photograph, never a product, never a line. It is what lets a future
+    // reader tell a good read from a lucky one, which on 17 August nobody could.
+    imagePreparation,
     readingsReturned: readings.length,
     lineNos: resolved.map((l) => l.line_no),
     matchedRegularIds: resolved

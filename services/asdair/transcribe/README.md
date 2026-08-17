@@ -11,6 +11,37 @@ by design, and that is a contract, not an implementation detail. It also touches
 |---|---|
 | `transcribeList.js` | The library. Validates the image, makes the single `vision` call, and defensively normalises the answer into a transcript. The model layer is **injectable**, so the whole thing tests offline against a fake. |
 | `transcribe-list.js` | **The runtime caller.** `node --env-file=<env> transcribe-list.js --image <path> [--json] [--dry-run]` |
+| `prepareImage.js` | **Makes the handwriting resolvable before anything reads it.** Consumed by the LIVE shop (`pipeline/deps.js`), not only by this folder. See below. |
+
+## `prepareImage.js` — the pixels are part of the request
+
+Mum's list reaches us from Telegram at **720 × 1280**. That is not a download bug: it is Telegram's
+largest compressed size, and `pickLargestPhoto` already asks for it. Across 37 handwritten lines it
+leaves about **34 pixels per line**, and at that size the model stopped failing honestly and produced
+something plausible instead — `2 sliced roast beef` came back as `2 skinny cow bars` on 2026-08-17,
+and it reached a real basket.
+
+Measured on the live gateway: same model, same prompt, one variable changed.
+
+| input | lines | invented | line 14 | line 16 |
+|---|---|---|---|---|
+| 720 × 1280, as shipped | 37 | **1** | wrong | merged away |
+| rotate 90° + 3× | 32 | 0 | correct | — |
+| rotate 270° + 3× | 34 | 0 | absent | — |
+| **2× upscale, no rotation** | **37** | **0** | correct | correct |
+| **3× upscale, no rotation** | **37** | **0** | correct | correct |
+
+**Scale fixes the invention. Rotation costs whole lines and buys nothing** — the model reads sideways
+text perfectly well once the strokes resolve. So this module lifts the short edge over a measured floor
+(`MIN_SHORT_EDGE = 1440`, the smallest short edge proven to read the list cleanly), **skips the work
+entirely when the source is already large enough**, and **never rotates**. What it did — source
+dimensions, scale, resulting dimensions — is recorded on the shop's grounding evidence beside
+`transcript_model`, so a later reader can tell a good read from a lucky one. On 17 August nobody could.
+
+**Dependency: `jimp` ^1.6.1**, a deliberate addition rather than an inherited one. Pure JavaScript with
+no native build step, so this service stays installable anywhere Node runs; the lockfile is committed.
+It is the only runtime dependency in this folder and it is imported **lazily**, so the pure surface and
+the offline suites still load on a box where nothing has been installed.
 
 ## How to run it
 

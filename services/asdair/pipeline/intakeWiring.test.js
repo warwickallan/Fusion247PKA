@@ -21,6 +21,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { makeHarness } from './test/harness.js';
+import * as commands from './commands.js';
+import { runPipeline } from './runPipeline.js';
+
 const here = import.meta.dirname;
 const runPipelineSrc = fs.readFileSync(path.join(here, 'runPipeline.js'), 'utf8');
 const depsSrc = fs.readFileSync(path.join(here, 'deps.js'), 'utf8');
@@ -61,6 +65,93 @@ test('the prompt no longer instructs the reader to collapse a repeated product',
     'the deduplicating instruction must not come back');
   assert.match(promptSrc, /ONE LINE ON THE PAPER IS ONE LINE IN YOUR ANSWER/,
     'and the reading task must say so explicitly');
+});
+
+// ── THE PREPARATION STEP, PROVEN THROUGH THE PIPELINE ITSELF ───────────────
+//
+// Not a source scan: the pipeline is actually driven, and the ORDER of the
+// dependency calls is what is asserted. A preparation step that runs after the
+// model has already read the photograph is not a preparation step.
+
+const HOUSEHOLD_ID = 1;
+const REF = 'SHOP-2026-08-03';
+const ACTOR = 'telegram:555';
+const HANDLE = { shopRef: REF };
+
+async function interpretOnePhoto(h) {
+  await commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate: '2026-08-03', sourceKind: 'photo',
+    rawMediaPath: 'C:/.fusion247/asdair/shopper-media/fake.jpg', needsReview: true,
+    actor: ACTOR, telegramChatId: '555', telegramMessageId: '900',
+  }, h.deps);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // -> TRANSCRIBING
+  await runPipeline(HANDLE, h.deps);   // the interpretation
+}
+
+test('THE IMAGE IS PREPARED BEFORE THE MODEL IS ASKED TO READ IT', async () => {
+  const h = makeHarness({ modelLines: [{ line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 }] });
+  await interpretOnePhoto(h);
+
+  const order = h.calls.map((c) => c.dep);
+  const prepAt = order.indexOf('prepareImage');
+  const modelAt = order.indexOf('interpretPhoto');
+  assert.notEqual(prepAt, -1,
+    'the photograph went to the model exactly as Telegram compressed it - 720x1280 is where "2 skinny cow bars" came from');
+  assert.ok(prepAt < modelAt, 'the image must be prepared BEFORE the model reads it, not after');
+});
+
+test('a TYPED list is never image-prepared - there is no photograph', async () => {
+  const h = makeHarness();
+  await commands.receiveList({
+    householdId: HOUSEHOLD_ID, listDate: '2026-08-03', sourceKind: 'text',
+    rawText: '3 gourmet cat food', actor: ACTOR, telegramChatId: '555', telegramMessageId: '900',
+  }, h.deps);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);
+  assert.equal(h.calls.some((c) => c.dep === 'prepareImage'), false);
+});
+
+test('what the model was SHOWN is recorded durably, beside what it was told', async () => {
+  const h = makeHarness({ modelLines: [{ line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 }] });
+  await interpretOnePhoto(h);
+
+  const evidence = h.db.pipeline_command.filter((c) => c.command === 'groundingEvidence');
+  assert.equal(evidence.length, 1);
+  const prep = evidence[0].args.image_preparation;
+  assert.ok(prep, 'nothing recorded the pixels the model was given - which is why nobody could tell a good read from a lucky one');
+  assert.equal(prep.source_width, 720);
+  assert.equal(prep.scale, 2);
+  assert.equal(prep.width, 1440);
+  assert.equal(prep.prepared, true);
+
+  // Still sanitised: dimensions are not household data, and nothing else leaked.
+  const serialised = JSON.stringify(evidence[0]).toLowerCase();
+  for (const leak of ['gourmet', 'shopper-media', '.jpg']) {
+    assert.ok(!serialised.includes(leak), `the grounding record leaked "${leak}"`);
+  }
+});
+
+test('the production container binds the preparation step - not just the test harness', async () => {
+  // The defect this build has paid for three times is a component that is
+  // complete, tested, and reachable only from its own test file.
+  const { createDeps } = await import('./deps.js');
+  const deps = createDeps();
+  assert.equal(typeof deps.prepareImage, 'function',
+    'deps.prepareImage is unbound in production, so the live path would send raw pixels while every test passed');
+  assert.match(depsSrc, /prepareImage:\s*realPrepareImage/);
+  assert.match(runPipelineSrc, /await deps\.prepareImage\(shop\.raw_media_path\)/);
+  // And the one place an image can reach the model prepares it even if a caller forgets.
+  assert.match(depsSrc, /prepareImage\(imagePath\)\)\.dataUrl/);
+});
+
+test('nothing in the intake path rotates the photograph', () => {
+  // Rotation was the intuitive fix and it LOST LINES: 37 -> 32 and 34 across
+  // the two arms. This is a cheap pin against it being reintroduced as a tidy-up.
+  const prepSrc = fs.readFileSync(path.join(here, '..', 'transcribe', 'prepareImage.js'), 'utf8');
+  assert.doesNotMatch(prepSrc, /\.rotate\s*\(/, 'prepareImage must never rotate');
+  assert.doesNotMatch(runPipelineSrc, /\.rotate\s*\(/);
+  assert.doesNotMatch(depsSrc, /\.rotate\s*\(/);
 });
 
 test('the prompt still carries the grounding invariant it always had', () => {
