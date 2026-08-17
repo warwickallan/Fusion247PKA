@@ -257,9 +257,27 @@ test('a line the run believed it added, but absent from the trolley read-back, i
 test('a line present in the trolley at the right quantity carries no discrepancy', () => {
   const manifest = { lines: [{ n: 1, qty: 2, product: 'Milk', asda_product_id: '489747' }] };
   const outcomes = [{ line: 1, product: 'Milk', qty: 2, status: 'added', product_ref: '489747', qty_actual: 2 }];
-  const { rows } = reconcile({ manifest, outcomes, basket: { products: [{ product_id: '489747', name: 'Milk' }] } });
+  // The quantity now comes off THE PAGE, so the fixture carries one. That is
+  // the whole point of gap 8: the run's own `qty_actual` is no longer evidence.
+  const { rows } = reconcile({ manifest, outcomes, basket: { products: [{ product_id: '489747', name: 'Milk', qty: 2, qty_source: 'input-value' }] } });
   assert.strictEqual(rows[0].in_trolley, true);
+  assert.strictEqual(rows[0].state, 'in_trolley_correct');
   assert.strictEqual(rows[0].discrepancy, null);
+});
+
+test('a trolley line whose quantity could NOT be read is not a pass - it is a blocker', () => {
+  // STRICTER than the old contract, deliberately. This exact shape - a product
+  // in the trolley with no readable quantity field - used to reconcile as
+  // "present, no discrepancy". Rule 34 requires the QUANTITY, and "Agents
+  // repeatedly get QUANTITIES wrong (happened this week and last)".
+  const manifest = { lines: [{ n: 1, qty: 2, product: 'Milk', asda_product_id: '489747' }] };
+  const outcomes = [{ line: 1, product: 'Milk', qty: 2, status: 'added', product_ref: '489747', qty_actual: 2 }];
+  const r = reconcile({ manifest, outcomes, basket: { products: [{ product_id: '489747', name: 'Milk' }] } });
+  assert.strictEqual(r.rows[0].in_trolley, true);
+  assert.strictEqual(r.rows[0].state, 'in_trolley_qty_not_established');
+  assert.match(r.rows[0].discrepancy, /could NOT be read/);
+  assert.strictEqual(r.ready.ready, false, 'the basket must not be announceable');
+  assert.ok(r.ready.blockers.some((b) => b.kind === 'quantity-not-established'));
 });
 
 test('the trolley read-back is matched on EITHER product_ref or product_id', () => {
@@ -269,7 +287,7 @@ test('the trolley read-back is matched on EITHER product_ref or product_id', () 
   const manifest = { lines: [{ n: 1, qty: 3, product: 'Milk', asda_product_id: '489747' }] };
   const outcomes = [{ line: 1, product: 'Milk', qty: 3, status: 'added', product_ref: '489747', qty_actual: 3 }];
   for (const key of ['product_ref', 'product_id']) {
-    const { rows } = reconcile({ manifest, outcomes, basket: { products: [{ [key]: '489747', name: 'Milk' }] } });
+    const { rows } = reconcile({ manifest, outcomes, basket: { products: [{ [key]: '489747', name: 'Milk', qty: 3, qty_source: 'input-value' }] } });
     assert.strictEqual(rows[0].in_trolley, true, `a trolley snapshot keyed on ${key} was not matched`);
     assert.strictEqual(rows[0].discrepancy, null);
   }
@@ -278,8 +296,111 @@ test('the trolley read-back is matched on EITHER product_ref or product_id', () 
 test('a product in the trolley that no manifest line accounts for is reported', () => {
   const manifest = { lines: [{ n: 1, qty: 1, product: 'Milk', asda_product_id: '1' }] };
   const outcomes = [{ line: 1, product: 'Milk', qty: 1, status: 'added', product_ref: '1', qty_actual: 1 }];
-  const { unexpected } = reconcile({ manifest, outcomes, basket: { products: [{ product_id: '1', name: 'Milk' }, { product_id: '77', name: 'Something Else' }] } });
-  assert.deepStrictEqual(unexpected, [{ product_ref: '77', name: 'Something Else' }]);
+  const { unexpected } = reconcile({
+    manifest,
+    outcomes,
+    basket: { products: [{ product_id: '1', name: 'Milk', qty: 1, qty_source: 'input-value' }, { product_id: '77', name: 'Something Else', qty: 4, qty_source: 'aria-label' }] },
+  });
+  assert.deepStrictEqual(unexpected, [{ product_ref: '77', name: 'Something Else', qty: 4, qty_source: 'aria-label' }]);
+});
+
+// =====================================================================
+// WO-2026-08-18-B15-RUNTIME - GAP 8. THE DEFECT THAT PRODUCED THREE
+// DIFFERENT TOTALS FOR ONE SHOP.
+// =====================================================================
+
+test('a line added by an EARLIER invocation is found in the trolley, not reported "not attempted"', () => {
+  // THE COMMITTED ARTEFACT OF 2026-08-17, reproduced: the reconciliation read
+  // "Added 2 - not attempted 35" beside a trolley holding 35 products, because
+  // presence was decided from THIS invocation's outcomes. A line added last
+  // time has no outcome this time.
+  const manifest = { lines: [
+    { n: 1, qty: 1, product: 'Milk', asda_product_id: '1' },
+    { n: 2, qty: 2, product: 'ASDA Paracetamol 500mg Capsules 16 Capsules', asda_product_id: '2' },
+  ] };
+  const outcomes = [{ line: 1, product: 'Milk', qty: 1, status: 'added', product_ref: '1', qty_actual: 1 }];
+  const r = reconcile({
+    manifest,
+    outcomes,
+    basket: { products: [
+      { product_ref: '1', name: 'Milk', qty: 1, qty_source: 'input-value' },
+      { product_ref: '2', name: 'ASDA Paracetamol 500mg Capsules 16 Capsules', qty: 2, qty_source: 'input-value' },
+    ] },
+  });
+  assert.strictEqual(r.rows[1].in_trolley, true, 'line 2 was added by an earlier run and IS in the trolley');
+  assert.strictEqual(r.rows[1].state, 'in_trolley_correct');
+  assert.strictEqual(r.summary.missing_unexplained, 0);
+  assert.strictEqual(r.unexpected.length, 0, 'and it must not double as an unaccounted-for product');
+  assert.strictEqual(r.ready.ready, true);
+});
+
+test('a line with NO stored id is reconciled on the canonical ASDA description', () => {
+  // Warwick: "each ASDA description is unique". A line the run resolved by
+  // search carries no id in the manifest, and reference-only matching reported
+  // it BOTH as missing and as an unexpected product - one product, two
+  // contradictory rows.
+  const manifest = { lines: [{ n: 1, qty: 3, product: 'Ben & Jerrys Cookie Dough 465ml' }] };
+  const r = reconcile({
+    manifest,
+    outcomes: [],
+    basket: { products: [{ product_ref: '9', name: "Ben & Jerry's Cookie Dough Ice Cream 465ml", qty: 3, qty_source: 'input-value' }] },
+  });
+  assert.strictEqual(r.rows[0].in_trolley, true);
+  assert.strictEqual(r.rows[0].matched_by, 'canonical-description');
+  assert.strictEqual(r.rows[0].state, 'in_trolley_correct');
+  assert.strictEqual(r.unexpected.length, 0);
+});
+
+test('a DIFFERENT pack of the same brand does not satisfy the line', () => {
+  // The manifest's own note on line 16 warns about exactly this pair.
+  const manifest = { lines: [{ n: 1, qty: 1, product: 'Heinz Baked Beans 6x415g' }] };
+  const r = reconcile({
+    manifest,
+    outcomes: [],
+    basket: { products: [{ product_ref: '5', name: 'Heinz Baked Beans & Richmond Pork Sausages 200g', qty: 1, qty_source: 'input-value' }] },
+  });
+  assert.strictEqual(r.rows[0].in_trolley, false, 'a different pack is a different product');
+  assert.strictEqual(r.unexpected.length, 1, 'and the thing that IS in the trolley is reported');
+  assert.strictEqual(r.ready.ready, false);
+});
+
+test('an unavailable line is accounted for and does NOT block the basket; an unexplained one does', () => {
+  // Rule 38 / BROWSER_METHOD `unavailable_item_handling`: record, drop, report.
+  // A household that cannot have Sweetex this week still has a ready basket.
+  const manifest = { lines: [
+    { n: 1, qty: 1, product: 'Milk', asda_product_id: '1' },
+    { n: 2, qty: 1, product: 'Sweetex' },
+  ] };
+  const ok = reconcile({
+    manifest,
+    outcomes: [
+      { line: 1, product: 'Milk', qty: 1, status: 'added', product_ref: '1' },
+      { line: 2, product: 'Sweetex', qty: 1, status: 'out_of_stock', reason: 'unavailable' },
+    ],
+    basket: { products: [{ product_ref: '1', name: 'Milk', qty: 1, qty_source: 'input-value' }] },
+  });
+  assert.strictEqual(ok.rows[1].state, 'not_in_trolley_unavailable');
+  assert.strictEqual(ok.ready.ready, true, 'an unavailable product is an honest, ready basket');
+  assert.strictEqual(ok.ready.accounted_for.unavailable, 1);
+
+  const bad = reconcile({
+    manifest,
+    outcomes: [{ line: 1, product: 'Milk', qty: 1, status: 'added', product_ref: '1' }],
+    basket: { products: [{ product_ref: '1', name: 'Milk', qty: 1, qty_source: 'input-value' }] },
+  });
+  assert.strictEqual(bad.rows[1].state, 'not_in_trolley_unexplained');
+  assert.strictEqual(bad.ready.ready, false, 'a line nothing explains must block the announcement');
+});
+
+test('a total and an item count alone can never open the announcement gate', () => {
+  // Warwick, verbatim: "A total and item count are insufficient."
+  const manifest = { lines: [{ n: 1, qty: 1, product: 'Milk', asda_product_id: '1' }] };
+  const r = reconcile({
+    manifest,
+    outcomes: [],
+    basket: { order_total: '135.02', item_count: '56', product_count: '35', products: [] },
+  });
+  assert.strictEqual(r.ready.ready, false);
 });
 
 test('the harvest file is an operations file for a human, and names the enrichment it cannot do', () => {

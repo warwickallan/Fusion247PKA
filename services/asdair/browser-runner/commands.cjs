@@ -35,6 +35,7 @@ const COMMANDS = Object.freeze({
   open_groceries:          { kind: 'navigate', args: [] },
   open_trolley:            { kind: 'navigate', args: [] },
   open_regulars:           { kind: 'navigate', args: [] },
+  read_regulars:           { kind: 'read',     args: [] },
   locate_product:          { kind: 'navigate', args: ['product_ref'] },
   add_known_product:       { kind: 'write',    args: ['product_ref'] },
   search:                  { kind: 'navigate', args: ['term'] },

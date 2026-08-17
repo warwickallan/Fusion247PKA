@@ -1363,6 +1363,77 @@ test('AC1 THE DEFECT ITSELF: a BARE typed message - no reply_to - answers the op
     'the answer must reach the SAME durable command surface a button tap reaches');
 });
 
+// =====================================================================
+// WO-2026-08-18-B15-RUNTIME - BINDING IS BY QUESTION IDENTITY, NEVER BY
+// ARRIVAL ORDER.
+//
+// THE MEASURED FAILURE, 2026-08-17: Warwick's typed answers slid onto the
+// FOLLOWING question. As each question was settled the next became the sole
+// open one, and the next thing he typed was absorbed by it. Four answers ended
+// up on the wrong rows and could not be taken back - `answerQuestion` is a
+// compare-and-set on status='open', so the first write wins.
+//
+// The guard is deliberately narrow. It does NOT withdraw AC1 above, which is
+// Warwick's own quoted requirement from 2026-08-09 and stays green: a bare
+// typed message still answers the open question. What it stops is the ONE case
+// with a distinguishing signature - words that answer a question in this shop
+// which is ALREADY SETTLED.
+// =====================================================================
+
+test('a late answer to a SETTLED question is refused, not written onto the question that is open now', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { cheeseKey, breadKey } = await seedTwoQuestions(h);
+
+  // He answers the CHEESE question by naming its candidate. Exact-candidate
+  // resolution binds it by identity, so this lands on cheese.
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'Dreamies Cheese 60g' })]),
+    bot,
+    questions: bot.questions,
+  });
+  assert.equal(questionRow(h, cheeseKey).status, 'answered', 'the cheese question should be settled first');
+  assert.equal(questionRow(h, breadKey).status, 'open', 'bread is now the SOLE open question');
+
+  // Now the same words arrive again - a repeat, a correction, a late thought.
+  // BREAD is the only thing open. The old code bound it to bread.
+  const report = await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 3, text: 'Dreamies Cheese 60g' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  const bread = questionRow(h, breadKey);
+  assert.equal(bread.status, 'open', 'a cheese answer must NEVER settle the bread question');
+  assert.equal(bread.answer_text, null, 'and it must not be written onto that row at all');
+  assert.equal(report.answers.length, 0, 'the pass must not report an answer it did not legitimately bind');
+
+  // And the words he already gave for cheese are untouched: the immutable
+  // decision row stands, and nothing here mutates history.
+  assert.equal(questionRow(h, cheeseKey).answer_text, 'Dreamies Cheese 60g');
+});
+
+test('the guard does not fire when nothing in the shop is settled - AC1 stays whole', async () => {
+  // The same shape as the test above with the FIRST answer removed. Nothing is
+  // settled, so there is no late-answer signature and the bare message binds
+  // exactly as Warwick requires.
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { questionKey } = await seedQuestion(h, [{ label: 'Dreamies Cheese 60g', regular_id: 41 }]);
+
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    intake: makeIntake([textUpdate({ updateId: 2, text: 'whatever he feels like typing' })]),
+    bot,
+    questions: bot.questions,
+  });
+
+  assert.equal(questionRow(h, questionKey).status, 'answered',
+    'a bare typed message must still answer the open question - 2026-08-09, and it is his own quoted requirement');
+});
+
 test('AC2 AND IT IS NOT ALSO A SHOPPING LIST - both halves', async () => {
   const h = makeHarness();
   const bot = await makeAskingBot(h);

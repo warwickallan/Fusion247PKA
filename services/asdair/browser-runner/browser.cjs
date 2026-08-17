@@ -77,7 +77,21 @@ const PAGE_STATE = `JSON.stringify((()=>{
   };
 })())`;
 
-/** Trolley snapshot. READ-ONLY. */
+/**
+ * Trolley snapshot. READ-ONLY.
+ *
+ * EVERY PRODUCT CARRIES ITS OWN QUANTITY, and where that cannot be read it says
+ * so rather than going quiet. BROWSER_METHOD `reconcile_from_quantity_field` is
+ * explicit that reconciliation reads each line's ACTUAL quantity field and never
+ * infers it from a price - a multibuy offer changes the price and will lie. A
+ * snapshot carrying only names and an order total cannot support that check at
+ * all, which is why the read-back that "saw one product" could never have been
+ * truthful no matter how it was compared.
+ *
+ * `qty_source` is the honest half. A null quantity with `qty_source:
+ * "not-established"` is a REPORTABLE GAP, not a zero and not a silent pass - the
+ * reconciliation is required to surface it rather than average over it.
+ */
 const TROLLEY_SNAPSHOT = `JSON.stringify((()=>{
   const txt = (document.body && document.body.innerText) || '';
   const order_total = (txt.match(/Order total\\s*£(\\d+\\.\\d{2})/) || [])[1] || null;
@@ -85,21 +99,80 @@ const TROLLEY_SNAPSHOT = `JSON.stringify((()=>{
   const product_count = (txt.match(/Your products\\s*\\((\\d+)\\)/) || [])[1] || null;
   const header = txt.match(/Trolley\\s+(\\d+)\\s+items?\\s+total price\\s+([\\d.]+)\\s+pounds/i);
   const empty = /trolley is empty/i.test(txt);
-  const names = Array.from(document.querySelectorAll('a[href*="/groceries/product/"]'))
-    .map(a => ({ name: (a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,90), href: a.getAttribute('href') }))
-    .filter(x => x.name);
+
+  const qtyOf = (anchor) => {
+    let scope = anchor;
+    for (let hop = 0; hop < 6 && scope; hop += 1) {
+      scope = scope.parentElement;
+      if (!scope) break;
+      const input = scope.querySelector('input[type="number"], input[name*="quant" i], input[aria-label*="quant" i]');
+      if (input && input.value !== '' && !isNaN(Number(input.value))) return { qty: Number(input.value), qty_source: 'input-value' };
+      const labelled = Array.from(scope.querySelectorAll('[aria-label]'))
+        .map(e => e.getAttribute('aria-label'))
+        .find(a => a && /quantity/i.test(a) && /\\d/.test(a));
+      if (labelled) return { qty: Number((labelled.match(/(\\d+)/)||[])[1]), qty_source: 'aria-label' };
+      const inc = scope.querySelector('button[aria-label^="Increase" i]');
+      if (inc) {
+        const t = (scope.innerText||'').replace(/\\s+/g,' ').trim();
+        const m = t.match(/(?:^|\\D)(\\d{1,3})(?:\\D|$)/);
+        if (m) return { qty: Number(m[1]), qty_source: 'stepper-text' };
+      }
+    }
+    return { qty: null, qty_source: 'not-established' };
+  };
+
+  const anchors = Array.from(document.querySelectorAll('a[href*="/groceries/product/"]'));
   const seen = new Set(); const products = [];
-  for (const n of names) {
-    const id = (n.href.match(/(\\d{3,12})(?:[/?#]|$)/) || [])[1] || null;
-    const key = id || n.name;
-    if (!seen.has(key)) { seen.add(key); products.push({ name: n.name, product_ref: id }); }
+  for (const a of anchors) {
+    const name = (a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,90);
+    const href = a.getAttribute('href') || '';
+    if (!name) continue;
+    const id = (href.match(/(\\d{3,12})(?:[/?#]|$)/) || [])[1] || null;
+    const key = id || name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    products.push(Object.assign({ name: name, product_ref: id }, qtyOf(a)));
   }
   return {
     order_total: order_total || (header ? header[2] : null),
     item_count: item_count || (header ? header[1] : null),
     product_count: product_count != null ? product_count : (empty ? '0' : (products.length ? String(products.length) : null)),
-    empty, products
+    empty, products,
+    quantities_established: products.filter(p => p.qty_source !== 'not-established').length,
+    quantities_not_established: products.filter(p => p.qty_source === 'not-established').length
   };
+})())`;
+
+/**
+ * The Regulars / Favourites grid, enumerated. READ-ONLY.
+ *
+ * THIS IS THE PAGE THE WHOLE METHOD TURNS ON. `open_regulars` could already
+ * NAVIGATE here and nothing could ever READ what was on it, so every line
+ * without a stored id went to free search instead - one navigation and one
+ * model call each, for products that were sitting on this one page with an
+ * unambiguous canonical description.
+ *
+ * The extraction is deliberately the SAME SHAPE as the search result reader:
+ * {product_ref, href, name}. A favourite and a search hit are the same kind of
+ * thing - a live ASDA product with a canonical description - so the identity
+ * layer above can treat them identically and the id stays an optimisation
+ * rather than becoming a second concept.
+ */
+const REGULARS_SNAPSHOT = `JSON.stringify((()=>{
+  const out=[]; const seen=new Set();
+  for (const a of document.querySelectorAll('a[href*="/groceries/product/"]')) {
+    const href=a.getAttribute('href')||'';
+    const id=(href.match(/(\\d{3,12})(?:[/?#]|$)/)||[])[1];
+    const name=(a.textContent||'').replace(/\\s+/g,' ').trim().slice(0,120);
+    if(!name) continue;
+    const key=id||name;
+    if(seen.has(key)) continue; seen.add(key);
+    out.push({product_ref:id||null, href, name});
+  }
+  const bulk = Array.from(document.querySelectorAll('button, a[role="button"]'))
+    .some(b => /add selected|add all|add to trolley/i.test((b.getAttribute('aria-label')||b.textContent||'')));
+  const boxes = document.querySelectorAll('input[type="checkbox"]').length;
+  return { items: out, bulk_control_present: bulk, checkbox_count: boxes };
 })())`;
 
 /**
@@ -246,6 +319,27 @@ class Session {
   async open_groceries() { return this.assertUsable(await this.goto(URLS.groceries)); }
   async open_trolley() { return this.assertUsable(await this.goto(URLS.trolley)); }
   async open_regulars() { return this.assertUsable(await this.goto(URLS.regulars)); }
+
+  /**
+   * Open the Regulars / Favourites grid and READ IT.
+   *
+   * One navigation, many products - which is `one_session_one_page_context`
+   * doing its actual job rather than being an instruction nobody could follow.
+   * The caller gets the live canonical descriptions and, where the grid exposes
+   * them, the ASDA references; matching household identity against those
+   * descriptions is the layer above's decision and is deliberately not made
+   * here.
+   */
+  async read_regulars() {
+    const s = this.assertUsable(await this.goto(URLS.regulars));
+    const snap = await this.evaluateJson(REGULARS_SNAPSHOT);
+    return {
+      url: s.url,
+      items: (snap && snap.items) || [],
+      bulk_control_present: !!(snap && snap.bulk_control_present),
+      checkbox_count: (snap && snap.checkbox_count) || 0,
+    };
+  }
 
   /**
    * Open a product page from its reference alone.
@@ -404,4 +498,7 @@ class Session {
   async read_estimated_total() { const b = await this.read_basket(); return { estimated_total: b.order_total, item_count: b.item_count }; }
 }
 
-module.exports = { Session, URLS, BASE, ReauthRequiredError, RateLimitedError, TROLLEY_SNAPSHOT, READ_QTY, PAGE_STATE, clickExpr, sleep };
+module.exports = {
+  Session, URLS, BASE, ReauthRequiredError, RateLimitedError,
+  TROLLEY_SNAPSHOT, REGULARS_SNAPSHOT, READ_QTY, PAGE_STATE, clickExpr, sleep,
+};

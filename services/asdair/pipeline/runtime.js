@@ -520,6 +520,40 @@ export async function loadDeferredClarifications(deps, { householdId = null, log
  * throw, an unusable return - lands on `null` for that reason. Failing towards
  * "not mine" is the only safe direction here.
  */
+/**
+ * Do these words answer a question in this shop that is ALREADY SETTLED?
+ *
+ * The signature of the 2026-08-17 slide. A message whose text resolves to a
+ * candidate of an answered question is a LATE answer to that question - it is
+ * not evidence about whatever question happens to be open now, and writing it
+ * there is unrecoverable.
+ *
+ * Fails towards `null` (bind as before) on any lookup error: this guard exists
+ * to stop a specific wrong write, and it must never become a new way to lose an
+ * answer.
+ */
+async function answersASettledQuestion(deps, { shopId, words, log = () => {} } = {}) {
+  if (shopId === null || shopId === undefined) return null;
+  let rows;
+  try {
+    rows = await store.listQuestions(deps, shopId);
+  } catch (err) {
+    log('settled_question_lookup_failed', { detail: String(err && err.message ? err.message : err) });
+    return null;
+  }
+  for (const row of rows || []) {
+    if (!row || row.status === 'open') continue;
+    const hit = shopDecisions.resolveExactCandidate({
+      status: 'open',
+      answer_text: words,
+      candidates: row.candidates,
+      rendered_candidates: row.rendered_candidates,
+    });
+    if (hit !== null) return { questionKey: row.question_key, status: row.status };
+  }
+  return null;
+}
+
 export async function correlateTypedAnswer(deps, { text, open, boardShopId = null, log = () => {} } = {}) {
   const words = typeof text === 'string' ? text.trim() : '';
   const all = Array.isArray(open) ? open : [];
@@ -621,9 +655,45 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
   // to read the estate as having exactly one candidate and answer a shop he was
   // not looking at. Scoped, the question is asked of his board and the settled
   // case is caught earlier, by the notice in runOnce.
+  //
+  // ── THE LATE-ANSWER GUARD (WO-2026-08-18-B15-RUNTIME) ─────────────────────
+  //
+  // THIS STEP IS ALSO HOW ANSWERS SLID ONTO THE FOLLOWING QUESTION on
+  // 2026-08-17: as each question was settled, the next became the sole open
+  // one, and the next thing Warwick typed was absorbed by it. Four answers
+  // ended up on the wrong rows and could not be taken back, because
+  // `answerQuestion` is a compare-and-set on status='open' and the first write
+  // wins.
+  //
+  // BINDING MUST BE BY QUESTION IDENTITY, NEVER BY ARRIVAL ORDER. But the
+  // opposite failure is ALSO a real, quoted Warwick defect - 2026-08-09,
+  // WP-B15-A1: "I dont have a bloody card I can type an answer... I don't want
+  // to be pressing buttons." A bare typed message MUST still be able to answer
+  // the open question, and dropping it is not an improvement.
+  //
+  // Both hold at once, because the two cases are distinguishable on EVIDENCE
+  // rather than on timing. The slide has a signature the ordinary case does
+  // not: the words resolve to a candidate of a question in this shop that has
+  // ALREADY BEEN ANSWERED. That is a late answer to a settled question, and it
+  // is the one thing that must never be written onto whatever happens to be
+  // open now. Everything else binds exactly as it did.
   if (scoped.length === 1) {
+    const only = scoped[0];
+    const late = await answersASettledQuestion(deps, { shopId: only.shopId, words, log });
+    if (late) {
+      // REFUSED, not mis-bound, and not silent: returning null leaves the
+      // caller to decline the claim and tell him, which is recoverable. A
+      // wrong write on a compare-and-set row is not.
+      log('late_answer_to_a_settled_question', {
+        shop_ref: only.shopRef,
+        settled_question_key: late.questionKey,
+        open_question_key: only.questionKey,
+        detail: 'these words answer a question that is already settled - they are NOT written onto the question that happens to be open now',
+      });
+      return null;
+    }
     return {
-      mappings: [{ questionKey: scoped[0].questionKey, shopRef: scoped[0].shopRef, answerText: words }],
+      mappings: [{ questionKey: only.questionKey, shopRef: only.shopRef, answerText: words }],
       unmapped: null,
       modelCalled: false,
     };
@@ -2237,6 +2307,35 @@ export async function runOnce(deps, wiring = {}) {
     log,
   });
   const advanced = await advanceAll(deps, { log });
+
+  // ── WO-2026-08-18-B15-RUNTIME, GAP 3. THE PASS SHOPS. ────────────────────
+  //
+  // `advanceAll` moves a READY_TO_SHOP shop to WAITING_FOR_BROWSER and queues
+  // an `asdair.browser_build_request` row. Until now NOTHING IN THE ESTATE
+  // EVER CLAIMED ONE - the stage table said it was waiting for "the supervised
+  // browser operator", and that operator was a human with a shell.
+  //
+  // This is that operator. It runs inside the pass that is already running, on
+  // the poll that is already polling, under the pid lock that already
+  // guarantees a single consumer. No new scheduler, no new queue, no new
+  // table: the request row and its lease have existed for weeks.
+  //
+  // WIRED, NEVER ASSUMED. `wiring.shopBasket` is absent in every test that has
+  // no business driving a browser, so the branch is explicit rather than a
+  // silent no-op, and `realWiring` is the only thing that supplies it.
+  let basket = null;
+  if (typeof wiring.shopBasket === 'function') {
+    try {
+      basket = await wiring.shopBasket({ log });
+      if (basket) log('browser_build_consumed', { request_id: basket.requestId, shop_ref: basket.shopRef, basket_ready: basket.ready });
+    } catch (err) {
+      // A failed shop must not kill the pass: the request has already been
+      // released back to `queued` by the consumer, so the NEXT pass retries it.
+      // That is the recovery path, and it only works if this pass survives.
+      log('browser_build_failed', { detail: String(err && err.message ? err.message : err) });
+    }
+  }
+
   // AFTER the advance, so a question opened by THIS pass's planning step is
   // carded on this pass rather than waiting a full interval for the next one.
   const cards = await queueShopCards(deps, {
@@ -2275,6 +2374,11 @@ export async function runOnce(deps, wiring = {}) {
       from: r.from, to: r.to, ok: r.ok !== false, error: r.error || null,
     })),
     stepped: advanced.filter((r) => r.stepped).length,
+    // The browser half of the pass. `null` means nothing was claimable, which
+    // is the ordinary answer and is reported rather than left to inference.
+    basket: basket
+      ? { request_id: basket.requestId, shop_ref: basket.shopRef, ready: basket.ready }
+      : null,
     cards: {
       questions: cards.questions.length,
       basket_ready: cards.basketReady.length,
@@ -2418,6 +2522,87 @@ async function realWiring(deps) {
     // `wiring.verificationFor`; until now nothing put one on this object, so
     // the basket-ready card could only ever say NOT VERIFIED.
     verificationFor: makeVerificationFor(deps),
+
+    // ── GAPS 3, 4 AND 5. THE BROWSER, OWNED BY THE RUNTIME. ────────────────
+    //
+    // GAP 4 - CREDENTIALS. Nothing new is opened, read, printed or copied
+    // here. The executor runs INSIDE this process, so it inherits the
+    // environment the runtime was started with by its scheduled task - the
+    // same `--env-file` pair that already supplies SHOPPER_BOT_TOKEN and the
+    // database URLs. Last night's `--env-file` on Larry's shell was not a
+    // missing mechanism; it was a missing CALLER. This module knows variable
+    // NAMES only, exactly as the rest of this file does.
+    //
+    // GAP 5 - THE BROWSER. `launcher.cjs` reads ASDAIR_CHROME_PATH,
+    // ASDAIR_CHROME_PROFILE_DIR and ASDAIR_CDP_PORT from that same
+    // environment and reuses a debuggable Chrome if one is already answering,
+    // launching one against the dedicated profile if not. So the browser
+    // dependency belongs to AsdAIr and no longer waits for a human to start
+    // it. An expired ASDA sign-in is still Warwick's - the runner raises
+    // ReauthRequiredError and never attempts to resolve it - but an ORDINARY
+    // signed-in session now needs nobody.
+    shopBasket: async ({ log: passLog = () => {} } = {}) => {
+      const { consumeOneBrowserBuildRequest } = await import('../basket-executor/consume-request.cjs');
+      const { runBasket } = await import('../basket-executor/run-basket.cjs');
+      const shopLines = await import('./shopLines.js');
+
+      return consumeOneBrowserBuildRequest({
+        query: (sql, params) => deps.writeQuery(sql, params),
+        loadShop: async (shopId) => {
+          const shopRows = await deps.readQuery(
+            'select id, shop_ref, household_id, status from asdair.shop where id = $1::bigint', [String(shopId)],
+          );
+          const shop = shopRows.rows[0];
+          if (!shop) throw new Error(`browser build request names shop ${shopId}, which does not exist`);
+          const lines = await shopLines.listLines(deps, shop.id);
+          return { shop, lines };
+        },
+        // The household catalogue, from our OWN rows. This is what turns Mum's
+        // wording into the canonical ASDA description the identity ladder
+        // matches on - and it is why a regular with no stored id is an
+        // ordinary line rather than a blocked one.
+        loadCatalogue: async () => {
+          const res = await deps.readQuery(
+            'select id, name, display_name, brand, category, aka, typical_qty, asda_product_id, active '
+            + 'from asdair.regulars where household_id = $1 and active is not false',
+            [Number(process.env.ASDAIR_HOUSEHOLD_ID || 1)],
+          );
+          return { rows: res.rows };
+        },
+        loadRules: async () => {
+          const res = await deps.readQuery(
+            'select id, rule_text, directive, category, active from asdair.rules where active is true order by id', [],
+          );
+          return { rows: res.rows };
+        },
+        runBasket,
+        // ── NO SECOND ANNOUNCEMENT PATH, DELIBERATELY ────────────────────────
+        //
+        // AsdAIr already tells Warwick the basket is ready: `advanceAll` moves
+        // SHOPPING -> BASKET_READY once the request is complete and carries a
+        // report, and `queueShopCards` queues the basket-ready card that
+        // `drainOutbox` sends. Writing a card from here would be a SECOND
+        // truth about the same event - which is the defect this Work Order
+        // exists to remove, not one to add in a new place.
+        //
+        // THE GATE STILL BINDS, AND IT BINDS ON THE EXISTING RAILS. The
+        // consumer finishes the request `complete` only when the
+        // reconciliation is truthful, and `failed` with the blockers in
+        // `last_error` when it is not. A failed request does not satisfy the
+        // RECORD_BASKET_READY gate, so the shop does not advance and the card
+        // is never queued. "Mum's basket is ready" therefore cannot be said
+        // over an untruthful reconciliation, and nothing had to be invented to
+        // make that so.
+        announce: async (payload) => {
+          passLog('basket_outcome', {
+            kind: payload.kind,
+            shop_ref: payload.shop_ref,
+            request_id: payload.request_id,
+            blockers: (payload.blockers || []).map((b) => b.kind),
+          });
+        },
+      }, { log: (m) => passLog('basket', { detail: m }) });
+    },
     intake: {
       runIntake: intakeMod.runIntake,
       config,
