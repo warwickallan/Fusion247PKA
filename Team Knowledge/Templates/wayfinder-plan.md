@@ -12,14 +12,7 @@
 
 Your map's lines 3–13 are the START/RESUME block, **copied byte-identical from the proven map** `Deliverables/2026-08-02-wayfinder-operating-reset-plan.md`. It is deliberately not reproduced in this template: a third copy is a third thing to drift. Do not reword it, do not "improve" it.
 
-Verify byte-identity after any edit to either file:
-
-```bash
-diff <(sed -n '3,13p' Deliverables/2026-08-02-wayfinder-operating-reset-plan.md | tr -d '\r') \
-     <(sed -n '3,13p' Deliverables/YYYY-MM-DD-<build-slug>-wayfinder-plan.md | tr -d '\r')
-```
-
-Exit 0 means identical. **Mutation-test it once** — append a byte to a copy and confirm `diff` reports a difference — so an identical result is a real match and not a control that always passes.
+**After editing either file, compare those eleven lines and confirm they are still identical** — the active map carries the exact command that does it, and a template is not the place to keep a control.
 
 ## 2. ⚑ WORK CLASSIFICATION — the block a reader must hit first
 
@@ -31,8 +24,14 @@ Put this table immediately after the map's STATUS heading, **above** the detail.
 |---|---|---|---|---|---|---|
 | **FRONTIER** | | | | | | |
 | **NEXT** | | | | | | |
-| **SIDECAR / NON-BLOCKING** | | | | | | |
-| **PARKED** | | | | | | |
+| **SIDECAR / NON-BLOCKING** | | | *(only these three)* | — | — | — |
+| **PARKED** | | | *(only these three)* | — | — | — |
+
+**All six fields for FRONTIER and NEXT. SIDECAR and PARKED need only work type, outcome and owner** — SIDECAR is non-blocking by definition and PARKED blocks nothing by definition, so filling `Blocks what` there is noise that dilutes the two rows where it carries weight.
+
+> **⛔ THE CELLS STATE CLASS, OUTCOME AND A FALSIFIABLE `DONE WHEN` — NEVER THE DAY'S PROGRESS.**
+>
+> This is what keeps the block a reading aid instead of a tracker. A map may be updated **only at a phase boundary**; a cell reading *"evidence is complete as of Tuesday"* is false by Wednesday, at no boundary, and turns the block into the execution tracker a Wayfinder is explicitly not. **`Done when` is a condition, not a state** — write it so anyone can test whether it has been met, and the FRONTIER row stays true between boundaries.
 
 ### The four work classes
 
@@ -76,11 +75,11 @@ Update **only** at a phase boundary, with an evidence pointer.
 |---|---|---|---|
 | 0 — … | ⬜ NOT STARTED | | — |
 
-**PASS additionally requires a Veritas receipt against that phase boundary and the outcome it promised.** PARTIAL and FAILED are Larry's to record without one; **PASS is not.** Canonical in `CLAUDE.md`.
+**PASS is not Larry's to record.** What it additionally requires is canonical in `CLAUDE.md` §"Wayfinder".
 
 ## 5. Amendments
 
-**⛔ What Warwick said is quoted. What Larry concluded is labelled as Larry's and never enters the heading.** And **an amendment that changes a phase's state is not complete until the rows and pointers describing that phase are re-cut in the same commit** — supersede the body, or do not append the amendment. Both rules are canonical in `CLAUDE.md` §"Amendments" and are pointed at here because this is where they get broken.
+Two rules bite here more than anywhere else — attribution, and re-cutting the body an amendment contradicts. Both are canonical in `CLAUDE.md` §"Amendments". Read them there before appending anything to a map.
 
 ## References
 

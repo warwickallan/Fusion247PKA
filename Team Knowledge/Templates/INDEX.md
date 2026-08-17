@@ -49,10 +49,8 @@ every other reader.
 | [[Templates/work-order]] | Work Order (bounded dispatch to a specialist) | `Builds/<BUILD-ID>/Work Packages/<wp-slug>.md`, or `Deliverables/YYYY-MM-DD-<slug>-work-order.md` when standalone |
 | [[Templates/veritas-receipt]] | Veritas assurance receipt (one per review, against one exact head) | `Builds/<BUILD-ID>/Assurance/veritas-<wp-or-phase>-<sha7>.md`, or `Deliverables/YYYY-MM-DD-veritas-<scope>-receipt.md` when standalone |
 
-The Wayfinder template carries the **⚑ WORK CLASSIFICATION** block (Warwick, 2026-08-17): every map must
-show at a glance what kind of work is happening — **BUILD / ACCEPT / REMEDIATE / ADMIN** — split into
-**FRONTIER / NEXT / SIDECAR / PARKED**, with owner, model/effort, what it blocks and what done looks
-like. The mandate for the map itself remains canonical in root `CLAUDE.md` §"Wayfinder".
+The Wayfinder template carries the **⚑ WORK CLASSIFICATION** block (Warwick, 2026-08-17), whose shape is
+defined there and whose mandate is canonical in root `CLAUDE.md` §"Wayfinder".
 
 The lifecycle it enforces is mandatory, and the procedure that runs against it is
 [[SOP-022-work-order-preflight]]:
