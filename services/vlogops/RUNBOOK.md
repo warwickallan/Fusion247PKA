@@ -4,9 +4,10 @@
 
 > ## ⚠️ WHAT THIS SERVICE IS TODAY — read this first, it changes what you are expected to do
 >
-> **At Phase 1 there is NO long-running service, NO daemon, NO scheduled task and NO listening
-> port.** VlogOps is currently a library, a database migration and a **command-line intake**
-> that runs when a person runs it and exits when it is done.
+> **At Phase 2 there is still NO long-running service, NO daemon, NO scheduled task and NO
+> listening port.** VlogOps is a library, two database migrations and **two command-line
+> tools** — an intake and a compiler — each of which runs when a person runs it and exits when
+> it is done. Compilation is invoked for a seed exactly as intake is invoked for a window.
 >
 > **There is therefore nothing to supervise, nothing to keep alive, and no health endpoint to
 > poll.** If you are looking for a process to register with a supervisor, there isn't one yet
@@ -30,6 +31,18 @@ Three ways a seed arrives, all started by a person:
 | **records** | `vlogops-intake records --from <date> --to <date>` | Compile evidence from what already exists in the repository for a date or period |
 | **promote** | `vlogops-intake promote --origin … --angle … --text …` | Promote another Fusion247 output into a seed |
 | **supplied** | `vlogops-intake supplied --angle … --file …` | Warwick supplies text or a document, plus the angle he wants taken |
+
+Then, once a seed exists, a second step turns it into the **evidence pack** the later phases
+read from:
+
+| Step | Command | What it means |
+|---|---|---|
+| **compile** | `vlogops-compile compile --seed <seed_id>` | Turn a sealed seed into a bounded, ordered, provenance-complete evidence pack |
+| **verify** | `vlogops-compile verify --pack <pack_id>` | Re-check a stored pack against the frozen bytes it was built from |
+
+**A pack is a narrowing, not a copy.** The seed holds everything intake judged sufficient for
+the window; the pack holds what fits the story's budget, in chronological order, with the
+duplicates collapsed. **A pack that had to leave something out says so** — see §6.
 
 ## 2. Configuration
 
@@ -76,6 +89,22 @@ Success prints one line of JSON and exits **0**:
   exact source was already stored, so nothing needed writing. Running the same intake twice is
   safe and is expected.
 
+Compiling that seed is the same shape — one command, one line of JSON, exit **0**:
+
+```bash
+node services/vlogops/bin/vlogops-compile.mjs compile --seed 3f9a… --emit pack.json
+```
+
+```json
+{"pack_id":"92f6…","seed_id":"3f9a…","deduplicated":false,"entries":8,
+ "entry_bytes":233501,"bounded":true,"omitted":4,"candidates":12}
+```
+
+- `bounded: true` — the budget bound and **something real was left out.** Not an error; see §6.
+- `deduplicated: true` — the same pack already existed. Same meaning as above: expected, safe.
+- `--emit <path>` writes the pack's canonical document. Two independent compiles of the same
+  seed write **byte-identical** files, which is the cheapest way to check nothing has drifted.
+
 ## 4. Stopping it
 
 Press Ctrl-C, or kill the process. **You do not need to be careful about when.**
@@ -115,6 +144,42 @@ psql "$VLOGOPS_DB_URL" -c "
 
 Every seed should be `sealed`. A row in any other state is worth reporting, not fixing.
 
+**Is a given pack still whole?** This is the check that matters most, and it is one command:
+
+```bash
+node services/vlogops/bin/vlogops-compile.mjs verify --pack <pack_id>
+```
+
+```json
+{"pack_id":"92f6…","ok":true,"entry_count":8,"entries_verified":8,"bounded":true,"problems":[]}
+```
+
+Exit **0** and `ok: true` means every entry still traces to its frozen source bytes and those
+bytes still hash to what the pack claims. **Exit 1 and `ok: false` is a real finding** — read
+`problems`, do not repair anything, and escalate per §10.
+
+**This check never re-reads the original file, which is the whole point.** It keeps answering
+correctly after the source has been edited, moved or deleted, because it reads only what was
+frozen at intake. A pack that verifies after its sources are gone is the normal case, not a
+lucky one.
+
+**Reading a bounded pack honestly.** `bounded: true` means a budget bound and evidence was
+left out. What was dropped, and why, is recorded on the pack itself:
+
+```bash
+psql "$VLOGOPS_DB_URL" -c "
+  select pack_id, entry_count, bounded, jsonb_array_length(omitted) as omitted
+    from vlogops.evidence_pack order by created_at desc limit 10"
+
+psql "$VLOGOPS_DB_URL" -c "
+  select jsonb_pretty(omitted) from vlogops.evidence_pack where pack_id = '<pack_id>'"
+```
+
+Each omission names the source, the reason (`over-budget` or `duplicate-content`) and which
+limit or duplicate caused it. **A pack cannot claim to be complete while having dropped
+something for budget** — the database refuses that row outright — so `bounded` can be trusted
+without cross-checking it.
+
 ## 7. Reading the logs
 
 Output goes to the terminal — stdout for the result, stderr for errors, with a full stack
@@ -136,12 +201,24 @@ The three failures you will actually meet:
 - Killed after it printed its JSON → the seed is stored. Running it again is harmless and
   reports `deduplicated: true`.
 - Ran it twice by accident → one seed. The database enforces this, not the program.
+- **Killed mid-compile → nothing was written. Run the same compile again.** The pack, all of
+  its entries and its ledger row commit in one transaction, exactly as intake does, so there
+  is no half-written pack and no repair step.
+- **Compiled the same seed twice → one pack**, and both attempts appear in `compile_run`. The
+  ledger keeps the record of what was attempted even where nothing needed writing.
+- **A source was edited or deleted after a pack was compiled → do nothing.** The pack is
+  unaffected by design. Confirm with `verify --pack` if you want the reassurance.
 
 **What you must never do:** do not `UPDATE` or `DELETE` rows in `vlogops.source_snapshot`,
-`vlogops.intake_run`, or the identity columns of `vlogops.content_seed`. The database will
+`vlogops.intake_run`, `vlogops.evidence_pack`, `vlogops.evidence_pack_entry` or
+`vlogops.compile_run`, or the identity columns of `vlogops.content_seed`. The database will
 refuse you — those tables are append-only by trigger, deliberately, because a later failure
 must never be able to rewrite what an earlier run captured. **If you find yourself wanting to
 edit one of these rows, escalate instead.**
+
+**Do not "fix" a pack by recompiling it either.** A pack's identity is its content, so a
+recompile of the same seed lands on the same pack. If you believe a pack is wrong, that is a
+finding for Larry, not an operation.
 
 ## 9. The database
 
@@ -149,10 +226,11 @@ The store lives in its own `vlogops` schema and touches nothing else. It holds n
 any API role, so it is not reachable through the managed project's Data API — only through a
 direct connection with `VLOGOPS_DB_URL`.
 
-**Applying or changing the schema is not an operations task.** The migration is
-`db/001_vlogops_content_seed.sql`; applying it to the managed project is a live action owned
-by Larry, after review. Do not apply it, and do not run `db/teardown.sql` against anything
-that holds real seeds — it drops the whole `vlogops` schema.
+**Applying or changing the schema is not an operations task.** The migrations are
+`db/001_vlogops_content_seed.sql` and `db/002_vlogops_evidence_pack.sql`, applied in numeric
+order; applying them to the managed project is a live action owned by Larry, after review. Do
+not apply them, and do not run `db/teardown.sql` against anything that holds real seeds — it
+drops the whole `vlogops` schema, packs included.
 
 ## 10. Escalation
 
