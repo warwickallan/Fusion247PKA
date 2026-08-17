@@ -705,6 +705,10 @@ async function stepInterpret(deps, snapshot) {
       line_no: l.line_no ?? i + 1,
       raw_reading: l.raw_reading,
       quantity: l.quantity ?? null,
+      // The pack the household WROTE, kept apart from how many they want. It is
+      // identity evidence - resolveByCatalogue tells a 6pk of beans from a
+      // single tin with it - and it is never an order quantity.
+      pack_size: l.pack_size ?? null,
       forced_review: false,
       // GATE ZERO (WP-B15-22): carried through to resolveByCatalogue.js's
       // vision-confidence gate, keyed exactly as resolveAll expects. Present
@@ -735,7 +739,18 @@ async function stepInterpret(deps, snapshot) {
   // resolveByCatalogue maps a reading onto a real asdair.regulars.id, or says
   // it cannot. Every `id` below therefore comes from ONE source - our own
   // regulars - and nothing here reads an id off any other table.
-  const resolved = deps.resolveAll(readings, regularsOf(catalogue)).map((l, i) => ({
+  // ── THE HOUSEHOLD'S RULES REACH THE RESOLVER (2026-08-17) ─────────────────
+  // `catalogue.rules` has been loaded on every interpretation since loadCatalogue
+  // was written, and was handed ONLY to the model in the prompt - so a rule was
+  // advice a model might follow rather than something the system applied. Rule 11
+  // ("toffees with no qualifier means ASDA Dairy Toffee 180g") and rule 50 ("Sure
+  // deodorant male: ALWAYS take regular 25 - FIXED CHOICE, do NOT ask") were both
+  // active on 17 August, and Warwick was asked about both anyway. They are now
+  // deterministic identity evidence - see interpret/ruleTriggers.js for what a
+  // rule must say before it is allowed to decide anything.
+  const resolved = deps.resolveAll(readings, regularsOf(catalogue), {
+    rules: catalogue.rules,
+  }).map((l, i) => ({
     ...l,
     line_no: readings[i].line_no,
     // A line shopperRoute could not read cleanly stays unresolved even if the

@@ -30,9 +30,17 @@ const regulars = (await client.query(`
   select id, name, display_name, brand, category, aka, typical_qty, asda_product_id, active
     from asdair.regulars where household_id = 1 and active order by id`)).rows;
 
+// THREE COLUMNS THIS QUERY USED TO OMIT, AND WHY THEY MATTER (2026-08-17).
+// `skill/planner.js actionableRules()` keeps only rows carrying match_term or
+// match_category, and `interpret/loadCatalogue.js` selects matched_product for
+// the model prompt - so a fixture without them cannot reproduce what the live
+// planner does with the same rulebook. The GLOBAL rows (household_id IS NULL)
+// are included for the same reason: loadCatalogue reads them and a fixture that
+// does not is quietly a different rulebook.
 const rules = (await client.query(`
-  select id, category, rule_text, directive, active
-    from asdair.rules where household_id = 1 and active order by id`)).rows;
+  select id, category, rule_text, directive, match_term, match_category, matched_product, active
+    from asdair.rules
+   where (household_id = 1 or household_id is null) and active order by id`)).rows;
 
 write('household-regulars.json', regulars,
   'The household catalogue. The ASDA product NAME is the identity; asda_product_id is an optimisation and is null for many rows. A line must be buyable without one.');

@@ -240,6 +240,14 @@ async function realInterpretPhoto({ prompt, imagePath }) {
     line_no: l.line_no ?? i + 1,
     raw_reading: String(l.raw_reading ?? '').trim(),
     quantity: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : null,
+    // ── THE PACK SIZE, WHICH IS NOT AN ORDER QUANTITY (2026-08-17) ───────
+    // "2 x 4pk orange sport Lucozade" carries TWO numbers meaning different
+    // things, and collapsing them cost half of Mum's drinks. The prompt now
+    // asks for them separately, so this carries the second one through rather
+    // than leaving every downstream reader to re-derive it from prose.
+    // IDENTITY uses it - a 6pk of beans is not a single tin - and the order
+    // quantity never does. Pass-through only: no default, no inference.
+    pack_size: Number.isInteger(l.pack_size) && l.pack_size > 1 ? l.pack_size : null,
     // ── GATE ZERO (WP-B15-22) ────────────────────────────────────────────
     // groundedPrompt.js EXPLICITLY asks for these two fields per line
     // (confidence 0.0-1.0, and status "unreadable" when the model cannot
