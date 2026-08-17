@@ -7,6 +7,14 @@
 - **Target:** the managed Supabase project (Postgres 17.6), the same project holding `asdair.*` and `session_report.*`.
 - **Repo state during the run:** `main` at `c06ee56`, working tree clean apart from Pax's two untracked report files.
 
+> ## ✅ OUTCOME, added 2026-08-17 after four Veritas passes: **PHASES 1 AND 2 ARE BOTH PASS.**
+>
+> **Gate 1 PASS (9 of 9) and Gate 2 PASS at `35ce064`.** Receipts `…confirm3-gate1-35ce064.md` (`5fb5ce1a…`) and `…confirm3-gate2-35ce064.md` (`7884e9c7…`).
+>
+> **No product defect was found at any of the four passes.** Every finding was mine, and all four were one failure: asserting where I could have measured. (1) No raw capture was committed, so nine requirements held on unwitnessed attestation. (2) The mid-compile kill I claimed had **no capture at all**. (3) Two documented RUNBOOK commands did not run as printed — one exited 78, one exited 0 having run nothing. (4) My replacement kill fired at 350 ms against a measured **~327 ms boot floor**, so it died during startup and proved nothing. F2-5 finally closed on merits using the product's own `--hold-at`, with the *server* confirming an open transaction at the instant of the kill. The full record, including the capture that was worthless, is in `Builds/BUILD-006-vlogops-publishing-engine/Assurance/evidence/`.
+>
+> The original status note is kept below, unedited, because it was true when written.
+
 > **STATUS: acceptance evidence COMPLETE. Phase PASS is NOT recorded here and is not Larry's to record.**
 > Both phases are submitted to Veritas for Gate 1 and Gate 2 assurance. Under
 > `GOVERNANCE-VERITAS-HIRE` the maximum permitted statement is that the work is integrated and
