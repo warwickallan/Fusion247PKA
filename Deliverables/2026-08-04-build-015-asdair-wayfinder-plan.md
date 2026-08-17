@@ -91,6 +91,24 @@
 
 > **⚠️ The 2026-08-17 manual recovery — Larry reading the photograph, hand-building the manifest, launching Chrome from a shell — was an OPERATIONAL RESCUE to get Mum her groceries that week. It is NOT the target architecture and NOT a precedent. Every step of it appears in the failure list above.**
 
+### 🔧 THE SEVEN RUNTIME CAPABILITIES OWED BEFORE NEXT WEEK'S SHOP — Warwick, 2026-08-17
+
+> **⛔ THE CONTRACT IS NOW AHEAD OF THE IMPLEMENTATION. Do not leave BUILD-015 at *"contract rewritten, automation still to come"*.** The missing capability is **not another document and not another component proof** — it is the production runtime that makes the new contract true. **A manual Larry start is acceptable ONLY as tonight's one-off rescue. It is NOT an acceptable state to leave the build in.**
+
+| # | Capability | What it must do | Owner |
+|---|---|---|---|
+| **1** | **WAKE / ENTRYPOINT** | Mum's SEND, ShopperBot commands and amendments, and Cockpit actions **create or continue AsdAIr work directly**. No shell command, no request-id lookup, **no Larry translation step**. | Keel |
+| **2** | **AGENT RUNTIME** | A durable AsdAIr runtime **independent of Claude Code**, invoking a capable production model through the approved gateway and owning the reasoning/tool loop itself. **Larry is its builder, never its intelligence at runtime.** | Keel |
+| **3** | **BROWSER EXECUTION** | The agent inspects and operates the live signed-in ASDA browser. **The AI owns semantic judgement; CDP/browser tooling provides eyes and hands.** A product with **no stored ASDA id is a NORMAL path**: search → inspect candidates → judge → select when clear → **abstain only on genuine ambiguity**. | Keel |
+| **4** | **QUESTION / RESUME** | Genuine ambiguity goes to Warwick via ShopperBot or Cockpit; his answer is written into **durable** AsdAIr state; **AsdAIr resumes automatically.** **Warwick must never have to tell Larry that he answered.** | Keel |
+| **5** | **LIFECYCLE / RECOVERY** | The runtime **must not depend on anyone remembering to launch it.** Durable production start, and recovery after process or machine restart. **Reuse the existing service/supervisor mechanisms — do NOT invent a new control plane.** | Keel |
+| **6** | **INTAKE — separate workstream, same deadline** | Tonight proved Mum's normal input route is also unacceptable. Produce the correct intended shop from her normal input **with capable AI judgement and without Larry repairing it.** **Terra is NOT mandatory merely because it exists.** **Repaired separately so Warwick is not dragged through both failures at once.** | separate owner |
+| **7** | **ACCEPTANCE** | See the acceptance rules above and the goal contract's nine-row table. | Warwick observes only |
+
+**The acceptance test, stated so it cannot be softened:** it begins with **Mum's normal input**, nothing pre-staged by Larry, no hidden worker manually started. Then **deliberately terminate Larry / Claude Code. If AsdAIr stops progressing, FAIL.** ShopperBot and the Cockpit must keep working with AsdAIr directly; the live browser must be operated by AsdAIr; the basket must be correctly reconciled; Warwick takes over only at checkout and payment. **That is PASS.**
+
+**Warwick's stated intent, and it is a constraint on how this work is run:** he wants to move on to **CareerAIR**, and must be able to, while this engineering closes **without consuming or supervising him.** Work that requires his attention to progress has failed its own brief.
+
 **Why the frontier is REMEDIATE and not BUILD:** the capability was built and certified component by
 component, and **the real run of 2026-08-16/17 demonstrated it does not deliver the outcome.** Naming that
 BUILD would hide a demonstrated failure inside "remaining work". Goal contract § "Why the old architecture
