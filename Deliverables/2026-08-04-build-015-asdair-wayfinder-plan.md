@@ -91,7 +91,48 @@
 
 > **⚠️ The 2026-08-17 manual recovery — Larry reading the photograph, hand-building the manifest, launching Chrome from a shell — was an OPERATIONAL RESCUE to get Mum her groceries that week. It is NOT the target architecture and NOT a precedent. Every step of it appears in the failure list above.**
 
-### 🔧 THE SEVEN RUNTIME CAPABILITIES OWED BEFORE NEXT WEEK'S SHOP — Warwick, 2026-08-17
+### 📕 PHASE CLOSED — W/C 16 AUGUST 2026. **Shop DONE. Build NOT closed.**
+
+**Warwick, 2026-08-17: *"this build does not close until my star is met and neither you nor I have to touch the fucking shop. You not at all — me, I add the list to Telegram and pay at the end. AsdAIr deals with it all."***
+
+| | |
+|---|---|
+| **Outcome** | ✅ **Mum's basket delivered: 56 items, £135.02.** The live trolley is now **evidence and history only** — do not add, remove, re-run or reopen any line of it. |
+| **Verdict** | ⚠️ **OPERATIONAL RESCUE. NOT product acceptance.** Larry read the photograph, hand-built the manifest, answered the question board, launched Chrome from a shell, started the executor, and interfered with the browser mid-run. **Every one of those is on the failure list in the operational contract above.** |
+| **What DID work, and is the one durable win** | AsdAIr's own capable model resolved products it had never seen, from live ASDA candidates, with **no human choosing any product** — Ben & Jerry's Cookie Dough, the TRESemme conditioner *and* shampoo as two distinct items, Heinz sausage & beans reasoned to five single tins. 12 ASDA ids harvested as a by-product. |
+| **Abstentions** | 4, correctly deferred rather than guessed. Warwick answered two from **Favourites**; Sweetex was genuinely **unavailable**; wet body wipes for women remain unresolved. |
+| **Evidence** | `Deliverables/2026-08-17-asdair-frozen-manifest-SHOP-2026-08-19.json` · `…-basket-run-log.json` · `…-trolley-reconciliation.md` · `…-regulars-harvest.json` · `SHOP-2026-08-19` (shop 35) |
+
+### ⭐ PHASE OPEN — **SHOP OF 24 AUGUST 2026. THE REAL PRODUCT ACCEPTANCE.**
+
+**The gate:** Mum's normal input → autonomous AsdAIr → genuine questions only through Telegram/Cockpit → autonomous browser shopping **by the established Favourites-first method** → reconciled real trolley → *"Mum's basket is ready"* → Warwick checks out. **Warwick starts it from Telegram, then closes Claude Code entirely, and AsdAIr continues on its own.**
+
+**FAIL immediately if:** Larry is required · Warwick runs anything technical · Telegram merely alerts Larry · the browser waits for someone to start it · intake needs Larry repair · **known items are individually free-searched instead of the Favourites-first method** · no-id items become blocked · ambiguity cannot pause and resume through Telegram · a crash requires Larry to revive the process · AsdAIr cannot truthfully reconcile the trolley.
+
+**⛔ No preparation by Larry. No manual start. No pre-staged runtime state to make the test pass.**
+
+### 🔧 THE TEN GAPS TO CLOSE BEFORE 24 AUGUST — Warwick, 2026-08-17
+
+**⛔ Gap 1 is the one tonight proved by violation, and it is not a new interpretation of anything — it is the SOP that already exists.**
+
+| # | Gap | Requirement |
+|---|---|---|
+| **1** | **BROWSER METHOD** | **`SOP-021 §4` and rule 40 ARE the production method.** Default for known/regular products: **Regulars/Favourites → Brand A–Z → identify there → ordered bulk pass.** Free search is reserved for a product genuinely absent from Favourites, a genuinely new product, or a bounded fallback. **Two-at-a-time is fallback where bulk errors, never the default.** Tonight's executor free-searched every no-id line individually — the cause of all four abstentions and ~25 minutes of avoidable work. |
+| **2** | **AGENTIC RUNTIME** | The reasoning/tool loop lives **inside AsdAIr**, calling the capable model through the approved gateway. No Claude Code prompt, no Larry model call, no Keel choosing products, no Sonnet prompt copied by Warwick. |
+| **3** | **AUTONOMOUS WAKE** | Telegram/ShopperBot and Cockpit are **control surfaces**. A valid command — *start Mum's shop*, *add two more milk*, *don't buy that*, *try the other one*, an answer — **creates or resumes AsdAIr work directly and durably.** No shell, no request-id lookup, no manual worker start, no "remember to kick it". |
+| **4** | **RUNTIME CREDENTIALS** | Move credential acquisition off Larry's `--env-file` shell into the normal approved runtime mechanism, so AsdAIr starts and restarts without it. **Do not expose or relocate secret values unnecessarily.** |
+| **5** | **BROWSER AVAILABILITY** | AsdAIr owns the browser dependency — launches or attaches to the authorised dedicated ASDA profile through the production runtime. **An ordinary signed-in session must not need Warwick or Larry to initialise it.** Genuinely expired auth may become a human re-auth requirement. |
+| **6** | **UNAVAILABLE ≠ AMBIGUOUS** | Two different states. **Unavailable** → record, drop, report per the shopping rules. **Ambiguous** → question to Telegram/Cockpit → Warwick answers there → **stored durably** → AsdAIr resumes automatically. No message through Larry. *(Tonight it labelled an out-of-stock Sweetex as pack-size ambiguity.)* |
+| **7** | **CRASH / RESTART RECOVERY** | Not merely resumable in theory — **something must actually wake and re-invoke it.** Prove restart recovery without Larry noticing or restarting anything. **Session-local state is prohibited as a required dependency.** |
+| **8** | **TROLLEY READ-BACK** | **Proven defective tonight: the read-back saw ONE product.** It must read the real final trolley and compare expected identity · expected quantity · actual product · actual quantity · unavailable · abstained · **unexpected products**. **"Mum's basket is ready" may only be issued after that reconciliation is truthful. A total and item count alone are insufficient.** |
+| **9** | **NORMAL INPUT** | Mum's normal input reaches the correct intended shop **without Warwick giving the source to Larry, without Larry repairing OCR/interpretation, without manual reconstruction.** Capable AI judgement directly where appropriate. **Terra optional.** Separate implementation stream — **do not rebuild the browser work while fixing intake.** |
+| **10** | **RUNTIME RULE DELIVERY** | **Do not repeat tonight's mistake of proving rules exist in files while the executor ignores them.** Establish how the running AsdAIr actually receives and obeys the current rules and SOP behaviour. **The test is runtime behaviour, not text in the repository.** |
+
+**Resolution order, settled and not to be re-derived:** stored id if present → **otherwise Favourites/Regulars identity by canonical ASDA description** → otherwise live ASDA search on that description → model evaluates real candidates → choose when clear → abstain only on genuine ambiguity → **harvested id persisted afterwards only as an optimisation.** **Product id is NOT the identity and must never become a prerequisite.**
+
+**Route to acceptance:** close the ten gaps → **Veritas** against the new Goal Contract, made to fail, graded on the North Star and not on component health → **bounded estate reconcile** so one canonical truth sits on main → **Codex** external release QA against the release claim → **24 August real shop.** Veritas does not replace Codex; Warwick's authority does not replace Codex.
+
+### 🔧 THE SEVEN RUNTIME CAPABILITIES — superseded by the TEN GAPS above, 2026-08-17. Kept for the owner column only.
 
 > **⛔ THE CONTRACT IS NOW AHEAD OF THE IMPLEMENTATION. Do not leave BUILD-015 at *"contract rewritten, automation still to come"*.** The missing capability is **not another document and not another component proof** — it is the production runtime that makes the new contract true. **A manual Larry start is acceptable ONLY as tonight's one-off rescue. It is NOT an acceptable state to leave the build in.**
 

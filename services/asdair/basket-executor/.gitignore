@@ -1,0 +1,4 @@
+# Run state and the single-writer lock. Per-run, machine-local, never canonical.
+# The durable record of a run is the log, reconciliation and harvest files this
+# executor writes into Deliverables/.
+state/

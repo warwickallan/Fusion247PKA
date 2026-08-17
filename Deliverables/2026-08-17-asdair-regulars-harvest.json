@@ -1,0 +1,53 @@
+{
+  "generated_by": "WO-2026-08-17-B15-BASKET services/asdair/basket-executor",
+  "generated_at": "2026-08-17T21:20:57.869Z",
+  "shop_ref": "SHOP-2026-08-19",
+  "APPLY_WITH": "node --env-file=<env> services/asdair/outcome/update-regulars.js --file <this file>",
+  "NOT_APPLIED_BY_THE_EXECUTOR": "This process makes no live-data write. These operations are for a human to run.",
+  "operations": [
+    {
+      "op": "upsertRegular",
+      "regular": {
+        "household_id": 1,
+        "name": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml)",
+        "asda_product_id": "3675350",
+        "asda_url": "https://www.asda.com/groceries/product/3675350",
+        "typical_qty": 1,
+        "substitutes_allowed": false,
+        "source": "regular",
+        "active": true
+      }
+    },
+    {
+      "op": "upsertRegular",
+      "regular": {
+        "household_id": 1,
+        "name": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+        "asda_product_id": "7518379",
+        "asda_url": "https://www.asda.com/groceries/product/7518379",
+        "typical_qty": 2,
+        "substitutes_allowed": false,
+        "source": "regular",
+        "active": true
+      }
+    }
+  ],
+  "enrichment_needed": [
+    {
+      "manifest_line": 19,
+      "name": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml)",
+      "harvested_asda_product_id": "3675350",
+      "name_on_site": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml) - ASDA Groceries",
+      "search_term_used": "ASDA Assorted Fruit Splits Lollies 6 x 73ml 438ml",
+      "note": "If a regulars row already exists for this name, upsertRegular will ADOPT it and leave asda_product_id unset. Converting this to an enrichRegular needs that row id."
+    },
+    {
+      "manifest_line": 36,
+      "name": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "harvested_asda_product_id": "7518379",
+      "name_on_site": "ASDA Paracetamol 500mg Capsules 16 Capsules - ASDA Groceries",
+      "search_term_used": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "note": "If a regulars row already exists for this name, upsertRegular will ADOPT it and leave asda_product_id unset. Converting this to an enrichRegular needs that row id."
+    }
+  ]
+}

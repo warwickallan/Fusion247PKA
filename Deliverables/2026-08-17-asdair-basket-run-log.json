@@ -1,0 +1,250 @@
+{
+  "work_order": "WO-2026-08-17-B15-BASKET",
+  "shop_ref": "SHOP-2026-08-19",
+  "started": "2026-08-17T21:18:48.443Z",
+  "finished": "2026-08-17T21:20:57.863Z",
+  "status": "completed",
+  "manifest": "C:\\Fusion247PKA\\Deliverables\\2026-08-17-asdair-frozen-manifest-SHOP-2026-08-19.json",
+  "plan_summary": {
+    "line_count": 37,
+    "with_stored_id": 21,
+    "needing_search": 16
+  },
+  "progress_summary": {
+    "regulars_added": 0,
+    "searched_added": 0,
+    "basket_product_count": 0,
+    "estimated_total": null,
+    "basket_shortfall": null,
+    "held_items": 0,
+    "unavailable_items": 0,
+    "failed_actions": 0,
+    "pending_favourite_actions": 0,
+    "last_successful_browser_step": null,
+    "human_reauth_required": false,
+    "runner_state": "idle",
+    "completed_steps": 0
+  },
+  "shortfall": {
+    "intended": 21,
+    "added": 0,
+    "missing": 21,
+    "unavailable": 0,
+    "held": 0,
+    "failed": 0,
+    "basket_product_count": 0
+  },
+  "outcomes": [
+    {
+      "line": 19,
+      "product": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml)",
+      "qty": 1,
+      "status": "added",
+      "product_ref": "3675350",
+      "name": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml)",
+      "via": "searched",
+      "qty_target": 1,
+      "qty_actual": 1,
+      "qty_reason": null
+    },
+    {
+      "line": 36,
+      "product": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "qty": 2,
+      "status": "added",
+      "product_ref": "7518379",
+      "name": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "via": "searched",
+      "qty_target": 2,
+      "qty_actual": 2,
+      "qty_reason": null
+    }
+  ],
+  "harvested_ids": [
+    {
+      "line": 19,
+      "manifest_product": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml)",
+      "asda_product_id": "3675350",
+      "name_on_site": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml) - ASDA Groceries",
+      "qty": 1,
+      "search_term": "ASDA Assorted Fruit Splits Lollies 6 x 73ml 438ml"
+    },
+    {
+      "line": 36,
+      "manifest_product": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+      "asda_product_id": "7518379",
+      "name_on_site": "ASDA Paracetamol 500mg Capsules 16 Capsules - ASDA Groceries",
+      "qty": 2,
+      "search_term": "ASDA Paracetamol 500mg Capsules 16 Capsules"
+    }
+  ],
+  "basket": {
+    "order_total": "132.52",
+    "item_count": "55",
+    "product_count": "35",
+    "empty": false,
+    "products": [
+      {
+        "name": "ASDA Crispy Skin-On Fries 750g",
+        "product_ref": "6966614"
+      },
+      {
+        "name": "Febreze Air Freshener Spray Vanilla Butterscotch 185ML",
+        "product_ref": "9309045"
+      },
+      {
+        "name": "ASDA Paracetamol 500mg Capsules 16 Capsules",
+        "product_ref": "7518379"
+      },
+      {
+        "name": "ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml)",
+        "product_ref": "3675350"
+      },
+      {
+        "name": "Ben & Jerry's Cool-Lection Cookie & Brownie Ice Cream Multipack 4 x 100ml",
+        "product_ref": "7596507"
+      },
+      {
+        "name": "Twix Chocolate & Caramel Ice Cream 4pk",
+        "product_ref": "7725445"
+      },
+      {
+        "name": "ASDA 10 Smoked Back Bacon Rashers 310g",
+        "product_ref": "9397262"
+      },
+      {
+        "name": "TGI Fridays BBQ Pulled Pork 400g",
+        "product_ref": "9132742"
+      },
+      {
+        "name": "Wet Ones Be Gentle 12 Antibacterial Hand & Body Wipes Fragrance Free with Aloe",
+        "product_ref": "7123692"
+      },
+      {
+        "name": "Canderel Granular Low Calorie Sweetener 75g",
+        "product_ref": "21173"
+      },
+      {
+        "name": "ASDA Dairy Toffee 180g",
+        "product_ref": "9108418"
+      },
+      {
+        "name": "TRESemme Rich Moisture HAIR CONDITIONER 680 ml",
+        "product_ref": "7608842"
+      },
+      {
+        "name": "TRESemme Rich Moisture HAIR SHAMPOO 680 ml",
+        "product_ref": "7608834"
+      },
+      {
+        "name": "Heinz Baked Beans & Richmond Pork Sausages 200g",
+        "product_ref": "9190635"
+      },
+      {
+        "name": "Princes Lean Corned Beef 200g",
+        "product_ref": "391036"
+      },
+      {
+        "name": "Exceptional by ASDA Roast Topside of Beef 90g",
+        "product_ref": "9125427"
+      },
+      {
+        "name": "ASDA British Milk Semi Skimmed 6 Pints",
+        "product_ref": "166556"
+      },
+      {
+        "name": "ASDA Free Range 6 Large Eggs",
+        "product_ref": "166779"
+      },
+      {
+        "name": "Cravendale Arla Filtered Fresh Semi Skimmed Milk 2L Fresher for Longer",
+        "product_ref": "489747"
+      },
+      {
+        "name": "Lurpak Slightly Salted Butter 200g",
+        "product_ref": "7731768"
+      },
+      {
+        "name": "Yazoo Chocolate Milk Drink 400ml",
+        "product_ref": "5277567"
+      },
+      {
+        "name": "Yazoo Strawberry Milk Drink 400ml",
+        "product_ref": "5277569"
+      },
+      {
+        "name": "Fairy Max Power Washing Up Liquid 545ML",
+        "product_ref": "9227130"
+      },
+      {
+        "name": "Sudocrem Antiseptic Cream (125g) - Nappy Rash, Acne spots, Eczema and First aid",
+        "product_ref": "6316368"
+      },
+      {
+        "name": "Walkers Cheese & Onion Multipack Crisps 6x25g",
+        "product_ref": "5017321"
+      },
+      {
+        "name": "Loctite Super Glue Original 3g",
+        "product_ref": "6755212"
+      },
+      {
+        "name": "Lenor Outdoorable Spring Awakening Fabric Conditioner 86 Washes",
+        "product_ref": "9230530"
+      },
+      {
+        "name": "Vanish Oxi Action Laundry Stain Remover Powder, 450g",
+        "product_ref": "6016740"
+      },
+      {
+        "name": "Dreamies DREAMIES Cat Treat Biscuits With Cheese Flavour 200g",
+        "product_ref": "6325769"
+      },
+      {
+        "name": "Gourmet GOURMET Mon Petit Intense Cod, Sardine, Salmon Wet Cat Food 6x50g",
+        "product_ref": "4996753"
+      },
+      {
+        "name": "Smart Litter Wood Pellet Litter 10 Litres",
+        "product_ref": "3104303"
+      },
+      {
+        "name": "McCain Air Fryer Hash Brown Bites 600g",
+        "product_ref": "9297593"
+      },
+      {
+        "name": "Lucozade Sport Drink Orange 4 x 500ml",
+        "product_ref": "4801401"
+      },
+      {
+        "name": "Lucozade Sport Drink Raspberry 4 x 500ml",
+        "product_ref": "4801403"
+      },
+      {
+        "name": "Warburtons Danish Lighter White Bread 400g",
+        "product_ref": "139863"
+      }
+    ]
+  },
+  "substitutions": {
+    "control_present_on_page": true,
+    "surrounding_text": "Showing \n\n1-2\n\n of \n\n2\n\n incomplete offer\n\nView all\n\nYour products\n\n(35) products\n\nSort\n\nDepartment name (most recent)\n\nAllow Substitutions for all\n\nSave trolley\n\nEmpty trolley\n\nPain Relief\n\n1 Product\n\nASDA Paracetamol 500mg Capsules 16 Capsules\n\nis£0.64\n\n16PK, 4.0p/ea\n\nSubstitutes unavailable\n\nIce Cream & Ice Lollies\n\n3 Products\n\nASDA Assorted Fruit Splits ",
+    "note": "control found on the trolley page - its ticked/unticked state is NOT readable from page text and was NOT clicked"
+  },
+  "fatal": null,
+  "console": [
+    "[2026-08-17T21:18:48.451Z] manifest SHOP-2026-08-19: 37 lines - 21 with a stored id, 16 needing search",
+    "[2026-08-17T21:18:48.454Z] plan: 74 steps",
+    "[2026-08-17T21:18:48.586Z] reusing the debuggable Chrome already on http://127.0.0.1:9222 (Chrome/151.0.7922.138)",
+    "[2026-08-17T21:18:48.586Z] chrome: REUSED existing Chrome/151.0.7922.138 on http://127.0.0.1:9222",
+    "[2026-08-17T21:18:48.602Z] runner asdair-browser-runner@WARWICK_YOGA#9468#0b83e8 holds the local trolley lock",
+    "[2026-08-17T21:18:48.651Z] attached to Chrome/151.0.7922.138 tab 3623DF21D4FA5FC1E73766F7A0DF0159",
+    "[2026-08-17T21:18:48.652Z] --- line 19: ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml) (qty 1) ---",
+    "[2026-08-17T21:19:02.745Z] line 19: search \"ASDA Assorted Fruit Splits Lollies 6 x 73ml 438ml\" -> 1 candidate(s)",
+    "[2026-08-17T21:19:05.178Z] line 19: resolved to 3675350 (ASDA Assorted Fruit Splits Lollies 6 x 73ml (438ml)) - Exact match: ASDA Assorted Fruit Splits Lollies, 6 x 73ml (438ml).",
+    "[2026-08-17T21:19:45.944Z] --- line 36: ASDA Paracetamol 500mg Capsules 16 Capsules (qty 2) ---",
+    "[2026-08-17T21:19:56.680Z] line 36: search \"ASDA Paracetamol 500mg Capsules 16 Capsules\" -> 2 candidate(s)",
+    "[2026-08-17T21:19:57.959Z] line 36: resolved to 7518379 (ASDA Paracetamol 500mg Capsules 16 Capsules) - Exact requested product; Warwick confirms this is the favourite.",
+    "[2026-08-17T21:20:43.907Z] reading the trolley back"
+  ]
+}
