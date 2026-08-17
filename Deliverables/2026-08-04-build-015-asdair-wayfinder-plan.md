@@ -57,6 +57,40 @@
 > block is updated only at a phase boundary. A cell that reads like a status report has been filled in
 > wrongly.
 
+### ⚑ THE OPERATIONAL CONTRACT — Warwick, 2026-08-17. Seven facts a fresh session must see at once.
+
+| | |
+|---|---|
+| **FRONTIER** | Agentic autonomous AsdAIr weekly runtime. |
+| **RUNTIME OWNER** | **AsdAIr itself.** |
+| **NORMAL CONTROL SURFACES** | **Telegram ShopperBot + the Cockpit.** |
+| **LARRY** | Builder / remediator only. **Not the weekly runtime.** |
+| **WARWICK** | Shopping decisions + final checkout only. |
+| **FAILURE** | Any technical or manual bridge through Warwick or Larry. |
+| **DONE WHEN** | A real weekly shop completes from normal Mum input to a reconciled basket **with no Larry in the runtime.** |
+
+**ASDAIR ITSELF IS THE WEEKLY SHOPPING RUNTIME.** Larry is not the runtime. A Claude Code session is not the runtime. A manually launched Sonnet session is not the runtime. Warwick is not the bridge between components. **AsdAIr must operate independently of any open Larry session — if killing Larry's session prevents the normal weekly shop from progressing, AsdAIr has failed.**
+
+**ShopperBot and the Cockpit are CONTROL SURFACES, not notification channels back to Larry.** Mum submits through the normal route. Warwick answers a genuine ambiguity, or says *"add two more milk"*, *"don't buy that"*, *"try the other one"*, through ShopperBot or the Cockpit. **AsdAIr receives that instruction DURABLY and acts on it itself.** Larry must never sit behind Telegram translating Warwick's messages into commands.
+
+**The route, and no step in it may require an interactive session to be open:** normal product event → durable AsdAIr state → **the agent wakes without Larry** → capable model invoked through the production gateway → it reads the shop, household context, rules, prior decisions and the original input → it inspects live ASDA → it reasons about known **and unseen** products → browser tooling gives it eyes and hands → correct products and quantities added → trolley read back and reconciled → genuine ambiguity to Warwick via ShopperBot/Cockpit → **AsdAIr resumes from his answer** → *"Mum's basket is ready"* → Warwick checks out.
+
+**⛔ ANY of these in a normal weekly path is a PRODUCT FAILURE, not an inconvenience:** Warwick giving the photo to Larry · Larry interpreting or repairing the list · Warwick running PowerShell or node · Warwick identifying request ids · Warwick starting a worker · Warwick launching Sonnet · Warwick copying a manifest or prompt into another AI · **Larry receiving a ShopperBot message and manually acting on it** · a product without a stored ASDA id being impossible to buy · a capable model unable to inspect live ASDA candidates · a browser step waiting indefinitely for someone to start it · progress depending on session-local state · an open Claude Code session being required · component PASS while the real weekly journey does not complete.
+
+**Success is deliberately boring.** Mum supplies her input. Warwick may get genuine shopping questions and answers them where he already is. Later: *"Mum's basket is ready."* Nothing technical happens through him in between, and the basket contains the intended products and quantities **including previously unseen ones that needed semantic search.**
+
+#### ⛔ NEXT WEEK'S REAL SHOP IS THE ACCEPTANCE OF THIS RUNTIME — not of any component
+
+- **Start it through Mum's NORMAL input route. Do not pre-stage it through Larry.**
+- **Do not manually start hidden machinery to make the test pass.**
+- **Do not repair the route mid-run and then claim the original route passed.** *(This is the estate's `acceptance-proves-mechanism-not-outcome` family, which recurred three times on 2026-08-17 alone.)*
+- **Observe whether the production event causes AsdAIr itself to proceed.** Explicitly test that **no Larry session is required** — kill it and watch.
+- Telegram/Cockpit questions and amendments must **enter AsdAIr directly** and be consumed without Larry translating them.
+- **A genuinely new item is a NORMAL case**, not an exception, if one occurs naturally in the route.
+- **Acceptance ends only at a correctly reconciled real ASDA trolley.**
+
+> **⚠️ The 2026-08-17 manual recovery — Larry reading the photograph, hand-building the manifest, launching Chrome from a shell — was an OPERATIONAL RESCUE to get Mum her groceries that week. It is NOT the target architecture and NOT a precedent. Every step of it appears in the failure list above.**
+
 **Why the frontier is REMEDIATE and not BUILD:** the capability was built and certified component by
 component, and **the real run of 2026-08-16/17 demonstrated it does not deliver the outcome.** Naming that
 BUILD would hide a demonstrated failure inside "remaining work". Goal contract § "Why the old architecture

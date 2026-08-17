@@ -77,6 +77,65 @@ at the keyboard is not delivered.
 
 ---
 
+## ASDAIR ITSELF IS THE WEEKLY SHOPPING RUNTIME — Warwick, 2026-08-17
+
+**Larry is not the runtime. A Claude Code session is not the runtime. A manually launched Sonnet session is not the runtime. Warwick is not the bridge between components.**
+
+**AsdAIr must be capable of operating independently of any open Larry session.** The falsifiable form, and it is the test: **if killing Larry's session prevents the normal weekly shop from progressing, AsdAIr has failed.**
+
+### The normal control surfaces are Telegram/ShopperBot and the Cockpit
+
+**They are AsdAIr CONTROL SURFACES, not notification channels back to Larry.**
+
+- Mum submits her shopping input through the normal route.
+- Warwick answers a genuine ambiguity through ShopperBot or the Cockpit.
+- Warwick may amend the shop there — *"add two more milk"*, *"don't buy that"*, *"try the other one"*.
+- **AsdAIr receives that instruction DURABLY and acts on it itself**, then resumes from it.
+- When the basket is ready, **AsdAIr** tells Warwick through the normal surface.
+
+**⛔ Larry must NEVER sit behind Telegram translating Warwick's messages into commands.**
+
+### The target runtime route — no step may require an interactive session
+
+```
+normal product event (ShopperBot / Cockpit)
+  -> durable AsdAIr state
+  -> AsdAIr agent WAKES WITHOUT LARRY
+  -> capable model invoked through the production model/gateway route
+  -> model reads the shop, household context, rules, prior decisions and the original input
+  -> model inspects live ASDA / browser state
+  -> model reasons semantically about known AND unseen products
+  -> browser tooling provides the eyes and hands
+  -> correct products and quantities added
+  -> trolley read back and reconciled
+  -> genuine ambiguity -> Warwick, via ShopperBot / Cockpit
+  -> AsdAIr RESUMES from his answer
+  -> "Mum's basket is ready"
+  -> Warwick takes over only at checkout / payment
+```
+
+### What counts as FAILURE — any one of these in a normal weekly path
+
+Warwick giving the photo to Larry · Larry interpreting or repairing the shopping list · Warwick running PowerShell or node · Warwick identifying request ids · Warwick starting a worker · Warwick launching Sonnet · Warwick copying a manifest or prompt into another AI · **Larry receiving a ShopperBot message and manually acting on it** · a product without an existing ASDA id being impossible to buy · a capable model being unable to inspect live ASDA candidates · a browser step waiting indefinitely for somebody to remember to start it · progress depending on session-local state · **an open Claude Code / Larry session being required** · component PASS while the real weekly journey does not complete.
+
+### What counts as SUCCESS — deliberately boring
+
+Mum supplies her normal input. Warwick may receive genuine shopping questions through Telegram or the Cockpit and answers them there. Later he receives **"Mum's basket is ready."** Nothing technical happens through Warwick in between. The basket contains the intended products and quantities, **including previously unseen products that required semantic search.** He reviews it and performs checkout and payment.
+
+### Next week's real shop is the acceptance of THIS RUNTIME, not of any component
+
+- **Start it through Mum's NORMAL input route. Do not pre-stage it through Larry.**
+- **Do not manually start hidden machinery to make the test pass.**
+- **Do not repair the route during the acceptance and then claim the original route passed.**
+- **Observe whether the production event causes AsdAIr itself to proceed**, and **explicitly test that no Larry session is required.**
+- Telegram/Cockpit questions and amendments must enter AsdAIr directly and be consumed without Larry translating them.
+- **A genuinely new item is a NORMAL case**, not an exceptional state, if one arises naturally in the route.
+- **Acceptance ends only at a correctly reconciled real ASDA trolley.**
+
+> **⚠️ The 2026-08-17 manual recovery is NOT the target architecture and NOT a precedent.** Larry reading Mum's photograph, hand-building the manifest, answering the question board and launching Chrome from a shell got Mum her groceries that week. **Every one of those steps appears in the failure list above.** Do not mistake the rescue for the product.
+
+---
+
 ## AsdAIr must be AGENTIC — this is the architecture, stated positively
 
 **The runtime is explicitly authorised to use a capable reasoning model in normal production.** Within its
