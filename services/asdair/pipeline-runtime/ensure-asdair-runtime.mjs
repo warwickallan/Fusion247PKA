@@ -181,12 +181,92 @@ export const GRANT_MATRIX = Object.freeze({
     'asdair.households': { table: ['SELECT'] },
     'asdair.shopping_lists': { table: ['SELECT', 'INSERT'] },
     'asdair.shopping_list_items': { table: ['SELECT', 'INSERT', 'UPDATE'] },
-    // DELIBERATE NEGATIVES, stated in 010's own header: no asdair_rw code path
-    // touches either table, so it gets no grant on either.
-    'asdair.budget_settings': {},
-    'asdair.product_alternatives': {},
+    // ── CORRECTED 2026-08-19 (WO-2026-08-19-01). THESE TWO WERE STALE. ──────
+    // They read `{}` for months, sourced from 010's header ("no asdair_rw code
+    // path touches either table"). That WAS true of 010. It stopped being true
+    // at 012_complete_grant_matrix.sql:96-101, which grants asdair_rw SELECT on
+    // both - and 012 was never folded in here.
+    //
+    // The cost was not cosmetic. The live preflight warned on EVERY start that
+    // "2 privilege(s) exist that NO committed migration grants", naming these
+    // two, while a committed migration plainly granted them. A check that emits
+    // confident false negatives teaches everyone to ignore it, so the day a
+    // real drift appears it is read as the usual noise.
+    //
+    // Worse in the other direction: once the pending REVOKE lands live, a stale
+    // `{}` here would have flipped the same staleness from a false ADVISORY
+    // over-grant into a false BLOCKING missing-grant, in the week of a real
+    // shop. MATRIX_SOURCE_MIGRATIONS below exists so that cannot happen again.
+    'asdair.budget_settings': { table: ['SELECT'] },
+    'asdair.product_alternatives': { table: ['SELECT'] },
   }),
 });
+
+/**
+ * ── THE MATRIX'S DECLARED PROVENANCE (WO-2026-08-19-01) ────────────────────
+ *
+ * GRANT_MATRIX is a HAND-MAINTAINED literal. That is a deliberate choice and it
+ * is the right one: the migrations build their grants by string concatenation
+ * inside `do $ ... end if $` blocks, several numbers are absent from the
+ * repository altogether (002, 003, 011, 013, 014, 015), and a REVOKE has to be
+ * ordered against the GRANTs that precede it. A runtime parser over that would
+ * be a claim of derivation resting on an incomplete set - the identical defect
+ * with more authority behind it.
+ *
+ * So the matrix keeps saying what it says, and instead DECLARES WHAT IT WAS
+ * READ FROM. The check below compares this list against the migration files
+ * actually on disk. When a new migration lands and nobody folds it in, the
+ * preflight says so - by name, at the next start - instead of quietly emitting
+ * a false claim in one direction or the other.
+ *
+ * ⛔ ADDING A FILE HERE IS A CLAIM THAT YOU READ IT AND FOLDED IN ITS GRANTS.
+ * It is not a way to silence the warning. Silencing it without reading the
+ * migration re-creates precisely the bug this constant was added to end.
+ */
+export const MATRIX_SOURCE_MIGRATIONS = Object.freeze([
+  '001_asdair_schema.sql',
+  '004_asdair_regulars.sql',
+  '005_asdair_rw_grants.sql',
+  '006_shop_control_surface.sql',
+  '007_rules_rotate_directive.sql',
+  '008_shop_line_interpretation.sql',
+  '009_pipeline_command_and_question_render.sql',
+  '010_household_and_list_grants.sql',
+  '012_complete_grant_matrix.sql',
+  '016_shop_source_image.sql',
+  '017_shop_decision.sql',
+  '018_remembered_choice.sql',
+  '019_shopping_list_shop_identity.sql',
+  '020_shop_line_provenance_and_human_state.sql',
+  '021_regulars_display_name.sql',
+]);
+
+/** Where those migrations live, relative to this file. */
+export const MIGRATIONS_DIR = new URL('../db/', import.meta.url);
+
+/**
+ * PURE. Compare the declared source list against what is actually on disk.
+ * `unaccounted` is the one that matters: a migration nobody folded in.
+ */
+export function compareMatrixProvenance(declared, onDisk) {
+  const d = new Set(declared);
+  const k = new Set(onDisk);
+  const unaccounted = onDisk.filter((n) => !d.has(n)).sort();
+  const vanished = declared.filter((n) => !k.has(n)).sort();
+  return { ok: unaccounted.length === 0 && vanished.length === 0, unaccounted, vanished };
+}
+
+/**
+ * The migration filenames on disk. THROWS rather than returning [] when the
+ * directory cannot be read: an empty list would make compareMatrixProvenance
+ * report every declared file as vanished, and a silent [] would make the whole
+ * check pass vacuously - which is the failure mode it exists to prevent.
+ */
+export function readMigrationFilenames(dir = MIGRATIONS_DIR) {
+  const names = fs.readdirSync(dir).filter((n) => n.endsWith('.sql'));
+  if (names.length === 0) throw new Error(`no .sql migrations found at ${dir}`);
+  return names;
+}
 
 /** The privileges the matrix reasons about. DELETE has no column-level form. */
 export const MATRIX_PRIVILEGES = Object.freeze(['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
@@ -743,6 +823,29 @@ const COLUMN_SQL = `
    where to_regclass(t.tbl) is not null`;
 
 async function checkGrantMatrix(conn, add) {
+  // ── IS THE MATRIX ITSELF CURRENT? ────────────────────────────────────────
+  // Runs FIRST, and runs whatever the database says, because every claim below
+  // this line is only as true as the literal it is derived from. ADVISORY for
+  // the same reason the over-grant check is: a stale matrix must not strand the
+  // household mid-week. But it names the file, so it cannot be mistaken for
+  // noise.
+  try {
+    const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, readMigrationFilenames());
+    add('AC4', 'the grant matrix accounts for every committed migration', prov.ok, ADVISORY,
+      prov.ok
+        ? `the matrix declares all ${MATRIX_SOURCE_MIGRATIONS.length} migration file(s) on disk`
+        : [
+          `the grant matrix was read from ${MATRIX_SOURCE_MIGRATIONS.length} migration file(s);`,
+          `${prov.unaccounted.length + prov.vanished.length} do not reconcile with what is on disk.`,
+          prov.unaccounted.length ? `NOT FOLDED IN: ${prov.unaccounted.join(', ')} - every grant claim below may be wrong in EITHER direction until someone reads them.` : '',
+          prov.vanished.length ? `DECLARED BUT ABSENT: ${prov.vanished.join(', ')}.` : '',
+        ].filter(Boolean).join(' '));
+  } catch (err) {
+    // A control that cannot read its own ground says so. It never passes.
+    add('AC4', 'the grant matrix accounts for every committed migration', false, ADVISORY,
+      `the migration directory could not be read, so the matrix's currency is UNKNOWN: ${err && err.message ? err.message : err}`);
+  }
+
   // Roles first: has_table_privilege raises if the role does not exist.
   const wanted = Object.keys(GRANT_MATRIX);
   const present = new Set(

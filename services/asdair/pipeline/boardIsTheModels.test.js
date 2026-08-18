@@ -544,3 +544,70 @@ test('AC3 JOURNEY: supersession TERMINATES - no round 3 on any later pass', asyn
     'a later pass opened another round - a supersession that loops is worse than the board it replaced');
   assert.equal(h.db.shop_question.filter((q) => Number(q.question_round) >= 3).length, 0);
 });
+
+// =====================================================================
+// WO-2026-08-19-01 AC1 - THE RUNTIME MUST NOT NARRATE A STATE IT IS NOT IN.
+//
+// TWO MINUTES after the supersession above worked exactly as designed, shop 37
+// transitioned NEEDS_DECISION -> PROCESSING announcing
+//
+//     "every question is answered - re-planning with the answers in place"
+//
+// with ALL SEVEN of its questions still `open` and NONE of them answered.
+//
+// The transition was correct - supersession re-plans a parked shop on purpose.
+// The SENTENCE was false, and `asdair.shop_event.description` is the only place
+// a human ever reads it back. Larry would have read that line in a month and
+// believed it.
+//
+// These two proofs pin the sentence to the rows instead of to the happy path.
+// They run the SAME shop-37 reproduction as the supersession journey above, so
+// they prove it on the production route rather than on a mock of it.
+// =====================================================================
+test('AC1: the re-plan does NOT claim answers it has not got', async () => {
+  const { h } = await shopAskingAboutWipes({ decisions: asksAboutWipes });
+  const original = h.db.shop_question[0];
+  original.candidates = SCORER_BOARD;
+  h.db.pipeline_command = h.db.pipeline_command.filter((c) => c.command !== 'decisionEvidence');
+
+  await drain(h);
+
+  const replans = h.db.shop_event.filter((e) => String(e.to_status) === 'PROCESSING'
+    && /re-plan/i.test(String(e.description || '')));
+  assert.ok(replans.length > 0,
+    'the fixture no longer reaches the re-plan transition - this proof would pass vacuously');
+
+  const unsettled = h.db.shop_question.filter((q) => q.status !== 'answered' && q.status !== 'skipped');
+  assert.ok(unsettled.length > 0,
+    'the fixture no longer leaves an unsettled question - this proof would pass vacuously');
+
+  for (const e of replans) {
+    // THE DEFECT, NAMED AS A LITERAL. Nothing may announce a settled board
+    // while a single row is neither answered nor skipped.
+    assert.doesNotMatch(String(e.description), /every question is answered/i,
+      `a re-plan claimed every question was answered while ${unsettled.length} were not: ${e.description}`);
+    assert.ok(!String(e.description).includes('with the answers in place'),
+      `a re-plan said the answers were in place while ${unsettled.length} question(s) were not settled: ${e.description}`);
+    // AND IT MUST SAY WHAT IS TRUE, not merely omit what is false. The count
+    // is the one AT THE MOMENT OF THE TRANSITION, which is not `unsettled`
+    // measured after the drain - so this asserts it reported a REAL non-zero
+    // count rather than pinning a number the event could not have known.
+    assert.ok(/ not;/.test(String(e.description)),
+      `the re-plan did not report an unsettled count at all: ${e.description}`);
+    assert.ok(!String(e.description).includes(', 0 not;'),
+      `the re-plan reported ZERO unsettled while questions were open: ${e.description}`);
+  }
+});
+
+test('AC1 MUTATION GUARD: the settled-board sentence is still reachable when the board REALLY is settled', () => {
+  // The fix must not have been made by deleting the honest branch. This asserts
+  // the positive wording exists in the source and is guarded by a zero test,
+  // so a future edit cannot satisfy the proof above by never claiming anything.
+  const src = fs.readFileSync(new URL('./runPipeline.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('all ${questions.length} question(s) answered or skipped'),
+    'the fully-settled wording was removed rather than made conditional');
+  assert.ok(src.includes('const open = questions.filter('),
+    'the reason is no longer derived from the question rows');
+  assert.ok(src.includes('open.length === 0'),
+    'the settled sentence is no longer guarded by a real zero test');
+});
