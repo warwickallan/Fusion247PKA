@@ -35,14 +35,23 @@ makes no claim of unattended browser execution.**
 The evidence already in this repository:
 `services/asdair/browser-runner/EXPERIMENT-RESULT.md` records the Claude-in-Chrome extension as a
 **host-level binding**, *"proven unreachable from a subagent (2026-07-28 probe) and unavailable to
-any independent process."* `RUNTIME-DECISION.md` open consideration 2 says the same in the other
-direction: Sonnet in Claude for Chrome *"is not a headless, unattended runtime… it removes the need
-for Larry; it does not remove the need for a browser session someone starts."*
+any independent process."* That is a **fact about that mechanism**, and it is exactly why the
+2026-08-17 ruling **disqualifies** the route rather than accommodating it.
 
-So what this module delivers is the honest thing instead: **the smallest truthful supervised route
+> ⛔ **SUPERSEDED 2026-08-17 — the paragraph below described the module's purpose as a SUPERVISED
+> hand-off to a human-started browser session. Supervision is no longer the acceptance bar** (goal
+> contract **S-1, S-2, S-4**), and **a route the system cannot invoke is disqualified** (**S-9**).
+>
+> **What this module still legitimately delivers:** one durable, deterministic, ordered artefact
+> that nobody has to explain, sort, translate or reconstruct — **produced by the product itself and
+> never hand-assembled by a Claude session.** Its consumer is now **whichever executor AsdAIr
+> chooses**, the authorised CDP runner included. The artefact is not superseded; the *human opens
+> the browser and pastes it* delivery model is.
+
+~~So what this module delivers is the honest thing instead: **the smallest truthful supervised route
 that removes Larry completely.** One durable artefact, ready before Warwick opens the browser, which
 nobody has to explain, sort, translate or reconstruct. Warwick opens Sonnet, pastes or points it at
-the artefact, and the shop runs. A fake "trigger" would be worse than building nothing.
+the artefact, and the shop runs. A fake "trigger" would be worse than building nothing.~~
 
 ⛔ **SUPERSEDED 2026-08-17 (register entry S-10). None of the three is acceptable as the normal path.**
 Starting the browser session and driving it are **AsdAIr's**. The substitution pass is governed by the
@@ -276,11 +285,14 @@ await completeHandoff(query, { requestId: claimed.id, writerId,
   be new machinery this build has not earned. The drift risk is **held above this module**, to be
   closed by a cross-module test pinning both implementations against one fixture set at integration.
   The loud `EXPECTED_DISTINCT_MISMATCH` refusal is the runtime backstop, not the primary control.
-- **The prohibitions are instructions, not code.** `RUNTIME-DECISION.md` records this honestly: the
-  CDP runner blocks checkout and substitution in three independent code layers; **Sonnet in Chrome has
-  no mechanical enforcement at all.** This module pins the wording, versions it and asserts it is
-  present — it cannot enforce it in the browser. That is a real reduction in guarantee, accepted
-  deliberately in exchange for a process that works at human speed.
+- **This module's prohibitions are instructions, not code — and that is now an argument for choosing
+  an executor that DOES enforce them.** The CDP runner blocks checkout and substitution in three
+  independent code layers, and **CDP is authorised** (goal contract **S-8**), so those layers are a
+  **strength of that route**. This module pins the wording, versions it and asserts it is present; it
+  cannot enforce it in a browser it does not drive. ~~*"That is a real reduction in guarantee,
+  accepted deliberately in exchange for a process that works at human speed."*~~ — **SUPERSEDED
+  2026-08-17**: it stated the trade backwards, and the mechanism carrying the enforcement is no
+  longer excluded.
 
 ## Tests
 

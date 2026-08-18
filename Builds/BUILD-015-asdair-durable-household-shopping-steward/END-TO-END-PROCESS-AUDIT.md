@@ -10,6 +10,19 @@ place and automated so that I never have to come to you with this again."*
 **Method:** the code was read, not the prose. Where a committed document and the source
 disagree, this audit believes the source and says so. Nothing was executed.
 
+> # ⚠️ HISTORICAL RECORD. This is Pax's audit of the estate AS AT 2026-08-04 and is preserved unrewritten.
+>
+> **Every "supposed to happen" and "ruled-in writer" statement below reflects the 2026-08-04 ruling
+> `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`, which named Sonnet in Claude for Chrome as the Stage 1 live basket
+> writer and excluded the CDP runner from the live route. Both are SUPERSEDED by Warwick's product ruling of
+> 2026-08-17** — canonical in [`BUILD-015-goal-contract.md`](./BUILD-015-goal-contract.md), register **S-5, S-7,
+> S-8**: **AsdAIr operates the live browser and chooses its own execution mechanism, and CDP is AUTHORISED.**
+>
+> **This audit is NOT rewritten**, because its findings were accurate about the estate on the date it was
+> written and the supersession register exists so that record survives. **It is not an instruction to anyone
+> today.** The current production browser method is `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md`;
+> Asdair's method and boundaries are `Team/Asdair - Household Shopping Steward/AGENTS.md`.
+
 ---
 
 ## THE ANSWER, FIRST

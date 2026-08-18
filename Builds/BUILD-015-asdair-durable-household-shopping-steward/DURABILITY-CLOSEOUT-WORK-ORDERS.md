@@ -71,15 +71,23 @@ every variable and every consuming process.
 
 ## WO-C — ~~The plan builder (resolved shop → browser-runner plan)~~ **SUPERSEDED 2026-08-04**
 
-> **SUPERSEDED by Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`, 2026-08-04.**
+> **⚠️ RE-CUT 2026-08-17 — WARWICK'S PRODUCT RULING. This programme is a HISTORICAL record of the
+> 2026-08-03 commissioning; the note below is corrected because it would otherwise misdirect priority.**
+> **AsdAIr drives the browser and chooses its own execution mechanism; the CDP runner is AUTHORISED**
+> (goal contract **S-5, S-7, S-8**). An executable plan for an authorised executor is therefore **back on the
+> critical path**, and the right artefact is a durable, deterministic, Brand A–Z execution packet **produced by
+> the product itself and never hand-assembled by a Claude session** — whichever executor consumes it.
+>
+> ~~**SUPERSEDED by Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`, 2026-08-04.**
 > See `RUNTIME-DECISION.md`. The live basket writer is **Sonnet in Claude for Chrome**, not
 > the custom CDP runner, so a plan builder that targets that runner is no longer on the
-> live-runtime critical path.
+> live-runtime critical path.~~
 >
-> **What replaces it: WO-P**, the Sonnet Browser Execution Packet — a different artefact for
+> ~~**What replaces it: WO-P**, the Sonnet Browser Execution Packet — a different artefact for
 > a different consumer, ordered **Brand A–Z**, exposed as JSON, as a human checklist, in the
-> Cockpit and to the Sonnet handoff. The diagnosis below stays on the record because it is
-> still true and still the reason tonight's basket needed hand-assembled files.
+> Cockpit and to the Sonnet handoff.~~ *(Struck 2026-08-17: the packet is not Sonnet's, and the runner is not
+> excluded.)* The diagnosis below stays on the record because it is still true and still the reason that
+> night's basket needed hand-assembled files.
 
 **Original entry, retained:** Owner: **Keel.** Blocking: none. Size: M. **Largest functional gap.**
 

@@ -236,15 +236,32 @@ his.**
 Never auto-substitute · never book a slot · never check out · never pay · never enter the ASDA
 password · `checked_out` stays false. **Warwick is the gate for every consequential action.**
 
-**Sonnet in Claude for Chrome is the Stage 1 live basket writer** — not Larry, not a Claude Code
+> ⛔ **SUPERSEDED 2026-08-17 — Warwick's product ruling. The two paragraphs below stood under
+> "HARD RULES — never negotiable" and are struck where they stand.**
+>
+> **AsdAIr operates the live ASDA browser and chooses its own execution mechanism. The CDP runner is
+> AUTHORISED** — Warwick confirmed that exclusion was an internal architecture decision, not his.
+> **A route that cannot be invoked by the system is DISQUALIFIED from the runtime.** Canonical:
+> `Builds/BUILD-015-asdair-durable-household-shopping-steward/BUILD-015-goal-contract.md`, register
+> **S-5, S-7, S-8, S-9**. Production browser method:
+> `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md`. Asdair's method and boundaries:
+> `Team/Asdair - Household Shopping Steward/AGENTS.md`. `RUNTIME-DECISION.md` is now history.
+>
+> **And the mechanical-guarantee comparison below is BACKWARDS under the current ruling:** with CDP
+> authorised, its three code layers are a **strength of that route and a reason to prefer it**, not a
+> loss accepted for speed. **The hard rules in the paragraph ABOVE this block — never auto-substitute,
+> never book a slot, never check out, never pay, never enter the ASDA password, `checked_out` stays
+> false — are UNCHANGED and absolute under every mechanism.**
+
+~~**Sonnet in Claude for Chrome is the Stage 1 live basket writer** — not Larry, not a Claude Code
 subagent, not the CDP runner at `services/asdair/browser-runner/`. That runner is experimental,
 deferred, and **prohibited from further live-account testing without fresh authority.** Canonical:
-`RUNTIME-DECISION.md`, `CANONICAL-WEEKLY-SHOP-PROCESS.md`.
+`RUNTIME-DECISION.md`, `CANONICAL-WEEKLY-SHOP-PROCESS.md`.~~
 
-**There is no programmatic Sonnet invocation surface. None was invented and none may be.** The
+~~**There is no programmatic Sonnet invocation surface. None was invented and none may be.** The
 prohibitions in the handoff are **instructions, not enforcement** — the CDP runner blocked checkout
 and substitution in three code layers; Sonnet in Chrome has none. That is a real reduction in
-mechanical guarantee, and it is why the live pass is supervised and stops at checkout-ready.
+mechanical guarantee, and it is why the live pass is supervised and stops at checkout-ready.~~
 
 Shopping content is **not** a privacy matter (Warwick, 2026-07-27) — report baskets plainly, and
 that includes the migrations encoding them. Only **secrets** stay out of the repo. Two credentials

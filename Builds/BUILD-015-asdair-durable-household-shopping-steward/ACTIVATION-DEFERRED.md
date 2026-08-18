@@ -25,13 +25,21 @@
 > decision. Nothing in this system is polling, shopping or touching the household database right
 > now, and that is the intended state.
 
-> **⚠️ SUPERSEDED IN PART, 2026-08-04 — Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**
-> **Read [`RUNTIME-DECISION.md`](./RUNTIME-DECISION.md) before using this file as an activation path.**
+> **⚠️ RE-CUT 2026-08-17 — WARWICK'S PRODUCT RULING. Read this before the 2026-08-04 block below.**
+> **AsdAIr operates the live ASDA browser and chooses its own execution mechanism, and the CDP runner is
+> AUTHORISED** — the 2026-08-04 exclusion was an internal architecture decision, not Warwick's, and he lifted it.
+> Canonical: [`BUILD-015-goal-contract.md`](./BUILD-015-goal-contract.md), register **S-5, S-7, S-8**. The
+> production browser method is `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md`.
+> **This file remains a HISTORICAL merge record of 2026-07-28 and is not an activation path for anything today.**
 >
-> This document describes activating the **CDP browser runtime** as the route to a live shop. **That is no longer
+> ~~**⚠️ SUPERSEDED IN PART, 2026-08-04 — Warwick's ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**~~
+> ~~**Read [`RUNTIME-DECISION.md`](./RUNTIME-DECISION.md) before using this file as an activation path.**~~
+>
+> ~~This document describes activating the **CDP browser runtime** as the route to a live shop. **That is no longer
 > the live route.** The Stage 1 live basket writer is **Sonnet in Claude for Chrome**; the runner at
 > `services/asdair/browser-runner/` is experimental, deferred, not the live default, **not a blocker to Stage 1**,
-> and **prohibited from further live-account testing without fresh authority from Warwick.**
+> and **prohibited from further live-account testing without fresh authority from Warwick.**~~
+> *(Struck 2026-08-17. Retained as the record of what the 2026-08-04 ruling said; not current.)*
 >
 > **Consequently:** deferred item **2** ("Live Telegram → browser → reconciliation acceptance") is no longer a
 > runner acceptance — the equivalent proof now runs **without touching the live ASDA account** (WO-X in

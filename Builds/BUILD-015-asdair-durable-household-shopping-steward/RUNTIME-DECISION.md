@@ -106,9 +106,15 @@ So the build had been extending a slower, unproven mechanism while the proven on
 documented in the SOP, misread as a specification for the thing being built. **That is the
 error this ruling corrects.**
 
-## What Sonnet in Claude for Chrome must do
+## ~~What Sonnet in Claude for Chrome must do~~ ⛔ SUPERSEDED 2026-08-17 — HISTORICAL RECORD
 
-The supervised process, as ruled:
+> **Who performs this is superseded** (goal contract **S-5, S-7**): **AsdAIr does**, and it chooses its own
+> execution mechanism. **The eleven steps themselves are NOT superseded** — they are the proven Brand A–Z
+> ordered sequential traversal, and they are **canonical in
+> `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md` §4**, which is the authority a live operator
+> follows. They are retained below as the 2026-08-04 record, not as an instruction to a Sonnet session.
+
+~~The supervised process, as ruled:~~
 
 1. Open the appropriate ASDA Regulars / Favourites view.
 2. **Change the ASDA ordering to Brand A–Z.**
@@ -139,12 +145,17 @@ mechanism.
 Never book a delivery slot · never check out · never pay · never enter a password · never
 auto-substitute. These are Warwick's gates and no change of runtime touches them.
 
-Note the CDP runner enforces the substitution ban in three independent layers (no allowlisted
-command; `substitut` in `guards.DENY_TARGET`; `forbidden.test.cjs` failing the build if the
-token appears in executable source). **Sonnet in Chrome has no such mechanical enforcement** —
-the boundary there is instruction and supervision, not code. That is a real, honest
-difference between the two adapters and it must not be glossed over. It is recorded as an
-open consideration below.
+> **⛔ RE-CUT 2026-08-17 — THIS NOTE WAS STATED BACKWARDS AND THE INVERSION IS CORRECTED.** The CDP runner
+> enforces the substitution ban in three independent layers (no allowlisted command; `substitut` in
+> `guards.DENY_TARGET`; `forbidden.test.cjs` failing the build if the token appears in executable source).
+> **With CDP authorised (S-8), those layers are a STRENGTH of that route and a reason to prefer it** — not a
+> loss accepted in exchange for something else. A mechanism bound only by instruction and supervision has no
+> equivalent enforcement, and it is the weaker option.
+>
+> ~~*"Sonnet in Chrome has no such mechanical enforcement — the boundary there is instruction and supervision,
+> not code. That is a real, honest difference between the two adapters and it must not be glossed over. It is
+> recorded as an open consideration below."*~~ — **SUPERSEDED.** The boundaries themselves (slot, checkout,
+> payment, password, substitution) are unchanged and absolute under every mechanism.
 
 ## Status of the custom CDP browser runner
 
@@ -201,21 +212,35 @@ who drives the browser. Each must be amended to point here rather than left to c
 - `DEFECT-LEDGER.md` (D-2026-08-03-12, D-2026-08-03-17, D-2026-08-03-18)
 - the decision ledger (WO-F)
 
-**A fresh instance must not be left choosing between Sonnet, Larry and the CDP runner.**
-The answer is Sonnet in Claude for Chrome. This file is why.
+~~**A fresh instance must not be left choosing between Sonnet, Larry and the CDP runner.**
+The answer is Sonnet in Claude for Chrome. This file is why.~~
+
+> ⛔ **SUPERSEDED 2026-08-17.** **The answer is AsdAIr**, which drives the live browser and chooses its own
+> execution mechanism; **CDP is authorised.** Canonical: `BUILD-015-goal-contract.md` (**S-5, S-7, S-8**);
+> Asdair's method: `Team/Asdair - Household Shopping Steward/AGENTS.md`; the production browser method:
+> `Team Knowledge/SOPs/SOP-021-run-the-weekly-asdair-shop.md`. **This file is history and decides nothing.**
 
 ## Open considerations, recorded honestly rather than resolved
 
-1. **No mechanical enforcement of the never-substitute / never-checkout boundary in the
+1. ~~**No mechanical enforcement of the never-substitute / never-checkout boundary in the
    Sonnet adapter.** The CDP runner enforces it in code that cannot be talked around; the
    browser adapter relies on instruction. This is a genuine reduction in mechanical
    guarantee, accepted deliberately in exchange for a process that actually works at
-   human speed. Worth revisiting if it ever bites.
-2. **Sonnet in Claude for Chrome is not a headless, unattended runtime.** The standing rule
+   human speed. Worth revisiting if it ever bites.~~
+
+   > ⛔ **CLOSED AND INVERTED, 2026-08-17.** It was never a trade to accept: **CDP is authorised (S-8), so the
+   > three code layers are available and preferring them is the stronger choice.** The consideration is closed,
+   > not carried.
+
+2. ~~**Sonnet in Claude for Chrome is not a headless, unattended runtime.** The standing rule
    that AsdAIr must run "independent of any Claude Code session" is satisfied in the sense
    that it no longer needs *Larry* — but it does need *a Sonnet browser session*. Whether
    that meets the intent of "fully automated" is Warwick's call, not a builder's, and it is
-   not asserted here either way.
+   not asserted here either way.~~
+
+   > ⛔ **CLOSED 2026-08-17 — WARWICK MADE THE CALL.** Unattended, autonomous operation of the live browser is
+   > **in scope and required** (goal contract **S-2, S-3, S-4**), and **a route that cannot be invoked by the
+   > system is DISQUALIFIED from the runtime** (**S-9**). Supervision is not the acceptance bar.
 3. ~~**The evidence for the exact proven mechanism is thin.** `EXPERIMENT-RESULT.md` records
    that a bulk control *exists*; it does not record it being used successfully at scale. The
    ruling's "fast ordered traversal" description is Warwick's first-hand account and is

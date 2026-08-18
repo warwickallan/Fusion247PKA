@@ -110,6 +110,22 @@ veritas_findings:
     disposition: assigned-here
 ---
 
+> # ⚠️ HISTORICAL RECORD — a Work Order ISSUED 2026-08-04. Preserved unrewritten; not an instruction today.
+>
+> **One clause carried in this order is SUPERSEDED and must not be acted on.** Under "HARD RULES — carried
+> forward complete and unweakened" this order states: *"**Sonnet in Claude for Chrome is the Stage 1 live basket
+> writer**; the CDP `browser-runner` is prohibited from further live-account testing; there is no programmatic
+> Sonnet invocation surface and none may be invented."* ⛔ **SUPERSEDED 2026-08-17** by Warwick's product ruling
+> — canonical in [`../BUILD-015-goal-contract.md`](../BUILD-015-goal-contract.md), register **S-5, S-7, S-8,
+> S-9**: **AsdAIr operates the live browser and chooses its own execution mechanism; CDP is AUTHORISED; and a
+> route that cannot be invoked by the system is DISQUALIFIED from the runtime.**
+>
+> **The other hard rules in that same list are UNCHANGED and absolute:** never auto-substitute, never book a
+> slot, never check out, never pay, never enter the ASDA password, `checked_out` stays false, and the two
+> credentials are consumed, never inspected.
+>
+> **The order's text is not rewritten** — it recorded the standing law correctly on the day it was issued.
+
 ## AMENDMENTS
 
 **Amended 2026-08-04 by Larry at read-back acceptance. Recorded here because they were issued

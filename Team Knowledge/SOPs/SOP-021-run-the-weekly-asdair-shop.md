@@ -5,15 +5,34 @@
 - **Triggered by:** a weekly shopping request arriving by any channel (Telegram photo/text, cockpit picker), or
   Warwick asking to "do the shop".
 
-> **⚠️ WHO WRITES THE LIVE BASKET — RULED 2026-08-04, `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`.**
-> **The Stage 1 live basket writer is Sonnet in Claude for Chrome.** It is **not** Larry, **not** a Claude Code
-> subagent, and **not** the custom Node/CDP runner at `services/asdair/browser-runner/` — that runner is now
-> **experimental, deferred, not the live default, and prohibited from further live-account testing without fresh
-> authority from Warwick.** Canonical: `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`,
-> with the end-to-end process in the same folder's `CANONICAL-WEEKLY-SHOP-PROCESS.md`. **Read those before acting
-> on any statement in this file about who drives the browser.** The earlier line here — *"Larry orchestrates and
-> holds the browser drive until the tool-binding question below is settled"* — is **superseded and removed**; that
-> question is settled and the answer is neither Larry nor the runner.
+> **⚠️ WHO WRITES THE LIVE BASKET — RULED 2026-08-17 BY WARWICK: AsdAIr does.**
+>
+> **AsdAIr operates the live ASDA browser itself and chooses its own execution mechanism.** The Node/CDP runner
+> at `services/asdair/browser-runner/` is **AUTHORISED** — Warwick has confirmed the 2026-08-04 exclusion was an
+> internal architecture decision, not his, and has lifted it. **Sonnet in Claude for Chrome is OPTIONAL and is
+> not the designated writer.**
+>
+> **Canonical, governs every statement in this file, and is NOT restated here:**
+> `Builds/BUILD-015-asdair-durable-household-shopping-steward/BUILD-015-goal-contract.md` — the product
+> contract and North Star, re-cut whole 2026-08-17, with the supersession register (**S-5, S-7, S-8**).
+> Asdair's own method and boundaries: `Team/Asdair - Household Shopping Steward/AGENTS.md`.
+>
+> **The two structural rules that bound whichever mechanism AsdAIr chooses** — quoted verbatim from the goal
+> contract § "Implementation is subordinate to the outcome" because they bound this SOP's own subject directly;
+> canonical there, never amended here:
+>
+> 1. **A deterministic executor may perform mechanical browser actions UNDERNEATH an AI. It must never be the
+>    semantic decision-maker.**
+> 2. **A browser-capable AI may do both halves if that is the best route.**
+>
+> **⛔ SUPERSEDED — struck here where it stood, not annotated beneath a correction.** This banner previously
+> stated, as standing law: ~~*"The Stage 1 live basket writer is Sonnet in Claude for Chrome. It is not Larry,
+> not a Claude Code subagent, and not the custom Node/CDP runner at `services/asdair/browser-runner/` — that
+> runner is now experimental, deferred, not the live default, and prohibited from further live-account testing
+> without fresh authority from Warwick."*~~ (ruled 2026-08-04, `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`;
+> **superseded 2026-08-17** by goal contract S-5, S-7 and S-8). The version before that read ~~*"Larry
+> orchestrates and holds the browser drive"*~~ — superseded 2026-08-04. **Neither is current. AsdAIr drives, and
+> `RUNTIME-DECISION.md` is a historical record of the 2026-08-04 ruling, not an authority on who shops.**
 >
 > **Everything else in this SOP still stands.** Only the who-drives-the-browser question changed. The
 > catalogue-grounding invariant, the single-poller hazard, the out-of-stock cause of a failed batch add, the
@@ -27,10 +46,11 @@
   failure mode from the live run of 2026-08-03. **This file owns the intent and policy; SOP-021a owns the
   mechanics.** Where the two appear to disagree, SOP-021a §8 records the resolution — the code was read, and
   the code won.
-  *(**Reframed 2026-08-04**, ruling `BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`: SOP-021a is now the reference for
-  the **DEFERRED experimental CDP adapter**, not for the live path. Its preflight, grant, diagnostic and
-  failure-mode knowledge remains accurate and valuable; its runner-driven execution route is **not** how the
-  live basket gets built. See `RUNTIME-DECISION.md`.)*
+  *(**Re-cut 2026-08-17**, Warwick's product ruling: the CDP exclusion is **lifted** and SOP-021a is the
+  mechanical reference for an **AUTHORISED** executor — one AsdAIr may choose to drive underneath its own
+  judgement. Its preflight, grant, diagnostic and failure-mode knowledge is accurate and now operational rather
+  than archival. ~~"SOP-021a is now the reference for the DEFERRED experimental CDP adapter, not for the live
+  path"~~ — superseded. Canonical: `BUILD-015-goal-contract.md` S-8.)*
 
 ## Scope boundary — read before adding anything here
 
@@ -219,12 +239,17 @@ twice**. An answer that only lives in the conversation will be asked again next 
 
 ## 4. Shop
 
-Warwick logs into ASDA. He is already authenticated; **nothing and nobody but Warwick ever enters the account
-password** (hard rule).
+The shop runs in the **dedicated, already-authenticated Chrome profile**. **Nothing and nobody but Warwick ever
+enters the account password** — that hard rule is unchanged and absolute. ~~*"Warwick logs into ASDA"* as a
+per-shop step~~ is **superseded 2026-08-17** (goal contract S-2, which strikes *"a HUMAN logs into Asda"*):
+authentication is a one-off property of the profile, not a weekly human action.
 
-> **⚠️ WHO SHOPS, RULED 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`) — Sonnet in Claude for Chrome.**
-> Not Larry, not a Claude Code subagent, not `services/asdair/browser-runner/`. Canonical:
-> `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`.
+> **⚠️ WHO SHOPS — RULED 2026-08-17 BY WARWICK: AsdAIr.**
+> AsdAIr operates the live ASDA browser and **chooses its own execution mechanism**; the Node/CDP runner at
+> `services/asdair/browser-runner/` is **authorised** and may act as the executor underneath its judgement.
+> Canonical: `Builds/BUILD-015-asdair-durable-household-shopping-steward/BUILD-015-goal-contract.md` (S-5, S-7,
+> S-8). ~~*"RULED 2026-08-04 — Sonnet in Claude for Chrome. Not Larry, not a Claude Code subagent, not
+> `services/asdair/browser-runner/`."*~~ — **superseded.**
 
 > ## ⛔ STOP. READ THIS SECTION BEFORE ANY BROWSER MUTATION. (Added 2026-08-11 — EXECUTED EVIDENCE.)
 >
@@ -379,13 +404,21 @@ substitutions and out-of-stock drops flagged. Check the total against the GBP 12
 > nobody closed this gap. **Make it the last action before hand-back, every week.** Detail:
 > [[SOP-021a-asdair-live-execution-method]] §4.
 >
-> **AMENDED 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`) — still a human, and now with LESS mechanical
-> protection, not more.** Substitutions cannot be automated at all, under either adapter. The deferred CDP runner
-> enforces the ban in the three code layers above. **Sonnet in Claude for Chrome has no such mechanical
-> enforcement — there the boundary is instruction and supervision, not code.** That is a real, honest reduction
-> in guarantee, accepted deliberately in exchange for a process that works at human speed, and recorded as an
-> open consideration in `RUNTIME-DECISION.md`. It makes this step **more** important, never less: a human sets
-> the substitution toggles, always, as the last action before hand-back.
+> **RE-CUT 2026-08-17 — the CDP code layers are AVAILABLE again, and choosing a mechanism that has them is the
+> STRONGER route.** Substitutions are never automated under any mechanism. **The Node/CDP runner is authorised
+> (goal contract S-8) and enforces the ban in the three code layers above — a mechanical guarantee no
+> instruction-bound browser session can offer**, which is a reason to prefer it, not a reason to defer it. **A
+> mechanism without those layers relies on instruction and supervision alone**; where AsdAIr chooses one, the
+> boundary is weaker and the operator carries it.
+>
+> ~~*"AMENDED 2026-08-04 — still a human, and now with LESS mechanical protection, not more. The deferred CDP
+> runner enforces the ban in the three code layers above. Sonnet in Claude for Chrome has no such mechanical
+> enforcement … That is a real, honest reduction in guarantee, accepted deliberately in exchange for a process
+> that works at human speed."*~~ — **SUPERSEDED 2026-08-17.** It was true only while CDP was excluded; with the
+> exclusion lifted it states a *strengthening* as a *weakness*, which is backwards.
+>
+> **What is unchanged:** a human sets the substitution toggles as the last action before hand-back, every week.
+> Whatever the mechanism, that step gets **more** important, never less.
 
 Unticking the global toggle alone is not the whole job — it makes the default safe, but items that are genuinely
 fine to substitute stay durable state in the database, and the per-item settings are how that state reaches the
@@ -511,16 +544,18 @@ If that fails, the loop is open again regardless of what files exist.
   `cockpit-api`) — by a specialist's Bash tool, a scheduled task, or a human, all equally valid. "Asdair directs,
   Larry clicks" was never a valid permanent operating mode. See the commit message and `RUNNER-PROOF.md` for the
   decisive experiment. **Do not re-test this** — it is settled.
-  > **SUPERSEDED IN CONSEQUENCE, 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`).** The technical finding
-  > above stands — `runner.js` genuinely does not need Larry, and that is still not to be re-tested. What
-  > changed is what follows from it: **`runner.js` is no longer the live basket writer.** Warwick ruled the live
-  > Stage 1 writer is **Sonnet in Claude for Chrome**; the CDP runner is experimental, deferred, not the live
-  > default, and **prohibited from further live-account testing without fresh authority from Warwick**. So the
-  > correct reading of this bullet is narrow: it retired "the browser step needs Larry", and it did **not**
-  > establish the runner as the operating route. `RUNTIME-DECISION.md`.
+  > **RE-CUT 2026-08-17, Warwick's product ruling.** The technical finding above stands — `runner.js` genuinely
+  > does not need Larry, and that is still not to be re-tested. **The runner is now AUTHORISED** (goal contract
+  > S-8): Warwick confirmed its exclusion was an internal architecture decision, not his. It is one mechanism
+  > **AsdAIr may choose**, operating underneath AsdAIr's judgement — never as the semantic decision-maker.
+  > ~~*"SUPERSEDED IN CONSEQUENCE, 2026-08-04 … `runner.js` is no longer the live basket writer … the CDP runner
+  > is experimental, deferred, not the live default, and prohibited from further live-account testing without
+  > fresh authority from Warwick."*~~ — **SUPERSEDED 2026-08-17.**
 - **The ASDA session is a singleton** — one profile, one login, one live trolley holding real money. It cannot be
   worktree-isolated or run concurrently.
-- **Fully hands-off is descoped** (Warwick, 2026-07-21): a human logs in. One shop per week.
+- ~~**Fully hands-off is descoped** (Warwick, 2026-07-21): a human logs in.~~ ⛔ **SUPERSEDED 2026-08-17**, goal
+  contract **S-2**: that descope is reversed and **autonomous operation of the live browser is in scope and
+  required.** One shop per week is unchanged.
 - Some regulars still lack captured ASDA product IDs, so those resolve by name rather than by ID. **56 of 97 as
   at 2026-07-28** (was 70 of 91 — one shop's harvesting closed 20 of them). Keep harvesting.
 - **Nothing drains the intent queue.** `services/control-plane/wp-d-proof/asdair-worker.mjs` is built and tested
@@ -542,24 +577,32 @@ If that fails, the loop is open again regardless of what files exist.
   enumeration — `step_id` appears only inside `services/asdair/browser-runner/`. ~~This is the largest remaining
   gap, and building it is a `product-decision`~~:
   [[SOP-021a-asdair-live-execution-method]] §7.6.
-  > **AMENDED 2026-08-04 (`BUILD-015-CANONICAL-RUNTIME-REALIGNMENT`).** The gap is real and the enumeration
-  > stands, but it is **no longer on the live critical path**, because the CDP runner is no longer the live
-  > writer. WO-C (the runner plan builder) is **superseded in purpose**; what replaces it is the **Sonnet
-  > Browser Execution Packet** (WO-P) — a durable, deterministic, Brand A–Z artefact produced by the product
-  > itself and stored in Postgres, with a different consumer. **No Claude session constructs it by hand.**
-  > `CANONICAL-WEEKLY-SHOP-PROCESS.md` §E.
-- **The live basket writer has no mechanical substitution/checkout enforcement** *(added 2026-08-04)*. Sonnet in
-  Claude for Chrome is bound by instruction and supervision, not by a closed command allowlist. The boundaries
-  (never book a slot, check out, pay, enter a password, or auto-substitute) are unchanged and absolute, but under
-  this adapter they are **not** enforced in code. Recorded as an open consideration in `RUNTIME-DECISION.md`.
+  > **RE-CUT 2026-08-17.** The enumeration stands. The 2026-08-04 note took this gap **off** the critical path
+  > because the CDP runner had been excluded; with the exclusion **LIFTED** (goal contract S-8), an executable
+  > plan for an authorised executor is back in scope. **The durable, deterministic, Brand A–Z execution packet
+  > produced by the product itself — never hand-assembled by a Claude session — remains the right artefact**,
+  > whichever executor consumes it. ~~*"AMENDED 2026-08-04 … no longer on the live critical path, because the
+  > CDP runner is no longer the live writer … what replaces it is the Sonnet Browser Execution Packet (WO-P)"*~~
+  > — **SUPERSEDED**: the packet is not Sonnet's, and the path is not deferred.
+- **Mechanical enforcement of the boundaries depends on the mechanism AsdAIr chooses** *(added 2026-08-04;
+  **re-cut 2026-08-17**)*. The boundaries — never book a slot, check out, pay, enter a password, or
+  auto-substitute — are **unchanged and absolute under every mechanism**. The authorised Node/CDP runner
+  additionally enforces them **in code that cannot be talked around** (closed allowlist, `guards.DENY_TARGET`,
+  `forbidden.test.cjs`). A browser session bound only by instruction does not. ~~*"The live basket writer has no
+  mechanical substitution/checkout enforcement … Sonnet in Claude for Chrome is bound by instruction and
+  supervision"*~~ — **SUPERSEDED 2026-08-17**: it described a state in which the mechanism carrying the code
+  layers was excluded, and it is not.
 
 ## References
 
-- **WHO WRITES THE LIVE BASKET (canonical, 2026-08-04):**
-  `Builds/BUILD-015-asdair-durable-household-shopping-steward/RUNTIME-DECISION.md`
+- **WHO WRITES THE LIVE BASKET, and every product boundary (canonical, re-cut 2026-08-17):**
+  `Builds/BUILD-015-asdair-durable-household-shopping-steward/BUILD-015-goal-contract.md`. Asdair's own method
+  and boundaries: `Team/Asdair - Household Shopping Steward/AGENTS.md`.
+  *(`RUNTIME-DECISION.md` in the same folder is a **historical record of the 2026-08-04 ruling**, superseded as
+  a runtime decision on 2026-08-17. Read it for the 2026-08-03 incident account, never for who shops.)*
 - **The end-to-end canonical process (2026-08-04):**
   `Builds/BUILD-015-asdair-durable-household-shopping-steward/CANONICAL-WEEKLY-SHOP-PROCESS.md`
-- **Mechanical execution method of the DEFERRED experimental CDP adapter — preflight, diagnostics and failure
+- **Mechanical execution method of the AUTHORISED Node/CDP executor — preflight, diagnostics and failure
   modes: [[SOP-021a-asdair-live-execution-method]]**
 - Standing rules + rule model: `services/asdair/skill/README.md`
 - Schema and the loop's tables: `services/asdair/db/001_asdair_schema.sql`
