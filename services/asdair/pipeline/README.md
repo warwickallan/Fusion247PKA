@@ -380,3 +380,45 @@ folder. Values arrive via `node --env-file=<path>`.
    `shopStore`'s own exported `_internal.applyTransition` inside `_internal.inTransaction`, which
    preserves every one of that module's guarantees. A `list_id` parameter on the public `transition`
    belongs to the shop work package.
+
+---
+
+## Two ledger rows that stay `pending` for ever, ON PURPOSE
+
+**Recorded here because a reviewer found them, reasonably suspected a defect, and there was nowhere
+in the code that said otherwise.** Veritas Gate 2 (`a0a71f5`) reported, correctly as observations:
+
+- `pipeline_command` `receiveList` — `status='pending'`, `attempts=0`, for ever, "a ledger row that never
+  reconciles with the effect it records";
+- `pipeline_command` `groundingEvidence` — `status='pending'`, `attempts=0`, since the shop was created.
+
+**Both are working as designed. Neither is repaired, and repairing either would break something real.**
+
+### `receiveList` is a LATCH, and a latch is never resolved
+
+`commandNames.js` marks it `consumption: LATCH`, and `runPipeline.js` (`abandonOutstanding`) states the
+rule in terms: LATCH commands are *"permanent facts about the week — 'this is where it came from', 'a human
+approved this' — and abandoning them would erase the record rather than tidy it."* Only `CONSUME` commands
+are resolved when a step succeeds.
+
+The gates that read a latch ask **"was this EVER issued"** (`stages.everIssued`), precisely so that
+resolving one cannot silently re-close a gate the shop has already passed. A `receiveList` row sitting at
+`pending`/`attempts=0` is therefore the ledger holding a durable fact, not a queue failing to drain.
+
+### `groundingEvidence` is a one-shot EVIDENCE MARKER, not a queued command
+
+`store.recordGroundingEvidence` writes it through `insertOneShot` against the total unique index, keyed
+`grounding:<shop_id>`, **from the model call's own return value**. It is not on the command allowlist,
+nothing dispatches it, and nothing is supposed to consume it. Its existence is the evidence: a run that
+skipped the model cannot produce one, which is the whole reason it was built that way after a `--dry-run`
+was once mistaken for a real interpretation.
+
+`store.recordDecisionEvidence` (added 2026-08-18) is the same shape and carries the same rule.
+
+### What `shop_line_provenance` having 0 rows actually means
+
+It is a **different mechanism entirely**, and `groundingEvidence` was never its writer. `db/020` creates
+the table and says in terms *"NO BACKFILL OF shop_line_provenance … DELIBERATELY"*; `cockpit-api/provenance.js`
+reads it and reports its absence as a known gap. **Nothing in the estate writes it yet.** Wiring that ledger
+is a separate piece of work — its photo provenance binds `source_region_id` to `shop_image_region`, which is
+a schema conversation — and it is not made truer by resolving either row above.

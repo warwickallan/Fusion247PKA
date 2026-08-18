@@ -82,6 +82,81 @@ test('AC5 ENUMERATION: every plan recomputation in this module goes through plan
     'planWithDecisions does not apply the decisions it exists to apply');
 });
 
+// =====================================================================
+// THE NEW PRECEDENCE - WO-2026-08-18-06 REV 2, closing Veritas Gate 2
+//
+// The assertions above pinned that ONE function owns plan recomputation. They
+// did not, and could not, say WHO DECIDES inside it - so the construction
+// Veritas failed satisfied every one of them: the deterministic planner chose,
+// and the model adjusted its output afterwards.
+//
+// These pin the order itself, in the source, because the order IS the
+// architecture:
+//
+//   planBasket -> strip scorer -> applyRulebook -> decideBasket -> Warwick
+//
+// Warwick's own words are the reason the last hop is last: a recorded human
+// decision must outrank a model judgement about the same line. And the model
+// must run BEFORE that, not after the planner has already chosen.
+// =====================================================================
+
+test('MODEL DECIDES: exactly one semantic decision call site, inside planWithDecisions', () => {
+  const callSites = [...runPipelineSrc.matchAll(/decideBasket\s*\(/g)];
+  assert.equal(callSites.length, 1,
+    `runPipeline.js has ${callSites.length} decideBasket( call sites. Exactly ONE is permitted, `
+    + 'inside planWithDecisions - for the same reason planBasket has exactly one: a second '
+    + 'recomputation that decides differently is a shop that looks decided and is not.');
+
+  const fn = runPipelineSrc.slice(runPipelineSrc.indexOf('async function planWithDecisions'));
+  const body = fn.slice(0, fn.indexOf('\n}\n'));
+  assert.match(body, /decideBasket\s*\(/,
+    'the semantic decision does not happen inside planWithDecisions');
+  assert.match(body, /loadContract\s*\(/,
+    'the decision call carries no contract - Veritas Gate 2 finding 8 is that the runtime '
+    + 'consumed no contract text at the decision point, and a decision without it must not exist');
+});
+
+test('MODEL DECIDES: the order in the source IS the precedence', () => {
+  const fn = runPipelineSrc.slice(runPipelineSrc.indexOf('async function planWithDecisions'));
+  const body = fn.slice(0, fn.indexOf('\n}\n'));
+
+  const planner = body.indexOf('deps.planBasket(');
+  const strip = body.indexOf('demoteDeterministicDecisions(');
+  const rulebook = body.indexOf('applyRulebook(');
+  const decide = body.indexOf('decideBasket(');
+  const human = body.indexOf('applyDecisionsToPlan(');
+
+  for (const [name, at] of [['planBasket', planner], ['demoteDeterministicDecisions', strip],
+    ['applyRulebook', rulebook], ['decideBasket', decide], ['applyDecisionsToPlan', human]]) {
+    assert.notEqual(at, -1, `${name} has disappeared from planWithDecisions`);
+  }
+
+  assert.ok(planner < strip,
+    'the scorer suggestions are stripped before the planner runs - the strip must come after it');
+  assert.ok(strip < decide,
+    'the deterministic scorer suggestions still reach the decision. That channel offered cat food '
+    + 'for "1 wet wipes" and bananas for "2 pkts ASDA plain toffees" on 2026-08-18');
+  assert.ok(decide < human,
+    "the model runs AFTER Warwick's recorded decisions are applied, so a model judgement could "
+    + 'overwrite an answer he actually gave. He is last, always');
+  assert.ok(rulebook < decide,
+    'the prose rulebook must be an INPUT to the decision, not an adjuster applied over its output - '
+    + 'the adjuster construction is exactly what Veritas Gate 2 failed');
+});
+
+test('MODEL DECIDES: the deterministic scorer has no production consumer left', () => {
+  // regularCandidates() is the function that scored `asda` at 0.25 against
+  // bananas and broke the tie alphabetically. It still exists in skill/, with
+  // its own unit tests intact - but nothing on the production planning path may
+  // read what it produced.
+  const fn = runPipelineSrc.slice(runPipelineSrc.indexOf('async function planWithDecisions'));
+  const body = fn.slice(0, fn.indexOf('\n}\n'));
+  assert.doesNotMatch(body, /regularCandidates\s*\(/,
+    'planWithDecisions reaches the word-overlap scorer directly');
+  assert.doesNotMatch(body, /rankAlternatives\s*\(/,
+    'planWithDecisions reaches the deterministic ranker directly');
+});
+
 test('AC5 ENUMERATION: both production plan consumers call planWithDecisions', () => {
   // The two recomputations on the live shopping journey. Named explicitly so
   // that deleting one from the source fails here rather than passing quietly.

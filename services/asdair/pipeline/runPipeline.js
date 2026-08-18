@@ -110,6 +110,23 @@ const { ingestCompletion, basketEvidence } = requireCjs('../handoff/completion.j
 // would buy nothing and cost the D-1 failure mode.
 const { applyRulebook } = requireCjs('../skill/rulebook.js');
 
+// ── THE SEMANTIC DECISION POINT, AND THE CONTRACT IT CARRIES (WO-06 REV 2) ──
+//
+// Imported directly rather than injected, for the reason stated above and in
+// deps.js: both are pure (skill/contract.js is pure over one file read), and a
+// `deps.X` that nothing binds resolves to `undefined` at run time while every
+// stubbed test still passes. The one thing that IS injected is the model call
+// itself - `deps.decide` - because that is the member with I/O, exactly like
+// `deps.consult` beside it.
+//
+// `loadContract` reads the approved contract from its canonical committed
+// location on every planning pass. It throws if the bytes are unreadable, and
+// `decideBasket` throws if it is handed no contract, so "the runtime consumed
+// no contract text at the decision point" (Veritas Gate 2, finding 8) is now a
+// state the production path cannot reach.
+const { decideBasket, needsDecision } = requireCjs('../skill/decide.js');
+const { loadContract } = requireCjs('../skill/contract.js');
+
 /**
  * THE ONE PLACE A PLAN IS BUILT (WP-B15-2).
  *
@@ -134,18 +151,49 @@ const { applyRulebook } = requireCjs('../skill/rulebook.js');
  * half-working shape this function exists to end - and would need a second
  * `deps.planBasket(` call site, which decisionSpine.test.js forbids outright.
  *
- * ── THE ORDER OF THE THREE STAGES IS THE PRECEDENCE, AND IT IS DELIBERATE ───
+ * ── THE ORDER OF THE STAGES IS THE PRECEDENCE, AND IT IS DELIBERATE ─────────
  *
- *   1. planBasket           - what the deterministic rules alone decide
- *   2. applyRulebook        - what the household's PROSE rules judge
- *   3. applyDecisionsToPlan - what WARWICK actually said, this week
+ *   1. planBasket           - the MECHANICAL pass: exact, unambiguous catalogue
+ *                             lookups, exclusions, quantities, budget. A lookup,
+ *                             never a choice.
+ *   2. stripDeterministicCandidates - the scorer's suggestions are DISCARDED
+ *                             before anything downstream can read them.
+ *   3. applyRulebook        - what the household's PROSE rules judge
+ *   4. decideBasket         - ⭐ THE SEMANTIC DECISION POINT. The model chooses,
+ *                             holding the approved contract, the catalogue, the
+ *                             regulars and the active rules.
+ *   5. applyDecisionsToPlan - what WARWICK actually said, this week
  *
  * The human is last, so a recorded decision always overrules a model
  * judgement about the same line. Nothing a reasoning consumer says can
  * displace an answer Warwick gave.
  *
+ * ── WHAT CHANGED HERE, AND WHY THE OLD ORDER WAS ITSELF THE DEFECT ─────────
+ *
+ * This function used to run `deps.planBasket` FIRST as the semantic decision
+ * and `applyRulebook` SECOND as an adjuster over its output, and only "where an
+ * inert rule speaks". Veritas Gate 2 (a0a71f5) failed exactly that
+ * construction: the deterministic planner decided which lines were unresolved
+ * and produced every candidate Warwick saw. That is why he was offered ham,
+ * eggs, freezer bags and bananas for "2 pkts ASDA plain toffees" while the
+ * household's own toffee rows (regulars 33 and 49) scored ZERO, and cat food
+ * for "1 wet wipes". `runtime.log` recorded ZERO rulebook events across 91,219
+ * lines, so in practice the model was never consulted about what to buy at all.
+ *
+ * The approved goal contract forbids that construction in terms - "a
+ * deterministic executor may perform mechanical browser actions UNDERNEATH an
+ * AI. It must never be the semantic decision-maker." Warwick's correction was
+ * "MODEL DECIDES. PLANNER / EXECUTOR EXECUTES", and he ruled out the cheaper
+ * repair explicitly: "Do not explain it away, narrow the contract, or tune the
+ * existing scorer. The failure is architectural."
+ *
+ * `applyRulebook` KEEPS its place and is no longer the model's only voice: it
+ * applies the household's prose rules BEFORE the decision, so its verdicts are
+ * an INPUT the decision reasons over rather than an adjustment bolted onto an
+ * already-made deterministic choice.
+ *
  * @returns {{plan:object, applied:Array, unresolved:Array, unlinkable:Array,
- *           decisions:Array}}
+ *           decisions:Array, decision_audit:object}}
  */
 async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
   const planned = deps.planBasket({
@@ -179,11 +227,76 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
   // A `consult` that THROWS is already caught inside the module: no line
   // changes, every affected line carries `rulebook not consulted`, and the
   // audit records why. There is deliberately no second catch here.
+  // ── THE SCORER LEAVES THE DECISION PATH (Veritas Gate 2, defects 1 and 2) ──
+  //
+  // `planBasket` still computes `rankAlternatives` / `regularCandidates`
+  // suggestions internally, and its own unit tests still prove that behaviour.
+  // On the PRODUCTION path those suggestions are discarded here, before any
+  // consumer can read them, and the model supplies the replacements below.
+  //
+  // Why discard rather than stop computing: the scorer's behaviour is pinned by
+  // ~15 assertions across three skill/ test files that this Work Order was not
+  // authorised to re-cut, and weakening a proof to make a change go green is
+  // prohibited. Discarding at the seam is provable in its own right - see the
+  // invariant test asserting that every candidate leaving this function carries
+  // model provenance - and it leaves those proofs standing, unweakened, as
+  // proofs about a component that no longer decides anything.
+  //
+  // REPORTED, NOT FIXED: `regularCandidates` now has no production consumer.
+  // Deleting it is a larger refactor across ~80 test call sites and "tuning the
+  // scorer" is explicitly out of scope for this order.
+  const mechanical = demoteDeterministicDecisions(planned);
+
   const { plan: judged } = await applyRulebook({
-    plan: planned,
+    plan: mechanical,
     rules: inputs.rules,
     household: shop.household_id,
     consult: deps.consult,
+  });
+
+  // ── ⭐ THE SEMANTIC DECISION POINT ─────────────────────────────────────────
+  //
+  // Everything above is mechanical: exact lookups, exclusions, quantities and
+  // the household's prose rules. Everything a HUMAN would call a shopping
+  // judgement happens here, once per shop, in a model call that is holding:
+  //
+  //   * the approved contract, read at run time from its canonical committed
+  //     location by skill/contract.js - this is Veritas finding 8's fix, and
+  //     the sha256 of the exact bytes sent is recorded durably below so a
+  //     reviewer can verify WHICH contract governed the decision;
+  //   * the household catalogue and its regulars - the only identities it may
+  //     cite, validated on the way back so an invented id cannot reach a basket;
+  //   * every active household rule;
+  //   * the WHOLE list, so it can reason across lines.
+  //
+  // `deps.decide` is the injected reasoning consumer. If it is unbound, or it
+  // throws, or it returns something unreadable, `decideBasket` THROWS. There is
+  // no fallback to the scorer, deliberately: the fallback would be the exact
+  // behaviour this change removes, and a board of cat food is worse than no
+  // board. The step fails visibly and the shop stays resumable.
+  const decided = await decideBasket({
+    plan: judged,
+    regulars: (catalogue && Array.isArray(catalogue.regulars) && catalogue.regulars.length > 0)
+      ? catalogue.regulars
+      : (inputs.regulars || []),
+    rules: inputs.rules,
+    contract: loadContract(),
+    household: shop.household_id,
+    consult: deps.decide,
+    // The model LABEL only, for the durable audit. Resolving it must never be
+    // able to stop a shop: it is provenance, not capability, and the decision
+    // itself already fails loudly if the model cannot be reached.
+    model: await resolveDecisionModel(deps),
+  });
+
+  // The durable, sanitised trace of the decision: counts, line numbers, the
+  // regulars ids cited, and the contract digest. Never a product name, never
+  // list content - the same rule store.recordGroundingEvidence already applies,
+  // for the same reason.
+  await store.recordDecisionEvidence(deps, {
+    shopId: shop.id,
+    householdId: shop.household_id,
+    audit: decided.audit,
   });
 
   const decisions = await shopDecisions.listDecisions(deps, shop.id);
@@ -191,7 +304,7 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
     ? catalogue.regularsById
     : new Map(((catalogue && catalogue.regulars) || []).map((r) => [Number(r.id), r]));
 
-  const result = applyDecisionsToPlan({ plan: judged, decisions, questionKeyFor, regularsById });
+  const result = applyDecisionsToPlan({ plan: decided.plan, decisions, questionKeyFor, regularsById });
 
   // ── AND THE CHOICE HE MADE LAST TIME (WP-B15-3-M1) ────────────────────────
   // LAST, and only over what is STILL unresolved after all three stages above.
@@ -222,6 +335,76 @@ async function planWithDecisions(deps, shop, { listItems, inputs, catalogue }) {
     remembered: memory.remembered,
     remembered_refused: memory.refused,
     decisions,
+    model_decisions: decided.decisions,
+    decision_audit: decided.audit,
+  };
+}
+
+/** The decision model's id, for provenance. Never load-bearing: an unbound or
+ *  unresolvable label records `null` and the decision proceeds, because what
+ *  matters for correctness is that the DECISION happened, which decideBasket
+ *  guarantees on its own. */
+async function resolveDecisionModel(deps) {
+  if (typeof deps.decisionModel !== 'function') return null;
+  try { return (await deps.decisionModel()) || null; } catch { return null; }
+}
+
+/**
+ * TAKE EVERY SEMANTIC JUDGEMENT OFF THE DETERMINISTIC LAYER, BEFORE THE
+ * DECISION IS TAKEN.
+ *
+ * PURE. Returns a new plan; never mutates its input.
+ *
+ * This is the seam where the deterministic layer stops being able to influence
+ * anything a human or a basket ever sees. It runs on the ONE production
+ * planning path, so "the planner does not decide" is a property of the function
+ * rather than a discipline every call site has to remember - the same reason
+ * `applyDecisionsToPlan` and `applyRulebook` live here.
+ *
+ * It does two things, and both are the same rule.
+ *
+ * ── 1. THE SCORER'S SUGGESTIONS ARE DISCARDED ─────────────────────────────
+ * From the live run of 2026-08-18: "2 pkts ASDA plain toffees" was offered ham,
+ * eggs, freezer bags, quarter pounders and BANANAS, because `asda` scored 0.25
+ * against most of a 109-row catalogue and the tie was broken ALPHABETICALLY.
+ * "1 wet wipes" was offered CAT FOOD. Both arrived through this field.
+ *
+ * ── 2. A TOLERANT BINDING IS MARKED AS OPEN TO CORRECTION, NOT DELETED ────
+ * The fast path the goal contract preserves is an EXACT and UNAMBIGUOUS match.
+ * `planner.matchRegular` also has a TOLERANT pass, which decides which product
+ * a line means from a similarity score - a judgement wearing a lookup's clothes.
+ *
+ * Found by the committed corpus while closing this Work Order, and NOT by the
+ * Gate 2 review: line 31 "1 TRESemme hair conditioner, blue label" was bound
+ * deterministically to "TRESemme Rich Moisture HAIR SHAMPOO 680 ml" - which
+ * that line's own `forbid` list names - and line 32 "1 TRESemme shampoo" was
+ * bound to the SAME product. So the basket bought one product twice, bought no
+ * conditioner at all, and raised no question about either.
+ *
+ * ⚠️ AND THE MEASUREMENT THAT DECIDED HOW TO FIX IT. On the same corpus, only
+ * ONE of 37 lines binds by exact alias equality; NINETEEN bind tolerantly, and
+ * eighteen of those nineteen are RIGHT. So demoting every tolerant binding to a
+ * question would have pushed 36 of 37 lines to the model, destroyed the fast
+ * path the contract preserves in terms, and made the shop dramatically more
+ * expensive to fix one wrong line.
+ *
+ * What happens instead costs nothing extra: the decision call already receives
+ * EVERY line, so a tolerant binding is sent with `binding: "tolerant"` and the
+ * model may CORRECT it in the same single call. An EXACT binding is sent as
+ * settled and a verdict against it is refused. The scorer's candidates are
+ * still discarded outright - nothing deterministic reaches a human - and the
+ * matcher is not tuned, which Warwick refused in terms.
+ *
+ * This function therefore strips candidates and nothing else; the tolerant
+ * marking travels on the item's own flags, where skill/decide.js reads it.
+ */
+export function demoteDeterministicDecisions(plan) {
+  if (!plan || !Array.isArray(plan.items)) return plan;
+  return {
+    ...plan,
+    items: plan.items.map((item) => (
+      needsDecision(item) ? { ...item, alternatives: [] } : item
+    )),
   };
 }
 

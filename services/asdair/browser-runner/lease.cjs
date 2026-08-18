@@ -113,6 +113,14 @@ async function claim(query, { runnerId, leaseMs = DEFAULT_LEASE_MS, requestId = 
               where status = any($4::text[])
                 ${filter}
                 and ${sql(CLAIMABLE, map)}
+                -- BACKING OFF. A request that has just failed is not claimable
+                -- again until its retry window opens. Without this, a failing
+                -- request re-claims on every 60-second pass forever, which is
+                -- what produced 291 identical failures on request id 1 between
+                -- 2026-07-28 and the Gate 2 review. An absent _retry_after is
+                -- the ordinary case and stays immediately claimable.
+                and (progress->>'_retry_after' is null
+                     or (progress->>'_retry_after')::timestamptz <= now())
               order by requested_at, id
               for update skip locked
               limit 1)
@@ -184,18 +192,100 @@ async function writeProgress(query, { requestId, runnerId, progress, status = nu
  * abandoning. The request returns to 'queued' because that is precisely what it
  * now is: work that exists and has no owner.
  */
-async function release(query, { requestId, runnerId, reason = null }) {
+/**
+ * HOW MANY TIMES A REQUEST MAY FAIL BEFORE IT STOPS ASKING.
+ *
+ * ── WHY THIS EXISTS (Veritas Gate 2, defect 6) ────────────────────────────
+ * `browser_build_request` id 1 was queued on 2026-07-28 and re-claimed, failed
+ * and released on EVERY runtime pass from then until the review - 291 logged
+ * failures, identical, with no ceiling, no backoff and no terminal state.
+ * Veritas: "A failure that repeats 291 times without escalating is not a
+ * durable failure mode; it is a silent one wearing a loud log."
+ *
+ * ⚠️ AND WHY THE CEILING SHIPS SECOND, NOT FIRST. A ceiling alone would have
+ * converted an endless-noise failure into a PERMANENTLY TERMINAL browser lane,
+ * days before the shop - the root cause (an unconverted manifest argument in
+ * run-basket.cjs) would still have been there, and the lane would simply have
+ * given up quietly instead of loudly. The join is fixed first; this stops the
+ * NEXT unknown failure from hiding in the same way.
+ *
+ * ── NO SCHEMA CHANGE, DELIBERATELY ───────────────────────────────────────
+ * `browser_build_request` has no attempts column (db/006), and a Work Order
+ * that needs a migration stops and returns. The count lives in the existing
+ * `progress` jsonb, which this module already owns and already writes.
+ */
+const MAX_ATTEMPTS = 5;
+
+/** Exponential, bounded: 1, 2, 4, 8, 16 minutes. A failing request stops
+ *  occupying every 60-second pass long before it reaches its ceiling. */
+function backoffMsFor(attempts) {
+  const n = Math.max(1, Number(attempts) || 1);
+  return Math.min(2 ** (n - 1), 16) * 60_000;
+}
+
+/**
+ * Release the lease so a human can take the browser, or so another runner may
+ * pick the request up later. Progress is preserved in full - releasing is not
+ * abandoning. The request returns to 'queued' because that is precisely what it
+ * now is: work that exists and has no owner.
+ *
+ * ── `countAttempt` IS OPT-IN, AND THAT DEFAULT IS LOAD-BEARING ────────────
+ * A release is NOT a failure. This same function is what runs when a human
+ * takes the browser over, when a pause is honoured, when ASDA asks for
+ * re-authentication, and when the runner is throttled - all of which are the
+ * system behaving correctly, and none of which may consume a retry or push a
+ * request towards a terminal state.
+ *
+ * The first draft of this change defaulted it to `true` and the browser-runner
+ * suite failed ten of its own proofs, correctly: "being throttled leaves the
+ * request queued for later rather than marking it failed" is exactly the
+ * property that default would have broken. Only the caller that knows it is
+ * handling an ERROR passes `countAttempt: true` - today that is
+ * basket-executor/consume-request.cjs, in its catch.
+ *
+ * When it IS counted and the count reaches `MAX_ATTEMPTS`, the request becomes
+ * `failed` and stops asking. The count and the next-eligible time live in
+ * `progress`, so `claim` can skip a request that is backing off and a human can
+ * see how many times it tried and why.
+ *
+ * The backoff is computed IN SQL from the row's own counter - no read-then-write
+ * round trip, so two runners cannot both read "2" and both write "3".
+ */
+async function release(query, { requestId, runnerId, reason = null, countAttempt = false }) {
   const text = `
     update asdair.browser_build_request
-       set status     = case when status in ('complete','failed','cancelled') then status else 'queued' end,
+       set status     = case
+                          when status in ('complete','failed','cancelled') then status
+                          when $4::boolean
+                           and coalesce((progress->>'_attempts')::int, 0) + 1 >= $5::int then 'failed'
+                          else 'queued'
+                        end,
            claimed_by = null,
+           last_error = coalesce($3::text, last_error),
+           finished_at = case
+                          when $4::boolean
+                           and coalesce((progress->>'_attempts')::int, 0) + 1 >= $5::int
+                           and status not in ('complete','failed','cancelled') then now()
+                          else finished_at
+                        end,
            progress   = (progress - '_lease')
                         || jsonb_build_object('_released_at', to_jsonb(now()),
-                                              '_released_reason', $3::text)
+                                              '_released_reason', $3::text,
+                                              '_attempts',
+                                                case when $4::boolean
+                                                  then coalesce((progress->>'_attempts')::int, 0) + 1
+                                                  else coalesce((progress->>'_attempts')::int, 0) end,
+                                              '_retry_after',
+                                                case when $4::boolean
+                                                  then to_jsonb(now() + make_interval(secs =>
+                                                         (least(power(2, coalesce((progress->>'_attempts')::int, 0)), 16) * 60)::int))
+                                                  else progress->'_retry_after' end)
      where id = $2::bigint
        and claimed_by = $1
-    returning id, status`;
-  const res = await query(text, [runnerId, String(requestId), reason]);
+    returning id, status, (progress->>'_attempts')::int as attempts, progress->>'_retry_after' as retry_after`;
+  const res = await query(text, [
+    runnerId, String(requestId), reason, countAttempt === true, MAX_ATTEMPTS,
+  ]);
   return res.rows[0] || null;
 }
 
@@ -237,5 +327,6 @@ module.exports = {
   DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, LIVE_STATUSES,
   LeaseLostError, NoClaimError,
   newRunnerId, claim, claimOrWait, heartbeat, writeProgress, release, finish, peek,
+  MAX_ATTEMPTS, backoffMsFor,
   _sql: { LEASE_JSON, CLAIMABLE, sql },
 };

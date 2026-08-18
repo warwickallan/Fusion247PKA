@@ -2775,6 +2775,23 @@ test('B15-10 AC4/AC5: the REMEMBERED-CHOICE validation set is deliberately NOT w
 });
 
 test('B15-10 AC4 END TO END: the question card carries the id, so the printed answer is tappable', async () => {
+  // ── RE-CUT BY WO-2026-08-18-06 REV 2, ON LARRY'S EXPLICIT AUTHORITY ────────
+  //
+  // WHAT IS UNCHANGED: the property. A question card must carry a TAPPABLE
+  // candidate carrying the regular's real id and the regular's own name. That
+  // is Warwick's "its bloody obvious!" defect and every assertion below it is
+  // byte-for-byte what it was.
+  //
+  // WHAT CHANGED: where the suggestion comes from. This test used to inject a
+  // name-only suggestion through `deps.planBasket`, because the planner's
+  // word-overlap scorer was the channel that produced candidates. Veritas Gate 2
+  // failed exactly that channel - it offered cat food for wet wipes and bananas
+  // for toffees - and it no longer reaches the card. The candidate now comes
+  // from the SEMANTIC DECISION, which returns ids validated against the
+  // household catalogue.
+  //
+  // The old injection is kept below as a NEGATIVE assertion: the scorer's
+  // channel must be provably dead, not merely unused.
   const h = makeHarness({
     modelLines: [
       { line_no: 1, raw_reading: '3 gourmet cat food', quantity: 3 },
@@ -2782,14 +2799,24 @@ test('B15-10 AC4 END TO END: the question card carries the id, so the printed an
       // which is the point: the fix must not make the question disappear.
       { line_no: 2, raw_reading: 'qqzz unreadable scrawl', quantity: null },
     ],
+    // AsdAIr cannot settle the scrawl, and says so - offering the one product
+    // it believes is meant, by ID, which is what makes the card tappable.
+    decide: (grounding) => ({
+      decisions: (grounding.decision_line_nos || []).map((n) => ({
+        line_no: n,
+        verdict: 'ask',
+        question: 'I could not read this line. Did you mean this?',
+        candidates: [{ regular_id: 11 }],
+      })),
+    }),
   });
-  // The planner suggests, by NAME ONLY, a product that IS a household regular -
-  // exactly the shape of the Batchelors line on Warwick's real card.
+  // THE DEAD CHANNEL. The planner still suggests, by NAME ONLY, exactly as it
+  // did on Warwick's real card. It must reach nothing.
   h.deps.planBasket = (input) => {
     const out = realPlanBasket(input);
     for (const item of out.items || []) {
       if (/qqzz/i.test(String(item.item_name))) {
-        item.alternatives = [{ name: 'Gourmet cat food' }];
+        item.alternatives = [{ name: 'A Scorer Suggestion That Must Never Print' }];
       }
     }
     return out;
@@ -2809,6 +2836,63 @@ test('B15-10 AC4 END TO END: the question card carries the id, so the printed an
     + '"its bloody obvious!"');
   assert.equal(tappable.label, 'Gourmet cat food',
     'the offered label must be the regular own name, looked up from the id');
+
+  // ── THE REGRESSION FOR VERITAS GATE 2, DEFECT 2 ───────────────────────────
+  // The word-overlap scorer's suggestion was injected above and must appear
+  // NOWHERE on the card. This is the channel that offered Warwick cat food for
+  // "1 wet wipes" and bananas for "2 pkts ASDA plain toffees".
+  assert.equal(cands.filter((c) => /Scorer Suggestion/i.test(String(c.label))).length, 0,
+    'a deterministic scorer suggestion reached the question card - that channel is what Gate 2 failed');
+});
+
+test('GATE 2 DEFECT 2, THROUGH THE PRODUCTION PATH: a line AsdAIr does not answer carries no scorer candidate', async () => {
+  // ── WHY THIS TEST EXISTS: A MUTATION THAT SURVIVED TWO OTHER PROOFS ───────
+  // Deleting `demoteDeterministicDecisions` from planWithDecisions was caught by
+  // the source-order assertion in decisionSpine.test.js and by NOTHING
+  // BEHAVIOURAL. On any line the model answers, `decideBasket` overwrites
+  // `alternatives` anyway, so the strip looks redundant - and the corpus suite
+  // calls the seam directly, so it cannot see the wiring at all.
+  //
+  // The strip is load-bearing on exactly one path: a line the model does not
+  // answer. There it is the only thing between the household and a card offering
+  // cat food for wet wipes. This drives that path through the REAL pipeline.
+  const h = makeHarness({
+    modelLines: [
+      { line_no: 1, raw_reading: 'qqzz first scrawl', quantity: null },
+      { line_no: 2, raw_reading: 'qqzz second scrawl', quantity: null },
+    ],
+    // AsdAIr answers the FIRST decision line and says nothing about the rest.
+    decide: (g) => ({
+      decisions: [{
+        line_no: g.decision_line_nos[0], verdict: 'ask',
+        question: 'which one?', candidates: [{ regular_id: 11 }],
+      }],
+    }),
+  });
+  h.deps.planBasket = (input) => {
+    const out = realPlanBasket(input);
+    for (const item of out.items || []) {
+      item.alternatives = [{ name: 'A Scorer Suggestion That Must Never Print', score: 0.25 }];
+    }
+    return out;
+  };
+
+  await receivePhoto(h);
+  await commands.buildShop({ shopRef: REF, actor: ACTOR }, h.deps);
+  await runPipeline(HANDLE, h.deps);   // transcribe
+  await runPipeline(HANDLE, h.deps);   // interpret
+  await runPipeline(HANDLE, h.deps);   // plan
+
+  const leaked = [];
+  for (const row of h.db.shop_question) {
+    const cands = typeof row.candidates === 'string' ? JSON.parse(row.candidates) : (row.candidates || []);
+    for (const c of cands) {
+      if (/Scorer Suggestion/i.test(String(c.label))) leaked.push(row.question_text);
+    }
+  }
+  assert.deepEqual(leaked, [],
+    'a deterministic scorer suggestion reached a question card for a line AsdAIr never decided. '
+    + 'That is precisely the board Warwick received on 2026-08-18');
 });
 
 // =====================================================================
