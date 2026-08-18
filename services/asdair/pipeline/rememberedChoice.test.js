@@ -209,6 +209,59 @@ const CAT_FOOD = {
 };
 
 const AMBIGUOUS_CATALOGUE = () => makeCatalogue({ regulars: [CAT_FOOD, ARIEL_A, ARIEL_B] });
+
+/**
+ * THE MODEL, ASKING ABOUT A GENUINE TWO-VARIANT AMBIGUITY.
+ *
+ * -- WHY THIS FIXTURE HAD TO EXIST (WO-2026-08-18-07 AC1) ------------------
+ * The candidates on a question card used to come from THREE populations, two
+ * of them deterministic - the interpret stage's `resolveByCatalogue`
+ * alternatives and the planner's ranked suggestions. That is what put a tin of
+ * cat food on the card for "1 wet wipes", and it is the defect Veritas graded
+ * requirement 8 FAIL on. A card is now built from the MODEL's own `ask`
+ * candidates and from nothing else.
+ *
+ * The assertions below are unchanged - the card must still offer BOTH grounded
+ * variants, and the memory must still be filed against the id he tapped. What
+ * moved is WHO OFFERS THEM, which is the entire point of the change: the
+ * harness's default `decide` deliberately makes the least claim it can and
+ * returns `ask` with no candidates, so a test that wants a real two-variant
+ * board must now say so, exactly as a test that wants a real decision already
+ * had to supply `script.decisions`.
+ *
+ * It reads THIS WEEK'S catalogue out of the grounding rather than carrying a
+ * hard-coded id list, for the reason AC4 below exists: when the 50-pack is
+ * withdrawn and a 52-pack takes its place, a static fixture would keep offering
+ * a product the household no longer holds and would prove nothing about the
+ * week under test. skill/decide.js would drop it - correctly, by the invention
+ * guard - and the test would fail for a reason that has nothing to do with
+ * memory.
+ *
+ * The alias comparison is separator-blind, which is what B15-13 made the real
+ * matcher and is why "VANISH PRETREAT GEL" and "Vanish Pre-Treat Gel" are the
+ * same product to a human. It is a FIXTURE's approximation of the model's
+ * judgement, not a second matcher: nothing in production reads this.
+ */
+const squashAlias = (value) => String(value === null || value === undefined ? '' : value)
+  .toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const asksAboutAlias = (grounding) => {
+  const byLine = new Map((grounding.lines || []).map((l) => [Number(l.line_no), l]));
+  return (grounding.decision_line_nos || []).map((n) => {
+    const line = byLine.get(Number(n)) || null;
+    const term = squashAlias(line && line.as_written);
+    const ids = (grounding.catalogue || [])
+      .filter((r) => (Array.isArray(r.aka) ? r.aka : []).some((a) => squashAlias(a) === term))
+      .map((r) => Number(r.regular_id));
+    return {
+      line_no: n,
+      verdict: 'ask',
+      question: null,
+      candidates: ids.map((id) => ({ regular_id: id })),
+      reason: 'several grounded variants share this alias',
+    };
+  });
+};
 const LIST_TEXT = '3 gourmet cat food\nariel pods';
 
 function shopHandle(ref) { return { shopRef: ref }; }
@@ -497,7 +550,7 @@ test('AC5: a preference carries no vocabulary with which to disobey', () => {
 // =====================================================================
 
 test('AC2 JOURNEY: answering a genuine two-candidate ambiguity records a remembered choice', async () => {
-  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE() });
+  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE(), decisions: asksAboutAlias });
   const rows = installRememberedChoiceTable(h);
   const REF = 'SHOP-2026-08-03';
 
@@ -547,7 +600,7 @@ test('AC2 JOURNEY: answering a genuine two-candidate ambiguity records a remembe
 });
 
 test('AC3 JOURNEY: a LATER shop resolves the same ambiguity with NO question raised', async () => {
-  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE() });
+  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE(), decisions: asksAboutAlias });
   const rows = installRememberedChoiceTable(h);
 
   // ── SHOP 1. It asks, and Warwick answers. ────────────────────────────────
@@ -587,7 +640,7 @@ test('AC3 JOURNEY: a LATER shop resolves the same ambiguity with NO question rai
 });
 
 test('AC4 JOURNEY: when the remembered product is gone this week, shop 2 ASKS AGAIN', async () => {
-  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE() });
+  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE(), decisions: asksAboutAlias });
   const rows = installRememberedChoiceTable(h);
 
   const REF1 = 'SHOP-2026-08-03';
@@ -646,7 +699,7 @@ test('AC4 JOURNEY: when the remembered product is gone this week, shop 2 ASKS AG
 // =====================================================================
 
 test('the writer is INSERT-ONLY and idempotent on the sourcing decision', async () => {
-  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE() });
+  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE(), decisions: asksAboutAlias });
   const rows = installRememberedChoiceTable(h);
   // A sourcing decision must exist for the composite FK to be satisfiable.
   h.db.shop_decision.push({ id: 501, shop_id: 1, question_id: 1, decision_kind: 'variant_choice' });
@@ -674,7 +727,7 @@ test('the writer is INSERT-ONLY and idempotent on the sourcing decision', async 
 });
 
 test('the reader returns the NEWEST row per term, and issues no statement when there is nothing to look up', async () => {
-  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE() });
+  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE(), decisions: asksAboutAlias });
   const rows = installRememberedChoiceTable(h);
   h.db.shop_decision.push(
     { id: 601, shop_id: 1, question_id: 1, decision_kind: 'variant_choice' },
@@ -723,7 +776,7 @@ test('an UNREADABLE memory store degrades VISIBLY: no line changes, and the reas
   // This is the shape of the first live run: migration 018 is AUTHORED, NOT
   // APPLIED, so asdair.remembered_choice does not exist yet. The plain harness
   // reproduces it exactly - fakePg has no handler for the statement and throws.
-  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE() });
+  const h = makeHarness({ catalogue: AMBIGUOUS_CATALOGUE(), decisions: asksAboutAlias });
   const logged = [];
   h.deps.log = (event, detail) => logged.push({ event, detail });
 
@@ -802,7 +855,7 @@ async function runShopSpelled(h, { ref, listDate, messageId, spelling }) {
 test('B15-20 FIXTURE: both spellings ground to the SAME candidate set, so the memory key is the only variable', async () => {
   // If this ever fails, the journey tests below stop proving what they claim -
   // a question in shop 2 would mean the RESOLVER missed, not the MEMORY.
-  const h = makeHarness({ catalogue: VANISH_CATALOGUE() });
+  const h = makeHarness({ catalogue: VANISH_CATALOGUE(), decisions: asksAboutAlias });
   installRememberedChoiceTable(h);
 
   for (const [i, spelling] of [SPELLING_CATALOGUE_WAY, SPELLING_AS_HE_TYPED_IT].entries()) {
@@ -820,7 +873,7 @@ test('B15-20 FIXTURE: both spellings ground to the SAME candidate set, so the me
 });
 
 test('AC2 B15-20 JOURNEY: the choice he made under one spelling is FOUND under the other, and no question is opened', async () => {
-  const h = makeHarness({ catalogue: VANISH_CATALOGUE() });
+  const h = makeHarness({ catalogue: VANISH_CATALOGUE(), decisions: asksAboutAlias });
   const rows = installRememberedChoiceTable(h);
 
   // ── SHOP 1. He writes it the catalogue way, and answers. ─────────────────
@@ -870,7 +923,7 @@ test('AC3 + AC6 B15-20 JOURNEY: a refusal STILL refuses through the new lookup -
   // The refusal must fire on the SEPARATOR-BLIND path, not only on the old
   // exact one: the memory is filed under "vanish pre treat gel", the list says
   // "VANISH PRETREAT GEL", and the remembered product is GONE this week.
-  const h = makeHarness({ catalogue: VANISH_CATALOGUE() });
+  const h = makeHarness({ catalogue: VANISH_CATALOGUE(), decisions: asksAboutAlias });
   const rows = installRememberedChoiceTable(h);
 
   const REF1 = 'SHOP-2026-08-03';

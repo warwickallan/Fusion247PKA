@@ -164,11 +164,76 @@ async function consumeOneBrowserBuildRequest(io, { leaseMs = lease.DEFAULT_LEASE
     });
 
     const ready = !!(result && result.basketReady);
+
+    // -- A CONFIGURATION FAILURE IS NOT A PERMANENT FAILURE (AC4) -----------
+    //
+    // What this replaces: `lease.finish(status:'failed')` on the FIRST
+    // `basket_not_ready`, whatever caused it. On 2026-08-18 that killed
+    // requests 1, 2, 5 and 7 between 21:22:48Z and 21:26:03Z because three
+    // environment variables were absent - no retry, no backoff, no re-queue -
+    // and overwrote `progress` with `{"executor": null}`, discarding the
+    // executor progress the Gap 7 recovery design exists to preserve.
+    //
+    // CLASSIFIED BY BLOCKER KIND, NOT BY MESSAGE. `run-basket.cjs` returns a
+    // structured blocker; `launcher-config` is the machine not being ready and
+    // says nothing about the shop. It goes back to the queue through the
+    // EXISTING bounded-retry path - the one the attempt ceiling already
+    // provides - rather than through a second mechanism written beside it.
+    //
+    // A RUN-CLASS failure is unchanged: an untruthful reconciliation is a fact
+    // about this shop and needs a human looking at the shop, not another
+    // attempt at the same thing.
+    const envBlockers = environmentBlockers(result);
+    if (!ready && envBlockers.length > 0) {
+      const released = await lease.release(query, {
+        requestId: claimed.id,
+        runnerId,
+        countAttempt: true,
+        failureClass: lease.FAILURE_CLASS.ENVIRONMENT,
+        reason: summariseBlockers(result),
+      });
+      const attempts = Number(released && released.attempts) || 0;
+      const terminal = !!(released && released.status === 'failed');
+
+      // -- AND IT IS NOT SILENT (AC5) --------------------------------------
+      // Announced on the FIRST occurrence, not only at the ceiling. Retrying a
+      // missing environment variable in silence for half an hour is the same
+      // defect wearing a quieter coat: nobody can supply what nobody was told
+      // was missing. The caller's `announce` is what makes it durable; this
+      // module only states the fact.
+      if (announce) {
+        await announce({
+          kind: 'basket_blocked_on_environment',
+          shop_ref: manifest.shop_ref,
+          shop_id: claimed.shop_id,
+          // The outbox is keyed per household. Carried on the payload rather
+          // than re-read by the announcer: the consumer already holds the shop
+          // row, and a second read is a second chance to disagree with it.
+          household_id: shop.household_id,
+          request_id: claimed.id,
+          blockers: envBlockers,
+          attempts,
+          max_attempts: lease.MAX_ATTEMPTS,
+          terminal,
+          retry_after: (released && released.retry_after) || null,
+        });
+      }
+      log(`request ${claimed.id} blocked on the environment (attempt ${attempts}/${lease.MAX_ATTEMPTS})`
+        + `${terminal ? ' - ceiling reached, it will be re-queued when the environment is ready' : ' - it will be retried'}`);
+      return {
+        requestId: claimed.id, runnerId, shopRef: manifest.shop_ref, ready: false, result, requeued: !terminal,
+      };
+    }
+
     await lease.finish(query, {
       requestId: claimed.id,
       runnerId,
       status: ready ? 'complete' : 'failed',
-      progress: { executor: result && result.reconciliation ? result.reconciliation : null },
+      // -- THE CARRIED PROGRESS SURVIVES A FAILURE (AC4) ---------------------
+      // This used to write `{ executor: null }` whenever there was no
+      // reconciliation, which is exactly when the carried progress is worth
+      // most. A run that got halfway and then failed now keeps what it did.
+      progress: { executor: (result && result.reconciliation) || carried || null },
       lastError: ready ? null : summariseBlockers(result),
     });
 
@@ -202,10 +267,35 @@ async function consumeOneBrowserBuildRequest(io, { leaseMs = lease.DEFAULT_LEASE
   }
 }
 
+/**
+ * The blocker kinds that describe the MACHINE rather than the shop.
+ *
+ * Deliberately a short, explicit allow-list rather than a rule about which
+ * kinds are "transient": a kind nobody has classified must fall to the
+ * conservative side and finish terminally, where a human sees it, instead of
+ * quietly cycling through five attempts on a fault that will never clear.
+ *
+ * NOT included, and named so the omission is a decision rather than an
+ * oversight: `reauth-required`. It is genuinely an environment condition a
+ * human closes, but `run-basket.cjs` records it on `progress` and it does not
+ * reach `result.blockers`, so classifying it here would be classifying
+ * something that never arrives. Reported, not silently half-built.
+ */
+const ENVIRONMENT_BLOCKERS = Object.freeze(['launcher-config']);
+
+/** PURE. The environment-class blockers in a run result, if any. */
+function environmentBlockers(result) {
+  const blockers = (result && result.blockers) || [];
+  return blockers.filter((b) => b && ENVIRONMENT_BLOCKERS.includes(String(b.kind)));
+}
+
 function summariseBlockers(result) {
   const blockers = (result && result.blockers) || [];
   if (blockers.length === 0) return 'the run produced no reconciliation';
   return blockers.slice(0, 5).map((b) => `${b.kind}${b.line != null ? ` (line ${b.line})` : ''}`).join('; ').slice(0, 300);
 }
 
-module.exports = { buildManifest, consumeOneBrowserBuildRequest, NOT_SHOPPABLE };
+module.exports = {
+  buildManifest, consumeOneBrowserBuildRequest, NOT_SHOPPABLE,
+  ENVIRONMENT_BLOCKERS, environmentBlockers,
+};

@@ -251,7 +251,28 @@ function backoffMsFor(attempts) {
  * The backoff is computed IN SQL from the row's own counter - no read-then-write
  * round trip, so two runners cannot both read "2" and both write "3".
  */
-async function release(query, { requestId, runnerId, reason = null, countAttempt = false }) {
+/**
+ * WHY A FAILURE WAS A FAILURE, recorded as a CLASS rather than as prose.
+ *
+ * WO-2026-08-18-07 AC4. `last_error` is a human sentence and it changes when
+ * somebody improves the wording; a recovery rule that greps it is a rule that
+ * silently stops matching. The class is written into `progress` - the jsonb
+ * this module already owns - and it is what `requeueEnvironmentFailures` selects
+ * on.
+ *
+ *   ENVIRONMENT - the machine was not ready: Chrome not configured, a path or
+ *                 port absent. Nothing about the shop is wrong and nothing
+ *                 about the request needs re-planning. Once the environment is
+ *                 supplied the SAME request is still exactly the work to do.
+ *   RUN         - the run happened and did not produce a truthful basket. That
+ *                 is a fact about this shop and it needs a human looking at the
+ *                 shop, not another attempt.
+ */
+const FAILURE_CLASS = Object.freeze({ ENVIRONMENT: 'environment', RUN: 'run' });
+
+async function release(query, {
+  requestId, runnerId, reason = null, countAttempt = false, failureClass = null,
+}) {
   const text = `
     update asdair.browser_build_request
        set status     = case
@@ -279,14 +300,83 @@ async function release(query, { requestId, runnerId, reason = null, countAttempt
                                                 case when $4::boolean
                                                   then to_jsonb(now() + make_interval(secs =>
                                                          (least(power(2, coalesce((progress->>'_attempts')::int, 0)), 16) * 60)::int))
-                                                  else progress->'_retry_after' end)
+                                                  else progress->'_retry_after' end,
+                                              -- COALESCED, never blindly written: a release that
+                                              -- names no class must not erase the class an earlier
+                                              -- one recorded.
+                                              '_failure_class',
+                                                to_jsonb(coalesce($6::text, progress->>'_failure_class')))
      where id = $2::bigint
        and claimed_by = $1
-    returning id, status, (progress->>'_attempts')::int as attempts, progress->>'_retry_after' as retry_after`;
+    returning id, status, (progress->>'_attempts')::int as attempts, progress->>'_retry_after' as retry_after,
+              progress->>'_failure_class' as failure_class`;
   const res = await query(text, [
-    runnerId, String(requestId), reason, countAttempt === true, MAX_ATTEMPTS,
+    runnerId, String(requestId), reason, countAttempt === true, MAX_ATTEMPTS, failureClass,
   ]);
   return res.rows[0] || null;
+}
+
+/**
+ * A CONFIGURATION FAILURE IS NOT A PERMANENT FAILURE (WO-2026-08-18-07 AC4).
+ *
+ * -- WHAT THIS RECOVERS, AND WHAT IT DELIBERATELY DOES NOT ------------------
+ * On 2026-08-18 four queued browser build requests were terminated between
+ * 21:22:48Z and 21:26:03Z because three environment variables were absent.
+ * Nothing about those requests was wrong; the machine simply had no Chrome
+ * configured. Under the retry above, such a request now backs off and reaches
+ * `failed` only at the ceiling - but it STILL ends terminal, and the moment the
+ * values are placed there is nothing to pick it back up. A shop parked at
+ * `wait:browser_runner` with its only request terminal has no route back.
+ *
+ * So: a request that failed for an ENVIRONMENT reason becomes claimable again
+ * when the environment is ready, and only then.
+ *
+ * Three bounds, all load-bearing:
+ *
+ *  1. THE CLASS, NOT THE MESSAGE. Selection is on `_failure_class`, written by
+ *     `release`. Nothing here reads `last_error`, so improving an error
+ *     sentence can never turn this rule off.
+ *  2. NEVER A SHOP THAT HAS MOVED ON. `shopStatuses` is an ALLOW-LIST supplied
+ *     by the caller - the states in which a browser build is still the work to
+ *     do. A cancelled, reconciled or already-basketed shop is not resurrected,
+ *     and the list is a positive one so a new shop status cannot silently
+ *     qualify.
+ *  3. THE COUNTER IS RESET, THE WORK IS NOT. `_attempts` and `_retry_after` go;
+ *     the executor's own progress stays exactly where it was, because the whole
+ *     point of Gap 7 is that a resumed run does not re-add everything.
+ *
+ * FORWARD-ONLY, AND SAY SO. A request finished by `lease.finish` before this
+ * shipped carries no `_failure_class`, so it is NOT selected. The four live
+ * requests killed on 2026-08-18 are outside this rule by construction; putting
+ * them back is a live data decision that belongs to whoever owns live data.
+ */
+async function requeueEnvironmentFailures(query, { shopStatuses, reason = null, limit = 50 } = {}) {
+  const allowed = Array.isArray(shopStatuses) ? shopStatuses.filter((s) => typeof s === 'string' && s !== '') : [];
+  if (allowed.length === 0) return [];
+  const text = `
+    update asdair.browser_build_request r
+       set status      = 'queued',
+           claimed_by  = null,
+           finished_at = null,
+           last_error  = coalesce($1::text, r.last_error),
+           progress    = (r.progress - '_lease' - '_retry_after' - '_attempts')
+                         || jsonb_build_object('_requeued_at', to_jsonb(now()),
+                                               '_requeued_from', to_jsonb($2::text))
+      from asdair.shop s
+     where s.id = r.shop_id
+       and r.id in (
+             select r2.id from asdair.browser_build_request r2
+              join asdair.shop s2 on s2.id = r2.shop_id
+             where r2.status = 'failed'
+               and r2.progress->>'_failure_class' = $2::text
+               and s2.status = any($3::text[])
+             order by r2.id
+             limit $4::int)
+    returning r.id, r.shop_id, r.status`;
+  const res = await query(text, [
+    reason, FAILURE_CLASS.ENVIRONMENT, allowed, Number(limit) || 50,
+  ]);
+  return res.rows || [];
 }
 
 /** Finish the request. Terminal; the lease is dropped with it. */
@@ -327,6 +417,7 @@ module.exports = {
   DEFAULT_LEASE_MS, DEFAULT_HEARTBEAT_MS, LIVE_STATUSES,
   LeaseLostError, NoClaimError,
   newRunnerId, claim, claimOrWait, heartbeat, writeProgress, release, finish, peek,
+  requeueEnvironmentFailures, FAILURE_CLASS,
   MAX_ATTEMPTS, backoffMsFor,
   _sql: { LEASE_JSON, CLAIMABLE, sql },
 };

@@ -52,6 +52,11 @@ import {
   ledgerIdempotencyKey,
 } from './keys.js';
 import { COMMAND_NAMES, COMMAND_SPECS, CONSUMPTION } from './commandNames.js';
+// The board classifier lives with the provenance marker it reads, in the one
+// module that has no imports of its own - so the writer of a candidate's
+// `source` and every reader of it cannot drift apart, and importing it here
+// creates no cycle.
+import { classifyQuestionBoards } from './applyDecisions.js';
 
 /** The command names a runner is expected to CONSUME. Derived from the command
  *  specs so the two can never drift. */
@@ -756,6 +761,28 @@ export async function recordDecisionEvidence(deps, { shopId, householdId, audit 
   });
 }
 
+/**
+ * Has the model EVER taken the semantic decision for this shop?
+ *
+ * The positive fact, read from the one-shot marker `recordDecisionEvidence`
+ * writes. It is the durable answer to "was this shop's board built by AsdAIr or
+ * by the superseded scorer?", and it is what stops `classifyQuestionBoards`
+ * condemning a legitimately empty model board for ever.
+ *
+ * A marker row is written INSIDE the decision step and only from the decision's
+ * own return, so this cannot go true without the decision having happened -
+ * which is the whole reason that row exists rather than a log line.
+ */
+export async function hasDecisionEvidence(deps, shopId) {
+  const res = await deps.readQuery(
+    `SELECT 1 FROM asdair.pipeline_command
+      WHERE shop_id = $1 AND kind = $2 AND command = $3
+      LIMIT 1`,
+    [shopId, LEDGER_KINDS.COMMAND, DECISION_EVIDENCE],
+  );
+  return rowsOf(res).length > 0;
+}
+
 /** The command name every answer-learning marker carries. */
 export const ANSWER_LEARNING = 'answerLearning';
 
@@ -951,16 +978,29 @@ export async function listHouseholdActions(deps, householdId) {
  */
 export async function readSnapshot(deps, handle) {
   const shop = await requireShop(deps, handle);
-  const [openQuestions, pending, issued, browser] = await Promise.all([
+  const [openQuestions, questions, modelHasDecided, pending, issued, browser] = await Promise.all([
     countOpenQuestions(deps, shop.id),
+    listQuestions(deps, shop.id),
+    hasDecisionEvidence(deps, shop.id),
     listPendingCommands(deps, shop.id),
     listIssuedCommandNames(deps, shop.id),
     findBrowserRequest(deps, shop.id),
   ]);
   const resumeFrom = shop.status === 'FAILED' ? await findResumeFrom(deps, shop.id) : null;
+  // -- WHAT THE SHOP IS ENTITLED TO WAIT ON (WO-2026-08-18-07 AC3) ----------
+  // `openQuestions` keeps its exact meaning - the count in the table - because
+  // a field that quietly stops counting what its name says is how a reader
+  // starts believing something false. The GATE moves to `blockingQuestions`,
+  // and `condemnedQuestions` is carried beside it so a stalled shop can say
+  // WHY it is not waiting rather than merely moving.
+  const boards = classifyQuestionBoards(questions, { modelHasDecided });
   return {
     shop,
     openQuestions,
+    blockingQuestions: boards.blocking.length,
+    condemnedQuestions: boards.condemned.length,
+    supersededQuestions: boards.superseded.length,
+    modelHasDecided,
     pendingCommands: pending,
     issuedCommands: issued,
     browser: browser ? { id: browser.id, status: browser.status, progress: browser.progress } : null,

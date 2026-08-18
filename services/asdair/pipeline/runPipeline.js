@@ -59,7 +59,9 @@ import * as store from './store.js';
 import * as shopLines from './shopLines.js';
 import * as shopDecisions from './shopDecisions.js';
 import * as rememberedChoice from './rememberedChoice.js';
-import { applyDecisionsToPlan } from './applyDecisions.js';
+import {
+  applyDecisionsToPlan, classifyQuestionBoards, MODEL_CANDIDATE_SOURCE,
+} from './applyDecisions.js';
 
 // ── THE BROWSER HANDOFF, ON THE LIVE ROUTE ─────────────────────────────────
 //
@@ -1209,10 +1211,14 @@ async function stepPlan(deps, snapshot) {
     plan, applied, unresolved, remembered, remembered_refused: rememberedRefused,
   } = await planWithDecisions(deps, shop, { listItems, inputs, catalogue });
 
-  // The interpretation is the ONLY source of regulars ids on a candidate. See
-  // planCandidates below for why that matters. Read once, above, by
-  // workingListItems.
-  const byReading = new Map(interpreted.map((l) => [normaliseTerm(l.raw_reading), l]));
+  // -- THE INTERPRET-STAGE READING NO LONGER REACHES A CARD -----------------
+  // A `byReading` index lived here and supplied `planCandidates` with the
+  // interpret stage's `resolveByCatalogue` alternatives - the population that
+  // used to put a trustworthy regulars id, and a deterministic suggestion, onto
+  // a question card. Since WO-2026-08-18-07 the board is the model's and only
+  // the model's, so the index has no consumer in this function and is gone
+  // rather than left standing as a field somebody re-wires by accident.
+  // `resolveRememberedChoices` still builds its own, for its own purpose.
 
   // ── THE DURABLE item_name CARRIER ─────────────────────────────────────────
   // asdair.shop_question has no column for the item a question is ABOUT, and
@@ -1278,14 +1284,63 @@ async function stepPlan(deps, snapshot) {
   const readingConfirmed = shop.needs_review !== true
     || everIssued(snapshot, COMMANDS.CONFIRM_INTERPRETATION);
 
+  // -- THE BOARDS ALREADY ON HIS PHONE (WO-2026-08-18-07 AC3) ---------------
+  //
+  // Read BEFORE anything is opened, because a question built by the superseded
+  // scorer must not be left standing merely because `openQuestion` is
+  // ON CONFLICT DO NOTHING and its round-1 key already exists. That idempotency
+  // is right for a question AsdAIr would ask again the same way; it is exactly
+  // wrong for one it would no longer ask at all. Shop 37's seven cards are that
+  // case, and nothing in the corrective work before this one reached them: the
+  // GENERATOR was repaired and the ARTEFACT was not.
+  //
+  // The condemned rows get a SUCCESSOR ROUND carrying the model's own board,
+  // through the same mechanism a clarification already uses. They are never
+  // rewritten in place and never deleted - the row is the record of what he was
+  // asked, and `parent_question_id` is what makes the supersession legible.
+  const priorQuestions = await store.listQuestions(deps, shop.id);
+  const boards = classifyQuestionBoards(priorQuestions, {
+    modelHasDecided: await store.hasDecisionEvidence(deps, shop.id),
+  });
+  // list_item_id is the only durable join between a condemned row and the line
+  // it was about: question_key is a hash and differs per round by design.
+  const condemnedByListItem = new Map();
+  for (const q of boards.condemned) {
+    if (q.list_item_id === null || q.list_item_id === undefined) continue;
+    const k = String(q.list_item_id);
+    const prev = condemnedByListItem.get(k);
+    if (!prev || Number(q.question_round || 1) > Number(prev.question_round || 1)) {
+      condemnedByListItem.set(k, q);
+    }
+  }
+
   const opened = [];
+  const superseded = [];
   for (const held of unresolved) {
     const line = lineByKey.get(held.question_key) || { item_name: held.item_name, alternatives: [] };
     const term = normaliseTerm(held.item_name);
+    const listItemId = listItemIdByTerm.get(term) ?? null;
+    // A condemned board for THIS line, if one is still standing.
+    const condemned = listItemId === null ? null : (condemnedByListItem.get(String(listItemId)) || null);
 
     // The clarification round, when one is owed. `question_round` on the
     // decision's own question row is the round we are IN; the next is +1.
     const wantsClarification = held.needs_clarification_round === true;
+    // -- A SUPERSESSION IS NOT A CLARIFICATION, AND DELIBERATELY NOT ONE -----
+    //
+    // `needs_clarification_round` is NOT set on the supersession path, and that
+    // is a design decision rather than an omission. The reading-confirmation
+    // deferral immediately below exists so AsdAIr never asks "which variant of
+    // line 3?" before Warwick has agreed we read line 3 at all; it recovered a
+    // real shop and it is untouched, byte for byte, for the case it was built
+    // for.
+    //
+    // A supersession is the opposite situation. The line has ALREADY been put
+    // to him - that is the whole problem - and what is being replaced is the
+    // OPTIONS on a card he is looking at right now. Routing it through the
+    // clarification flag would have made it wait behind a reading confirmation
+    // and left the condemned board live on his phone, which is the exact
+    // artefact this Work Order exists to retire.
     if (wantsClarification && !readingConfirmed) {
       // ── THE CARD WAITS. THE WORD DOES NOT. (WP-B15-A1) ────────────────────
       //
@@ -1347,14 +1402,57 @@ async function stepPlan(deps, snapshot) {
       continue;
     }
 
-    const nextRound = wantsClarification
-      ? Number(held.question_round || 1) + 1
-      : 1;
+    // -- WHICH ROUND THIS CARD IS, AND WHOSE SUCCESSOR IT IS -----------------
+    // Two independent reasons to open a NEW round rather than re-open round 1:
+    //   * he asked for a clarification (the original reason), or
+    //   * the board standing on his phone is condemned (WO-2026-08-18-07 AC3).
+    // A condemned round-1 row cannot be re-opened with better options because
+    // `openQuestion` is ON CONFLICT DO NOTHING - which is why the successor
+    // round is the mechanism rather than an in-place rewrite.
+    //
+    // TWO SUPERSESSION TRIGGERS, AND THEY REACH DIFFERENT ROWS:
+    //   * `held.superseded_board` - he ANSWERED a condemned card, so the row is
+    //     `answered` and never appears in `boards.condemned`. The round and the
+    //     parent come off the refused decision.
+    //   * `condemned` - the card is still OPEN and unanswered. The row itself is
+    //     the parent. This is shop 37: seven cards, none answered, all built by
+    //     the scorer, and nothing on any other path would ever have reached
+    //     them.
+    const supersededRound = held.superseded_board === true
+      ? Number(held.question_round || 1)
+      : (condemned ? Number(condemned.question_round || 1) : 0);
+    const priorRound = wantsClarification
+      ? Number(held.question_round || 1)
+      : supersededRound;
+    const nextRound = priorRound > 0 ? priorRound + 1 : 1;
+    const parentQuestionId = (wantsClarification || held.superseded_board === true)
+      ? (held.question_id ?? null)
+      : (condemned ? condemned.id : null);
+
+    // -- THE ONLY CANDIDATES THAT MAY REACH A CARD ---------------------------
+    // `planCandidates` no longer builds a question board. It stays exported and
+    // proven for `resolveRememberedChoices`, which recomputes a candidate set
+    // for a DIFFERENT purpose (see its own call site) - but the human-facing
+    // board comes from the model's decision and from nothing else.
+    const cardCandidates = modelCardCandidates(line);
 
     const key = nextRound === 1 ? held.question_key : questionKeyFor(held.item_name, nextRound);
-    const questionText = nextRound === 1
+    const reason = held.clarification_reason
+      || (condemned ? 'the options you were sent were built by the old planner, not by AsdAIr' : null)
+      || 'I could not tell which you meant';
+    let questionText = nextRound === 1
       ? `Which product is "${held.item_name}"?`
-      : `About "${held.item_name}" - ${held.clarification_reason || 'I could not tell which you meant'}. Which did you mean?`;
+      : `About "${held.item_name}" - ${reason}. Which did you mean?`;
+    // -- AN EMPTY BOARD SAYS SO. IT NEVER JUST ARRIVES EMPTY -----------------
+    // Question 76509 reached Warwick's phone carrying ZERO options and no
+    // explanation of why. Provenance is what AC1 requires and non-emptiness is
+    // not - the model can honestly have nothing to offer - but a card that
+    // offers nothing and explains nothing is the same defect wearing a
+    // different coat. So the card tells him, and invites the one thing that
+    // does work: his own words.
+    if (cardCandidates.length === 0) {
+      questionText += ' AsdAIr has no suggestion it is confident in for this one - tell me in your own words and I will use that.';
+    }
 
     const res = await deps.shopStore.openQuestion({
       shop_id: shop.id,
@@ -1362,26 +1460,41 @@ async function stepPlan(deps, snapshot) {
       // Null when the plan line answers to no stored list item. The joins are
       // LEFT for exactly this: a question with no carrier still reaches the
       // human with a degraded card, and is never dropped.
-      list_item_id: listItemIdByTerm.get(term) ?? null,
+      list_item_id: listItemId,
       question_text: questionText,
-      // WP-B15-10 AC4. The catalogue is passed HERE, on the card, so a printed
-      // suggestion that exactly names a household regular becomes a real
-      // tappable candidate instead of text he has to retype. It offers; it
-      // resolves nothing. See planCandidates.
-      candidates: planCandidates(line, byReading.get(term) || null, regularsOf(catalogue)),
+      candidates: cardCandidates,
       // Absent on round 1, so that INSERT stays byte-for-byte what it was.
       ...(nextRound > 1
-        ? { question_round: nextRound, parent_question_id: held.question_id }
+        ? { question_round: nextRound, parent_question_id: parentQuestionId }
         : {}),
     });
     opened.push({
       key, created: res.created, already_answered: res.already_answered, round: nextRound,
     });
+    if (condemned && nextRound > 1 && res.created) {
+      superseded.push({
+        question_id: condemned.id,
+        item_name: held.item_name,
+        from_round: Number(condemned.question_round || 1),
+        to_round: nextRound,
+      });
+    }
   }
 
-  const openNow = await store.countOpenQuestions(deps, shop.id);
+  // -- THE GATE COUNTS WHAT ASDAIR IS ENTITLED TO WAIT ON ------------------
+  // Re-read AFTER the ask loop, because the loop is what turns a condemned row
+  // into a superseded one by giving it a successor. `openNow` keeps its literal
+  // meaning for the return payload; `blockingNow` is what the gate uses. The
+  // two differing is not a discrepancy - it is the shop saying "seven cards are
+  // open and none of them is a question I should be waiting on."
+  const questionsNow = await store.listQuestions(deps, shop.id);
+  const boardsNow = classifyQuestionBoards(questionsNow, {
+    modelHasDecided: await store.hasDecisionEvidence(deps, shop.id),
+  });
+  const openNow = questionsNow.filter((q) => String(q.status || '') === 'open').length;
+  const blockingNow = boardsNow.blocking.length;
   const gate = planOutcome({
-    openQuestions: openNow,
+    openQuestions: blockingNow,
     needsReview: shop.needs_review === true,
     interpretationConfirmed: everIssued(snapshot, COMMANDS.CONFIRM_INTERPRETATION),
     // THE LINE GATE. Zero open questions no longer means "every line is
@@ -1503,6 +1616,12 @@ async function stepPlan(deps, snapshot) {
     stepped: moved.changed, from: shop.status, to: gate.to,
     plan_summary: plan.summary, questions: opened,
     questions_open: openNow,
+    // Reported rather than merely acted on: a shop that moved past seven open
+    // cards must be able to say which ones and why, or the next reader of this
+    // payload sees a gate that appears to have ignored its own condition.
+    questions_blocking: blockingNow,
+    questions_condemned: boardsNow.condemned.length,
+    questions_superseded: superseded,
     decisions_applied: applied, lines_unresolved: unresolved,
     remembered_choices: remembered, remembered_refused: rememberedRefused,
   };
@@ -1595,6 +1714,83 @@ export function planCandidates(planLine, interpretedLine, regulars = []) {
     }
     if (out.some((c) => c.label === label)) continue;
     out.push({ label, source: 'planner suggestion (no product id)' });
+  }
+  return out.slice(0, 8);
+}
+
+// -- THE FLAG skill/decide.js WRITES ON A LINE IT DECIDED TO ASK ABOUT -------
+//
+// `skill/decide.js` is outside this module and outside the Work Order's file
+// surface, so the string is mirrored here rather than imported. A mirrored
+// string is a drift risk, and the drift is closed by a test that reads
+// decide.js's own source and fails if this literal is no longer in it
+// (boardIsTheModels.test.js). That is a guard, not a hope.
+export const MODEL_ASK_FLAG = 'decided by asdair: ask';
+
+/**
+ * PURE. THE ONLY CANDIDATES THAT MAY REACH A QUESTION CARD.
+ *
+ * -- WHAT THIS REPLACES, AND WHY REPLACING IT WAS THE POINT -----------------
+ * `planCandidates` below merges THREE populations onto a card: the interpret
+ * stage's `resolveByCatalogue` alternatives, the planner's ranked suggestions,
+ * and an exact-name promotion of the second into the first. Every one of them
+ * is deterministic. On 2026-08-18 that produced the board Veritas graded
+ * requirement 8 FAIL: a tin of cat food as the ONLY option for "1 wet wipes",
+ * ham and eggs for toffees, quarter pounders for Ben & Jerry's.
+ *
+ * The corrective Work Order before this one inverted the decision path so the
+ * model decides. It did not change WHO BUILDS THE CARD, so the card kept coming
+ * from the scorer. This function is that half.
+ *
+ * -- PROVABLE BY CONSTRUCTION, WHICH NEEDS TWO LOCKS AND NOT ONE ------------
+ * Lock 1: the candidates are read from `planLine.alternatives` on the DECIDED
+ *         plan. `demoteDeterministicDecisions` empties that field on every
+ *         undecided item BEFORE the decision runs, and `skill/decide.js` is the
+ *         only thing that writes it afterwards. So the field cannot hold a
+ *         scorer suggestion at this point in the pipeline.
+ * Lock 2: it is used ONLY when the item carries MODEL_ASK_FLAG, which
+ *         `skill/decide.js` attaches on exactly the `ask` branch. An item that
+ *         reaches here without that flag gets NO candidates, whatever its
+ *         `alternatives` happen to contain.
+ *
+ * Lock 1 alone would be an argument about call order. Lock 2 makes it a
+ * property of the data: a candidate the model did not author cannot reach a
+ * card unless something also forges the model's own flag.
+ *
+ * -- AN EMPTY BOARD IS AN HONEST OUTCOME, AND IT MUST SAY SO ----------------
+ * A line the model could not settle, or one whose cited id the household does
+ * not hold, legitimately has no candidates. That is provenance, not
+ * non-emptiness - but a card with no options and no explanation is question
+ * 76509, which is the other half of the same defect. The CALLER is responsible
+ * for saying so in the question text; this function's job is to return nothing
+ * rather than to invent something.
+ */
+export function modelCardCandidates(planLine) {
+  if (!planLine || typeof planLine !== 'object') return [];
+  const flags = Array.isArray(planLine.flags) ? planLine.flags : [];
+  if (!flags.includes(MODEL_ASK_FLAG)) return [];
+
+  const out = [];
+  const claimed = new Set();
+  for (const a of (Array.isArray(planLine.alternatives) ? planLine.alternatives : [])) {
+    if (!a) continue;
+    const label = a.name || a.label || null;
+    const rawId = a.regular_id === null || a.regular_id === undefined ? null : Number(a.regular_id);
+    if (rawId !== null) {
+      // An id the household does not hold never reaches here: skill/decide.js
+      // validates every cited regular_id against the catalogue rows and drops
+      // the ones it cannot find, recording them in `audit.rejected`.
+      if (!Number.isFinite(rawId) || claimed.has(rawId)) continue;
+      claimed.add(rawId);
+      out.push({ label, regular_id: rawId, source: MODEL_CANDIDATE_SOURCE });
+      continue;
+    }
+    if (!label) continue;
+    if (out.some((c) => c.label === label)) continue;
+    // No id: a label the model offered that the household holds no row for.
+    // Offered, never resolvable to a product by a tap - same rule the three
+    // populations in planCandidates already obey.
+    out.push({ label, source: MODEL_CANDIDATE_SOURCE });
   }
   return out.slice(0, 8);
 }

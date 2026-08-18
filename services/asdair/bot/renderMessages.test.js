@@ -129,6 +129,16 @@ const SAMPLES = {
       { n: 5, item: '1 pk fruit lolly ice' },
     ],
   },
+  // WO-2026-08-18-07 AC5. The incident, as the sample: the browser lane could
+  // not start because the machine had no Chrome configured, and on 2026-08-18
+  // that fact reached nobody.
+  basket_blocked_on_environment: {
+    shopRef: REF,
+    blockers: [{ kind: 'launcher-config' }],
+    attempts: 1,
+    maxAttempts: 5,
+    terminal: false,
+  },
 };
 
 function everyButton(rendered) {
@@ -167,8 +177,16 @@ test('the catalogue covers every message the directive specifies', () => {
   // exists: runtime.js now ENQUEUES that kind, and an unregistered renderer
   // would have drainOutbox resolve it 'abandoned' and discard the one message
   // that stops a refused answer being a silent loss.
+  // 'basket_blocked_on_environment' added by WO-2026-08-18-07 AC5, and it is
+  // the fourth time this control has earned its place. runtime.js's `announce`
+  // bound the browser lane's failure to a LOG LINE ONLY: four requests died on
+  // 2026-08-18 for want of three environment variables, no outbox row was
+  // written, and nothing reached anybody. The renderer is registered here
+  // because a "failure must never be silent" fix that drainOutbox abandons is
+  // itself silent.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
-    'answer_not_attributed', 'basket_built', 'basket_ready', 'clarification_deferred',
+    'answer_not_attributed', 'basket_blocked_on_environment',
+    'basket_built', 'basket_ready', 'clarification_deferred',
     'confirm_interpretation', 'confirmation_received', 'control_refused', 'failure',
     'lines_unresolved', 'list_read', 'photo_read', 'plan_ready', 'progress', 'question',
     'question_board', 'receipt', 'reconciliation_summary', 'reply_not_taken', 'shop_ready',
