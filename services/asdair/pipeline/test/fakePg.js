@@ -927,6 +927,15 @@ export function createFakeClient(store, options = {}) {
       rows(db.pipeline_command.filter((c) => c.status === 'pending' && c.kind === 'outbox')
         .sort((a, b) => a.id - b.id))],
 
+    // store.hasDecisionEvidence - "has the model EVER decided for this shop?"
+    // Parameterised on kind AND command, unlike outboxEverQueued below, because
+    // the decision marker is a `command` row and not an outbox row.
+    [/^SELECT 1 FROM asdair\.pipeline_command\s+WHERE shop_id = \$1 AND kind = \$2 AND command = \$3/i, (sql, p) => {
+      const hit = db.pipeline_command.some((c) => String(c.shop_id) === String(p[0])
+        && c.kind === p[1] && c.command === p[2]);
+      return hit ? rows([{ exists: 1 }]) : none();
+    }],
+
     // store.outboxEverQueued - the receipt self-heal's "ever, not merely pending" check.
     [/^SELECT 1 FROM asdair\.pipeline_command\s+WHERE shop_id = \$1 AND kind = 'outbox' AND command = \$2/i, (sql, p) => {
       const hit = db.pipeline_command.some((c) => String(c.shop_id) === String(p[0])

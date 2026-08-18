@@ -178,6 +178,7 @@ export function everIssued(snapshot, name) {
  *   shop: {id:*, shop_ref:string, household_id:*, status:string,
  *          source_kind:'text'|'photo', list_id:*, needs_review:boolean},
  *   openQuestions: number,
+ *   blockingQuestions: number|undefined,
  *   pendingCommands: Array<{id:*, command:string, key:string, payload:object}>,
  *   issuedCommands: string[],
  *   browser: {id:*, status:string}|null,
@@ -191,7 +192,25 @@ export function decideNextStep(snapshot) {
     throw new Error('stages: decideNextStep needs a snapshot carrying shop.status');
   }
   const status = shop.status;
-  const openQuestions = Number(snapshot.openQuestions) || 0;
+  // -- THE QUESTIONS THIS SHOP IS ENTITLED TO WAIT ON (WO-2026-08-18-07 AC3) -
+  //
+  // `blockingQuestions` excludes two populations that are open in the table and
+  // are not live conversations: a question a LATER round has superseded, and a
+  // board built by the superseded scorer rather than by AsdAIr's own decision.
+  // store.readSnapshot computes it with `classifyQuestionBoards`; the reason it
+  // matters is shop 37, held for eight and a half hours against seven cards one
+  // of which offered cat food as the only answer to "1 wet wipes".
+  //
+  // THE FALLBACK IS DELIBERATELY THE CONSERVATIVE ONE. A snapshot built without
+  // the new field - an older caller, a hand-built test fixture - falls back to
+  // the raw open count, i.e. it waits for MORE rather than fewer. A missing
+  // field can therefore make this gate cautious; it can never make it advance
+  // past a question it should have waited on.
+  const openQuestions = Number(
+    snapshot.blockingQuestions === undefined || snapshot.blockingQuestions === null
+      ? snapshot.openQuestions
+      : snapshot.blockingQuestions,
+  ) || 0;
 
   // ── 1. CANCEL OUTRANKS EVERYTHING ──────────────────────────────────────────
   // Warwick asking to stop must not queue behind a plan, a model call or a

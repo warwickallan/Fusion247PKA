@@ -94,7 +94,13 @@ const SELECT_BY_QUESTION_SQL =
 // applyDecisions never has to reach back into the database, and stays pure.
 const SELECT_BY_SHOP_SQL =
   `SELECT ${SELECT_LIST.split(', ').map((c) => `d.${c}`).join(', ')}, ` +
-  'q.question_key, q.question_round, q.parent_question_id, q.status AS question_status ' +
+  'q.question_key, q.question_round, q.parent_question_id, q.status AS question_status, ' +
+  // WO-2026-08-18-07 AC2. The BOARD the answer was given against, carried onto
+  // the decision row so applyDecisions can ask "was this identity taken off a
+  // candidate the model never produced?" without reaching into the database and
+  // without losing its purity. Same reason question_key is joined here: the
+  // rule belongs with the data, not in a second query somebody has to remember.
+  'q.candidates AS question_candidates ' +
   'FROM asdair.shop_decision d ' +
   'JOIN asdair.shop_question q ON q.id = d.question_id AND q.shop_id = d.shop_id ' +
   'WHERE d.shop_id = $1 ORDER BY d.id ASC';
@@ -332,7 +338,27 @@ export function resolveExactCandidate(question) {
 /** Every decision recorded for a shop, in the order they were made. */
 export async function listDecisions(deps, shopId) {
   const res = await deps.readQuery(SELECT_BY_SHOP_SQL, [shopId]);
-  return (res && res.rows) || [];
+  // `question_candidates` is jsonb. A driver may hand it back parsed or as
+  // text depending on how the column was selected, and a downstream `for..of`
+  // over a STRING iterates characters rather than failing - which would read as
+  // "no matching candidate" and silently let a poisoned tap bind. Normalised
+  // once, here, so applyDecisions only ever sees an array.
+  return ((res && res.rows) || []).map((row) => ({
+    ...row,
+    question_candidates: asCandidateArray(row && row.question_candidates),
+  }));
+}
+
+/** PURE. jsonb -> array, whatever shape the driver hands back. Never throws. */
+function asCandidateArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+  return [];
 }
 
 /** The decision for one question, or null when it has not been decided. */

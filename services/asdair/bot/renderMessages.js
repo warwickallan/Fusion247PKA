@@ -1455,6 +1455,81 @@ export function renderAnswerNotAttributed({ shopRef, words, questions = [] } = {
   };
 }
 
+/**
+ * THE BROWSER LANE COULD NOT START, AND HE IS TOLD. (WO-2026-08-18-07 AC5)
+ *
+ * -- THE DEFECT THIS CLOSES -------------------------------------------------
+ * On 2026-08-18 four browser build requests were terminated between 21:22:48Z
+ * and 21:26:03Z because three environment variables were absent. The runtime's
+ * `announce` wrote a log line and nothing else: no outbox row, no card, nothing
+ * on anybody's phone. Root CLAUDE.md is unambiguous - "failure must never be
+ * silent" - and a shop sat at `wait:browser_runner` with its only request dead
+ * and nobody informed.
+ *
+ * -- IT NAMES A MACHINE PROBLEM AND ASKS FOR NOTHING HE CANNOT GIVE ---------
+ * This is the one card in the catalogue whose cause is NOT something Warwick
+ * can fix by tapping. So it does not offer a button that pretends otherwise:
+ * it says what stopped, that his shop is safe, and whether AsdAIr is still
+ * trying. The variable NAMES are not printed - they are operator detail, they
+ * are in the runbook, and a card is not a config reference.
+ *
+ * @param {{shopRef:string, blockers?:Array, attempts?:number,
+ *          maxAttempts?:number, terminal?:boolean}} spec
+ */
+export function renderBasketBlockedOnEnvironment({
+  shopRef, blockers, attempts, maxAttempts, terminal,
+} = {}) {
+  assertShopRef(shopRef);
+  const named = (Array.isArray(blockers) ? blockers : [])
+    .map((b) => (b && b.kind ? String(b.kind) : null))
+    .filter((k) => k !== null);
+  const isTerminal = terminal === true;
+
+  const lines = [
+    '🛑 I could not start the ASDA browser',
+    `Ref: ${value(shopRef)}`,
+    '',
+    'This is a problem with the machine, not with your shop.',
+    '',
+  ];
+
+  if (named.length > 0) {
+    lines.push('What stopped it:');
+    for (const kind of named) lines.push(`  • ${value(kind)}`);
+    lines.push('');
+  }
+
+  const tried = Number(attempts) || 0;
+  const ceiling = Number(maxAttempts) || 0;
+  if (tried > 0 && ceiling > 0) {
+    lines.push(`Attempt ${count(tried)} of ${count(ceiling)}.`);
+    lines.push('');
+  }
+
+  if (isTerminal) {
+    lines.push('I have stopped trying for now. Your shop and everything I had');
+    lines.push('already done are kept exactly as they are, and I will pick this');
+    lines.push('same job back up on my own once the browser is set up.');
+  } else {
+    lines.push('I will keep trying, a little less often each time. Your shop and');
+    lines.push('everything I had already done are kept exactly as they are.');
+  }
+
+  lines.push('');
+  lines.push('Nothing has been added to a basket and nothing has been ordered.');
+
+  // ONE CONTROL, AND ONLY ONE HE CAN HONESTLY USE. There is nothing he can tap
+  // that supplies a Chrome path, so no control here pretends to fix it - but
+  // "where is my shop, then?" is a real question this card provokes, and every
+  // other card in the catalogue answers it. STATUS is that answer.
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      [button('Where is my shop?', ACTIONS.STATUS, shopRef)],
+    ]),
+  };
+}
+
 export const MESSAGES = Object.freeze({
   receipt: renderReceipt,
   plan_ready: renderPlanReady,
@@ -1486,4 +1561,9 @@ export const MESSAGES = Object.freeze({
   list_read: renderListRead,
   shop_ready: renderShopReady,
   basket_built: renderBasketBuilt,
+  // WO-2026-08-18-07 AC5. Registered HERE and not merely written, for the
+  // reason stated at the top of this map: drainOutbox looks the renderer up by
+  // kind and ABANDONS a row it cannot render. An unregistered kind would be a
+  // "failure must never be silent" fix that is itself silent.
+  basket_blocked_on_environment: renderBasketBlockedOnEnvironment,
 });

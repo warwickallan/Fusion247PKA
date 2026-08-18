@@ -44,6 +44,171 @@
 // place that distinction is computed.
 // =====================================================================
 
+// -- THE PROVENANCE MARKER, AND WHY IT LIVES IN THIS FILE --------------------
+//
+// WO-2026-08-18-07 AC1/AC2. Every candidate this system puts on a question card
+// carries a `source` string saying which population it came from. From the
+// corrective work onward there is exactly ONE permitted population on a card -
+// the model's own `ask` candidates - and this is the string that says so.
+//
+// It lives HERE, in the module with no imports, because the WRITER (runPipeline
+// building a card) and the READER (this module deciding whether a recorded
+// answer may bind) must not be able to drift apart. Two copies of a marker
+// string is how a guard silently stops matching the thing it guards.
+//
+// The three legacy strings it replaces are still readable in live rows and are
+// exactly what `decisionBindsASupersededBoard` refuses:
+//   'asdair.regulars (resolveByCatalogue)'
+//   'planner suggestion, matched to asdair.regulars by exact name'
+//   'planner suggestion (no product id)'
+export const MODEL_CANDIDATE_SOURCE = 'asdair decision (model)';
+
+/**
+ * PURE. True when this decision would bind an identity that was taken from a
+ * candidate THE MODEL NEVER PRODUCED.
+ *
+ * -- THE EXACT THING THIS REFUSES, AND THE EXACT THING IT MUST NOT ----------
+ * Warwick outranking AsdAIr where he genuinely decided is settled product law
+ * and is NOT reversed here. What is refused is narrower, and it is the live
+ * defect Veritas graded requirement 8 FAIL on: question 76512 offered ONE
+ * option for "1 wet wipes" - a tin of cat food - because a word-overlap scorer
+ * built the board. `applyDecisionsToPlan` runs AFTER the decision by design
+ * ("the human is last"), so a tap on that card became a binding the model could
+ * not overturn.
+ *
+ * Three cases, and the middle one is why this is a per-CANDIDATE test rather
+ * than a per-board one:
+ *
+ *   1. The decision binds NO regular id (skip_this_week, new_item, a
+ *      clarification, a bare quantity change). Nothing was taken off a board.
+ *      BINDS - unchanged.
+ *   2. The decision binds an id that is NOT among the question's candidates.
+ *      He typed it, or it arrived by a route that never offered a button. Those
+ *      are HIS OWN WORDS, not a poisoned tap. BINDS.
+ *   3. The decision binds an id that IS among the question's candidates, and
+ *      that candidate does not carry MODEL_CANDIDATE_SOURCE. This is a tap on a
+ *      suggestion the model never made and would have refused. REFUSED.
+ *
+ * `question_candidates` is joined onto the decision row by
+ * shopDecisions.SELECT_BY_SHOP_SQL. A caller that does not supply it gets case
+ * 2 for every decision - exactly the behaviour that existed before this rule.
+ * The guard fails OPEN on absent data and CLOSED on present evidence, which is
+ * the right way round: it never invents a refusal out of a missing join.
+ */
+export function decisionBindsASupersededBoard(decision) {
+  if (!decision) return false;
+  const id = decision.decided_regular_id;
+  if (id === null || id === undefined) return false;
+  const wanted = Number(id);
+  if (!Number.isFinite(wanted)) return false;
+  const candidates = Array.isArray(decision.question_candidates) ? decision.question_candidates : [];
+  for (const c of candidates) {
+    if (!c || c.regular_id === null || c.regular_id === undefined) continue;
+    if (Number(c.regular_id) !== wanted) continue;
+    // The candidate he tapped. It binds only if the model authored it.
+    return String(c.source || '') !== MODEL_CANDIDATE_SOURCE;
+  }
+  return false;
+}
+
+/**
+ * PURE. Classify every question on a shop into the three states that decide
+ * whether AsdAIr is entitled to sit and wait for a human.
+ *
+ * -- WHY A CLASSIFIER AND NOT `count(*) WHERE status='open'` -----------------
+ * The gate that parks a shop at NEEDS_DECISION has always been "are there open
+ * questions". On 2026-08-18 that gate held shop 37 for eight and a half hours
+ * against SEVEN questions built by a word-overlap scorer - one of which offered
+ * a tin of cat food as the only option for "1 wet wipes", and one of which
+ * offered nothing at all. Waiting on those was not patience; it was the product
+ * refusing to move until Warwick answered a question it should never have
+ * asked. A board AsdAIr should not have sent is not a board it may wait on.
+ *
+ * Three states, and they are independent tests rather than a priority list:
+ *
+ *   SUPERSEDED - some LATER round exists for this same question (a row whose
+ *                `parent_question_id` is this row's id). The successor is the
+ *                live conversation; the ancestor is history. Durable, exact,
+ *                and it needs no clock and no provenance opinion.
+ *
+ *   CONDEMNED  - the board was not built from the model's decision:
+ *                (a) it carries a candidate whose `source` is not
+ *                    MODEL_CANDIDATE_SOURCE - i.e. a scorer suggestion; or
+ *                (b) it carries NO candidates at all on a shop where the model
+ *                    has never decided, which is the only way a card with zero
+ *                    options could have been produced.
+ *                A condemned board gets a successor round; it never gets a tap
+ *                that binds (see `decisionBindsASupersededBoard`).
+ *
+ *   BLOCKING   - open, not superseded, not condemned. A real question, built
+ *                from a real decision, genuinely waiting on a human.
+ *
+ * (b) is deliberately narrow. Once the model HAS decided for a shop, an empty
+ * board is a legitimate outcome - the model can honestly have no candidate to
+ * offer - and condemning it would open a fresh round every pass forever. The
+ * SUPERSEDED test is what keeps the original row quiet after its one successor
+ * has been opened, so the loop terminates by construction rather than by luck.
+ *
+ * @param {Array}   questions          store.listQuestions rows for one shop
+ * @param {boolean} opts.modelHasDecided  a decisionEvidence marker exists for
+ *                                        this shop
+ */
+export function classifyQuestionBoards(questions, { modelHasDecided = false } = {}) {
+  const rows = Array.isArray(questions) ? questions.filter(Boolean) : [];
+  const hasSuccessor = supersededQuestionIds(rows);
+
+  const blocking = [];
+  const condemned = [];
+  const superseded = [];
+
+  for (const q of rows) {
+    if (String(q.status || '') !== 'open') continue;
+    const self = idKey(q.id);
+    if (self !== null && hasSuccessor.has(self)) { superseded.push(q); continue; }
+    const candidates = Array.isArray(q.candidates) ? q.candidates : [];
+    const foreign = candidates.some((c) => c && String(c.source || '') !== MODEL_CANDIDATE_SOURCE);
+    const emptyLegacy = candidates.length === 0 && modelHasDecided !== true;
+    if (foreign || emptyLegacy) { condemned.push(q); continue; }
+    blocking.push(q);
+  }
+
+  return { blocking, condemned, superseded };
+}
+
+/**
+ * PURE. The ids of questions that a LATER ROUND has replaced, as comparable
+ * strings.
+ *
+ * One home, two readers: `classifyQuestionBoards` uses it to decide what the
+ * shop may wait on, and `runtime.boardStateOf` uses it to decide what Warwick
+ * is shown. A superseded card that vanishes from the gate but stays on the
+ * board is the condemned artefact still sitting on his phone, which is the
+ * thing this Work Order exists to retire - so the two must not be able to
+ * disagree about which rows are history.
+ *
+ * ids are compared as STRINGS and never with `===`, for the reason
+ * decisionSpine.test.js pins on this file's source text: a bigint arrives as a
+ * string from one driver and a number from another, so an `===` between two ids
+ * passes every offline suite and silently finds nothing live.
+ */
+export function supersededQuestionIds(questions) {
+  const out = new Set();
+  for (const q of (Array.isArray(questions) ? questions : [])) {
+    if (!q) continue;
+    const parent = idKey(q.parent_question_id);
+    if (parent === null) continue;
+    out.add(parent);
+  }
+  return out;
+}
+
+/** PURE. Any id -> a comparable string, or null. Never an `===` between ids. */
+function idKey(value) {
+  if (value === null || value === undefined) return null;
+  const s = String(value);
+  return s === '' ? null : s;
+}
+
 /** Flags this module attaches, as data, so tests pin the string once. */
 export const DECISION_FLAGS = Object.freeze({
   DECIDED: 'decided by Warwick this week',
@@ -51,7 +216,22 @@ export const DECISION_FLAGS = Object.freeze({
   SKIPPED: 'skipped this week by Warwick',
   NEW_ITEM: 'new item approved by Warwick this week',
   CLARIFY: 'awaiting clarification from Warwick',
+  // WO-2026-08-18-07 AC2. The decision exists and is NOT discarded - the row
+  // stays in asdair.shop_decision, which is insert-only and is the record of
+  // what he was asked and what he said. What this flag records is that it did
+  // not BIND, and why, so a reader of the plan is never left guessing whether
+  // an answer went missing.
+  SUPERSEDED_BOARD: 'answered from a superseded board - AsdAIr is asking again',
 });
+
+/**
+ * The ceiling on the round walk below.
+ *
+ * A line's conversation running past a dozen rounds is a defect in the
+ * conversation, not a case to support, and an unbounded walk over a Map is how
+ * a pure function acquires a pathological input.
+ */
+const MAX_DECISION_ROUNDS = 12;
 
 /** The kinds that resolve a line to a stocked product. */
 const RESOLVING_KINDS = Object.freeze(['existing_regular', 'variant_choice', 'quantity_change']);
@@ -136,7 +316,7 @@ export function applyDecisionsToPlan({ plan, decisions, questionKeyFor, regulars
     // reasoning about the code - which is exactly why that test exists.
     let key = null;
     let decision = null;
-    for (let round = 1; ; round += 1) {
+    for (let round = 1; round <= MAX_DECISION_ROUNDS; round += 1) {
       let candidateKey;
       try {
         candidateKey = questionKeyFor(item.item_name, round);
@@ -147,9 +327,24 @@ export function applyDecisionsToPlan({ plan, decisions, questionKeyFor, regulars
       }
       if (round === 1) key = candidateKey;
       const found = byKey.get(candidateKey) || null;
-      // A gap ends the chain: rounds are opened consecutively, so the absence
-      // of round N means there is no round N+1 either.
-      if (!found) break;
+      // -- A GAP NO LONGER ENDS THE CHAIN (WO-2026-08-18-07) -----------------
+      // This loop used to `break` on the first round with no decision, on the
+      // stated ground that "rounds are opened consecutively". That was true
+      // while the ONLY thing that opened round N+1 was a round-N decision of
+      // kind `clarification_required` - so round N always had one.
+      //
+      // Board supersession breaks that premise deliberately. A round-1 question
+      // built by the superseded scorer is condemned and a round-2 question is
+      // opened for the same line WITHOUT round 1 ever being decided. Under the
+      // old break, round 1's absence hid round 2 entirely and Warwick's answer
+      // to the NEW card would have applied to nothing - the shop would have sat
+      // unresolved while he had already settled it.
+      //
+      // So the walk continues past a gap and the HIGHEST round that carries a
+      // decision wins, which is the rule the comment above always described.
+      // Bounded rather than unbounded because `questionKeyFor` will happily
+      // mint keys forever and a hot loop over a Map is not a search strategy.
+      if (!found) continue;
       decision = found;
       key = candidateKey;
     }
@@ -163,6 +358,36 @@ export function applyDecisionsToPlan({ plan, decisions, questionKeyFor, regulars
         unresolved.push({ item_name: item.item_name, question_key: key, reason: 'no structured decision recorded' });
       }
       return item;
+    }
+
+    // -- THE TAP THE MODEL WOULD HAVE REFUSED (WO-2026-08-18-07 AC2) --------
+    // Checked BEFORE the kind is read, because the refusal is about where the
+    // identity came from and not about what sort of decision it was. The line
+    // returns to `needs_decision` and is reported unresolved carrying the
+    // round it was decided in, which is what lets stepPlan open the next round
+    // with a board the model actually built.
+    if (decisionBindsASupersededBoard(decision)) {
+      unresolved.push({
+        item_name: item.item_name,
+        question_key: key,
+        reason: 'decided from a candidate the model never produced',
+        question_id: decision.question_id ?? null,
+        question_round: Number(decision.question_round ?? 1),
+        // The successor round is opened by the same ROUND mechanism a
+        // clarification uses - that path is proven and it is what prevents the
+        // PROCESSING <-> NEEDS_DECISION livelock. It is deliberately NOT
+        // flagged as a clarification: a clarification waits for the reading to
+        // be confirmed, and a superseded board must not, because the line has
+        // already been asked about and it is the OPTIONS that were wrong.
+        superseded_board: true,
+        clarification_reason: 'the options you were sent were built by the old planner, not by AsdAIr',
+      });
+      return {
+        ...item,
+        status: 'needs_decision',
+        planned_qty: 0,
+        flags: pushFlag(item.flags, DECISION_FLAGS.SUPERSEDED_BOARD),
+      };
     }
 
     const kind = String(decision.decision_kind || '');

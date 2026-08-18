@@ -53,6 +53,7 @@ import * as shopDecisions from './shopDecisions.js';
 import { STEPS, everIssued } from './stages.js';
 import { COMMANDS } from './commandNames.js';
 import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
+import { supersededQuestionIds } from './applyDecisions.js';
 // WO-2026-08-18-03 AC1. A MODEL MAPPING IS NOT EVIDENCE. Pure, zero-dep, opens
 // no connection - same reasoning as the shopDecisions import above.
 import { bindingVerdict } from './answerCorroboration.js';
@@ -1560,6 +1561,22 @@ export function boardStateOf(questionRows, park = null) {
   const answered = [];
   const byOrdinal = new Map();
 
+  // -- A SUPERSEDED CARD LEAVES THE BOARD (WO-2026-08-18-07 AC3) ------------
+  //
+  // A question a LATER ROUND has replaced is history, and showing it beside its
+  // own successor would leave the condemned board - the cat food, the ham, the
+  // quarter pounders - sitting on Warwick's phone next to the card that
+  // replaced it. Removing the row from the DATABASE is not the answer: it is
+  // the record of what he was actually asked, and `parent_question_id` is what
+  // makes the supersession legible without editing history.
+  //
+  // `byOrdinal` still carries EVERY row, and `n` is still each row's own index
+  // over the full list, so a tap from a card sent before the supersession
+  // resolves to the same question it always did - it is refused by the render
+  // contract as a stale card, which is the correct refusal, rather than
+  // silently resolving to a different line because the numbering moved.
+  const replaced = supersededQuestionIds(rows);
+
   rows.forEach((q, i) => {
     const n = i + 1;
     // `item_name` is the thing itself; `question_text` is a whole sentence
@@ -1568,6 +1585,7 @@ export function boardStateOf(questionRows, park = null) {
     // "unknown".
     const item = q.item_name || q.question_text || null;
     byOrdinal.set(n, { questionKey: q.question_key, status: q.status });
+    if (replaced.has(String(q.id))) return;
     if (q.status === 'open') {
       const { candidates, unidentified } = normaliseStoredCandidates(q.candidates);
       outstanding.push({
@@ -2574,6 +2592,19 @@ export async function runOnce(deps, wiring = {}) {
   // WIRED, NEVER ASSUMED. `wiring.shopBasket` is absent in every test that has
   // no business driving a browser, so the branch is explicit rather than a
   // silent no-op, and `realWiring` is the only thing that supplies it.
+  // -- BEFORE THE LANE RUNS, GIVE BACK WHAT THE ENVIRONMENT TOOK (AC4) -----
+  // A request terminated for a configuration reason becomes claimable again the
+  // moment the configuration exists, and it is claimed on THIS pass rather than
+  // the next one. Wrapped in its own try for the same reason `shopBasket` is: a
+  // recovery that throws must not cost the pass that was going to do the work.
+  if (typeof wiring.recoverBrowserEnvironment === 'function') {
+    try {
+      await wiring.recoverBrowserEnvironment({ log });
+    } catch (err) {
+      log('browser_environment_recovery_failed', { detail: String(err && err.message ? err.message : err) });
+    }
+  }
+
   let basket = null;
   if (typeof wiring.shopBasket === 'function') {
     try {
@@ -2745,6 +2776,87 @@ export function makeVerificationFor(deps, { log = () => {} } = {}) {
 
 /** Build the real Telegram wiring from the environment. Names only - no value
  *  is read from a credentials file by this module. */
+/** The outbox kind the browser lane's environment failure travels on. Named
+ *  once: the enqueue, the renderer registration in bot/renderMessages.js and
+ *  the idempotency family all have to agree, and a literal repeated three times
+ *  is a literal that will eventually disagree with itself. */
+export const BASKET_BLOCKED_ON_ENVIRONMENT = 'basket_blocked_on_environment';
+
+/**
+ * THE BROWSER LANE'S OUTCOME, TOLD DURABLY WHEN IT IS A FAILURE.
+ *
+ * Extracted from `realWiring` so the production function is the function under
+ * test. See the call site for why.
+ *
+ * -- SUCCESS IS UNCHANGED AND DELIBERATELY WRITES NOTHING ------------------
+ * "Mum's basket is ready" is issued by `advanceAll` -> `queueShopCards` ->
+ * `drainOutbox` over a truthful reconciliation. A second card from here would
+ * be a second truth about one event, which is the defect the browser lane Work
+ * Order removed rather than one to add back in a new place.
+ *
+ * -- ONCE PER SHOP PER DISTINCT FACT, NOT ONCE PER PASS --------------------
+ * The family key carries whether AsdAIr is still trying, so one outage
+ * produces at most two cards - "it stopped and I am retrying" and "I have
+ * stopped trying" - and never a stream. Same `spentLedgerGenerations` guard and
+ * the same reason as the clarification notice in runPipeline.js: an outbox KEY
+ * alone stopped a duplicate only while the card sat unsent and re-issued the
+ * moment it was delivered. Eighteen identical cards in seventeen minutes is the
+ * measured cost of getting this wrong.
+ *
+ * Root CLAUDE.md: *failure must never be silent.* A log line in a journal
+ * nobody reads is silence with a timestamp on it.
+ */
+export async function announceBasketOutcome(deps, payload, { log = () => {} } = {}) {
+  const p = payload || {};
+  log('basket_outcome', {
+    kind: p.kind,
+    shop_ref: p.shop_ref,
+    request_id: p.request_id,
+    blockers: (p.blockers || []).map((b) => b && b.kind),
+  });
+  if (p.kind !== BASKET_BLOCKED_ON_ENVIRONMENT) return null;
+  if (p.shop_id === null || p.shop_id === undefined) return null;
+
+  const phase = p.terminal === true ? 'terminal' : 'retrying';
+  const key = outboxKeyFor(p.shop_ref, `${BASKET_BLOCKED_ON_ENVIRONMENT}.${phase}`);
+  const family = ledgerFamilyKey({
+    kind: LEDGER_KINDS.OUTBOX,
+    householdId: p.household_id ?? null,
+    name: BASKET_BLOCKED_ON_ENVIRONMENT,
+    key,
+  });
+  if ((await store.spentLedgerGenerations(deps, family)) !== 0) return null;
+
+  return store.enqueueMessage(deps, {
+    householdId: p.household_id ?? null,
+    shopId: p.shop_id,
+    kind: BASKET_BLOCKED_ON_ENVIRONMENT,
+    key,
+    payload: {
+      shopRef: p.shop_ref,
+      // Blocker KINDS only. The blocker's `detail` carries a launcher message
+      // naming environment variables, and a card is not a config reference -
+      // pipeline-runtime/RUNBOOK.md is.
+      blockers: (p.blockers || []).map((b) => ({ kind: b && b.kind ? String(b.kind) : null })),
+      attempts: p.attempts ?? null,
+      maxAttempts: p.max_attempts ?? null,
+      terminal: p.terminal === true,
+    },
+  });
+}
+
+/**
+ * The shop statuses in which a browser build is STILL the work to do.
+ *
+ * A positive allow-list, not a deny-list: `requeueEnvironmentFailures` must
+ * never resurrect a request for a shop that has been cancelled, reconciled, or
+ * whose basket has already been reported - and a deny-list would let a status
+ * added later qualify by accident.
+ */
+const BROWSER_WANTED_SHOP_STATUSES = Object.freeze([
+  'READY_TO_SHOP', 'WAITING_FOR_BROWSER', 'SHOPPING',
+]);
+
 async function realWiring(deps) {
   const intakeMod = await import('../intake/shopperIntake.js');
   const botRouter = await import('../bot/inboundRouter.js');
@@ -2792,6 +2904,48 @@ async function realWiring(deps) {
     // it. An expired ASDA sign-in is still Warwick's - the runner raises
     // ReauthRequiredError and never attempts to resolve it - but an ORDINARY
     // signed-in session now needs nobody.
+    // -- A CONFIGURATION FAILURE IS NOT A PERMANENT FAILURE (AC4) ----------
+    //
+    // Runs BEFORE `shopBasket` on the same pass, so a request that becomes
+    // claimable is claimed immediately rather than a full interval later.
+    //
+    // THE ENVIRONMENT IS TESTED BY THE PRODUCTION VALIDATOR, not by a second
+    // opinion about which variables matter. `launcher.resolveConfig` is the
+    // exact function `ensureChrome` calls and the exact function that threw
+    // when the values were absent - so "ready" here means "ready by the same
+    // rule that refused", and the two cannot drift. It reads variable NAMES
+    // only and never prints or returns a value.
+    //
+    // THE ALLOW-LIST IS POSITIVE. Only a shop that still WANTS a browser build
+    // has its request resurrected; a cancelled, reconciled or already-basketed
+    // shop is never touched, and a new shop status cannot silently qualify by
+    // failing to appear on a deny-list.
+    recoverBrowserEnvironment: async ({ log: passLog = () => {} } = {}) => {
+      const launcher = await import('../basket-executor/launcher.cjs');
+      const lease = await import('../browser-runner/lease.cjs');
+      try {
+        launcher.default.resolveConfig({}, process.env);
+      } catch {
+        // Still not configured. Nothing to recover, and nothing to say - the
+        // card that says so was queued when the request was released.
+        return [];
+      }
+      const requeued = await lease.default.requeueEnvironmentFailures(
+        (sql, params) => deps.writeQuery(sql, params),
+        {
+          shopStatuses: BROWSER_WANTED_SHOP_STATUSES,
+          reason: 'the browser environment is configured again - re-queued for another attempt',
+        },
+      );
+      if (requeued.length > 0) {
+        passLog('browser_environment_recovered', {
+          requeued: requeued.length,
+          request_ids: requeued.map((r) => Number(r.id)),
+        });
+      }
+      return requeued;
+    },
+
     shopBasket: async ({ log: passLog = () => {} } = {}) => {
       const { consumeOneBrowserBuildRequest } = await import('../basket-executor/consume-request.cjs');
       const { runBasket } = await import('../basket-executor/run-basket.cjs');
@@ -2844,14 +2998,26 @@ async function realWiring(deps) {
         // is never queued. "Mum's basket is ready" therefore cannot be said
         // over an untruthful reconciliation, and nothing had to be invented to
         // make that so.
-        announce: async (payload) => {
-          passLog('basket_outcome', {
-            kind: payload.kind,
-            shop_ref: payload.shop_ref,
-            request_id: payload.request_id,
-            blockers: (payload.blockers || []).map((b) => b.kind),
-          });
-        },
+        // -- AND THE FAILURE HALF IS NOT SILENT (WO-2026-08-18-07 AC5) -----
+        //
+        // Everything above stays true FOR THE SUCCESS CASE and is unchanged:
+        // "Mum's basket is ready" is still issued once, by `advanceAll` ->
+        // `queueShopCards` -> `drainOutbox`, over a truthful reconciliation,
+        // and nothing here writes a second truth about it.
+        //
+        // The FAILURE case had no such route at all. This binding WAS a log
+        // line and only a log line, so when four requests died on 2026-08-18
+        // for want of three environment variables, no outbox row was written
+        // (the newest `pipeline_command` was id 282, hours earlier) and
+        // nothing reached anybody.
+        //
+        // THE BODY IS A NAMED, EXPORTED FUNCTION AND NOT AN INLINE ARROW, on
+        // purpose. An inline closure inside `realWiring` is reachable only by
+        // standing up the whole runtime, so the only thing a test could have
+        // asserted about it is that the SOURCE TEXT mentions an outbox - which
+        // is the shape of proof this build already has too much of. Extracted,
+        // the production function itself is what the test executes.
+        announce: (payload) => announceBasketOutcome(deps, payload, { log: passLog }),
       }, { log: (m) => passLog('basket', { detail: m }) });
     },
     intake: {

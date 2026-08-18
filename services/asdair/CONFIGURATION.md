@@ -13,8 +13,19 @@ missing for hours and only surfaced as a vision-model failure mid-shop.
 > by the product's own code, through `FUSION_GATEWAY_URL`, to a real OpenAI-compatible API —
 > never by an interactive AI session standing in for it.
 
+> **⚠️ NAMES CORRECTED 2026-08-18 (WO-2026-08-18-07 AC6).** This file named
+> `ASDAIR_CHROME_EXE` for a lane whose launcher reads **`ASDAIR_CHROME_PATH`**, documented
+> `ASDAIR_CDP_ENDPOINT` as though an operator supplies it when it is **derived and written by
+> the launcher**, and did not mention **`ASDAIR_CDP_PORT`** at all — while the same file called
+> those rows "live preconditions". `pipeline-runtime/RUNBOOK.md` had the right names; the two
+> disagreed, and this file is the one that is canonical, so this file was wrong. Found by
+> Veritas at the Gate 2 re-review (defect 5) after `ensureChrome` threw
+> `LauncherConfigError` and terminated four browser build requests on 2026-08-18.
+> **The consumer named on each row below is now the module that actually reads the variable**,
+> established by reading it, not by memory.
+
 > **⚠️ RE-CUT 2026-08-17, Warwick's product ruling.** The `ASDAIR_CDP_ENDPOINT` /
-> `ASDAIR_CHROME_EXE` / `ASDAIR_CHROME_PROFILE_DIR` / `ASDAIR_RUNNER_ID` /
+> `ASDAIR_CHROME_PATH` / `ASDAIR_CHROME_PROFILE_DIR` / `ASDAIR_RUNNER_ID` /
 > `ASDAIR_RUNNER_STATE_DIR` rows below configure the Node/CDP runner at
 > `services/asdair/browser-runner/`, which is **AUTHORISED** — Warwick confirmed the
 > 2026-08-04 exclusion was an internal architecture decision, not his, and lifted it.
@@ -67,9 +78,25 @@ variable **names** only.
 | `FUSION_GATEWAY_URL` | yes | `transcribe` → `obsidiwikai/src/core/models.mjs` | OpenAI-compatible base URL, usually ending `/v1` | none | **BLOCKING** — the endpoint is actually called | Every photo list dies at TRANSCRIBING: *"no vision-capable gateway configured"* — D-04 | **YES** — it may carry userinfo |
 | `FUSION_GATEWAY_KEY` | yes | as above | bearer token | none | **BLOCKING** — an authenticated call must return 200 | Gateway reachable but every call 401s | **YES** |
 | `FUSION_MODEL_VISION` | **yes** | `transcribe`, `interpret-list.js` | a model id the gateway actually serves | `fusion.vision` — **which this gateway does not serve** | **BLOCKING** — the id must appear in the gateway's own `/models` response | Gateway reachable and authenticated, but rejects the default alias with `Invalid model name`; every photo list dies at TRANSCRIBING — D-05 | no |
-| `ASDAIR_CDP_ENDPOINT` | no | `browser-runner/cdp.js` | `http://host:port` | `http://127.0.0.1:9222` | **ADVISORY** — Chrome is opened when a basket is built, not at logon | The runner cannot attach to Chrome | no |
-| `ASDAIR_CHROME_EXE` | no | preflight (documented for the runner) | absolute path to `chrome.exe` | the two standard Program Files locations | **BLOCKING** — the file must exist | No browser to drive | no |
-| `ASDAIR_CHROME_PROFILE_DIR` | no | preflight (documented for the runner) | absolute directory path | `C:/.fusion247/asdair/chrome-profile` | **BLOCKING** — the directory must exist | The runner drives a profile that is **not signed in**, and fails halfway through a basket with an unexplained empty page | no (but it *contains* a live session) |
+| `ASDAIR_CHROME_PATH` | **yes, for the browser lane** | `basket-executor/launcher.cjs` (`resolveConfig`) | absolute path to `chrome.exe` | **none — this module carries no defaults by design** | **BLOCKING** — absent, the launcher throws `LauncherConfigError` before anything is launched | No browser to drive. The browser build request is released with `_failure_class: environment` and Warwick is sent the "I could not start the ASDA browser" card | no |
+| `ASDAIR_CHROME_PROFILE_DIR` | **yes, for the browser lane** | `basket-executor/launcher.cjs` (`resolveConfig`) | absolute directory path | **none — no default** | **BLOCKING** — as above | The lane cannot start. If it were defaulted, the runner would drive a profile that is **not signed in** and fail halfway through a basket with an unexplained empty page — which is why there is no default | no (but it *contains* a live session) |
+| `ASDAIR_CDP_PORT` | **yes, for the browser lane** | `basket-executor/launcher.cjs` (`resolveConfig`) | integer TCP port, 1–65535 | **none — no default** | **BLOCKING** — absent *or* not a valid port number, the launcher throws before launching | The lane cannot start | no |
+| `ASDAIR_CDP_ENDPOINT` | **no — DERIVED, do not set it** | written by `basket-executor/run-basket.cjs`; read by `browser-runner/cdp.js` | `http://host:port` | `http://127.0.0.1:9222` when nothing set it | **NOT a precondition** — `run-basket.cjs` sets it from the Chrome it just launched or reused, so the value is an *output* of `ensureChrome`, not an input to it | Setting it by hand points the runner at a browser the launcher did not open. The three rows above are what configure the lane | no |
+
+### Why the three browser-lane rows have NO defaults
+
+`basket-executor/launcher.cjs` refuses to invent a Chrome path, a profile directory or a
+debugging port: *"This module carries no defaults for them by design."* That is deliberate and
+it is not tidiness. A defaulted profile directory is the difference between "the lane will not
+start" — loud, at the first attempt, before a browser exists — and "the lane started, drove a
+profile that was never signed in, and failed halfway through a basket on an unexplained empty
+page." The first is recoverable in a minute; the second wastes a shop.
+
+Since WO-2026-08-18-07 the consequence is bounded rather than terminal: a launcher
+configuration failure is classified `environment`, retried with backoff, and re-queued
+automatically once the three values are present — and Warwick is told on the **first**
+occurrence rather than at the ceiling. **Placing the values is still an operator action; the
+product will not guess them.**
 
 ### Why `ASDAIR_MEDIA_ROOT` is only ADVISORY
 
