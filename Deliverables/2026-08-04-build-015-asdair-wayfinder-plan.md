@@ -130,7 +130,13 @@
 
 **Resolution order, settled and not to be re-derived:** stored id if present → **otherwise Favourites/Regulars identity by canonical ASDA description** → otherwise live ASDA search on that description → model evaluates real candidates → choose when clear → abstain only on genuine ambiguity → **harvested id persisted afterwards only as an optimisation.** **Product id is NOT the identity and must never become a prerequisite.**
 
-**Route to acceptance:** close the ten gaps → **Veritas** against the new Goal Contract, made to fail, graded on the North Star and not on component health → **bounded estate reconcile** so one canonical truth sits on main → **Codex** external release QA against the release claim → **Tuesday 25 August 2026 real shop.** Veritas does not replace Codex; Warwick's authority does not replace Codex.
+**Route to acceptance — ⛔ RE-CUT 2026-08-18 on Warwick's sequencing correction. The line that stood here put Veritas BEFORE the first real joined production run, which is backwards: the real inbound Telegram event is *part of the integrated proof Veritas inspects*, not something deferred until after the gates. Assuring a route that has never run is assuring a hypothesis.**
+
+close the ten gaps → **the joined production route is genuinely ready** → Warwick takes the ONE normal product action, **SEND THE PHOTO TO @Fusion247shopperbot** → **observe the real production event end to end** → close any gap that real run exposes → **repeat until the joined route genuinely works** → **Veritas** made to fail against *that integrated production route*, graded on the North Star and not on component health → fix anything Veritas finds → **Veritas PASS** → **bounded estate reconcile** so one canonical truth sits on main → **Codex** external release QA against the release claim → **Tuesday 25 August 2026 real shop.** Veritas does not replace Codex; Warwick's authority does not replace Codex.
+
+**The run must prove the ACTUAL path**, not a rehearsal of it: real inbound Telegram photo → live runtime consumes it → production image preparation → intake / catalogue / rules → durable AsdAIr work → autonomous runtime → downstream browser path as appropriate → question and resume behaviour if triggered → truthful evidence.
+
+**Both halves of this bind.** Warwick is not asked to SEND until the gaps are closed and the route is genuinely ready — and Veritas and Codex do not run ahead of the first real joined production exercise.
 
 ### 🔧 THE SEVEN RUNTIME CAPABILITIES — superseded by the TEN GAPS above, 2026-08-17. Kept for the owner column only.
 
@@ -6046,9 +6052,17 @@ exists.**
 > Report repeat failures as: REPEAT FAILURE / PREVIOUS PREVENTION / WHY PREVENTION FAILED / CAUSAL FIX /
 > PROOF / RECURRENCE BARRIER. **Do not tell Warwick he is right — show the mechanism was removed.**
 >
-> ### Route to done
-> close 1–7 → exercise the joined route on the photo door → **Veritas made-to-fail** → bounded estate
-> reconcile → **Codex** external release QA → the Tuesday 25 August 2026 shop is the real acceptance.
+> ### Route to done — **expanded 2026-08-18 on Warwick's sequencing correction. The order was already
+> right here; what was missing is the ITERATION, and that omission let a chat summary put Veritas first.**
+>
+> close 1–7 → **the joined route is genuinely ready** → Warwick's ONE normal product action, **SEND THE
+> PHOTO** → **observe the real production event end to end** → close any gap that run exposes →
+> **repeat until the joined route genuinely works** → **Veritas made-to-fail against that integrated
+> production route** → fix what Veritas finds → **Veritas PASS** → bounded estate reconcile →
+> **Codex** external release QA → the Tuesday 25 August 2026 shop is the real acceptance.
+>
+> **The real inbound Telegram event is PART OF the integrated proof Veritas inspects.** It is not a
+> victory lap after the gates. Full path and both binding halves: § "Route to acceptance" above.
 
 
 > **⛔ This section was REPLACED, not appended to.** The 2026-08-11 §12 — *"INPUT TRUTH IS THE FRONTIER…
