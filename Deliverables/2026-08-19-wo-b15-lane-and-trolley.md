@@ -55,6 +55,12 @@ file_surface:
   - services/asdair/browser-runner/**
   - services/asdair/reconcile/**
   - services/asdair/pipeline-runtime/**
+  # AMENDED BY LARRY 2026-08-19. Added ON THE FIELD, because the worker is right that an
+  # authority supplied in a dispatch message does not exist - it told me so about AC2 and I
+  # repeated the error here. renderMessages.js:912 emits the AC1 false predicate ONTO WARWICK'S
+  # PHONE, which is worse than the log line. Permitted by Team/Keel …/AGENTS.md § Where Keel
+  # writes - services/**.
+  - services/asdair/bot/**
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
