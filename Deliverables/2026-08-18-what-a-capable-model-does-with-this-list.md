@@ -40,7 +40,7 @@ false defect against a run that had got it right.
 
 | # | The line, as written | What it plainly is | Was a question warranted? |
 |---|---|---|---|
-| 1 | `2 SLICED ROAST BEEF` | Sliced cooked roast beef from the chilled meats aisle. `ASDA Sliced Topside of Beef 90g` — **already regular 80, already its own top candidate, already matched at 0.99** | **No** |
+| 1 | `2 SLICED ROAST BEEF` | Sliced cooked roast beef from the chilled meats aisle. `ASDA Sliced Topside of Beef 90g`. ⛔ **CORRECTED 2026-08-18 by Veritas:** this row read *"already matched at 0.99"*. It is **not matched.** `shop_line` line 14 carries `match_confidence` **0.99** with `matched_regular_id` **NULL**, while regulars **80** *"Sliced beef"* and **81** *"Roast beef"* are active. **High confidence with nothing bound is a DIFFERENT and worse defect than a matched line being asked about** — the system was sure, and bound nothing. Warwick's acceptance rule: **a confidence value without an identity binding is not a successful match.** | **No** |
 | 2 | `1 x 6pk. HEINZ BAKED BEANS` | A six-pack of Heinz baked beans. **Already matched at 0.99.** The question quoted the product's own full catalogue name back at Warwick | **No** |
 | 3 | `1 x 4pk BEN & JERRY's COOKIE DOUGH` | Ben & Jerry's Cookie Dough ice cream, four-pack — the mini-cup/stick multipack | **Yes — but the right question.** *"I can't find a 4-pack of Ben & Jerry's Cookie Dough in your catalogue. Search ASDA?"* Not *"is it Beef Quarter Pounders?"* |
 | 4 | `1 pk. ASDA FRUIT LOLLY ICES` | ASDA own-brand fruit ice lollies | **No** — recorded as present in his ASDA Favourites |
