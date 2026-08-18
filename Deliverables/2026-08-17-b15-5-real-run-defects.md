@@ -83,3 +83,41 @@ handoff, the freeze point. ALL REACHED.** What remains is the basket workflow be
 > **The honest reading: the TEXT door completed the journey. The PHOTO door failed on a real shop and
 > its three defects remain entirely open.** Warwick reached a working weekly shop by changing door, which
 > is a legitimate route to a shop and is **not** evidence that the photo path works.
+
+---
+
+# ⭐⭐ 2026-08-18 — THE PHOTO PATH RE-RAN AND DID NOT REPRODUCE THE DEFECTS. **The invention is INTERMITTENT.**
+
+`SHOP-2026-08-18-M128` · id 37 · **photo, arrived via Telegram** · 37 lines · **0 duplicate readings**.
+
+**Read against the two known failures, on what is evidently the same list:**
+
+| | 2026-08-17 (abandoned) | 2026-08-18 |
+|---|---|---|
+| line 14 | **"2 skinny cow bars"** — **INVENTED**, the item was sliced roast beef | **"2 sliced roast beef"** — **CORRECT** |
+| line 16 | **duplicated**, so *Heinz sausage and beans* was **lost** | `1 x 6pk Heinz baked beans` **and** `1 x 5pk Heinz sausages & beans` — **both present, both distinct** |
+| duplicate readings | present | **ZERO** |
+| lines | — | **37** (same count as the successful text run) |
+
+## ⛔ WHY THIS IS NOT "FIXED", AND MUST NEVER BE WRITTEN UP AS FIXED
+
+**Nothing was changed between the two runs.** No code, no prompt, no model, no configuration. **The same
+door, on the same list, produced a materially wrong transcript once and a correct one the next day.**
+
+> **That makes the invention INTERMITTENT, not resolved — and intermittent is the harder finding.** A
+> deterministic fault announces itself on every run. This one passes, and passes, and then silently
+> substitutes one product for another and drops a third.
+>
+> **A single clean run is therefore NOT evidence the defect is gone. It is evidence the defect is not
+> constant** — which is what "2-of-3 is corroboration, not verification" already says on this build.
+
+**The practical consequence for a weekly shop:** the failure mode is a **wrong item bought and a needed
+item missing**, with nothing on screen saying so. **It is only catchable by a human comparing the
+transcript against the photograph** — which is exactly what Warwick did on the 17th, and why that shop was
+abandoned rather than shipped.
+
+## State at this point
+
+**6 lines unmatched → 6 questions incoming.** The **answer-binding defect (Defect 2) has NOT yet been
+re-exercised** — it only appears when the answers are submitted. **That is the next thing worth watching,
+and it is the one that cost the 17th its shop.**
