@@ -48,6 +48,7 @@ import {
   MODEL_CANDIDATE_SOURCE, DECISION_FLAGS,
 } from './applyDecisions.js';
 import { runPipeline, modelCardCandidates, planCandidates, MODEL_ASK_FLAG } from './runPipeline.js';
+import { boardStateOf } from './runtime.js';
 import { questionKeyFor } from './keys.js';
 import * as commands from './commands.js';
 import { makeHarness, makeCatalogue, HOUSEHOLD_ID } from './test/harness.js';
@@ -347,6 +348,38 @@ test('AC3 CLASSIFIER MUTATION: it is the provenance string that condemns, nothin
   const mutated = { ...q, candidates: [{ ...q.candidates[0], source: 'planner suggestion (no product id)' }] };
   assert.equal(classifyQuestionBoards([mutated], { modelHasDecided: true }).condemned.length, 1,
     'changing only the provenance string did not change the verdict - the classifier is not reading it');
+});
+
+test('AC3 BOARD: a superseded card LEAVES the board, and the ordinals do not move', () => {
+  // The gate and the board must not disagree about which rows are history. A
+  // condemned card that stops blocking the shop but stays on Warwick's phone
+  // beside its own successor is the artefact still sitting in front of him -
+  // cat food on one card, AsdAIr's real options on the next.
+  const rows = [
+    { id: 76512, status: 'open', question_key: 'k1', item_name: '1 wet wipes', question_round: 1, parent_question_id: null, candidates: SCORER_BOARD },
+    { id: 76599, status: 'open', question_key: 'k2', item_name: '1 wet wipes', question_round: 2, parent_question_id: 76512, candidates: MODEL_BOARD },
+    { id: 76600, status: 'open', question_key: 'k3', item_name: '2 pkts toffees', question_round: 1, parent_question_id: null, candidates: MODEL_BOARD },
+  ];
+
+  const state = boardStateOf(rows);
+  const shown = state.outstanding.map((o) => o.questionKey);
+  assert.deepEqual(shown, ['k2', 'k3'],
+    'the superseded round-1 card is still on the board beside the card that replaced it');
+
+  // THE ORDINALS ARE EACH ROW'S OWN INDEX OVER THE FULL LIST and do not shift
+  // when a row is dropped from the display. A tap from a card sent before the
+  // supersession therefore still addresses the question it always did - it is
+  // refused as a stale card by the render contract, which is the correct
+  // refusal, rather than silently resolving to a DIFFERENT line.
+  assert.deepEqual(state.outstanding.map((o) => o.n), [2, 3]);
+  assert.equal(state.byOrdinal.get(1).questionKey, 'k1',
+    'the superseded row left the ordinal map - an old tap would now resolve to the wrong question');
+  assert.equal(state.byOrdinal.size, 3);
+
+  // MUTATION: break the parent link and the condemned card comes straight back.
+  const orphaned = [rows[0], { ...rows[1], parent_question_id: null }, rows[2]];
+  assert.deepEqual(boardStateOf(orphaned).outstanding.map((o) => o.questionKey), ['k1', 'k2', 'k3'],
+    'the board is not reading parent_question_id at all - it dropped the row for some other reason');
 });
 
 test('AC3 ROUND WALK: a round-2 decision applies even when round 1 was never decided', () => {

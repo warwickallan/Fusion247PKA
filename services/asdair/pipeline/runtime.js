@@ -53,6 +53,7 @@ import * as shopDecisions from './shopDecisions.js';
 import { STEPS, everIssued } from './stages.js';
 import { COMMANDS } from './commandNames.js';
 import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
+import { supersededQuestionIds } from './applyDecisions.js';
 // WO-2026-08-18-03 AC1. A MODEL MAPPING IS NOT EVIDENCE. Pure, zero-dep, opens
 // no connection - same reasoning as the shopDecisions import above.
 import { bindingVerdict } from './answerCorroboration.js';
@@ -1560,6 +1561,22 @@ export function boardStateOf(questionRows, park = null) {
   const answered = [];
   const byOrdinal = new Map();
 
+  // -- A SUPERSEDED CARD LEAVES THE BOARD (WO-2026-08-18-07 AC3) ------------
+  //
+  // A question a LATER ROUND has replaced is history, and showing it beside its
+  // own successor would leave the condemned board - the cat food, the ham, the
+  // quarter pounders - sitting on Warwick's phone next to the card that
+  // replaced it. Removing the row from the DATABASE is not the answer: it is
+  // the record of what he was actually asked, and `parent_question_id` is what
+  // makes the supersession legible without editing history.
+  //
+  // `byOrdinal` still carries EVERY row, and `n` is still each row's own index
+  // over the full list, so a tap from a card sent before the supersession
+  // resolves to the same question it always did - it is refused by the render
+  // contract as a stale card, which is the correct refusal, rather than
+  // silently resolving to a different line because the numbering moved.
+  const replaced = supersededQuestionIds(rows);
+
   rows.forEach((q, i) => {
     const n = i + 1;
     // `item_name` is the thing itself; `question_text` is a whole sentence
@@ -1568,6 +1585,7 @@ export function boardStateOf(questionRows, park = null) {
     // "unknown".
     const item = q.item_name || q.question_text || null;
     byOrdinal.set(n, { questionKey: q.question_key, status: q.status });
+    if (replaced.has(String(q.id))) return;
     if (q.status === 'open') {
       const { candidates, unidentified } = normaliseStoredCandidates(q.candidates);
       outstanding.push({

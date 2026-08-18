@@ -155,16 +155,7 @@ export function decisionBindsASupersededBoard(decision) {
  */
 export function classifyQuestionBoards(questions, { modelHasDecided = false } = {}) {
   const rows = Array.isArray(questions) ? questions.filter(Boolean) : [];
-  // ids are compared as STRINGS and never with ===, for the reason
-  // decisionSpine.test.js pins on this file's source text: a bigint arrives as
-  // a string from one driver and a number from another, so an === between two
-  // ids passes every offline suite and silently finds nothing live.
-  const hasSuccessor = new Set();
-  for (const q of rows) {
-    const parent = idKey(q.parent_question_id);
-    if (parent === null) continue;
-    hasSuccessor.add(parent);
-  }
+  const hasSuccessor = supersededQuestionIds(rows);
 
   const blocking = [];
   const condemned = [];
@@ -182,6 +173,33 @@ export function classifyQuestionBoards(questions, { modelHasDecided = false } = 
   }
 
   return { blocking, condemned, superseded };
+}
+
+/**
+ * PURE. The ids of questions that a LATER ROUND has replaced, as comparable
+ * strings.
+ *
+ * One home, two readers: `classifyQuestionBoards` uses it to decide what the
+ * shop may wait on, and `runtime.boardStateOf` uses it to decide what Warwick
+ * is shown. A superseded card that vanishes from the gate but stays on the
+ * board is the condemned artefact still sitting on his phone, which is the
+ * thing this Work Order exists to retire - so the two must not be able to
+ * disagree about which rows are history.
+ *
+ * ids are compared as STRINGS and never with `===`, for the reason
+ * decisionSpine.test.js pins on this file's source text: a bigint arrives as a
+ * string from one driver and a number from another, so an `===` between two ids
+ * passes every offline suite and silently finds nothing live.
+ */
+export function supersededQuestionIds(questions) {
+  const out = new Set();
+  for (const q of (Array.isArray(questions) ? questions : [])) {
+    if (!q) continue;
+    const parent = idKey(q.parent_question_id);
+    if (parent === null) continue;
+    out.add(parent);
+  }
+  return out;
 }
 
 /** PURE. Any id -> a comparable string, or null. Never an `===` between ids. */
