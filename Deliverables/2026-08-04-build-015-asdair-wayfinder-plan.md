@@ -5986,6 +5986,62 @@ exists.**
 
 ## 12. RESUMABLE STATE AFTER `/clear` OR A FRESH SESSION — **REPLACED WHOLE 2026-08-17**
 
+> ## 🔴 CURRENT STATE — 2026-08-18 morning. THIS BLOCK SUPERSEDES EVERYTHING BELOW IT IN §12.
+>
+> **Integrated head:** `2329a98` on `main`, clean, `main == origin/main`. Both build branches are
+> MERGED (`wo/b15-intake`, `wo/b15-runtime`). Nothing of value is left on a branch or worktree.
+>
+> ### FRONTIER — REMEDIATE. Close the remaining North-Star gaps, then Veritas.
+>
+> **NEXT ACTION:** exercise the JOINED production route end to end on the PHOTO door, then dispatch
+> Veritas made-to-fail against the full autonomous route. Not another defect list.
+>
+> ### Genuinely closed, with evidence
+>
+> | Gap | Evidence |
+> |---|---|
+> | Intake identity/rules | Mum's real list, measured: unauthorised identities **1→0**, lines needing a human **7→0**, correct **29/37→37/37**, deterministic rules **5→7**. `node services/asdair/interpret/measure-known-list.js` (no DB, no gateway). |
+> | The invented product | Root cause was **image preparation**, not the model. Telegram delivers 720×1280 (~34 px/line); a 2×/3× upscale, **no rotation**, removes the invention and keeps all 37 lines. `transcribe/prepareImage.js`, mutation-tested. |
+> | The merged line | The prompt was **instructing** the merge ("mark the later one possible_duplicate"). Removed; the two Heinz products stay two. |
+> | Conditioner→shampoo | Category guard in `resolveByCatalogue.js`; regular 105's alias `"tresemme blue label"` no longer wins over regular 17. |
+> | Favourites-first | `basket-executor/method.cjs` reads the pinned `BROWSER_METHOD`; `favourites.cjs` + `resolve.cjs` walk the settled ladder. **Live-unverified against the real grid DOM.** |
+> | Nothing claimed a build request | `basket-executor/consume-request.cjs`, called by the runtime pass. This was why every shop parked at `wait:browser_runner` forever. |
+> | Trolley read-back | Trolley-derived, one count, per-run artefacts. Unreadable quantity is now a blocker. |
+> | Dead model default | `ROLE_ALIAS.vision` was `fusion.vision`, which the gateway does not register; the guard pinned the broken literal and `loadModels()` never cleared `FUSION_MODEL_*`. All three fixed; mutation-proven. |
+> | CI | `basket-executor` added — it operates the live trolley and nothing ran its 56 tests. |
+>
+> ### OPEN — these are the completion gate
+>
+> 1. **The PHOTO door has never completed a real shop.** Attempt 3 (`SHOP-2026-08-19`) succeeded on the
+>    **TEXT** door. Mis-binding, Terra invention and first-answer-wins were **not re-exercised** on the
+>    path that broke. See `Deliverables/2026-08-17-b15-5-real-run-defects.md`.
+> 2. **Autonomous wake is unproven end to end** — Telegram → durable command → runtime picks it up with
+>    no shell, no request id, no Larry.
+> 3. **Runtime credentials** still arrive from an invoking shell in practice; the runtime-inherits path
+>    is built but unexercised.
+> 4. **Crash/restart re-invocation** — resumable is built; automatic re-invocation is unproven.
+> 5. **Question → Telegram → durable answer → automatic resume** is unproven live.
+> 6. **The audited correction command is NOT built** (deferred deliberately: a new name in a closed
+>    allowlist days before a real shop).
+> 7. **Favourites bulk tick-and-add is written against a DOM never seen.**
+>
+> ### Test state at `2329a98`
+> interpret 48/0 · transcribe 43/0 · intake 43/0 · pipeline **525/0** · pipeline-runtime 132/0 ·
+> browser-runner 92/0 · handoff 135/0 · basket-executor 56/0. `skill` carries 7 pre-existing
+> environment failures (`ASDAIR_DB_URL` unset, `pg` absent) — unchanged baseline, not a regression.
+>
+> ### Standing constraints a fresh Larry must not relearn
+> **Larry is NOT in the weekly runtime.** Never checkout/pay/slot/credentials/substitute. The ASDA
+> **product NAME is identity**; a missing `asda_product_id` must never block a line. Rules must reach the
+> **decision point** — a rule in Git or Supabase that the runtime does not consume is FAIL.
+> Report repeat failures as: REPEAT FAILURE / PREVIOUS PREVENTION / WHY PREVENTION FAILED / CAUSAL FIX /
+> PROOF / RECURRENCE BARRIER. **Do not tell Warwick he is right — show the mechanism was removed.**
+>
+> ### Route to done
+> close 1–7 → exercise the joined route on the photo door → **Veritas made-to-fail** → bounded estate
+> reconcile → **Codex** external release QA → the 24 August shop is the real acceptance.
+
+
 > **⛔ This section was REPLACED, not appended to.** The 2026-08-11 §12 — *"INPUT TRUTH IS THE FRONTIER…
 > RESOLVE SOURCE TRUTH… DO NOT ASK WARWICK FOR A PHOTOGRAPH"* — was **stale**: superseded by the events of
 > 2026-08-13, 08-14, 08-15 and by Warwick's product ruling of 2026-08-17. It is **removed from this map**
