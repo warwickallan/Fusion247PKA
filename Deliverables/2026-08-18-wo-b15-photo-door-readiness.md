@@ -57,6 +57,11 @@ machine_surface:
   - C:/.fusion247/asdair/runtime.log
   - C:/.fusion247/asdair/status.json
   - C:/.fusion247/asdair/shopper-intake-state.json
+  # AMENDED BY LARRY 2026-08-18 (read-back defect 1). AC5 as issued told the worker to
+  # inspect a path the same document's out-of-scope clause forbade. Added, and BOUND:
+  # METADATA ONLY — existence, modification time, size. NO file contents read, NO cookie
+  # store parsed, NO session material opened. That bound is the whole of the grant.
+  - C:/.fusion247/asdair/chrome-profile
 out_of_scope_policy: report-only
 
 # --- contract and capability compatibility ---
@@ -93,7 +98,11 @@ credential_scope: BOUNDED — may pass --env-file PATHS to node so a process loa
 # DEVIATION from standing default `none`. ESCALATION: Warwick, 2026-08-18 — "ensure the joined production route is ready to receive the event ... make sure you are ready to observe the entire event chain from the real bot input"
 live_authority: BOUNDED READ-ONLY — observe the running AsdAIr runtime (pid 42548) and READ asdair Postgres. NO start, stop, restart, arm, disarm, deregister. NO Telegram call of any kind. NO write to any table.
 # DEVIATION from standing default `none`. ESCALATION: Warwick, 2026-08-18 — "ensure the joined production route is ready to receive the event ... make sure you are ready to observe the entire event chain from the real bot input"
-network: none
+network: BOUNDED — the asdair Postgres connection ONLY. No web fetch, no outbound API,
+#   no Telegram in any form. AMENDED BY LARRY 2026-08-18 (read-back defect 2): the issued
+#   value 'none' contradicted a live_authority that grants "READ asdair Postgres", and a
+#   remote database read is a network operation. The worker was right to refuse to resolve
+#   this silently. The intent was always "no web, no API"; the field now says so.
 dependency_policy: no-new-runtime-deps
 private_surface: none
 
@@ -132,12 +141,28 @@ call and the run is worthless. Report READY or NOT READY with the evidence. **Do
 restarting.** If it is NOT READY, that is mine to sequence.
 
 **AC3 — Nothing technical is required of Warwick after SEND.** Walk the chain — inbound update,
-image preparation, intake, catalogue and rules, shop creation, autonomous wake, model call, browser
-build request, the browser route, questions, reconciliation — and at EVERY stage name what would
-have to happen for a human to be needed. The seven open gaps in the Wayfinder §12 are the obvious
-candidates: gap 3 (credentials from an invoking shell), gap 4 (crash/restart re-invocation), gap 5
-(question to durable answer to automatic resume). Report each as: AUTOMATIC / NEEDS WARWICK
-(shopping decision, which is legitimate) / NEEDS A TECHNICAL STEP (which is a failure).
+image preparation, **durable transcription with provenance**, intake, catalogue and rules, shop
+creation, autonomous wake, model call, browser build request, the browser route, questions,
+reconciliation — and at EVERY stage name what would have to happen for a human to be needed. Report
+each as: AUTOMATIC / NEEDS WARWICK (shopping decision, which is legitimate) / NEEDS A TECHNICAL STEP
+(which is a failure).
+
+> **AMENDED BY LARRY 2026-08-18 — read-back defects 3 and 4, both the worker's catches, both right.**
+>
+> **The gap citation was wrong and is withdrawn.** Answer against the **TEN GAPS** (map lines
+> 114–147) as canonical. The SEVEN RUNTIME CAPABILITIES list is explicitly headed *"superseded by
+> the TEN GAPS above"*, §12 is the resumable-state section and carries no gap table, and my own
+> glosses matched the ten, not the seven: credentials-from-a-shell is TEN gap **4**, crash/restart
+> re-invocation is TEN gap **7**, question-to-durable-answer-to-resume is TEN gap **6**. Anchor on
+> the glosses; the numbers I gave were wrong.
+>
+> **DURABLE TRANSCRIPTION WITH PROVENANCE is now a first-class stage, and it is WANTED, not scope
+> creep.** The chain as issued omitted the one stage that has actually failed in production: on
+> 2026-08-10 it emitted empty text, null provider, null model and null confidence, the pipeline
+> continued regardless, and roughly 35 plausible lines that never came from the photograph reached a
+> real trolley **while every other control in the estate was green**. SOP-021 §1 GATE ZERO exists
+> because of that. It is the highest-value row in the AC4 table. Required finding: **is there a
+> durable transcription with provenance, and can we read it within seconds of SEND?**
 
 **AC4 — The whole event chain is observable by us.** For each stage, name the durable evidence it
 emits and the exact command that reads it. `runtime.log` is JSONL and `asdair.shop*` carries the
