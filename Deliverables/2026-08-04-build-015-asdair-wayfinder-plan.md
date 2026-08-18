@@ -248,7 +248,7 @@ of them first and must learn from that one which document it is allowed to act o
 > 1. **Lane C's *"no Larry-less claimer BY DESIGN"*** (`stages.js:85`: *"waitsFor: the supervised browser
 >    runner (Larry, at the keyboard)"*) — ⛔ **that design is REVERSED.** A Larry-less claimer is now
 >    **required**. This is a defect to fix, not a boundary to respect.
-> 2. **Every lane's implied basket-writer** — Sonnet in Claude for Chrome, or a supervised session. ⛔
+> 2. ~~**Every lane's implied basket-writer** — Sonnet in Claude for Chrome, or a supervised session.~~ ⛔ **SUPERSEDED 2026-08-17 (S-7): AsdAIr drives the browser itself.** ⛔
 >    **AsdAIr operates the browser itself and chooses its own mechanism. CDP is authorised.**
 > 3. **Lane statuses generally** — these were true on 2026-08-09 and several have since moved in both
 >    directions. **Resolve status by execution, not from this table.**
@@ -605,10 +605,14 @@ packet (Brand A–Z)** → basket built → reconciliation against expected coun
 
 **Product boundaries, canonical in `Builds/BUILD-015-.../RUNTIME-DECISION.md`:**
 
-- **Sonnet in Claude for Chrome is the Stage 1 live basket writer.** Not Larry, not a Claude Code
-  subagent, not the CDP runner at `services/asdair/browser-runner/`.
-- The CDP runner is **experimental, deferred, not the live default, not a blocker to Stage 1, and
-  prohibited from further live-account testing without fresh authority from Warwick.**
+- ~~**Sonnet in Claude for Chrome is the Stage 1 live basket writer.** Not Larry, not a Claude Code
+  subagent, not the CDP runner at `services/asdair/browser-runner/`.~~ ⛔ **SUPERSEDED 2026-08-17 —
+  goal contract S-7. ASDAIR DRIVES THE BROWSER** and chooses its own execution mechanism.
+- ~~The CDP runner is **experimental, deferred, not the live default, not a blocker to Stage 1, and
+  prohibited from further live-account testing without fresh authority from Warwick.**~~ ⛔ **LIFTED
+  2026-08-17 — goal contract S-8.** Warwick confirmed that exclusion was an INTERNAL architecture
+  decision, not his, and has AUTHORISED CDP. **Checkout and payment remain permanently out of scope
+  (S-3) and are unchanged and absolute.**
 - **Deferred as Stage 2c and not to be built:** a persistent external-LLM daemon, a fully autonomous
   planning daemon, an unattended ASDA browser, automated checkout, automated payment.
 - The Cockpit read contract is published and binding on the read side:
@@ -621,7 +625,7 @@ Each is settled. **Do not re-open one; point at it.**
 
 | Decision | Where it is canonical |
 |---|---|
-| Sonnet in Claude for Chrome writes the basket | `RUNTIME-DECISION.md` (Warwick, 2026-08-04) |
+| ~~Sonnet in Claude for Chrome writes the basket~~ ⛔ **SUPERSEDED 2026-08-17: AsdAIr drives the browser** | Goal contract § supersession register **S-7 / S-8** — *not* `RUNTIME-DECISION.md`, which is struck |
 | Sort order is **BRAND A–Z**, for the ASDA grid and the packet | Goal contract Q2, `CANONICAL-WEEKLY-SHOP-PROCESS.md` §E |
 | Supervised bar, not hands-off; Warwick is the checkout and payment gate | Goal contract |
 | Stage 2a/2b are REQUIRED parts of Stage 1; only 2c is deferred | Goal contract §"Stage 1 scope" |
@@ -755,6 +759,10 @@ document**, which is not the same decision and has not been made.
   stays false, enforced as a SQL literal.
 - **A real reduction in mechanical guarantee, stated rather than glossed:** the CDP runner enforced
   the substitution ban in three independent code layers. **Sonnet in Chrome has none** — the boundary
+  ⛔ **RE-READ THIS THE RIGHT WAY ROUND, 2026-08-17.** When Sonnet was the ruled writer this was
+  recorded as an accepted weakness. **CDP is now the authorised executor (S-8), so the three
+  mechanically-enforced layers are a REASON TO PREFER IT.** A boundary bound only by instruction is
+  the weaker option and is the one that must be justified.
   there is instruction and supervision. That is why the live pass is supervised and stops at
   checkout-ready.
 - **Recovery boundary — the honest one.** Durability is **claimed nowhere in this build**. Restart
@@ -5829,7 +5837,7 @@ written to Postgres.**
 | 1 | Nothing sends a question card to Telegram — `sendQuestionCard()` had zero production callers | **✅ CLOSED BY EXECUTION — 2026-08-10** | Wired at `996a838`. **Exercised by a real shop on 2026-08-09/10:** `SHOP-2026-08-09` queued `question.q8f8d3866#0` and `question.q549c765f#0` at **17:36:04**, and `question.qe1c7008a#0` at **00:07:51** (round 2), **every one `status=done`** in `asdair.pipeline_command`. Warwick received and answered them on his phone |
 | 2 | A button answer cannot be captured — live wiring passed `resolveCandidate: () => null` | **✅ CLOSED BY EXECUTION — 2026-08-10** | `runtime.js:211–233` hands real resolvers via `bot/resolveTap.js`. **A real tap became a durable decision:** `asdair.shop_decision` id 1 — `decision_kind=existing_regular`, `interpreted_by=human`, `interpreted_model=null`, i.e. **resolved with ZERO model calls**, which is the property the button exists for |
 | 3 | The execution packet does not exist | **OPEN** | The producer now exists (`packet/buildExecutionPacket.js`) and `handoff/buildHandoff.js` calls it — but **`handoff/` has zero non-test importers in all of `services/asdair/`** (enumerated 2026-08-08); `runtime.js` names `buildHandoff()` only in a comment. The production journey still cannot produce a packet. A tested module with no caller is not delivered |
-| 4 | No basket writer | **OPEN** | The ruled writer is supervised Sonnet in Claude for Chrome (`RUNTIME-DECISION.md`); the handoff artefact it would consume is unreachable (row 3); no programmatic invocation surface exists, **deliberately** (`996a838`: "none was invented"). The CDP runner remains experimental and prohibited from live-account testing. No basket has ever been built by the ruled route |
+| 4 | No basket writer | **OPEN** | ⛔ **THIS ROW IS A DATED AUDIT FINDING, NOT CURRENT LAW. Its premise was SUPERSEDED 2026-08-17 (goal contract S-7/S-8): AsdAIr drives the browser and the CDP runner is AUTHORISED.** The row below records what was true on 2026-08-10 and is retained as history. ~~The ruled writer is supervised Sonnet in Claude for Chrome (`RUNTIME-DECISION.md`); the handoff artefact it would consume is unreachable (row 3); no programmatic invocation surface exists, **deliberately** (`996a838`: "none was invented"). The CDP runner remains experimental and prohibited from live-account testing. No basket has ever been built by the ruled route |
 | 5 | No basket-ready handback — nothing enqueues kind `basket_ready` | **SOURCE FIXED — NOT LIVE** | `basket_ready` is enqueued from `pipeline/runtime.js` at source (enumerated 2026-08-08) — but it sits downstream of rows 3–4, so it has never fired, and the live process predates it |
 | 6 | The rulebook is not consumed — `info` rules discarded, exact-string matching, `rule_qa_log` never read | **SOURCE FIXED — NOT LIVE**, with a red flag | Rule-consumption workstream landed (`996a838`); tolerant matching in `skill/termMatch.js`; skill suite recovered green at `24a731f`. **Caveat that must not be dropped: `asdair-tests.yml`'s `integration` job — clean Postgres → schema → seed → `data.js` → `planner.js` — FAILED (AssertionError) at `eb03696`, 2026-08-08, the newest run on `main`. The full-path proof is red; root cause unestablished** |
 | 7 | Answers do not survive the week — `promoteDecision` deliberately not wired | **SOURCE FIXED — FIRED LIVE, EFFECT UNPROVEN** | `promoteDecision` is driven from the outcome writers (enumerated 2026-08-08). **The loop fired for the first time on 2026-08-09/10:** three `answerLearning` commands, all `status=done` (22:23:23, 22:23:27, 00:15:25). **What is NOT proven is the thing the row is about** — that an answer given this week suppresses the question next week. That needs a SECOND real shop and cannot be established from one. Recorded as fired, not as closed |
