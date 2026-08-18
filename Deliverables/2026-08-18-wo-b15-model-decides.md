@@ -165,9 +165,25 @@ Prove on the committed corpus, using its `forbid` lists as the discriminator:
 
 **AC2 — CATALOGUE, REGULARS AND THE 39 ACTIVE RULES REACH THE DECISION CALL.** Traced in and proven by
 observed behaviour — *"zero rulebook events across the historical run"* is the evidence they do not
-today. **FAVOURITES IS EXCLUDED AND YOU WERE RIGHT TO SAY SO:** nothing in the estate holds the
-household's ASDA Favourites list; the only offline proxies are rule 40 and `regulars.asda_product_id`.
+today. **FAVOURITES — SCOPED EXCLUSION, AND THE SCOPE IS LOAD-BEARING (Warwick, 2026-08-18).** Nothing in
+the estate holds the household's ASDA Favourites list, so it cannot be part of the **offline,
+`network: none` corpus proof**; the only offline proxies are rule 40 and `regulars.asda_product_id`.
 **Record that as a gap; do not manufacture a source.**
+
+> ⛔ **THAT EXCLUSION IS FOR THE OFFLINE PROOF ONLY AND MUST NOT BECOME A PRODUCTION-RUNTIME
+> CONCLUSION.** Warwick, verbatim: *"The fact that no committed fixture contains the live Favourites
+> list does NOT waive the requirement for the joined production route to inspect/use the live
+> Favourites surface."*
+>
+> **The established shopping method is unchanged and remains binding:**
+> **live ASDA Favourites / Regulars first → exact/unambiguous fast-path where possible → model
+> judgement where identity is not mechanically certain → live search ONLY where genuinely absent or
+> new.**
+>
+> So: **do not design the decision path in a way that forecloses the live Favourites surface.** The
+> model call must be able to receive live Favourites/Regulars evidence when the browser lane supplies
+> it, even though this order cannot exercise that. **Veritas proves that behaviour on the joined live
+> route**, not here.
 
 **AC3 — FIX THE JOIN FIRST, THEN BOUND THE RETRIES. IN THAT ORDER.** `consume-request.cjs:152` passes a
 manifest object; `run-basket.cjs:332` reads it as a path. Fix that, so the browser lane executes at
