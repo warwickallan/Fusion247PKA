@@ -496,3 +496,83 @@ test('A TOLERANT BINDING IS CORRECTABLE, and the change is recorded as a correct
   assert.ok(record, 'a binding changed and nothing recorded that it had been something else');
   assert.equal(record.was, 'TRESemme Rich Moisture HAIR SHAMPOO 680 ml');
 });
+
+// =====================================================================
+// THE LIVE RETAILER SURFACE - not exercised here, and NOT foreclosed
+//
+// Warwick, 2026-08-18 (order amendment 8b5b3ff): "The fact that no committed
+// fixture contains the live Favourites list does NOT waive the requirement for
+// the joined production route to inspect/use the live Favourites surface."
+//
+// Nothing in the estate holds that list, so nothing offline can exercise it and
+// NOTHING HERE FABRICATES ONE. What these assertions hold open is the SHAPE: the
+// decision call must be able to receive the live Favourites / Regulars grid the
+// moment the browser lane reads it, and must never treat "nobody looked" as
+// "looked and it was not there". Veritas proves the behaviour on the joined
+// live route; this proves the door is not nailed shut.
+// =====================================================================
+
+test('LIVE SURFACE: the decision call ADMITS live Favourites evidence when it is supplied', async () => {
+  let seen = null;
+  await decideBasket({
+    plan: demoteDeterministicDecisions(mechanicalPlan()),
+    regulars: catalogue.regulars,
+    rules: catalogue.rules,
+    contract,
+    household: 1,
+    retailerEvidence: {
+      source: 'asda favourites grid',
+      captured_at: '2026-08-18T19:00:00Z',
+      favourites: [{ name: 'ASDA Dairy Toffee 180g', product_ref: '3707569' }],
+      regulars: [{ name: 'Lurpak Slightly Salted Butter 200g' }],
+    },
+    consult: (g) => { seen = g; return correctConsult(g); },
+  });
+
+  assert.ok(seen.live_retailer_surface,
+    'the live retailer surface cannot reach the decision at all - the shape forecloses the '
+    + 'established method, whose FIRST step is the live Favourites / Regulars grid');
+  assert.equal(seen.live_retailer_surface.favourites[0].name, 'ASDA Dairy Toffee 180g');
+  assert.equal(seen.live_retailer_surface.source, 'asda favourites grid');
+
+  const { buildDecisionPrompt } = require('../skill/decide.js');
+  const prompt = buildDecisionPrompt(seen);
+  assert.match(prompt, /ASDA Dairy Toffee 180g/,
+    'the live surface reached the grounding and never reached the model');
+  assert.match(prompt, /THE ESTABLISHED SHOPPING METHOD/,
+    'the decision is not told the method whose first step is the live surface');
+});
+
+test('LIVE SURFACE: ABSENT is reported as NOT INSPECTED, never as an empty Favourites list', async () => {
+  // The distinction this Work Order must not blur. An empty list asserts that
+  // the grid was READ and did not contain the product - a fact nobody
+  // established - and would push a line to `search` on evidence never gathered.
+  let seen = null;
+  await decideOverCorpus((g) => { seen = g; return correctConsult(g); });
+
+  assert.equal(seen.live_retailer_surface, null,
+    'an un-inspected retailer surface was reported as an empty result, which is a claim about '
+    + 'the live account that nothing in this route ever checked');
+
+  const { buildDecisionPrompt } = require('../skill/decide.js');
+  const prompt = buildDecisionPrompt(seen);
+  assert.match(prompt, /NOT INSPECTED ON THIS ROUTE/,
+    'the model is not told the difference between "not in Favourites" and "nobody looked"');
+  assert.doesNotMatch(prompt, /"favourites":\[\]/,
+    'an empty Favourites array was sent as though the grid had been read');
+});
+
+test('LIVE SURFACE: no offline path fabricates one', () => {
+  // The order is explicit: record the gap, do not manufacture a source. So the
+  // corpus path must produce exactly nothing here, from anywhere.
+  const g = require('../skill/decide.js').buildDecisionGrounding({
+    plan: demoteDeterministicDecisions(mechanicalPlan()),
+    regulars: catalogue.regulars,
+    rules: catalogue.rules,
+    contract,
+    household: 1,
+  });
+  assert.equal(g.live_retailer_surface, null,
+    'a Favourites source appeared from somewhere offline. Nothing in the estate holds that list, '
+    + 'so anything here would be invented');
+});

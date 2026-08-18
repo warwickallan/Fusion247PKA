@@ -174,6 +174,38 @@ function buildDecisionGrounding(spec) {
     lines.push(entry);
   });
 
+  // ── THE LIVE RETAILER SURFACE. EMPTY HERE, AND THE SHAPE ADMITS IT. ──────
+  //
+  // Warwick, 2026-08-18: "The fact that no committed fixture contains the live
+  // Favourites list does NOT waive the requirement for the joined production
+  // route to inspect/use the live Favourites surface."
+  //
+  // The established shopping method is unchanged and binding:
+  //   live ASDA Favourites / Regulars FIRST -> exact, unambiguous fast path
+  //   -> model judgement where identity is not mechanically certain
+  //   -> live search ONLY where genuinely absent or new.
+  //
+  // Nothing in the estate holds that list today, so no offline proof can
+  // exercise it and NOTHING HERE FABRICATES ONE. What this module guarantees is
+  // that the decision call CAN receive it the moment the browser lane reads it:
+  // `spec.retailerEvidence` flows through untouched, and the prompt below tells
+  // the model to consult it first when it is present.
+  //
+  // ⛔ ABSENT IS NOT EMPTY, AND THE DIFFERENCE IS LOAD-BEARING. An absent
+  // surface is reported as null - "not inspected on this route" - and never as
+  // an empty list. An empty list would tell the model the Favourites grid was
+  // READ AND DID NOT CONTAIN THIS PRODUCT, which is a fact nobody established,
+  // and would push a line to `search` on the strength of evidence that was
+  // never gathered.
+  const retailer = spec.retailerEvidence && typeof spec.retailerEvidence === 'object'
+    ? {
+      source: spec.retailerEvidence.source || 'browser lane',
+      captured_at: spec.retailerEvidence.captured_at || null,
+      favourites: Array.isArray(spec.retailerEvidence.favourites) ? spec.retailerEvidence.favourites : [],
+      regulars: Array.isArray(spec.retailerEvidence.regulars) ? spec.retailerEvidence.regulars : [],
+    }
+    : null;
+
   return {
     household: household,
     contract: spec.contract && spec.contract.text ? spec.contract.text : null,
@@ -181,6 +213,7 @@ function buildDecisionGrounding(spec) {
     lines: lines,
     decision_line_nos: decisionLineNos,
     correctable_line_nos: correctableLineNos,
+    live_retailer_surface: retailer,
     catalogue: regulars.map(function (r) {
       return {
         regular_id: Number(r.id),
@@ -226,6 +259,18 @@ function buildDecisionPrompt(grounding) {
     '',
     'THE HOUSEHOLD RULES (asdair.rules - active rows; obey them, do not merely read them):',
     JSON.stringify(g.rules),
+    '',
+    'THE LIVE ASDA SURFACE (Favourites / Regulars, as read by the browser this run):',
+    (g.live_retailer_surface
+      ? JSON.stringify(g.live_retailer_surface)
+      : 'NOT INSPECTED ON THIS ROUTE. This is NOT the same as "not in Favourites" - nobody looked. '
+        + 'Do not conclude a product is absent from the household ASDA account from this line.'),
+    '',
+    'THE ESTABLISHED SHOPPING METHOD, in order. Follow it:',
+    '  1. The LIVE ASDA Favourites / Regulars surface above, where it was inspected - it comes first;',
+    '  2. an exact, unambiguous match in the household catalogue;',
+    '  3. YOUR judgement where identity is not mechanically certain;',
+    '  4. a live search ONLY where the product is genuinely absent or new.',
     '',
     mumsList,
     JSON.stringify(g.lines),
