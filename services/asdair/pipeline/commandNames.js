@@ -40,6 +40,24 @@ export const COMMANDS = Object.freeze({
   CORRECT_LINE: 'correctLine',
   BUILD_SHOP: 'buildShop',
   ANSWER_QUESTION: 'answerQuestion',
+  // WO-2026-08-18-04. THE ONE ADDITION, AND THE ONLY ONE.
+  //
+  // A settled answer is superseded by a DELIBERATE act. It is NOT a second
+  // answerQuestion: that command is a compare-and-set on status='open' and
+  // first-answer-wins, which is exactly the protection an accidental double
+  // tap needs and exactly the trap a wrong answer fell into. The two live side
+  // by side; neither weakens the other.
+  //
+  // ── WHERE THE LINE BETWEEN ACCIDENT AND INTENT SITS ────────────────────────
+  // It sits on the ROUTE, not on the content. A bare board reply ("3: the blue
+  // one") is answerQuestion and cannot overwrite anything. A board reply that
+  // opens with the word `change` is correctAnswer. Nothing about the words that
+  // follow decides it - only the act of typing the keyword, which nobody types
+  // by accident and which a double tap cannot produce at all.
+  //
+  // It reaches NO consequential capability: it opens a question and records an
+  // answer, exactly like the two commands either side of it.
+  CORRECT_ANSWER: 'correctAnswer',
   REQUEST_BASKET_BUILD: 'requestBasketBuild',
   PAUSE_BASKET_BUILD: 'pauseBasketBuild',
   SUBMIT_CONFIRMATION: 'submitConfirmation',
@@ -69,6 +87,19 @@ export const COMMAND_SPECS = Object.freeze({
   [COMMANDS.CORRECT_LINE]: { durable: true, consumption: CONSUMPTION.CONSUME, discriminator: 'line' },
   [COMMANDS.BUILD_SHOP]: { durable: true, consumption: CONSUMPTION.CONSUME, discriminator: null },
   [COMMANDS.ANSWER_QUESTION]: { durable: true, consumption: CONSUMPTION.LATCH, discriminator: 'question' },
+  // CONSUME, not LATCH, and the discriminator is the SUPERSEDED question's key.
+  //
+  // CONSUME because the runner has real work to do when one of these lands -
+  // a shop already at READY_TO_SHOP must be brought back to NEEDS_DECISION so
+  // the plan is recomputed. A LATCH would be a permanent fact nothing acts on,
+  // which is the "recorded but never reached the decision point" failure.
+  //
+  // The discriminator is the key of the round being superseded, so it CHANGES
+  // every round: correcting round 1 keys on round 1's question, correcting the
+  // correction keys on round 2's. Two different corrections are two different
+  // commands; the SAME correction issued twice is one, which is what makes a
+  // redelivered message a no-op.
+  [COMMANDS.CORRECT_ANSWER]: { durable: true, consumption: CONSUMPTION.CONSUME, discriminator: 'question' },
   [COMMANDS.REQUEST_BASKET_BUILD]: { durable: true, consumption: CONSUMPTION.CONSUME, discriminator: null },
   [COMMANDS.PAUSE_BASKET_BUILD]: { durable: true, consumption: CONSUMPTION.CONSUME, discriminator: null },
   [COMMANDS.SUBMIT_CONFIRMATION]: { durable: true, consumption: CONSUMPTION.CONSUME, discriminator: null },

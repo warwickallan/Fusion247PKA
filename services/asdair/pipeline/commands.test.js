@@ -292,9 +292,12 @@ test('dispatch refuses anything outside the allowlist - there is no checkout doo
   }
 });
 
-test('the surface exposes exactly the twelve commands, and dispatch reaches every one', async () => {
+test('the surface exposes exactly the thirteen commands, and dispatch reaches every one', async () => {
   const names = Object.keys(commands.COMMAND_SURFACE);
-  assert.equal(names.length, 12);
+  // 12 until WO-2026-08-18-04, which added `correctAnswer` and nothing else.
+  // The literal is pinned HERE, outside the source it checks, so a command added
+  // without a human revisiting this line reddens the suite.
+  assert.equal(names.length, 13);
   for (const n of names) assert.equal(typeof commands.COMMAND_SURFACE[n], 'function');
 });
 

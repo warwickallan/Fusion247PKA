@@ -39,6 +39,12 @@ export const STEPS = Object.freeze({
   // acting steps
   CANCEL: 'act:cancel',
   APPLY_CORRECTIONS: 'act:apply_corrections',
+  // WO-2026-08-18-04. A settled answer has been superseded, so whatever was
+  // planned from the old one is stale. This step retires the correction command
+  // and, where the shop had already been planned, walks it back to
+  // NEEDS_DECISION so the ordinary NEEDS_DECISION -> PROCESSING route recomputes
+  // the plan. It is the ONLY writer of READY_TO_SHOP -> NEEDS_DECISION.
+  REOPEN_FOR_CORRECTION: 'act:reopen_for_correction',
   RESUME: 'act:resume',
   TRANSCRIBE: 'act:transcribe',
   INTERPRET: 'act:interpret',
@@ -92,7 +98,7 @@ export const STAGE_TABLE = Object.freeze([
   { status: 'TRANSCRIBING', step: 'interpret', gate: 'none', to: 'PROCESSING', waitsFor: null },
   { status: 'PROCESSING', step: 'plan', gate: `interpretation review needs ${COMMANDS.CONFIRM_INTERPRETATION}`, to: 'NEEDS_DECISION | READY_TO_SHOP', waitsFor: 'Warwick confirming a reviewed interpretation' },
   { status: 'NEEDS_DECISION', step: 'replan once every question is settled', gate: 'no open questions', to: 'PROCESSING', waitsFor: 'Warwick answering the open questions' },
-  { status: 'READY_TO_SHOP', step: 'queue the browser build', gate: `${COMMANDS.REQUEST_BASKET_BUILD} command`, to: 'WAITING_FOR_BROWSER', waitsFor: 'Warwick tapping "Build ASDA basket"' },
+  { status: 'READY_TO_SHOP', step: 'queue the browser build', gate: `${COMMANDS.REQUEST_BASKET_BUILD} command`, to: 'WAITING_FOR_BROWSER | NEEDS_DECISION', waitsFor: 'Warwick tapping "Build ASDA basket" - or correcting an answer, which walks the shop back to NEEDS_DECISION' },
   { status: 'WAITING_FOR_BROWSER', step: 'record that a SUPERVISED operator has picked the request up', gate: 'the durable request is claimed, running or complete', to: 'SHOPPING', waitsFor: 'the supervised browser operator claiming the request' },
   { status: 'SHOPPING', step: 'record the basket the supervised operator reported', gate: 'the request is complete AND carries a report', to: 'BASKET_READY | NEEDS_DECISION', waitsFor: 'the supervised browser operator reporting the basket' },
   { status: 'BASKET_READY', step: 'record the order confirmation', gate: `${COMMANDS.SUBMIT_CONFIRMATION} command`, to: 'ORDER_CONFIRMATION_RECEIVED', waitsFor: 'Warwick checking out HIMSELF and forwarding the ASDA confirmation' },
@@ -256,6 +262,34 @@ export function decideNextStep(snapshot) {
     return decision(STEPS.APPLY_CORRECTIONS, `${corrections.length} line correction(s) outstanding`);
   }
 
+  // -- 5b. AUDITED ANSWER CORRECTIONS (WO-2026-08-18-04) ----------------------
+  //
+  // AC4-b, AND IT IS STRUCTURAL RATHER THAN A CHECK SOMEBODY REMEMBERED.
+  //
+  // This block sits ABOVE the stage table, so while a correction is outstanding
+  // the READY_TO_SHOP branch below is NEVER REACHED and a pending basket-build
+  // request is never claimed. The trolley cannot be built from the very answer
+  // that is in the middle of being superseded - not because a guard says so,
+  // but because control does not get that far.
+  //
+  // WHY IT ALSO CARRIES THE TRANSITION. A correction reaching a shop that is
+  // still NEEDS_DECISION or PROCESSING needs nothing else: those states already
+  // re-plan, and applyDecisionsToPlan will pick up the newest round on the very
+  // next pass. A shop at READY_TO_SHOP has nowhere to re-plan FROM - which is
+  // why the correction used to be recorded, audited, and completely inert - so
+  // this walks it back one state and lets the existing NEEDS_DECISION ->
+  // PROCESSING route do the actual work. Nothing new plans anything.
+  //
+  // WAITING_FOR_BROWSER and SHOPPING are deliberately NOT reached: a supervised
+  // operator may already hold the packet, and correcting mid-shop is a separate
+  // product choice nobody has made. There the command is simply retired.
+  const answerCorrections = pendingCommands(snapshot, COMMANDS.CORRECT_ANSWER);
+  if (answerCorrections.length > 0) {
+    return decision(STEPS.REOPEN_FOR_CORRECTION,
+      `${answerCorrections.length} answer correction(s) outstanding`,
+      { to: status === 'READY_TO_SHOP' ? 'NEEDS_DECISION' : null });
+  }
+
   // ── 6. THE STAGE TABLE ─────────────────────────────────────────────────────
   switch (status) {
     case 'RECEIVED': {
@@ -295,6 +329,18 @@ export function decideNextStep(snapshot) {
     }
 
     case 'READY_TO_SHOP': {
+      // -- THE FAIL-SAFE HALF OF AC4-b (WO-2026-08-18-04) --------------------
+      // The block at 5b above stops a basket being built while a CORRECTION is
+      // outstanding. This stops one being built while any QUESTION is open,
+      // whatever opened it. Until now this branch consulted only the pending
+      // basket-build request and never looked at open questions at all, so a
+      // shop that acquired one after planning would have shopped straight past
+      // it. Answering is what unblocks it, through the ordinary route.
+      if (openQuestions > 0) {
+        return decision(STEPS.REOPEN_FOR_CORRECTION,
+          `${openQuestions} question(s) are open on a shop that was already planned - nothing goes in a basket until they are settled`,
+          { to: 'NEEDS_DECISION' });
+      }
       const req = pendingCommand(snapshot, COMMANDS.REQUEST_BASKET_BUILD);
       if (!req) {
         return decision(STEPS.AWAIT_BASKET_REQUEST, 'planned and waiting for "Build ASDA basket"');

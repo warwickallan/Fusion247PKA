@@ -209,12 +209,19 @@ export async function countOpenQuestions(deps, shopId) {
  * highest-value single field in the learning loop - it becomes the alias that
  * stops next week's question - and it is a fact of the interpretation, so it is
  * read from asdair.shop_line rather than reconstructed by anybody downstream.
+ *
+ * `question_round`, `parent_question_id` and `answered_at` (WO-2026-08-18-04)
+ * are migration 017 columns this projection did not carry. The correction path
+ * needs the round to derive the successor's, the parent to build the chain, and
+ * `answered_at` because AC2's audit trail is "the ORIGINAL text AND when it was
+ * given" - a trail that cannot say WHEN is not an audit trail.
  */
 export async function listQuestions(deps, shopId) {
   const res = await deps.readQuery(
     `SELECT q.id, q.list_item_id, q.question_key, q.question_text, q.candidates, q.status,
             q.answer_text, q.answer_source, q.card_chat_id, q.card_message_id,
             q.rendered_candidates, q.render_fingerprint, q.render_version, q.callback_index,
+            q.question_round, q.parent_question_id, q.answered_at,
             li.item_name AS item_name,
             sl.raw_reading AS photographed_wording
        FROM asdair.shop_question q

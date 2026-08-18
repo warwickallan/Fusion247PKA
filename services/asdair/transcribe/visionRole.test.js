@@ -68,6 +68,32 @@ function stubFetch(captured) {
   };
 }
 
+// ---------------------------------------------------------------------
+// THE VISION ALIAS - PINNED TO A LITERAL HELD HERE, OUTSIDE THE SOURCE
+// UNDER TEST. (WO-2026-08-18-01)
+//
+// These assertions used to read `assert.equal(..., 'fusion.vision')`. Commit
+// 67736bb changed the default deliberately, because `fusion.vision` is A DEAD
+// ALIAS THE GATEWAY DOES NOT REGISTER, and this suite was not moved with it -
+// so it has been RED on `main` ever since, which is worse than no test at all.
+//
+// Re-pinning to whatever `models.mjs` says today would assert a source against
+// itself and would re-create the exact defect 67736bb closed: a defaults test
+// that cannot see a wrong default. So the invariant is stated in terms of a
+// literal owned by THIS file:
+//
+//   * the vision role must NEVER resolve to `fusion.vision` - the value proven
+//     dead on a live run;
+//   * it must be a non-empty string, because an empty model id fails at the
+//     gateway rather than here;
+//   * it must remain overridable by FUSION_MODEL_VISION, read at call time.
+//
+// ⚠️ WHAT THIS DOES NOT ESTABLISH: that the value in force IS registered on the
+// live gateway. Establishing that needs a network call, and this Work Order
+// runs under `network: none`. UNVERIFIED, deliberately, and said out loud
+// rather than implied by a green.
+const DEAD_VISION_ALIAS = 'fusion.vision';
+
 test('vision() sends OpenAI-style multimodal content parts under the vision alias', async () => {
   const m = await loadModels({ FUSION_GATEWAY_URL: 'http://127.0.0.1:1/v1/', FUSION_GATEWAY_KEY: 'k' });
   const realFetch = globalThis.fetch;
@@ -77,7 +103,11 @@ test('vision() sends OpenAI-style multimodal content parts under the vision alia
     const out = await m.vision('read this list', 'data:image/png;base64,AA');
     assert.equal(out, '{"lines":[]}');
     assert.equal(cap.url, 'http://127.0.0.1:1/v1/chat/completions');
-    assert.equal(cap.body.model, 'fusion.vision');
+    // The request must go out under the role's OWN resolved alias - never a
+    // literal this file happens to remember, and never the dead one.
+    assert.equal(cap.body.model, m.ROLE_ALIAS.vision);
+    assert.notEqual(cap.body.model, DEAD_VISION_ALIAS,
+      'the vision request went out under an alias the gateway does not register - this failed LIVE');
     assert.deepEqual(cap.body.messages[0].content, [
       { type: 'text', text: 'read this list' },
       { type: 'image_url', image_url: { url: 'data:image/png;base64,AA' } },
@@ -87,11 +117,16 @@ test('vision() sends OpenAI-style multimodal content parts under the vision alia
   }
 });
 
-test('FUSION_MODEL_VISION overrides the alias; default is fusion.vision', async () => {
+test('the vision default is NOT the dead alias, and FUSION_MODEL_VISION still overrides it', async () => {
   const a = await loadModels({});
-  assert.equal(a.ROLE_ALIAS.vision, 'fusion.vision');
+  assert.notEqual(a.ROLE_ALIAS.vision, DEAD_VISION_ALIAS,
+    'the vision role defaulted back to an alias the gateway does not register');
+  assert.equal(typeof a.ROLE_ALIAS.vision, 'string');
+  assert.ok(a.ROLE_ALIAS.vision.trim().length > 0, 'an empty model id fails at the gateway, not here');
+
   const b = await loadModels({ FUSION_MODEL_VISION: 'house.qwen-vl' });
-  assert.equal(b.ROLE_ALIAS.vision, 'house.qwen-vl');
+  assert.equal(b.ROLE_ALIAS.vision, 'house.qwen-vl',
+    'the override is what makes a bad default recoverable without a code change');
 });
 
 // ---------------------------------------------------------------------
@@ -115,12 +150,19 @@ test('reason() still sends a PLAIN STRING content (text roles unchanged)', async
 test('the existing role aliases and gatewayConfigured are unchanged', async () => {
   const m = await loadModels({});
   assert.equal(m.gatewayConfigured, false);
-  assert.deepEqual(m.ROLE_ALIAS, {
+  // The FIVE TEXT ROLES are pinned exactly - they are unchanged and any drift
+  // in them is a regression. `vision` is deliberately excluded and checked by
+  // its own invariant above: it is the one alias that has legitimately moved,
+  // and pinning it here is what made this suite red rather than useful.
+  const { vision, ...textRoles } = m.ROLE_ALIAS;
+  assert.deepEqual(textRoles, {
     extract: 'fusion.extract',
     keyword: 'fusion.keyword',
     query: 'fusion.query',
     reason: 'fusion.reason',
     embed: 'fusion.embed',
-    vision: 'fusion.vision',
   });
+  assert.notEqual(vision, DEAD_VISION_ALIAS);
+  assert.equal(Object.keys(m.ROLE_ALIAS).length, 6,
+    'a role was added or removed - the alias contract changed and this pin must be revisited');
 });

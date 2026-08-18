@@ -53,6 +53,9 @@ import * as shopDecisions from './shopDecisions.js';
 import { STEPS, everIssued } from './stages.js';
 import { COMMANDS } from './commandNames.js';
 import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
+// WO-2026-08-18-03 AC1. A MODEL MAPPING IS NOT EVIDENCE. Pure, zero-dep, opens
+// no connection - same reasoning as the shopDecisions import above.
+import { bindingVerdict } from './answerCorroboration.js';
 // The bot folder is PURE and zero-dependency (it opens no connection; a test in
 // that folder enforces it), so importing these three statically does NOT break
 // the property the dynamic import of deps.js below protects: this file must stay
@@ -209,14 +212,38 @@ export async function pollIntake(deps, { intake, householdId, now, claim = null,
  * question table must degrade to "typed messages are shopping lists", never to
  * a pass that cannot run at all.
  */
-export async function loadOpenQuestions(deps, { householdId = null, log = () => {} } = {}) {
+export async function loadOpenQuestions(deps, opts = {}) {
+  return (await loadBoardQuestions(deps, opts)).open;
+}
+
+/**
+ * OPEN *AND* SETTLED, WITH THE SAME ORDINALS THE BOARD PRINTS.
+ * (WO-2026-08-18-04.)
+ *
+ * loadOpenQuestions used to be the whole of this, and it dropped every settled
+ * row on the floor. That was correct while the only thing a typed message could
+ * do was ANSWER something: a number naming a settled question is a late answer
+ * and must not be written. It stopped being correct the moment a message could
+ * also CORRECT one - a correction names a settled question BY DEFINITION, so
+ * the set it has to resolve against is exactly the set that used to be
+ * discarded.
+ *
+ * BOTH LISTS ARE NUMBERED FROM THE SAME `i + 1` OVER ALL ROWS, in the shop's
+ * own immutable `ORDER BY q.id ASC`. That is the same derivation boardStateOf
+ * uses to print the card, which is what makes "change 3" and the "3." he is
+ * looking at the same question. Numbering the two lists separately would be a
+ * quiet off-by-everything: settled rows are exactly what the shared counter
+ * exists to skip over.
+ */
+export async function loadBoardQuestions(deps, { householdId = null, log = () => {} } = {}) {
   const open = [];
+  const settled = [];
   let shops = [];
   try {
     shops = await store.listActiveShops(deps, store.CONSUMABLE_COMMANDS);
   } catch (err) {
     log('open_questions_lookup_failed', { detail: String(err && err.message ? err.message : err) });
-    return open;
+    return { open, settled };
   }
 
   for (const shop of shops) {
@@ -226,7 +253,24 @@ export async function loadOpenQuestions(deps, { householdId = null, log = () => 
     try {
       const rows = await store.listQuestions(deps, shop.id);
       rows.forEach((q, i) => {
-        if (q.status !== 'open') return;
+        if (q.status !== 'open') {
+          // A settled row carries far less than an open one because far less is
+          // asked of it: a correction names it by number and replaces its
+          // answer. The answer it currently holds travels so a caller can say
+          // WHAT is being superseded without a second read.
+          settled.push({
+            shopRef: shop.shop_ref,
+            shopId: shop.id,
+            householdId: shop.household_id,
+            questionKey: q.question_key,
+            itemName: q.item_name || null,
+            questionText: q.question_text || null,
+            ordinal: i + 1,
+            status: q.status,
+            answerText: q.answer_text || null,
+          });
+          return;
+        }
         open.push({
           shopRef: shop.shop_ref,
           shopId: shop.id,
@@ -251,7 +295,7 @@ export async function loadOpenQuestions(deps, { householdId = null, log = () => 
       });
     }
   }
-  return open;
+  return { open, settled };
 }
 
 /** PURE. The comparison form for "are these the same words?" - whitespace and
@@ -554,9 +598,10 @@ async function answersASettledQuestion(deps, { shopId, words, log = () => {} } =
   return null;
 }
 
-export async function correlateTypedAnswer(deps, { text, open, boardShopId = null, log = () => {} } = {}) {
+export async function correlateTypedAnswer(deps, { text, open, settled = [], boardShopId = null, log = () => {} } = {}) {
   const words = typeof text === 'string' ? text.trim() : '';
   const all = Array.isArray(open) ? open : [];
+  const allSettled = Array.isArray(settled) ? settled : [];
 
   // ── THE SHOP SCOPE (WP-B15-18). ONE PLACE, BEFORE ANY STEP RUNS. ──────────
   //
@@ -576,8 +621,18 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
   const scoped = boardShopId === null || boardShopId === undefined
     ? all
     : all.filter((q) => String(q.shopId) === String(boardShopId));
+  // Settled rows are scoped by the SAME rule, for the same reason: a number
+  // means "the question printed beside it on the board I am looking at".
+  const scopedSettled = boardShopId === null || boardShopId === undefined
+    ? allSettled
+    : allSettled.filter((q) => String(q.shopId) === String(boardShopId));
 
-  if (words === '' || scoped.length === 0) return null;
+  // A CORRECTION IS THE ONE THING THAT WORKS WITH NOTHING OPEN, and that is the
+  // case it exists for: every question settled, the shop planned, and one of the
+  // answers wrong. The old guard returned here on `scoped.length === 0` and
+  // would have made the whole capability unreachable at exactly the moment
+  // Warwick needs it.
+  if (words === '' || (scoped.length === 0 && scopedSettled.length === 0)) return null;
 
   // ── 0. THE BOARD'S OWN NUMBERS (WP-B15-09). ───────────────────────────────
   //
@@ -599,13 +654,45 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
     const byOrdinal = new Map(scoped
       .filter((q) => !ambiguousOrdinals.has(q.ordinal))
       .map((q) => [q.ordinal, q]));
+    // The settled half gets its OWN ambiguity drop rather than sharing one. Two
+    // shops each offering a settled "3" name two different questions, and
+    // correcting the wrong shop's answer is the same class of error as
+    // answering it.
+    const ambiguousSettled = tokensOfferedByMoreThanOneShop(scopedSettled, (q) => q.ordinal);
+    const settledByOrdinal = new Map(scopedSettled
+      .filter((q) => !ambiguousSettled.has(q.ordinal))
+      .map((q) => [q.ordinal, q]));
     const mappings = [];
     let refusedForShop = 0;
     for (const n of numbered) {
+      // -- A CORRECTION RESOLVES AGAINST THE SETTLED ROWS (WO-2026-08-18-04) --
+      //
+      // And ONLY when he typed the keyword. `correction` comes off
+      // parseBoardReply and is the human's own explicit act; nothing here infers
+      // it from the words, the timing or the state of the board.
+      if (n.correction === true) {
+        if (ambiguousSettled.has(n.ordinal)) { refusedForShop += 1; continue; }
+        const settledQ = settledByOrdinal.get(n.ordinal);
+        if (settledQ) {
+          mappings.push({
+            questionKey: settledQ.questionKey,
+            shopRef: settledQ.shopRef,
+            answerText: n.answerText,
+            correction: true,
+          });
+          continue;
+        }
+        // "change 4" against a question that is still OPEN is not a correction -
+        // there is nothing settled to supersede. It falls through and becomes an
+        // ordinary answer, which is what he plainly meant and what the command
+        // surface would otherwise refuse.
+      }
       if (ambiguousOrdinals.has(n.ordinal)) { refusedForShop += 1; continue; }
       const q = byOrdinal.get(n.ordinal);
       if (!q) continue;
-      mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText: n.answerText });
+      mappings.push({
+        questionKey: q.questionKey, shopRef: q.shopRef, answerText: n.answerText, correction: false,
+      });
     }
     if (refusedForShop > 0) {
       log('board_reply_shop_ambiguous', {
@@ -615,13 +702,27 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
       });
     }
     if (mappings.length > 0) {
-      log('board_reply_correlated', { numbered: numbered.length, matched: mappings.length });
+      log('board_reply_correlated', {
+        numbered: numbered.length,
+        matched: mappings.length,
+        corrections: mappings.filter((m) => m.correction === true).length,
+      });
       return { mappings, unmapped: null, modelCalled: false };
     }
     // Every number missed. Fall through rather than refusing: "3 for £5" is a
     // shopping-list line, and this parser must never be the thing that decides
     // a genuine list is an answer.
     log('board_reply_uncorrelated', { numbered: numbered.length, open_questions: scoped.length });
+  }
+
+  // NOTHING OPEN. Steps 1-3 all correlate against OPEN questions, so with none
+  // there is nothing for them to do - and step 3 would put a model call on the
+  // wire carrying an empty question list, which can only ever come back wrong.
+  // Reached whenever a correction was the only thing that could have matched and
+  // did not; the caller then tells him rather than writing anything.
+  if (scoped.length === 0) {
+    log('typed_message_nothing_open', { settled_questions: scopedSettled.length });
+    return null;
   }
 
   // ── 1. DETERMINISTIC. No model call, and the same resolver the spine uses. ─
@@ -740,6 +841,24 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
     .filter((q) => !ambiguousKeys.has(q.questionKey))
     .map((q) => [q.questionKey, q]));
   const mappings = [];
+  // ── THE CORROBORATION GATE (WO-2026-08-18-03 AC1) ────────────────────────
+  //
+  // Mappings the model claimed at `high` confidence WHILE HIS WORDS NAMED A
+  // DIFFERENT OPEN QUESTION. This is the 2026-08-17 defect: seven answers
+  // written in 2.5 seconds, the first three right, and from the fourth on every
+  // one landed on the question above - "Ice lollies..." onto Ben & Jerry's while
+  // fruit lolly ice sat open one row below. `answerQuestion` is a compare-and-
+  // set, so each of those writes was permanent on arrival and the only way out
+  // was cancelling the shop, which is what Warwick did.
+  //
+  // CONTRADICTION-ONLY, on his ruling of 2026-08-18: an answer that names
+  // nothing in particular STILL BINDS, because refusing his shorthand is a cost
+  // he declined to pay. See answerCorroboration.js for the residual he
+  // acknowledged rather than waived. These refusals are carried back to the
+  // caller rather than dropped, because a refusal he is not told about is a
+  // silent loss and that is the failure this whole path already exists to
+  // prevent.
+  const uncorroborated = [];
   let refusedForShop = 0;
   for (const m of returned.mappings) {
     if (!m || m.confidence !== 'high') continue;
@@ -747,19 +866,52 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
     const q = byKey.get(m.question_key);
     // A key the correlator was never shown is dropped, not corrected.
     if (!q) continue;
-    mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText: m.answer_text || words });
+    const answerText = m.answer_text || words;
+
+    const verdict = bindingVerdict({ answerText, question: q, scoped });
+    if (!verdict.bind) {
+      uncorroborated.push({
+        questionKey: q.questionKey,
+        shopRef: q.shopRef,
+        shopId: q.shopId,
+        ordinal: q.ordinal,
+        itemName: q.itemName || q.questionText || null,
+        answerText,
+      });
+      log('answer_mapping_uncorroborated', {
+        shop_ref: q.shopRef,
+        question_key: q.questionKey,
+        open_questions: scoped.length,
+        points_at: verdict.elsewhere.map((e) => e.questionKey),
+        on: verdict.elsewhere.flatMap((e) => e.on),
+        detail: 'the model mapped these words to this question and the words name a DIFFERENT open question - REFUSED, not written',
+      });
+      continue;
+    }
+
+    mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText });
   }
   if (refusedForShop > 0) {
     log('answer_correlation_shop_ambiguous', {
       refused: refusedForShop, open_questions: scoped.length,
     });
   }
-  if (mappings.length === 0) {
+  if (mappings.length === 0 && uncorroborated.length === 0) {
     log('answer_correlation_low_confidence', { open_questions: scoped.length, offered: returned.mappings.length });
     return null;
   }
 
-  return { mappings, unmapped: returned.unmapped_text || null, modelCalled: true };
+  // ── WHY THIS IS NOT `null` WHEN EVERYTHING WAS REFUSED ────────────────────
+  //
+  // `null` means "not ours", and the caller hands a message that is not ours to
+  // intake - where it becomes a NEW SHOPPING LIST. Returning null here would
+  // turn a refused answer into a phantom shop, which is a worse failure than
+  // the one being fixed. An empty `mappings` with a populated `uncorroborated`
+  // says the opposite: this IS ours, we refused to place it, and the caller
+  // owes him a question.
+  return {
+    mappings, unmapped: returned.unmapped_text || null, modelCalled: true, uncorroborated,
+  };
 }
 
 /**
@@ -1899,7 +2051,11 @@ export async function runOnce(deps, wiring = {}) {
   // taken inside runIntake, before that message is treated as a list and before
   // its offset advances. Routing genuinely goes first; only the function call
   // order looks otherwise.
-  const openQuestions = await loadOpenQuestions(deps, { householdId: wiring.householdId, log });
+  const board = await loadBoardQuestions(deps, { householdId: wiring.householdId, log });
+  const openQuestions = board.open;
+  // WO-2026-08-18-04. The settled rows a correction can name. Loaded in the same
+  // pass as the open ones so both carry the identical board ordinal.
+  const settledQuestions = board.settled;
   // ── THE DEFERRED WINDOW (WO-2026-08-10-B15-04 AC2) ────────────────────────
   // Read ONLY when nothing is open, so the ordinary claim path is untouched in
   // every other state.
@@ -2110,7 +2266,26 @@ export async function runOnce(deps, wiring = {}) {
       const openOnRepliedBoard = repliedToBoard
         ? openQuestions.filter((q) => String(q.shopId) === String(repliedToBoard.shopId))
         : openQuestions;
-      if (openOnRepliedBoard.length === 0 && deferred.length === 0 && repliedToBoard) {
+      // -- AND A CORRECTION IS NOT A REPLY THAT WAS NOT TAKEN (WO-2026-08-18-04)
+      //
+      // This branch fires on precisely the state a correction lives in: every
+      // question settled, a board still on his phone, and him replying to it.
+      // Left alone it would CLAIM the message and answer "I could not take that"
+      // before correlation ever ran - so the capability would be unreachable in
+      // the one situation it was built for, and the failure would look like a
+      // polite refusal rather than a bug.
+      //
+      // The test is narrow and it is HIS OWN KEYWORD against HIS OWN BOARD: a
+      // numbered line marked `correction` whose ordinal names a settled question
+      // on the shop whose card he replied to. Anything else still lands here.
+      const correctionsOnRepliedBoard = repliedToBoard
+        ? parseBoardReply(verdict.text)
+          .filter((n) => n.correction === true)
+          .filter((n) => settledQuestions.some((q) => String(q.shopId) === String(repliedToBoard.shopId)
+            && q.ordinal === n.ordinal)).length
+        : 0;
+      if (openOnRepliedBoard.length === 0 && deferred.length === 0 && repliedToBoard
+          && correctionsOnRepliedBoard === 0) {
         const target = repliedToBoard;
         const noticeKey = outboxKeyFor(target.shopRef, `reply_not_taken.${verdict.updateId}`);
         try {
@@ -2200,6 +2375,7 @@ export async function runOnce(deps, wiring = {}) {
       const correlation = await correlateTypedAnswer(deps, {
         text: verdict.text,
         open: openQuestions,
+        settled: settledQuestions,
         boardShopId: repliedToBoard ? repliedToBoard.shopId : null,
         log,
       });
@@ -2208,6 +2384,81 @@ export async function runOnce(deps, wiring = {}) {
           updateId: verdict.updateId, open_questions: openQuestions.length,
         });
         return false;
+      }
+
+      // ── ASKING IS THE FALLBACK, AND IT IS NOT A FAILURE (AC2) ────────────
+      //
+      // The corroboration gate refused to place at least part of this message.
+      // He gets told, through the ordinary surface, with the board numbers he
+      // is already looking at - so answering is "5: the ones in favourites",
+      // an ordinary typed reply on a path that already exists. NO new command,
+      // NO new callback action, nothing added to the allowlist.
+      //
+      // It does NOT park and it does NOT drop. The North Star permits asking
+      // about genuine ambiguity; an answer nothing supports IS genuine
+      // ambiguity. What it forbids is guessing, and guessing is what this
+      // replaces.
+      const unplaced = Array.isArray(correlation.uncorroborated) ? correlation.uncorroborated : [];
+      if (unplaced.length > 0) {
+        const target = unplaced[0];
+        const stillOpen = openQuestions.filter((q) => String(q.shopId) === String(target.shopId));
+        const noticeKey = outboxKeyFor(target.shopRef, `answer_not_attributed.${verdict.updateId}`);
+        try {
+          // ONE QUESTION PER MESSAGE, EVER - the same family guard as the two
+          // notices above, for the same reason: a redelivery must never mint a
+          // new generation on every pass and rebuild the storm.
+          const family = ledgerFamilyKey({
+            kind: LEDGER_KINDS.OUTBOX,
+            householdId: wiring.householdId,
+            name: 'answer_not_attributed',
+            key: noticeKey,
+          });
+          if ((await store.spentLedgerGenerations(deps, family)) === 0) {
+            await store.enqueueMessage(deps, {
+              householdId: wiring.householdId,
+              shopId: target.shopId,
+              kind: 'answer_not_attributed',
+              key: noticeKey,
+              payload: {
+                shopRef: target.shopRef,
+                words: target.answerText,
+                questions: stillOpen.map((q) => ({
+                  n: q.ordinal,
+                  item: q.itemName || q.questionText || null,
+                })),
+              },
+            });
+          }
+        } catch (err) {
+          // TOLD HIM NOTHING => DO NOT CLAIM. Never a silent drop. Returning
+          // false holds the offset and lets Telegram redeliver, which is the
+          // recovery this loop already has.
+          log('answer_not_attributed_notice_failed', {
+            updateId: verdict.updateId,
+            shop_ref: target.shopRef,
+            detail: String(err && err.message ? err.message : err),
+          });
+          return false;
+        }
+        log('typed_answer_not_attributed', {
+          updateId: verdict.updateId,
+          shop_ref: target.shopRef,
+          refused: unplaced.length,
+          also_bound: correlation.mappings.length,
+        });
+
+        // NOTHING PLACEABLE AT ALL: he has been asked, so the message is
+        // CLAIMED. Handing it back to intake would turn his answer into a new
+        // shopping list, which is the failure this branch exists to prevent.
+        if (correlation.mappings.length === 0) {
+          refusals.push({
+            updateId: verdict.updateId, shop_ref: target.shopRef, reason: 'answer_not_attributed',
+          });
+          claimedUpdateIds.add(verdict.updateId);
+          return true;
+        }
+        // Otherwise part of the message DID place. Those mappings are settled
+        // below on their own rows, and the question above covers the rest.
       }
 
       const intent = wiring.bot.routeAsdairUpdate(update, {
