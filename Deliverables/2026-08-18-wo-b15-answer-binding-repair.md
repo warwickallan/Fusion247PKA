@@ -118,6 +118,31 @@ operational_handoff: none
 > answers arrived the open set was never of size one. Step 2 was structurally unreachable. The worker
 > established this by execution and refused to build to my bar; that refusal is correct.
 
+> ## ✅ WARWICK'S RULING, 2026-08-18 — CORRELATION POLICY = A. THIS SETTLES AC1 AND AC5.
+>
+> **His words:** *"Preserve the existing shorthand behaviour. Use the narrow corroboration rule: if
+> Warwick's words clearly belong to a different open question, refuse the proposed binding and ask;
+> otherwise preserve the shorthand/deictic path that already works. Do NOT implement B and do not
+> increase ordinary shopping interruptions merely to make correlation stricter."*
+>
+> **CONTRADICTION-ONLY is the rule.** Refuse a binding **only** when the answer text positively
+> supports a **different** open question. Where the words support nothing in particular, **bind** —
+> the deictic and shorthand path (*"the four pack"*, *"the big ones please"*) is preserved exactly as
+> it behaves today.
+>
+> **STRICT is withdrawn and must NOT be implemented.**
+>
+> **AC5 therefore becomes a hard requirement, not a report.** `B15-18 AC2b` and `B15-18 AC5a` must
+> pass **unchanged** — do not edit them, and do not weaken their assertions. They encode a settled
+> Warwick decision and are now the guard on this policy. **Both established mis-binds of 17 August
+> (rows 4 and 5) must remain closed**, and the mutation must still reproduce the incident. If those
+> two facts cannot hold together, stop and say so rather than trading one for the other.
+>
+> **The residual is ACKNOWLEDGED BY HIM and is NOT waived** — his words: *"an answer that matches
+> nothing at all is still accepted and cannot be changed afterwards. That permanence is not acceptable
+> as the completed North Star."* It is **not** yours to fix in this order. It moves to answer
+> correction, which he has now **UNPARKED** — see the note under AC4.
+
 **THE ACTUAL BAR: a model mapping is not evidence.** Production wires `correlateAnswer:
 realCorrelateAnswer` — Terra — at `pipeline/deps.js:836`, and `runtime.js:743-750` writes a
 `confidence: 'high'` mapping **straight through onto a compare-and-set row that can never be
@@ -186,11 +211,18 @@ Household shopping content is explicitly permitted in this public repository (GL
 ruled it three times) — and the reason the fixture belongs in Git is the same reason `bcf222d` exists:
 a defect nobody can reproduce without database credentials is a defect nobody can fix.
 
-**AC4 — Defect 3, and its boundary.** Establish whether closing AC1 removes the REACHABLE cause of the
-first-answer-wins trap, or merely narrows it. The trap is that a wrong answer is permanent and only
-`cancelShop` escapes it. **Do NOT build a correction or reopen command** — that is TEN gap 6, parked
-by Warwick deliberately, and adding a name to a closed allowlist is his decision and not this order's.
-Report what remains reachable after AC1, and what would close it. Design nothing.
+**AC4 — Defect 3, and its boundary. ✅ MET at `7e1d75c`; the boundary has since MOVED.** Establish
+whether closing AC1 removes the REACHABLE cause of the first-answer-wins trap, or merely narrows it.
+Report what remains reachable after AC1, and what would close it.
+
+> **⛔ STILL DO NOT BUILD IT IN THIS ORDER — but the reason has changed, so read this.** The original
+> boundary said a correction command was TEN gap 6, parked by Warwick, and his to unpark.
+> **On 2026-08-18 he unparked it:** *"The already-open audited correction capability / answer-correction
+> path still needs to be completed before Veritas so a wrongly accepted answer is not immutable
+> forever."*
+>
+> It is therefore **required work with named authority**, and it gets **its own Work Order** rather
+> than being absorbed here. This order stays what it is. Your AC4 report is its starting evidence.
 
 **AC5 — Nothing else moves.** The card-reply route already correlates correctly on the exact
 `(chatId, messageId)` pair — you proved it on a nine-question photo queue. It must still pass
