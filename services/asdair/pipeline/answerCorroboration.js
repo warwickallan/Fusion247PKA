@@ -30,11 +30,46 @@
 //
 // ── THE RULE THIS MODULE IMPLEMENTS ──────────────────────────────────
 //
-// Accept a model's mapping ONLY when the answer text independently
-// corroborates the question it was mapped to. Otherwise refuse the bind
-// and ask. The model's confidence is its opinion of itself; this is the
-// separate question of whether anything he actually typed supports the
-// row we are about to write forever.
+// CORRELATION POLICY = A, CONTRADICTION-ONLY. Warwick's ruling of
+// 2026-08-18, in his own words:
+//
+//   "Preserve the existing shorthand behaviour. Use the narrow
+//    corroboration rule: if Warwick's words clearly belong to a
+//    different open question, refuse the proposed binding and ask;
+//    otherwise preserve the shorthand/deictic path that already works.
+//    Do NOT implement B and do not increase ordinary shopping
+//    interruptions merely to make correlation stricter."
+//
+// So: REFUSE A MAPPING ONLY WHEN THE WORDS POSITIVELY SUPPORT A
+// DIFFERENT OPEN QUESTION. Where they support nothing in particular -
+// "the four pack", "the big ones please" - the mapping BINDS, exactly as
+// it does today. The model's confidence is overruled by evidence
+// pointing somewhere else; it is NOT overruled by the mere absence of
+// evidence.
+//
+// THE STRICTER RULE WAS BUILT, MEASURED AND WITHDRAWN, and that is
+// recorded here so nobody re-derives it as an improvement. Requiring
+// positive support for the mapped question closed the same two mis-binds
+// AND refused every deictic answer, failing two committed tests -
+// B15-18 AC2b and B15-18 AC5a - one of which records in its own
+// assertion message that refusing that path "would delete a path that
+// resolves correctly today". Warwick chose to keep the shorthand. Do not
+// reinstate strict.
+//
+// ── THE RESIDUAL. ACKNOWLEDGED BY HIM, AND NOT WAIVED ────────────────
+//
+// Contradiction-only does NOT catch a wrong binding whose words support
+// nothing at all. Row 6 of the corpus is a live example: "there is a
+// rule about this" supports no question, so it binds wherever the model
+// put it. His words on that residual:
+//
+//   "an answer that matches nothing at all is still accepted and cannot
+//    be changed afterwards. That permanence is not acceptable as the
+//    completed North Star."
+//
+// The answer is answer CORRECTION, which he UNPARKED in the same ruling.
+// It is a separate Work Order with its own audit trail. It is NOT closed
+// by tightening this file, and tightening this file is what he refused.
 //
 //   "Ice lollies are in favourites. stupid question"
 //        vs "1 x 4pk Ben & Jerry's cookie dough"   -> NO SUPPORT, refuse
@@ -55,11 +90,14 @@
 // to carry words that would falsely match while a question happens to be
 // alone in offering them - packaging, sizes, retailer names.
 //
-// ── WHICH WAY IT FAILS ───────────────────────────────────────────────
+// ── WHICH WAY IT FAILS, AND IT IS NOT THE SAFE-LOOKING DIRECTION ─────
 //
-// Towards ASKING. A question with no usable tokens at all corroborates
-// nothing, so it is asked about rather than written to. An extra
-// question costs Warwick a reply; a wrong write costs him the shop.
+// Towards BINDING. Under Warwick's ruling an unsupported answer is
+// written rather than questioned, because interrupting him on every
+// shorthand reply is a real cost he has explicitly refused to pay.
+// Asking happens only where the words point somewhere else. That is a
+// deliberate trade with a named owner and a named successor Work Order -
+// not an oversight in this file, and not a thing to quietly harden.
 //
 // PURE. No I/O, no deps, no model, zero dependencies.
 // =====================================================================
@@ -206,4 +244,43 @@ export function corroboration({ answerText, question, scoped = [] } = {}) {
   }
   on.sort();
   return { corroborated: on.length > 0, on };
+}
+
+/**
+ * THE POLICY. Should this model mapping be written, or asked about?
+ *
+ * CONTRADICTION-ONLY (Warwick, 2026-08-18). Three outcomes, and only the
+ * middle one refuses:
+ *
+ *   supported     the words name this question          -> BIND
+ *   contradicted  the words name a DIFFERENT open one   -> REFUSE, ask
+ *   shorthand     the words name nothing in particular  -> BIND
+ *
+ * The third case is the whole of his ruling: "the four pack" and "the big
+ * ones please" are how he actually answers, and refusing them to make
+ * correlation tidier is the increase in ordinary interruptions he ruled
+ * out. It is also the residual - a wrong mapping whose words say nothing
+ * still lands, and answer correction is what closes that, not this file.
+ *
+ * `elsewhere` carries the questions the words DO name, so a refusal log
+ * says where they pointed rather than merely that it refused.
+ */
+export function bindingVerdict({ answerText, question, scoped = [] } = {}) {
+  const own = corroboration({ answerText, question, scoped });
+  if (own.corroborated) return { bind: true, reason: 'supported', on: own.on, elsewhere: [] };
+
+  const key = question && question.questionKey;
+  const elsewhere = [];
+  for (const q of Array.isArray(scoped) ? scoped : []) {
+    if (!q) continue;
+    if (key !== undefined && key !== null && q.questionKey === key) continue;
+    const other = corroboration({ answerText, question: q, scoped });
+    if (other.corroborated) {
+      elsewhere.push({ questionKey: q.questionKey, ordinal: q.ordinal ?? null, on: other.on });
+    }
+  }
+  if (elsewhere.length > 0) return { bind: false, reason: 'contradicted', on: [], elsewhere };
+
+  // Nothing anywhere. Preserve the path that already works.
+  return { bind: true, reason: 'shorthand', on: [], elsewhere: [] };
 }

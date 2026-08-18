@@ -31,6 +31,14 @@
 // all seven in ONE pass, which is the real shape, and holds the same
 // line.
 //
+// ── THE POLICY THESE ASSERTIONS ENCODE ───────────────────────────────
+//
+// CONTRADICTION-ONLY (Warwick, 2026-08-18). A mapping is refused only
+// where his words name a DIFFERENT open question. Rows 4 and 5 are that
+// case and stay closed. Rows 6 and 8 name nothing at all, so they BIND -
+// which is the residual he acknowledged and did not waive, and which
+// answer correction closes rather than this file.
+//
 // FULLY OFFLINE. Fake pg, injected bot, injected correlator. No
 // database, no network, no credentials, no live runtime.
 // =====================================================================
@@ -275,11 +283,21 @@ test('⭐ AC3 THE NINE REAL ANSWERS OF 2026-08-17, replayed against the nine-que
     assert.equal(row.answer_text, null, `question ${n} must carry nothing`);
   }
 
-  // ── rows 6 and 8 are honestly unresolvable, so they are asked about ──────
+  // ── rows 6 and 8 name NOTHING, so under Warwick's ruling they BIND ───────
+  //
+  // This asserts WHAT HAPPENS and deliberately does NOT assert that it is
+  // right. Row 6 is genuinely ambiguous - the corpus says "row 6 or 7" and
+  // forbids resolving it - and row 8 is plausible but unestablished. Neither
+  // has an established target, so neither is counted as a correct bind and
+  // neither can be counted as a mis-bind. The permanence of a wrong one here
+  // is the residual, owned by answer correction.
   for (const n of [6, 8]) {
     const row = rowOf(h, keys[n - 1]);
-    assert.equal(row.status, 'open', `question ${n} is not established and must not be written`);
-    assert.equal(row.answer_text, null);
+    assert.equal(row.status, 'answered',
+      `question ${n} carries no evidence either way, so the shorthand path binds it`);
+    assert.equal(row.answer_text, ROWS[n - 1].answerText);
+    assert.equal(ROWS[n - 1].answersQuestion, null,
+      `question ${n} must have no established target, or this assertion is hiding a mis-bind`);
   }
 
   // ── rows 7 and 9 were never recorded on the real run ─────────────────────
@@ -292,8 +310,9 @@ test('⭐ AC3 THE NINE REAL ANSWERS OF 2026-08-17, replayed against the nine-que
   // ── AC2: NOT ONE OF THEM WAS SILENTLY DROPPED ────────────────────────────
   // Four answers could not be placed, and he was asked about all four -
   // through the ordinary Telegram surface, as text he can reply to.
-  assert.equal(asked(bot).length, 4,
-    'every answer that could not be placed must produce a question back - refusing in silence is the failure, not the fix');
+  assert.equal(asked(bot).length, 2,
+    'EXACTLY the two whose words named a different open question. Not four: interrupting him '
+    + 'about shorthand he uses every week is the cost Warwick explicitly refused to pay.');
 });
 
 test('AC2 THE ASK IS ANSWERABLE WITHOUT A TECHNICAL BRIDGE - it carries the board numbers and his own words', async () => {

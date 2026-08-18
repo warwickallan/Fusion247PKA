@@ -15,7 +15,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { tokenise, questionTokens, corroboration } from './answerCorroboration.js';
+import {
+  tokenise, questionTokens, corroboration, bindingVerdict,
+} from './answerCorroboration.js';
 
 const CORPUS = JSON.parse(
   fs.readFileSync(path.join(import.meta.dirname, 'testdata', '2026-08-17-shop-33-answers.json'), 'utf8'),
@@ -137,22 +139,32 @@ test('rows 1-3 bound correctly on the real run and the gate leaves them alone', 
 
 // ── the honest ones stay honest ─────────────────────────────────────────────
 
-test('an answer carrying no product word at all corroborates NOTHING - it is asked about, never placed', () => {
+test('an answer carrying no product word at all corroborates NOTHING - and under the ruling it still BINDS', () => {
   // Row 6, "there is a rule about this". The Work Order records it as genuinely
   // ambiguous between two questions and forbids resolving it to make a cleaner
-  // test. The gate agrees with that: it supports neither, so neither is written.
+  // test. It supports NONE of the nine...
   const words = answerOf(6);
   for (const row of CORPUS.rows) {
     assert.equal(corroboration({ answerText: words, question: q(row.n), scoped: OPEN }).corroborated, false,
       `these words must not support question ${row.n}`);
   }
+
+  // ...and under CONTRADICTION-ONLY that is not a refusal. Warwick ruled that
+  // an answer naming nothing in particular binds rather than interrupting him.
+  // THIS IS THE RESIDUAL, asserted here so it is visible rather than implied:
+  // he knows about it, he did not waive it, and answer correction closes it.
+  const verdict = bindingVerdict({ answerText: words, question: q(6), scoped: OPEN });
+  assert.equal(verdict.bind, true);
+  assert.equal(verdict.reason, 'shorthand');
 });
 
-test('row 8 is NOT ESTABLISHED, and the gate does not pretend otherwise', () => {
+test('row 8 is NOT ESTABLISHED, and neither the gate nor this test pretends otherwise', () => {
   // "n favourites FFS stupid question" is plausibly the toffees answer. Nothing
-  // in the words says so, so it is asked about rather than written. That is the
-  // cost of this repair and it is reported, not hidden.
+  // in the words says so. It supports nothing and contradicts nothing, so it
+  // binds - and it is recorded neither as a correct bind nor as a mis-bind.
   assert.equal(corroboration({ answerText: answerOf(8), question: q(8), scoped: OPEN }).corroborated, false);
+  assert.equal(bindingVerdict({ answerText: answerOf(8), question: q(8), scoped: OPEN }).reason, 'shorthand');
+  assert.equal(CORPUS.rows[7].answersQuestion, null, 'the corpus must not have acquired a target for row 8');
 });
 
 // ── the uniqueness rule ─────────────────────────────────────────────────────
@@ -183,4 +195,69 @@ test('it fails towards ASKING - an empty answer, an empty question, or nothing s
   assert.equal(corroboration({}).corroborated, false);
   assert.equal(corroboration({ answerText: 'eggs', question: q(1), scoped: null }).corroborated, true,
     'a missing scope is not a reason to refuse a question the words plainly name');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE POLICY ITSELF - CONTRADICTION-ONLY (Warwick, 2026-08-18).
+//
+//   "Preserve the existing shorthand behaviour... if Warwick's words clearly
+//    belong to a different open question, refuse the proposed binding and ask;
+//    otherwise preserve the shorthand/deictic path that already works. Do NOT
+//    implement B and do not increase ordinary shopping interruptions merely to
+//    make correlation stricter."
+//
+// The stricter rule was built, measured and withdrawn. These tests are what
+// stops it being reinstated as an improvement.
+// ════════════════════════════════════════════════════════════════════════════
+
+test('POLICY: the words name THIS question -> bind, reason "supported"', () => {
+  const v = bindingVerdict({ answerText: answerOf(1), question: q(1), scoped: OPEN });
+  assert.equal(v.bind, true);
+  assert.equal(v.reason, 'supported');
+  assert.deepEqual(v.on, ['egg']);
+});
+
+test('⭐ POLICY: the words name a DIFFERENT open question -> refuse, and say where they pointed', () => {
+  // The 17 August defect, in one assertion. These words name question 5 and the
+  // model put them on question 4.
+  const v = bindingVerdict({ answerText: answerOf(4), question: q(4), scoped: OPEN });
+  assert.equal(v.bind, false);
+  assert.equal(v.reason, 'contradicted');
+  assert.equal(v.elsewhere.length, 1);
+  assert.equal(v.elsewhere[0].ordinal, 5);
+  assert.deepEqual(v.elsewhere[0].on, ['ice', 'lolly']);
+
+  const five = bindingVerdict({ answerText: answerOf(5), question: q(5), scoped: OPEN });
+  assert.equal(five.bind, false);
+  assert.equal(five.elsewhere[0].ordinal, 6);
+});
+
+test('⭐ POLICY: SHORTHAND IS PRESERVED - the deictic answers that fail strict must still bind', () => {
+  // These two strings are lifted from the committed tests B15-18 AC2b and AC5a,
+  // whose own assertion records that refusing this path "would delete a path
+  // that resolves correctly today". Warwick ruled the same way. If a future
+  // change makes either of these refuse, it has reinstated strict.
+  const scoped = [
+    { questionKey: 'a', ordinal: 1, itemName: 'richmond pork sausages' },
+    { questionKey: 'b', ordinal: 2, itemName: 'ariel 4in1 pods 33' },
+  ];
+  for (const words of ['the big ones please', 'the 12 skinless ones', 'the four pack']) {
+    const v = bindingVerdict({ answerText: words, question: scoped[0], scoped });
+    assert.equal(v.bind, true, `"${words}" must still bind - this is the shorthand path he uses`);
+    assert.equal(v.reason, 'shorthand');
+  }
+});
+
+test('POLICY: a mapping is refused ONLY on evidence pointing elsewhere, never on silence', () => {
+  const scoped = [
+    { questionKey: 'a', ordinal: 1, itemName: 'gourmet cat food' },
+    { questionKey: 'b', ordinal: 2, itemName: 'arla semi skimmed milk' },
+  ];
+  // Silence -> bind.
+  assert.equal(bindingVerdict({ answerText: 'the usual', question: scoped[0], scoped }).reason, 'shorthand');
+  // Evidence pointing at the other one -> refuse.
+  const v = bindingVerdict({ answerText: 'the semi skimmed', question: scoped[0], scoped });
+  assert.equal(v.bind, false);
+  assert.equal(v.reason, 'contradicted');
+  assert.deepEqual(v.elsewhere[0].on, ['semi', 'skimmed'], 'both words are unique to the milk question');
 });

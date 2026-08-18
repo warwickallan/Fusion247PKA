@@ -55,7 +55,7 @@ import { COMMANDS } from './commandNames.js';
 import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
 // WO-2026-08-18-03 AC1. A MODEL MAPPING IS NOT EVIDENCE. Pure, zero-dep, opens
 // no connection - same reasoning as the shopDecisions import above.
-import { corroboration } from './answerCorroboration.js';
+import { bindingVerdict } from './answerCorroboration.js';
 // The bot folder is PURE and zero-dependency (it opens no connection; a test in
 // that folder enforces it), so importing these three statically does NOT break
 // the property the dynamic import of deps.js below protects: this file must stay
@@ -745,18 +745,21 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
   const mappings = [];
   // ── THE CORROBORATION GATE (WO-2026-08-18-03 AC1) ────────────────────────
   //
-  // Mappings the model claimed at `high` confidence and NOTHING HE TYPED
-  // SUPPORTS. This is the 2026-08-17 defect: seven answers written in 2.5
-  // seconds, the first three right, and from the fourth on every one landed on
-  // the question above. `answerQuestion` is a compare-and-set, so each of those
-  // writes was permanent on arrival and the only way out was cancelling the
-  // shop - which is what Warwick did.
+  // Mappings the model claimed at `high` confidence WHILE HIS WORDS NAMED A
+  // DIFFERENT OPEN QUESTION. This is the 2026-08-17 defect: seven answers
+  // written in 2.5 seconds, the first three right, and from the fourth on every
+  // one landed on the question above - "Ice lollies..." onto Ben & Jerry's while
+  // fruit lolly ice sat open one row below. `answerQuestion` is a compare-and-
+  // set, so each of those writes was permanent on arrival and the only way out
+  // was cancelling the shop, which is what Warwick did.
   //
-  // The model's `confidence` is its opinion of itself. It is not evidence about
-  // the row we are about to write forever, so it is no longer accepted as if it
-  // were. These are carried back to the caller rather than dropped, because a
-  // refusal he is not told about is a silent loss and that is the failure this
-  // whole path already exists to prevent.
+  // CONTRADICTION-ONLY, on his ruling of 2026-08-18: an answer that names
+  // nothing in particular STILL BINDS, because refusing his shorthand is a cost
+  // he declined to pay. See answerCorroboration.js for the residual he
+  // acknowledged rather than waived. These refusals are carried back to the
+  // caller rather than dropped, because a refusal he is not told about is a
+  // silent loss and that is the failure this whole path already exists to
+  // prevent.
   const uncorroborated = [];
   let refusedForShop = 0;
   for (const m of returned.mappings) {
@@ -767,8 +770,8 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
     if (!q) continue;
     const answerText = m.answer_text || words;
 
-    const support = corroboration({ answerText, question: q, scoped });
-    if (!support.corroborated) {
+    const verdict = bindingVerdict({ answerText, question: q, scoped });
+    if (!verdict.bind) {
       uncorroborated.push({
         questionKey: q.questionKey,
         shopRef: q.shopRef,
@@ -781,7 +784,9 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
         shop_ref: q.shopRef,
         question_key: q.questionKey,
         open_questions: scoped.length,
-        detail: 'the model mapped these words to this question and nothing in the words supports it - REFUSED, not written',
+        points_at: verdict.elsewhere.map((e) => e.questionKey),
+        on: verdict.elsewhere.flatMap((e) => e.on),
+        detail: 'the model mapped these words to this question and the words name a DIFFERENT open question - REFUSED, not written',
       });
       continue;
     }
