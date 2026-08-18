@@ -1434,6 +1434,38 @@ createApp({
     // disabled with an honest explanation rather than pretending to work.
     const ASDAIR_SKIP_COMMANDS = Object.freeze(['skipThisWeek', 'skipItem', 'markNotThisWeek', 'skipLine']);
     const asdairSkipCommand = computed(() => ASDAIR_SKIP_COMMANDS.find((n) => asdairCommands.value.has(n)) || null);
+    // Correcting a settled answer. Published as `correctAnswer` on the shared surface; until the API
+    // lists it in command_names the control renders DISABLED and says why, exactly as the skip
+    // control above does. No probe list here — unlike skip, this command's name is not a guess.
+    const asdairCanCorrect = computed(() => asdairHasCommand('correctAnswer'));
+
+    // ---- THE CORRECTION CHAIN, WHEN THE API PUBLISHES IT ---------------------------------------
+    // A correction is a NEW ROUND whose parent is the row it superseded, so after one correction the
+    // resolved list legitimately holds BOTH rounds about the same line. Pairing them needs the API
+    // to say which superseded which: `question_round`, `supersedes_question_key` and
+    // `superseded_by_question_key` on each resolved item.
+    //
+    // ⛔ THESE ARE READ DEFENSIVELY AND NOTHING IS INFERRED WHEN THEY ARE ABSENT. The round is also
+    // encoded in `question_key`, and parsing it out of that string would pair the rounds without the
+    // API's help — that is the view deciding what a correction means, which is the second-brain
+    // failure this surface exists not to be. With the fields absent, both rounds simply render as
+    // the ordinary answered questions they are. Less is shown; nothing false is.
+    const asdairResolvedByKey = computed(() => {
+      const m = new Map();
+      const qs = asdairWs.value && asdairWs.value.questions;
+      for (const q of (qs && Array.isArray(qs.resolved) ? qs.resolved : [])) {
+        if (q && q.question_key) m.set(q.question_key, q);
+      }
+      return m;
+    });
+    /** The row that REPLACED this one, or null. Null also means "the API does not publish the chain". */
+    const asdairSupersededBy = (q) => (q && q.superseded_by_question_key
+      ? (asdairResolvedByKey.value.get(q.superseded_by_question_key) || null) : null);
+    /** The row this one replaced, or null. */
+    const asdairSupersedes = (q) => (q && q.supersedes_question_key
+      ? (asdairResolvedByKey.value.get(q.supersedes_question_key) || null) : null);
+    /** Superseded rows are still ANSWERED — they are history, not deletions, and never say "deleted". */
+    const asdairIsSuperseded = (q) => !!(q && q.superseded_by_question_key);
 
     // ---- "See immediately that the answer landed, and what remains" (AC5) ---------------------
     // One transient line, set only by a write that actually succeeded, cleared by the next write.
@@ -1449,13 +1481,28 @@ createApp({
     // ---- The AsdAIr action sheet — one small, self-contained modal for every write action AND the
     // full-photo view, kept separate from the generic `detail` sheet (whose header is shared by
     // idea/opp/output/doc and would need a fifth branch for no benefit — this owns its own markup).
-    /** @type {import('vue').Ref<null|{kind:'photo'}|{kind:'question',question:object}|{kind:'change',line:object}>} */
+    /** @type {import('vue').Ref<null|{kind:'photo'}|{kind:'question',question:object}|{kind:'change',line:object}|{kind:'correct',question:object}>} */
     const asdairSheet = ref(null);
     const asdairSheetBusy = ref(false);
     const asdairSheetErr = ref(null);
     const asdairChangeName = ref('');
     const asdairChangeQty = ref('');
     const asdairAnswerText = ref(''); // separate from asdairChangeName — a different field, a different sheet
+    // ---- Answer correction. Its OWN state, deliberately not shared with asdairAnswerText -------
+    // A correction is not an answer typed again; it is a different command against a settled row,
+    // and sharing the field would be the first step back towards sharing the command.
+    const asdairCorrectText = ref('');
+    // THE DELIBERATE ACT. On Telegram the separation between an accident and an intent is the word
+    // `change` — see commands.js §correctAnswer: "Only the act of typing a keyword, which a double
+    // tap cannot produce, a redelivery cannot invent, and nobody types by accident." A screen has no
+    // keyword, so this is its equivalent: a SECOND control, physically apart from the button, whose
+    // label states the consequence. Two distinct deliberate acts, which is what a stray tap cannot
+    // produce. It resets on every open, so intent is never inherited from the last correction.
+    const asdairCorrectConfirm = ref(false);
+    // What the correction BECAME, straight from the command's own receipt — never re-derived here.
+    // Held after a success so the sheet can show the supersede as a fact rather than an assumption.
+    /** @type {import('vue').Ref<null|{was:string|null,when:string|null,now:string,round:*}>} */
+    const asdairCorrectDone = ref(null);
     // WCAG 2.4.3: opening a dialog MUST move focus in; closing MUST return it. asdairCloseSheet
     // already returns focus to the workspace heading (mirrors focusSel's use elsewhere for level
     // transitions); this is the matching "in" half.
@@ -1463,15 +1510,45 @@ createApp({
     async function asdairCloseSheet() { asdairSheet.value = null; asdairSheetErr.value = null; await focusSel('#app-workspace-h'); }
     function asdairOpenPhoto() { asdairOpenSheet({ kind: 'photo' }); }
     function asdairOpenQuestion(q) { asdairAnswerText.value = ''; asdairOpenSheet({ kind: 'question', question: q }); }
-    // AC5, "correct an already-resolved item". A RESOLVED question reopens the SAME sheet and the
-    // SAME answerQuestion command — deliberately not a second, parallel "edit" path. His previous
-    // answer is prefilled so changing it is an edit, not a retype from nothing.
-    // ⚠️ ASSUMPTION, REPORTED: that answerQuestion accepts a re-answer on an already-resolved
-    // question. If the backend refuses, the sheet shows that refusal verbatim — never a silent no-op.
-    function asdairOpenReanswer(q) {
-      asdairAnswerText.value = asdairKnown(q && q.answer_text_display) ? String(q.answer_text_display) : '';
-      asdairOpenSheet({ kind: 'question', question: q, reanswer: true });
+    // ---- CORRECTING A SETTLED ANSWER -----------------------------------------------------------
+    //
+    // ⛔ WHAT WAS HERE BEFORE WAS A LIE, AND REMOVING IT IS THE POINT OF THIS CHANGE.
+    //
+    // `asdairOpenReanswer` reopened the ANSWER sheet on a resolved question and called
+    // `answerQuestion` again, on a REPORTED ASSUMPTION that the backend would accept a re-answer.
+    // That assumption was false. `answerQuestion` is a compare-and-set on status='open'
+    // (pipeline/commands.js §"FIRST ANSWER WINS"); against a settled row it writes NOTHING and
+    // returns a SUCCESSFUL receipt carrying `changed:false, duplicate:true`. Since asdairCommand
+    // only rejects on `!r.ok || d.ok === false`, that receipt passed as success and the UI flashed
+    //     Saved: "<the new text>."
+    // for a write that never happened. A missing button is a gap; this was worse than a gap.
+    //
+    // The correct command is `correctAnswer`, which does not overwrite anything: it opens a NEW
+    // ROUND (question_round N+1, parent_question_id → the superseded row) and answers it. The
+    // original keeps its answer_text and answered_at because nothing on that path can reach them.
+    // That is why the UI below says SUPERSEDES and never says delete: the record of what Warwick
+    // was actually asked, and what he first said, survives on purpose.
+    //
+    // Prefilled with his PREVIOUS answer, so correcting is an edit rather than a retype from
+    // nothing — the one good property of the path this replaces.
+    function asdairOpenCorrect(q) {
+      asdairCorrectText.value = asdairKnown(q && q.answer_text_display) ? String(q.answer_text_display) : '';
+      asdairCorrectConfirm.value = false; // intent is never inherited — see the ref's comment
+      asdairCorrectDone.value = null;
+      asdairOpenSheet({ kind: 'correct', question: q });
     }
+    /** Both deliberate acts done, and something actually different to say. */
+    const asdairCorrectReady = computed(() => {
+      const s = asdairSheet.value;
+      if (!s || s.kind !== 'correct') return false;
+      const text = asdairCorrectText.value.trim();
+      if (!text || !asdairCorrectConfirm.value) return false;
+      // Submitting the SAME words is not a correction. The backend would open a successor round and
+      // answer it identically — durable, audited, and pointless. Caught here so he is told rather
+      // than given a receipt for a change he did not make.
+      const was = asdairKnown(s.question && s.question.answer_text_display) ? String(s.question.answer_text_display) : null;
+      return was === null || text !== was.trim();
+    });
     function asdairOpenChange(line) {
       const l = line || {};
       // Prefill from what is actually KNOWN — never the API's word "unknown". Typing over the string
@@ -1553,6 +1630,63 @@ createApp({
         q._error = e.message || 'failed';
       } finally {
         q._busy = false;
+      }
+    }
+
+    /**
+     * SUPERSEDE A SETTLED ANSWER. The screen's half of the word `change`.
+     *
+     * Calls `correctAnswer` — never `answerQuestion`, for the reason written at length above
+     * asdairOpenCorrect. Three outcomes, and all three are said plainly:
+     *
+     *   corrected:true   → it landed, and the sheet shows what it WAS beside what it now IS.
+     *   duplicate:true   → the successor round was already answered with this, so nothing changed.
+     *                      Said as "you already made this change", NEVER as "Saved." This is the
+     *                      exact trap the old re-answer path fell into and it does not get to
+     *                      happen twice in one file.
+     *   throw            → shown verbatim. `unknown_command` from the API (its 400 carries the real
+     *                      command_names) means the capability is not published yet, which the
+     *                      button's own disabled state should already have prevented.
+     */
+    async function asdairSubmitCorrection() {
+      const s = asdairSheet.value;
+      if (!s || s.kind !== 'correct') return;
+      const q = s.question;
+      const text = asdairCorrectText.value.trim();
+      if (!text) { asdairSheetErr.value = 'Type what you meant instead.'; return; }
+      if (!asdairCorrectConfirm.value) { asdairSheetErr.value = 'Tick “replace what I said” first — this supersedes a settled answer.'; return; }
+      if (!asdairCorrectReady.value) { asdairSheetErr.value = 'That is the same answer you already gave. Change the wording, or go back.'; return; }
+      asdairSheetBusy.value = true; asdairSheetErr.value = null; asdairFlash.value = null; asdairRemember.value = null;
+      try {
+        const r = await asdairCommand('correctAnswer', {
+          questionKey: q.question_key,
+          answerText: text,
+          answerSource: 'typed',
+        });
+        // ⛔ A RECEIPT IS NOT A RESULT. `ok:true` says the command ran, not that anything changed.
+        if (r && r.duplicate === true && r.corrected !== true) {
+          asdairSheetErr.value = 'You already made this change — AsdAIr has it as “' + text + '”. Nothing was written just now.';
+          return;
+        }
+        // What it WAS and WHEN comes from the question row the sheet is already showing, because
+        // those strings are server-formatted (answered_at_display goes through the API's humanWhen).
+        // The receipt's superseded_answered_at is a raw timestamp, and formatting a date here would
+        // be the view inventing a presentation the server owns.
+        asdairCorrectDone.value = {
+          was: asdairKnown(q.answer_text_display) ? String(q.answer_text_display) : null,
+          when: asdairKnown(q.answered_at_display) ? String(q.answered_at_display) : null,
+          now: text,
+          round: r && r.question_round !== undefined ? r.question_round : null,
+        };
+        // Re-read FIRST, then say what remains — the same ordering asdairAnswerQuestion uses, and for
+        // the same reason: "what remains" must be the new truth. A correction can reopen decisions,
+        // so the number genuinely can go UP here.
+        await loadAsdairWorkspace();
+        asdairSetFlash('Changed to: ' + text + '.');
+      } catch (e) {
+        asdairSheetErr.value = e.message || 'failed';
+      } finally {
+        asdairSheetBusy.value = false;
       }
     }
 
@@ -2001,10 +2135,16 @@ createApp({
       asdairProvenance, asdairLineOrigin,
       asdairAttentionLines, asdairChangeLines, asdairResolvedLines,
       asdairRegionOf, asdairCropBoxStyle, asdairCropImgStyle, asdairCanCrop, asdairMediaSize, asdairLineTitle, asdairSaid,
-      asdairHasCommand, asdairSkipCommand, asdairSkipLine, asdairFlash, asdairOpenReanswer, asdairTrapFocus,
+      asdairHasCommand, asdairSkipCommand, asdairSkipLine, asdairFlash, asdairTrapFocus,
       asdairMediaUrl, asdairSheet, asdairSheetBusy, asdairSheetErr, asdairChangeName, asdairChangeQty, asdairAnswerText,
       asdairOpenSheet, asdairCloseSheet, asdairOpenPhoto, asdairOpenQuestion, asdairOpenChange,
       asdairAnswerQuestion, asdairSubmitChange,
+      // Answer correction (supersede, never overwrite). `asdairOpenReanswer` is GONE, not renamed:
+      // it called answerQuestion on a settled row and reported success for a write that never
+      // happened. Anything still referencing it must be found now, by failing, not by looking right.
+      asdairCanCorrect, asdairOpenCorrect, asdairSubmitCorrection, asdairCorrectReady,
+      asdairCorrectText, asdairCorrectConfirm, asdairCorrectDone,
+      asdairSupersededBy, asdairSupersedes, asdairIsSuperseded,
       // WP-B15-42 — one exception board, the brand-grouped final list, corroboration vocabulary,
       // and the UI half of the stale "needs human" defect.
       asdairBrand, ASDAIR_NO_BRAND, asdairCorroboration, ASDAIR_CORROBORATION_CAVEAT,
@@ -3090,8 +3230,8 @@ createApp({
                 <div class="grp" v-if="asdairBoardDone.length">
                   <h2>Resolved<span class="g-count">{{ asdairBoardCounts.resolved }}</span></h2>
                   <p class="as-meaning">Kept on screen on purpose — an answer you cannot find again is an answer you cannot correct.</p>
-                  <details v-for="e in asdairBoardDone" :key="e.key" class="tech">
-                    <summary>{{ e.question.status_display === 'skipped' ? 'Skipped' : 'Answered' }}<span v-if="asdairKnown(e.question.answer_text_display)"> · {{ e.question.answer_text_display }}</span><span v-if="asdairKnown(e.question.answered_at_display)"> · {{ e.question.answered_at_display }}</span></summary>
+                  <details v-for="e in asdairBoardDone" :key="e.key" class="tech" :class="{'as-superseded': asdairIsSuperseded(e.question)}">
+                    <summary><span v-if="asdairIsSuperseded(e.question)" class="as-chip-old">Superseded</span>{{ e.question.status_display === 'skipped' ? 'Skipped' : 'Answered' }}<span v-if="asdairKnown(e.question.answer_text_display)"> · {{ e.question.answer_text_display }}</span><span v-if="asdairKnown(e.question.answered_at_display)"> · {{ e.question.answered_at_display }}</span></summary>
                     <div class="tech-body">
                       <div class="as-raw">{{ e.question.question_text_display }}</div>
                       <div class="as-sub" v-if="asdairKnown(e.question.answer_text_display)">You said: “{{ e.question.answer_text_display }}”</div>
@@ -3100,9 +3240,33 @@ createApp({
                            decision's own recorded forward intent, never inferred. -->
                       <div class="as-sub" v-if="e.question.decision && asdairKnown(e.question.decision.forward_intent_display)">Remembered for future shops: {{ e.question.decision.forward_intent_display }}</div>
                       <div class="as-note" v-else>Applied to this shop. Nothing says it was remembered for future shops.</div>
-                      <div class="i-act">
-                        <button class="act" :disabled="e.question._busy" @click="asdairOpenReanswer(e.question)">Change this answer</button>
+
+                      <!-- THE CHAIN — SHOWN ONLY WHEN THE API PUBLISHES IT, never reconstructed here.
+                           A superseded answer is KEPT: this block is what makes that visible on the
+                           board rather than only inside the sheet that changed it.
+                           ⛔ THE COPY STATES WHAT IS TRUE AND NEVER DENIES THE SCARY WORD. "kept on
+                           record" and not "it is not deleted" — a denial plants the word it denies,
+                           and the render gate now asserts no deletion vocabulary reaches this view
+                           at all. That assertion caught this exact sentence. -->
+                      <div class="as-chain" v-if="asdairSupersededBy(e.question)">
+                        <span class="as-chip-old">Superseded</span>
+                        <span>You changed this to “{{ asdairSupersededBy(e.question).answer_text_display }}”<span v-if="asdairKnown(asdairSupersededBy(e.question).answered_at_display)"> · {{ asdairSupersededBy(e.question).answered_at_display }}</span>. This answer is kept on record.</span>
                       </div>
+                      <div class="as-chain" v-if="asdairSupersedes(e.question)">
+                        <span class="as-chip-new">Correction</span>
+                        <span>This replaced “{{ asdairSupersedes(e.question).answer_text_display }}”<span v-if="asdairKnown(asdairSupersedes(e.question).answered_at_display)">, given {{ asdairSupersedes(e.question).answered_at_display }}</span>.</span>
+                      </div>
+
+                      <div class="i-act">
+                        <!-- Gated on the API's own published surface, the pattern this file already
+                             uses for skip: a control whose command is absent is DISABLED and says
+                             why, never rendered as if it worked. It lights up by itself the moment
+                             "correctAnswer" appears in command_names. -->
+                        <button class="act" :disabled="e.question._busy || !asdairCanCorrect"
+                          :title="asdairCanCorrect ? 'Supersede this answer — the original is kept' : 'AsdAIr does not publish a correction command yet'"
+                          @click="asdairOpenCorrect(e.question)">Change this answer</button>
+                      </div>
+                      <p class="as-note" v-if="!asdairCanCorrect">“Change this answer” is greyed out because AsdAIr does not yet publish a command for correcting a settled answer. It becomes live the moment one exists — nothing here pretends to work in the meantime.</p>
                       <p class="err" v-if="e.question._error">{{ e.question._error }}</p>
                     </div>
                   </details>
@@ -3933,7 +4097,7 @@ createApp({
          Empty focusable sentinels with no ARIA are the standard shape for this pattern. -->
     <span tabindex="0" class="as-trap" @focus="asdairTrapFocus('last')"></span>
     <div class="sheet-card asdair-sheet" role="dialog" aria-modal="true"
-      :aria-label="asdairSheet.kind==='photo' ? 'Original photo' : asdairSheet.kind==='question' ? 'Answer this question' : 'Change this line'"
+      :aria-label="asdairSheet.kind==='photo' ? 'Original photo' : asdairSheet.kind==='question' ? 'Answer this question' : asdairSheet.kind==='correct' ? 'Change an answer you already gave' : 'Change this line'"
       @keydown.esc="asdairCloseSheet()">
       <button class="back" @click="asdairCloseSheet()">‹ Back</button>
 
@@ -3944,9 +4108,12 @@ createApp({
       </template>
 
       <template v-else-if="asdairSheet.kind==='question'">
-        <h1>{{ asdairSheet.reanswer ? 'Change your answer' : 'Answer this question' }}</h1>
+        <!-- This sheet answers an OPEN question and nothing else. The "reanswer" variant it used to
+             carry called answerQuestion against a settled row, which silently wrote nothing — see
+             the block above asdairOpenCorrect. Correcting a settled answer is the 'correct' sheet
+             below, a different command with a different guarantee. -->
+        <h1>Answer this question</h1>
         <div class="as-raw">{{ asdairSheet.question.question_text_display }}</div>
-        <p class="as-sub" v-if="asdairSheet.reanswer && asdairKnown(asdairSheet.question.answer_text_display)">You said “{{ asdairSheet.question.answer_text_display }}”. Change it below and save.</p>
         <!-- The crop, in the sheet too — the same region, drawn the same way, so answering from the
              sheet never means losing sight of the evidence. -->
         <div v-if="asdairCanCrop(asdairRegionOf(asdairSheet.question))" class="as-crop" :style="asdairCropBoxStyle(asdairRegionOf(asdairSheet.question))">
@@ -3985,6 +4152,67 @@ createApp({
             @click="asdairSkipLine(asdairSheet.line)">Not this week</button>
         </div>
         <p class="as-note" v-if="!asdairSkipCommand">“Not this week” is greyed out because AsdAIr does not yet publish a command for skipping an already-sorted line. It becomes live the moment one exists — nothing here pretends to work in the meantime.</p>
+        <p class="err" v-if="asdairSheetErr">{{ asdairSheetErr }}</p>
+      </template>
+
+      <!-- ══ CHANGE AN ANSWER ALREADY GIVEN ═════════════════════════════════════════════════════
+           A correction SUPERSEDES; it never deletes and it never overwrites. The original answer
+           stays on this screen the whole time, above the field, with when it was given — because
+           the record of what Warwick was actually asked, and what he first said, survives on
+           purpose. Nothing in this sheet is styled as a destructive action. -->
+      <template v-else-if="asdairSheet.kind==='correct'">
+        <h1>Change your answer</h1>
+        <div class="as-raw">{{ asdairSheet.question.question_text_display }}</div>
+
+        <!-- WHAT IS ON RECORD NOW. Kept visible while he types the replacement, so the change is
+             made against the old answer rather than from memory of it. -->
+        <div class="as-was">
+          <div class="as-was-h">On record now — kept, whatever you do here</div>
+          <div class="as-was-a" v-if="asdairKnown(asdairSheet.question.answer_text_display)">“{{ asdairSheet.question.answer_text_display }}”</div>
+          <div class="as-was-a" v-else>{{ asdairSheet.question.status_display === 'skipped' ? 'You skipped this.' : 'No answer text is recorded.' }}</div>
+          <div class="as-was-w" v-if="asdairKnown(asdairSheet.question.answered_at_display)">Given {{ asdairSheet.question.answered_at_display }}</div>
+          <div class="as-sub" v-if="asdairSheet.question.resolution_display">→ {{ asdairSheet.question.resolution_display }}</div>
+        </div>
+
+        <!-- DONE. Shown instead of the form once the correction has landed, so the supersede is
+             read as a completed pair — what it was, what it now is — rather than an empty field. -->
+        <template v-if="asdairCorrectDone">
+          <div class="as-done">
+            <div class="as-done-h">Changed</div>
+            <div class="as-done-b"><span class="as-chip-old">Was</span> “{{ asdairCorrectDone.was }}”<span v-if="asdairCorrectDone.when"> · {{ asdairCorrectDone.when }}</span></div>
+            <div class="as-done-b"><span class="as-chip-new">Now</span> “{{ asdairCorrectDone.now }}”</div>
+            <p class="as-note">The original is kept on record. AsdAIr asked the question again and took your new answer.</p>
+          </div>
+          <div class="i-act">
+            <button class="act accept" @click="asdairCloseSheet()">Done</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <label class="lane-sub" for="asdair-correct-text">What you meant instead</label>
+          <input id="asdair-correct-text" class="asdair-input" type="text" v-model="asdairCorrectText"
+            placeholder="e.g. Cravendale Whole Milk 2L"
+            aria-describedby="asdair-correct-help" />
+          <p class="as-note" id="asdair-correct-help">AsdAIr will ask this question again and record your new answer as the one that counts. The answer above stays on record with the time you gave it.</p>
+
+          <!-- THE DELIBERATE ACT. On Telegram this is the word "change"; here it is a second control,
+               apart from the button, saying what will happen. A stray tap reaches one control, never
+               two. Kept a plain checkbox on purpose — not a typed confirmation phrase, which on a
+               phone is friction without extra safety, since the correction is reversible by another
+               correction and destroys nothing. -->
+          <label class="as-confirm" for="asdair-correct-confirm">
+            <input id="asdair-correct-confirm" type="checkbox" v-model="asdairCorrectConfirm" />
+            <span>Replace what I said. My original answer stays on record.</span>
+          </label>
+
+          <div class="i-act">
+            <button class="act accept" :disabled="asdairSheetBusy || !asdairCorrectReady"
+              :title="asdairCorrectReady ? 'Supersede the answer above' : 'Type a different answer and tick the box above'"
+              @click="asdairSubmitCorrection()">{{ asdairSheetBusy ? '…' : 'Change my answer' }}</button>
+            <button class="act" :disabled="asdairSheetBusy" @click="asdairCloseSheet()">Leave it as it is</button>
+          </div>
+        </template>
+
         <p class="err" v-if="asdairSheetErr">{{ asdairSheetErr }}</p>
       </template>
     </div>

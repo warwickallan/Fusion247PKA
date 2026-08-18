@@ -30,6 +30,7 @@ import {
   ASDAIR_LIST_ROUTE, MAX_BODY_BYTES, UPSTREAM_PATH, proxyAsdairList,
   ASDAIR_CHECK_ITEM_ROUTE, CHECK_ITEM_UPSTREAM_PATH, proxyAsdairCheckItem,
   ASDAIR_DISPLAY_NAME_ROUTE, DISPLAY_NAME_UPSTREAM_PATH, proxyAsdairDisplayName,
+  ASDAIR_COMMAND_ROUTE, COMMAND_UPSTREAM_PATH, proxyAsdairCommand,
 } from './asdair-list.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -104,6 +105,23 @@ function withCheckHandler(origin, deps) {
 /** The same, around the REAL display-name handler. */
 function withDisplayNameHandler(origin, deps) {
   const server = http.createServer((req, res) => proxyAsdairDisplayName(req, res, origin, deps));
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+  });
+}
+
+// The command route. Same rule as the three above.
+export function serverDispatchesCommand(source) {
+  return source.split(/\r?\n/).some((l) => {
+    const t = l.trim();
+    if (t.startsWith('import ')) return false;
+    return t.includes('ASDAIR_COMMAND_ROUTE') && /proxyAsdairCommand\s*\(/.test(t);
+  });
+}
+
+/** The same, around the REAL command handler. */
+function withCommandHandler(origin, deps) {
+  const server = http.createServer((req, res) => proxyAsdairCommand(req, res, origin, deps));
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
   });
@@ -282,6 +300,77 @@ async function main() {
     ok('server.mjs DISPATCHES the display-name route (not merely imports it)', serverDispatchesDisplayName(src));
     ok('the display-name route constant is the one the editor posts to',
       ASDAIR_DISPLAY_NAME_ROUTE === '/api/asdair/display-name', ASDAIR_DISPLAY_NAME_ROUTE);
+    // The shared command surface. Same reason again — and this one matters more than the others,
+    // because the workspace routes EVERY write through it. Undispatched, every control on the
+    // AsdAIr board 404s at once.
+    ok('server.mjs DISPATCHES the command route (not merely imports it)', serverDispatchesCommand(src));
+    ok('the command route constant is the one the workspace posts to',
+      ASDAIR_COMMAND_ROUTE === '/api/asdair/command', ASDAIR_COMMAND_ROUTE);
+  }
+
+  // ── 13. THE SHARED COMMAND SURFACE, OVER A REAL SOCKET ────────────────────────────────────────
+  {
+    // A correctAnswer receipt as the pipeline really shapes it. `duplicate` is the field that
+    // decides whether the UI says "Changed" or "you already made this change", so the assertion
+    // below is about it surviving the proxy byte for byte.
+    const receipt = {
+      ok: true,
+      command: 'correctAnswer',
+      result: {
+        ok: true, command: 'correctAnswer', question_key: 'milk#1',
+        successor_question_key: 'milk#2', question_round: 2,
+        superseded_answer_text: 'semi-skimmed', superseded_answered_at: '2026-08-17T10:00:00Z',
+        corrected: true, opened: true, duplicate: false,
+      },
+    };
+    const up = await fakeUpstream((req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(receipt));
+    });
+    const h = await withCommandHandler(up.origin);
+    const sent = { command: 'correctAnswer', actor: 'warwick', args: { questionKey: 'milk#1', answerText: 'whole milk' } };
+    const res = await post(h.port, sent, {}, ASDAIR_COMMAND_ROUTE);
+
+    ok('a command reaches the upstream over a real socket', up.seen.length === 1, up.seen.length + ' request(s)');
+    ok('it is POSTed to ' + COMMAND_UPSTREAM_PATH,
+      up.seen[0] && up.seen[0].method === 'POST' && up.seen[0].url === COMMAND_UPSTREAM_PATH,
+      up.seen[0] ? up.seen[0].method + ' ' + up.seen[0].url : 'nothing');
+    ok('the command name and args arrive unchanged — the proxy names no command of its own',
+      JSON.stringify(JSON.parse(up.seen[0].body)) === JSON.stringify(sent));
+    ok('the receipt is forwarded VERBATIM, `duplicate` included',
+      JSON.stringify(parsed(res)) === JSON.stringify(receipt));
+  }
+  {
+    // ⛔ THE PROPERTY THIS ROUTE EXISTS TO PROTECT, AND IT IS A DISTINCTION BETWEEN TWO FAILURES.
+    // Unreachable = never asked = nothing happened, so saying so is TRUE and a retry is safe.
+    const dead = await fakeUpstream(() => {});
+    const origin = dead.origin;
+    await new Promise((r) => dead.server.close(r));
+    const h = await withCommandHandler(origin, { timeoutMs: 1500 });
+    const res = await post(h.port, { command: 'correctAnswer' }, {}, ASDAIR_COMMAND_ROUTE);
+    const body = parsed(res);
+    ok('an unreachable command is 502 in the JSON error shape', res.status === 502 && body !== null, String(res.status));
+    ok('and an UNREACHABLE upstream may say nothing was changed — it was never asked',
+      body && /nothing was changed/i.test(body.message || ''), body ? body.message : '');
+    h.server.close();
+  }
+  {
+    // ...but an upstream that answered UNREADABLY may already have written. Claiming "nothing was
+    // changed" there would be a confident false statement about a durable row — the same class of
+    // lie as a success message over a write that never happened, relocated into the proxy.
+    const up = await fakeUpstream((req, res) => {
+      res.writeHead(500, { 'content-type': 'text/html' });
+      res.end('<html><body>gateway exploded</body></html>');
+    });
+    const h = await withCommandHandler(up.origin);
+    const res = await post(h.port, { command: 'correctAnswer' }, {}, ASDAIR_COMMAND_ROUTE);
+    const body = parsed(res);
+    ok('a non-JSON upstream answer is still the JSON error shape', body !== null && body.ok === false);
+    ok('and it does NOT claim nothing was changed — that is not knowable here',
+      body && !/nothing was changed/i.test(body.message || ''), body ? body.message : '');
+    ok('it tells the reader where to look instead',
+      body && /check the board/i.test(body.message || ''), body ? body.message : '');
+    h.server.close(); up.server.close();
   }
 
   // ── 12. WP-B15-51: WARWICK'S DISPLAY-NAME WRITE, OVER A REAL SOCKET ───────────────────────────
@@ -427,6 +516,21 @@ function selfTest() {
   ok('the display-name assertion accepts the REAL server.mjs', serverDispatchesDisplayName(real));
   Object.keys(displayMutants).forEach((why) => {
     ok('the display-name assertion REJECTS a mutant: ' + why, serverDispatchesDisplayName(displayMutants[why]) === false);
+  });
+
+  // And again for the command dispatch. A fourth source scan added without proving it can go red
+  // would be a fourth piece of decoration — and this is the scan whose silent failure would take
+  // every write control on the AsdAIr board down at once.
+  const commandMutants = {
+    'the command dispatch line deleted': real.split(/\r?\n/)
+      .filter((l) => !(l.includes('ASDAIR_COMMAND_ROUTE') && /proxyAsdairCommand\s*\(/.test(l)))
+      .join('\n'),
+    'only the command import left': "import { ASDAIR_COMMAND_ROUTE, proxyAsdairCommand } from './asdair-list.mjs';\n",
+    'the command handler call removed but the constant kept': real.replace(/proxyAsdairCommand\s*\(/g, 'somethingElse('),
+  };
+  ok('the command assertion accepts the REAL server.mjs', serverDispatchesCommand(real));
+  Object.keys(commandMutants).forEach((why) => {
+    ok('the command assertion REJECTS a mutant: ' + why, serverDispatchesCommand(commandMutants[why]) === false);
   });
   console.log(failed
     ? 'SELF-TEST FAIL — ' + failed + ' of ' + ran + ' assertions failed.'
