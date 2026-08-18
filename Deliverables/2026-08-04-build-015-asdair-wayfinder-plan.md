@@ -5990,7 +5990,7 @@ exists.**
 >
 > **Integrated head:** `80944ae` on `main`, clean, `main == origin/main`.
 >
-> **Session report:** `Deliverables/2026-08-18-session-report-b15-recovery.md` — **OUTSTANDING ON ARRIVAL.** Commissioned from Pax at this rotation (run `a35517be0e80a70f4`) and may return AFTER the `/clear`. Inputs handed to him: `Deliverables/2026-08-18-subagent-token-ledger-b15-recovery.md` (committed) and `~/.mypka/governor/capae-opening.json`. **When it lands: write it to `Deliverables/`, commit, run `populate.mjs` then `capae-sync.mjs` on its payload, and add the pointer here.** Both build branches are
+> **Session report:** `Deliverables/2026-08-18-session-report-b15-recovery.md` — **LANDED AND DISCHARGED 2026-08-18, committed at `519803b`** with its payload `Deliverables/2026-08-18-session-report-payload.json`. `populate.mjs` wrote rotation `b24b6d66` (verified); `capae-sync.mjs` synced 4 families — `record-amended-body-not-recut` took its **first clean exposure in five**, the other three recurred. **Pax survived the `/clear` and returned normally; the earlier statement that its return path died with the session was an unsupported inference from an absent file and is withdrawn.** Both build branches are
 > MERGED (`wo/b15-intake`, `wo/b15-runtime`). Nothing of value is left on a branch or worktree.
 >
 > ### FRONTIER — REMEDIATE. Close the remaining North-Star gaps, then Veritas.
