@@ -6023,8 +6023,15 @@ exists.**
 >    is built but unexercised.
 > 4. **Crash/restart re-invocation** — resumable is built; automatic re-invocation is unproven.
 > 5. **Question → Telegram → durable answer → automatic resume** is unproven live.
-> 6. **The audited correction command is NOT built** (deferred deliberately: a new name in a closed
->    allowlist days before a real shop).
+> 6. **The audited correction command is NOT built.** ⚑ **UNPARKED BY WARWICK, 2026-08-18 — it is now
+>    REQUIRED WORK, BEFORE VERITAS.** It was deferred deliberately (a new name in a closed allowlist
+>    days before a real shop); that reason has expired and he has replaced it. **His words:** *"The
+>    already-open audited correction capability / answer-correction path still needs to be completed
+>    before Veritas so a wrongly accepted answer is not immutable forever."* Its trigger is the residual
+>    he explicitly refused to waive when ruling CORRELATION POLICY = A: *"an answer that matches nothing
+>    at all is still accepted and cannot be changed afterwards. That permanence is not acceptable as the
+>    completed North Star."* Starting evidence is WO-2026-08-18-03's AC4 report — four executed probes
+>    naming exactly what remains reachable.
 > 7. **Favourites bulk tick-and-add is written against a DOM never seen.**
 >
 > ### Test state at `2329a98`
