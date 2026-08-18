@@ -45,6 +45,36 @@
 
 const { isHumanState } = require('../shop/humanState');
 
+// =====================================================================
+// WO-2026-08-19-03 AC2 - WHAT COUNTS AS SUPERSEDED IS THE PIPELINE'S RULE,
+// NOT A SECOND ONE WRITTEN HERE.
+//
+// A SECOND VIEW, NOT A SECOND BRAIN. `supersededQuestionIds` is the pipeline's
+// own derivation (services/asdair/pipeline/applyDecisions.js:194, a pure
+// `export function`), and it already has two readers: `classifyQuestionBoards`,
+// which decides what the shop may WAIT ON, and `runtime.boardStateOf`, which
+// decides what Warwick is SHOWN on the Telegram board. This module is the
+// third, and it is deliberately not a fourth implementation - the whole defect
+// being closed here is that the cockpit counted `status` independently of the
+// board and therefore disagreed with it about what was outstanding.
+//
+// ⛔ LOAD-BEARING IMPORT CONSTRAINT - READ BEFORE EDITING applyDecisions.js.
+//
+// This is a CommonJS module `require()`-ing an ESM one. Node has supported that
+// since v20.17/v22.12 and it is verified working here on v22.18.0 - but ONLY
+// while the target module has no TOP-LEVEL `await`. The day one is added to
+// applyDecisions.js (or to anything it imports at module scope), this require
+// throws `ERR_REQUIRE_ASYNC_MODULE`.
+//
+// That failure would NOT be a red test in the pipeline's suite. It would be a
+// load failure in the COCKPIT, and the first symptom would be Warwick's
+// workspace failing to render. It is called out here, at the point of
+// consumption, so whoever adds the first top-level await sees the cost before
+// paying it - and shopArithmetic.test.js asserts this import still resolves, so
+// the estate finds out from a red test rather than from Warwick.
+// =====================================================================
+const { supersededQuestionIds } = require('../pipeline/applyDecisions.js');
+
 function fail(message) {
   throw new Error('shopArithmetic: ' + message);
 }
@@ -252,7 +282,35 @@ function countShop(input) {
     return Number.isInteger(n) && resolvedLineNos.has(n);
   });
   const staleKeys = new Set(stale.map((q) => q.question_key));
-  const live = byStatus.open.filter((q) => !staleKeys.has(q.question_key));
+
+  // ── WO-2026-08-19-03 AC2. THE SUPERSESSION RULE. ────────────────────────
+  //
+  // A question a LATER ROUND has replaced is HISTORY, not an outstanding
+  // decision. The Telegram board has known this since WO-2026-08-18-07; the
+  // cockpit did not, so the same shop read "1 outstanding" on the phone and
+  // "1 outstanding" here about a card the phone had already retired - two
+  // surfaces disagreeing about what Warwick still has to do.
+  //
+  // ⚠️ THIS IS NOT THE STALE RULE WITH A DIFFERENT NAME, and collapsing the
+  // two would lose a real distinction. STALE = the question is still a real
+  // question, but its subject got settled elsewhere. SUPERSEDED = AsdAIr
+  // itself replaced this round with a better one and is asking again. They are
+  // counted separately so neither can hide inside the other's number.
+  //
+  // The rule is the pipeline's (see the import at the top of this file). What
+  // is derived here is only which of THIS shop's open rows it applies to.
+  const supersededIds = supersededQuestionIds(questions);
+  const superseded = byStatus.open.filter((q) => {
+    const self = idKey(q.id);
+    return self !== null && supersededIds.has(self);
+  });
+  const supersededKeys = new Set(superseded.map((q) => q.question_key));
+
+  // OPEN, AS A HUMAN MEANS IT: still on the board and still his to answer.
+  // Neither suppression is a guess about the data - one is a resolved subject,
+  // the other is a replaced round, and both are reported as their own number.
+  const openLive = byStatus.open.filter((q) => !supersededKeys.has(q.question_key));
+  const live = openLive.filter((q) => !staleKeys.has(q.question_key));
 
   const heldItems = items.filter(isHeldItem);
 
@@ -267,7 +325,30 @@ function countShop(input) {
     // Reported so the stale state is visible rather than merely excluded.
     stale_questions_suppressed: stale.length,
 
+    // WO-2026-08-19-03 AC2. Same discipline: EXCLUDED, and therefore SAID.
+    // A non-zero value here is AsdAIr having re-asked something, which is a
+    // fact about the shop worth being able to see rather than a number that
+    // quietly went down.
+    superseded_questions_suppressed: superseded.length,
+    // The keys, so every downstream block projects this ONE derivation instead
+    // of re-deriving supersession for itself - which is the defect being closed,
+    // not a pattern to repeat one layer up.
+    superseded_question_keys: Object.freeze(superseded.map((q) => q.question_key)),
+
+    // ⚠️ TWO DIFFERENT TRUE NUMBERS, AND THE NAMES SAY WHICH IS WHICH.
+    //
+    // `questions_open` is a fact about the STATUS COLUMN: how many rows say
+    // 'open'. It keeps the AC4 totality invariant - open + answered + skipped
+    // + unknown === questions_total ALWAYS - so no question can fall out of the
+    // arithmetic, which is what that invariant exists to guarantee.
+    //
+    // `questions_open_live` is what OPEN MEANS TO WARWICK: still on the board,
+    // still his. It is the one a human-facing count must project. Subtracting
+    // the supersession from `questions_open` instead would have made the
+    // buckets stop summing, and a question that vanishes from the arithmetic is
+    // exactly the failure the four buckets were built to prevent.
     questions_open: byStatus.open.length,
+    questions_open_live: openLive.length,
     questions_answered: byStatus.answered.length,
     questions_skipped: byStatus.skipped.length,
     // AC4. A status the schema forbids. Counted and NAMED rather than dropped:

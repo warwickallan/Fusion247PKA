@@ -836,3 +836,72 @@ test('AC1: GET on the sense-check route is 405, not a silent read', async () => 
   const res = await handleRequest({ method: 'GET', path: '/asdair/check-item' }, checkDeps());
   assert.equal(res.status, 405);
 });
+
+// =====================================================================
+// WO-2026-08-19-03 AC1 - THE CORRECTION CAPABILITY IS ROUTABLE THROUGH THE
+// COCKPIT'S OWN HTTP LAYER.
+//
+// Before this Work Order `POST /asdair/command` answered 400 unknown_command
+// for `correctAnswer`: the pipeline had implemented it and Telegram could reach
+// it, and the Cockpit - which the goal contract names as the OTHER normal
+// control surface - could not ask for it at all.
+//
+// 'every command the workspace offers is routable' above already covers this
+// by loop. It is named explicitly here because a capability that exists on one
+// surface and not the other is the defect this order was raised for, and a
+// claim that specific deserves an assertion somebody can find.
+// =====================================================================
+
+test('AC1: correctAnswer routes end to end through POST /asdair/command', async () => {
+  const seen = [];
+  const res = await handleRequest(
+    {
+      method: 'POST',
+      path: '/asdair/command',
+      body: {
+        command: 'correctAnswer',
+        args: { questionKey: 'shop:7:line:3:r1', answerText: 'Felix As Good As It Looks' },
+        idempotency_key: 'k-correct-1',
+      },
+    },
+    { commands: stubCommands(seen) }
+  );
+
+  assert.equal(res.status, 200, 'this returned 400 unknown_command before the surface grew');
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.command, 'correctAnswer');
+
+  // It reached the shared implementation, with the arguments intact...
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].name, 'correctAnswer');
+  assert.equal(seen[0].args.questionKey, 'shop:7:line:3:r1');
+  assert.equal(seen[0].args.answerText, 'Felix As Good As It Looks');
+  // ...and stamped with WHICH surface acted, exactly as the Telegram path
+  // records its responder. An audit trail that cannot tell the phone from the
+  // Cockpit is not an audit trail.
+  assert.equal(seen[0].args.requested_by, 'cockpit:warwick');
+  assert.equal(seen[0].args.idempotency_key, 'k-correct-1');
+});
+
+test('AC1: the refusal message now LISTS correctAnswer, so a caller can discover it', async () => {
+  const res = await handleRequest(
+    { method: 'POST', path: '/asdair/command', body: { command: 'notACommand' } },
+    { commands: stubCommands([]) }
+  );
+  assert.equal(res.status, 400);
+  assert.ok(res.body.command_names.includes('correctAnswer'),
+    'the surface it publishes on refusal is how a client learns what it may ask for');
+});
+
+test('AC4: the command route still refuses checkout, payment, slot and credential names', async () => {
+  for (const bad of ['checkout', 'payNow', 'bookSlot', 'readCredential', 'placeOrder']) {
+    const res = await handleRequest(
+      { method: 'POST', path: '/asdair/command', body: { command: bad } },
+      { commands: stubCommands([]) }
+    );
+    assert.equal(res.status, 400, bad + ' must be refused at the route');
+    assert.equal(res.body.error, 'unknown_command');
+    assert.ok(!res.body.command_names.includes(bad),
+      'a forbidden name must never appear in the published surface');
+  }
+});

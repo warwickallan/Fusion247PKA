@@ -129,6 +129,25 @@ const COLUMN_PROBE_SQL =
   'SELECT column_name FROM information_schema.columns ' +
   'WHERE table_schema = \'asdair\' AND table_name = $1';
 
+// ---------------------------------------------------------------------
+// WO-2026-08-19-03 AC2. THE TWO COLUMNS THAT MAKE A SUPERSESSION LEGIBLE.
+//
+// Migration 017 added `question_round` and `parent_question_id` to
+// asdair.shop_question. The Telegram board has consumed them since
+// WO-2026-08-18-07 (runtime.boardStateOf -> applyDecisions.supersededQuestionIds),
+// and the cockpit did not read them AT ALL - which is why a question a later
+// round had replaced still counted as outstanding here. The rule could not have
+// been applied on this side even if somebody had written it: the data never
+// arrived in the first place.
+//
+// ⚠️ WHITELIST-THEN-PROBE, FOR THE REASON THE CATALOGUE READ ALREADY DOES IT.
+// A blind column list takes Warwick's WHOLE workspace read down against a
+// database where 017 has not landed, and 017 is recent enough that this file
+// already treats asdair.shop_decision as optional (see DECISIONS_SQL above). A
+// missing column must cost the supersession refinement, never the workspace.
+// ---------------------------------------------------------------------
+const QUESTION_OPTIONAL_COLUMNS = Object.freeze(['question_round', 'parent_question_id']);
+
 // WP-B15-41 AC9. IS THE PROVENANCE LEDGER ACTUALLY HERE?
 //
 // provenance.js used to STATE, in a comment and in a string that reaches the
@@ -348,6 +367,34 @@ async function probeRegularsColumns(client) {
   }
 }
 
+/**
+ * WO-2026-08-19-03 AC2. The questions SELECT, plus whichever of migration 017's
+ * two round columns this database actually has.
+ *
+ * Same whitelist-then-intersect shape as buildCatalogueSelect above, and for the
+ * same reason: nothing outside QUESTION_OPTIONAL_COLUMNS can reach a statement,
+ * and a database without 017 still gets a working workspace read.
+ */
+function buildQuestionSelect(presentColumns) {
+  const have = new Set((presentColumns || []).map(function (c) { return String(c); }));
+  const extra = QUESTION_OPTIONAL_COLUMNS.filter(function (c) { return have.has(c); });
+  if (extra.length === 0) return QUESTIONS_SQL;
+  extra.forEach(function (c) {
+    if (!IDENTIFIER.test(c)) throw new Error('readWorkspace: refusing unsafe column name "' + c + '".');
+  });
+  return QUESTIONS_SQL.replace(' FROM asdair.shop_question', ', ' + extra.join(', ') + ' FROM asdair.shop_question');
+}
+
+async function probeQuestionColumns(client) {
+  try {
+    const res = await client.query(COLUMN_PROBE_SQL, ['shop_question']);
+    return rows(res).map(function (r) { return r.column_name; });
+  } catch (ignore) {
+    // A database that will not answer the probe still gets the base columns.
+    return [];
+  }
+}
+
 async function probeItemColumns(client) {
   try {
     const res = await client.query(COLUMN_PROBE_SQL, ['shopping_list_items']);
@@ -491,7 +538,10 @@ async function gather(client, opts) {
   const shop = first(await client.query(SHOP_ROW_SQL, [status.shop_id]));
 
   const events = rows(await client.query(EVENTS_SQL, [status.shop_id]));
-  const questions = rows(await client.query(QUESTIONS_SQL, [status.shop_id]));
+  // WO-2026-08-19-03 AC2. `question_round` / `parent_question_id` when 017 is
+  // applied here, the base columns when it is not.
+  const questionColumns = await probeQuestionColumns(client);
+  const questions = rows(await client.query(buildQuestionSelect(questionColumns), [status.shop_id]));
 
   // AC4. Both are optional in the sense that a database without them must not
   // 500 the workspace - readOptional treats "relation does not exist" as
@@ -588,7 +638,10 @@ module.exports = {
     gather: gather,
     buildItemSelect: buildItemSelect,
     buildCatalogueSelect: buildCatalogueSelect,
+    buildQuestionSelect: buildQuestionSelect,
+    QUESTION_OPTIONAL_COLUMNS: QUESTION_OPTIONAL_COLUMNS,
     probeItemColumns: probeItemColumns,
+    probeQuestionColumns: probeQuestionColumns,
     probeRegularsColumns: probeRegularsColumns,
     probeProvenanceLedger: probeProvenanceLedger,
     PROVENANCE_LEDGER_PROBE_SQL: PROVENANCE_LEDGER_PROBE_SQL,
