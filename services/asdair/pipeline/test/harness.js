@@ -251,6 +251,37 @@ export function makeHarness(script = {}) {
       return planBasket(input);
     },
 
+    /**
+     * THE INJECTED DECISION CONSUMER (WO-2026-08-18-06).
+     *
+     * Since the semantic decision point moved off the deterministic planner,
+     * every production planning pass consults a model. The offline suite has no
+     * gateway, so this stands in for it - and the default deliberately makes
+     * the LEAST claim it can: every line it is asked about comes back `ask`
+     * with NO candidates, which is "I could not settle this", not a decision.
+     *
+     * That default is chosen so a test cannot accidentally pass because the
+     * fake was clever. A test that wants a real decision supplies
+     * `script.decisions` and says so; a test that does not is asserting
+     * plumbing, and gets a stand-in that resolves nothing.
+     *
+     * `script.decide` overrides the whole function - that is the seam the
+     * fail-loud proofs use to make it throw or return rubbish.
+     */
+    decide(grounding) {
+      calls.push({ dep: 'decide', lines: (grounding.decision_line_nos || []).length });
+      if (typeof script.decide === 'function') return script.decide(grounding);
+      if (script.decisions) {
+        return { decisions: typeof script.decisions === 'function' ? script.decisions(grounding) : script.decisions };
+      }
+      return {
+        decisions: (grounding.decision_line_nos || []).map((n) => ({
+          line_no: n, verdict: 'ask', question: null, candidates: [],
+          reason: 'offline test harness: no reasoning consumer is bound',
+        })),
+      };
+    },
+
     async loadPlanningInputs() {
       calls.push({ dep: 'loadPlanningInputs' });
       return script.planningInputs || {

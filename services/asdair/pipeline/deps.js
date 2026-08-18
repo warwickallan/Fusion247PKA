@@ -46,6 +46,10 @@ const { planBasket } = require('../skill/planner.js');
 // here: `applyRulebook` is called by runPipeline.js, which owns the plan. This
 // module owns exactly one thing about the rulebook - the model call.
 const { buildRulebookPrompt } = require('../skill/rulebook.js');
+// The SEMANTIC DECISION POINT (WO-2026-08-18-06). Only the prompt builder is
+// needed here: `decideBasket` is called by runPipeline.js, which owns the plan.
+// This module owns exactly one thing about the decision - the model call.
+const { buildDecisionPrompt } = require('../skill/decide.js');
 const { buildPayload } = require('../reconcile/record-confirmation.js');
 const { recordConfirmation } = require('../reconcile/recordConfirmation.js');
 const { updateRegulars } = require('../outcome/updateRegulars.js');
@@ -769,6 +773,43 @@ async function realConsultRulebook(grounding) {
   return extractJson(await answer(buildRulebookPrompt(grounding)));
 }
 
+/**
+ * THE SEMANTIC DECISION CALL. The wire, and nothing else.
+ *
+ * `buildDecisionPrompt` owns the wording and the safety envelope it states, and
+ * `decideBasket` owns the grounding, the validation of every id that comes back
+ * and the refusal to proceed without a contract. This function is the model
+ * call, exactly as `realConsultRulebook` above is - deliberately its sibling,
+ * so neither carries a product instruction of its own.
+ *
+ * ── WHY THE `answer` ROLE AND NOT `reason` ────────────────────────────────
+ * Because Warwick ruled on precisely this temptation (WO-2026-08-09-B15-03):
+ * "Do NOT substitute `reason` because it is easier to reach." That ruling was
+ * about the answer-interpretation path rather than this one, so it does not
+ * decide this call - but reaching for the role a standing instruction warned
+ * against, unasked, is not an implementer's decision to make. This uses the
+ * role the household's existing judgement call already uses. Moving it is a
+ * product decision, and it is recorded here as one rather than taken quietly.
+ *
+ * A failure here is NOT caught. `decideBasket` converts it into a
+ * DecisionUnavailableError and the step fails loudly, because the only
+ * alternative - carrying on without a decision - is the word-overlap scoring
+ * this build exists to remove.
+ */
+async function realDecideBasket(grounding) {
+  const { answer } = await import('../../obsidiwikai/src/core/models.mjs');
+  const { extractJson } = await import('../../obsidiwikai/src/core/llm.mjs');
+  return extractJson(await answer(buildDecisionPrompt(grounding)));
+}
+
+/** The model id that ACTUALLY answered, resolved at call time - never a literal
+ *  frozen at import, for the same reason `answerModel()` is read at call time
+ *  everywhere else: a durable provenance row must say what really answered. */
+async function realDecisionModel() {
+  const { answerModel } = await import('../../obsidiwikai/src/core/models.mjs');
+  return answerModel();
+}
+
 /** The hard allowlist, imported from the route that owns it so the two cannot
  *  drift. add-to-draft-list is the ONLY command that can reach the database. */
 async function realAssertAllowedIntents(intents) {
@@ -817,9 +858,17 @@ export function createDeps(overrides = {}) {
     assertAllowedIntents: realAssertAllowedIntents,
     executeIntents: realExecuteIntents,
 
-    // planning
+    // planning - MECHANICAL ONLY since WO-2026-08-18-06. planBasket performs
+    // exact, unambiguous catalogue lookups, exclusions, quantities and budget.
+    // It does not choose among candidates and it does not decide identity.
     planBasket,
     loadPlanningInputs: realLoadPlanningInputs,
+
+    // ⭐ THE SEMANTIC DECISION. Bound here and nowhere else. An unbound `decide`
+    // does not silently degrade to the deterministic scorer - decideBasket
+    // throws, which is the whole point of Veritas Gate 2's correction.
+    decide: realDecideBasket,
+    decisionModel: realDecisionModel,
 
     // the answer -> current-shop decision seam (WP-B15-2).
     // A tap never reaches this; only free text does. Without this binding a

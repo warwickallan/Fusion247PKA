@@ -683,6 +683,79 @@ export async function recordGroundingEvidence(deps, {
   });
 }
 
+/** The command name every decision-evidence marker carries. */
+export const DECISION_EVIDENCE = 'decisionEvidence';
+
+/**
+ * Record, per shop, THAT THE SEMANTIC DECISION WAS TAKEN BY A MODEL HOLDING THE
+ * APPROVED CONTRACT - and WHICH contract, by digest.
+ *
+ * ── WHY THIS EXISTS (Veritas Gate 2, findings 1, 2 and 8) ──────────────────
+ * The reviewer established that the runtime consumed no contract text at any
+ * point, and that the model was never consulted about what to buy: ZERO
+ * rulebook events across 91,219 log lines. Both facts were discoverable only by
+ * reading a log and inferring absence, and absence is a poor evidence base - it
+ * cannot tell "never ran" apart from "ran and logged nothing".
+ *
+ * So the positive fact is recorded instead. This row exists only if the
+ * decision call returned: `lines_sent`, `selected`, `asked` and the contract
+ * `sha256` are all read off the audit the decision itself produced. A skipped
+ * decision cannot write it, exactly as a skipped model call cannot write
+ * `recordGroundingEvidence` above.
+ *
+ * ── THE DIGEST IS THE POINT ────────────────────────────────────────────────
+ * `contract_sha256` is computed over the exact bytes that went into the prompt.
+ * A reviewer can recompute it from the committed documents and establish which
+ * contract governed this shop's decisions, without taking the runtime's word
+ * for it. "The contract reached the decision point" stops being a claim and
+ * becomes a checkable fact.
+ *
+ * ── SANITIZED: COUNTS, IDS AND DIGESTS ONLY ────────────────────────────────
+ * NEVER a product name, never list content, never a raw reading, never the
+ * prompt text - the same rule recordGroundingEvidence follows, for the same
+ * reason. What is stored is the SHAPE of the decision, which is what makes the
+ * claim checkable, and none of the household's data.
+ *
+ * ── AND IT IS A ONE-SHOT MARKER, SO IT STAYS `pending` BY DESIGN ───────────
+ * Like `groundingEvidence`, this is a durable FACT rather than a queued unit of
+ * work: nothing consumes it and nothing should resolve it. See pipeline/README.md
+ * - a marker row sitting at `attempts=0` forever is this ledger working, not
+ * failing.
+ */
+export async function recordDecisionEvidence(deps, { shopId, householdId, audit }) {
+  const a = audit || {};
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const ids = (list) => (Array.isArray(list) ? list.map(num).filter((n) => n !== null) : []);
+  return insertOneShot(deps, {
+    shopId,
+    name: DECISION_EVIDENCE,
+    idempotencyKey: `decision:${shopId}`,
+    payload: {
+      household_id: num(householdId),
+      // WHICH contract was in the call, and how much of it.
+      contract_sha256: a.contract_sha256 || null,
+      contract_bytes: num(a.contract_bytes),
+      contract_sources: Array.isArray(a.contract_sources) ? a.contract_sources : [],
+      // THAT it was consulted, and what it was given to decide with.
+      consulted: a.consulted === true,
+      model: a.model || null,
+      catalogue_size: num(a.catalogue_size),
+      rules_sent: ids(a.rules_sent),
+      // WHAT came back. A skipped decision cannot produce these.
+      lines_total: num(a.lines_total),
+      lines_sent: ids(a.lines_sent),
+      selected: ids(a.selected),
+      searched: ids(a.searched),
+      asked: ids(a.asked),
+      undecided: ids(a.undecided),
+      // Every id the model cited that the household does not hold. An empty
+      // list is the ordinary case; a non-empty one is the invention guard
+      // firing, and it is recorded rather than smoothed over.
+      rejected: Array.isArray(a.rejected) ? a.rejected : [],
+    },
+  });
+}
+
 /** The command name every answer-learning marker carries. */
 export const ANSWER_LEARNING = 'answerLearning';
 

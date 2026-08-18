@@ -187,7 +187,13 @@ async function consumeOneBrowserBuildRequest(io, { leaseMs = lease.DEFAULT_LEASE
   } catch (err) {
     // The request goes BACK to queued rather than dying, so the next pass -
     // or the next process after a restart - picks it up again.
-    await lease.release(query, { requestId: claimed.id, runnerId, reason: String(err && err.message ? err.message : err).slice(0, 300) })
+    // countAttempt: TRUE - this is the ERROR path, and it is the one release
+    // that may consume a retry. Request id 1 was released here 291 times
+    // between 2026-07-28 and the Gate 2 review with nothing counting them.
+    await lease.release(query, {
+      requestId: claimed.id, runnerId, countAttempt: true,
+      reason: String(err && err.message ? err.message : err).slice(0, 300),
+    })
       .catch(() => { /* the lease will expire on its own; never mask the real error */ });
     log(`request ${claimed.id} released after an error: ${err && err.message}`);
     throw err;

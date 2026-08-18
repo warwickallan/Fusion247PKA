@@ -509,10 +509,26 @@ test('AC4: the PLAN guard does not regress - an empty plan with no handoff still
 // FAILED request rather than throwing out of run().
 // =====================================================================
 
-/** A query that rejects the lease-release statement, and nothing else. */
+/**
+ * A query that rejects the lease-release statement, and nothing else.
+ *
+ * ── HOW THIS FIXTURE IDENTIFIES THE STATEMENT (updated 2026-08-18) ────────
+ * It used to match `/set\s+status\s+= case when status in/`. WO-2026-08-18-06
+ * added the attempt ceiling and backoff to `lease.release`, which reformatted
+ * that CASE across several lines - so the regex stopped matching, the fixture
+ * stopped rejecting, and all four proofs below failed. They failed LOUDLY and
+ * correctly: the assertions were untouched and the tests refused to pass on a
+ * fixture that had quietly become a no-op, which is the whole reason a control
+ * must be able to tell "did not fire" from "found nothing".
+ *
+ * It now matches `_released_reason`, a jsonb key that appears in the release
+ * statement and in no other statement this module issues. The four tests below
+ * remain the mutation detector for this line: if it ever stops matching, they
+ * go red again rather than silently proving nothing.
+ */
 function releaseHostileQuery(query) {
   const wrapped = async (t, p) => {
-    if (/set\s+status\s+= case when status in/.test(t)) throw new Error('database went away during release');
+    if (/_released_reason/.test(t)) throw new Error('database went away during release');
     return query(t, p);
   };
   wrapped.state = query.state;

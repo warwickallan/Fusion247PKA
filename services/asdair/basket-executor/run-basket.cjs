@@ -329,9 +329,46 @@ async function runBasket(args = {}) {
   const lines = [];
   const log = (m) => { const s = `[${new Date().toISOString()}] ${m}`; lines.push(s); console.log(s); };
 
-  const manifestPath = args.manifest || path.join(REPO, 'Deliverables', '2026-08-17-asdair-frozen-manifest-SHOP-2026-08-19.json');
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  // ── THE JOIN. THE LINE THAT HAD NEVER ONCE WORKED. ────────────────────────
+  //
+  // `args.manifest` arrives as one of two things, and this function assumed
+  // only one of them:
+  //
+  //   * a PATH, from `main(argv)` - the CLI shape, which worked;
+  //   * an OBJECT, from pipeline/runtime.js -> basket-executor/consume-request.cjs,
+  //     which builds the manifest in memory from durable rows and passes it
+  //     straight in as `runBasket({ manifest, ... })`.
+  //
+  // Handing the object to `fs.readFileSync` throws, verbatim:
+  //   TypeError: The "path" argument must be of type string or an instance of
+  //   Buffer or URL. Received an instance of Object
+  //
+  // which is exactly what `runtime.log` recorded 291 times between 2026-07-28
+  // and the Veritas Gate 2 review - on every pass, unbounded, with the request
+  // released back to `queued` each time so the next pass retried it forever.
+  //
+  // ⛔ THE SIZE OF IT: the browser lane has therefore NEVER EXECUTED A SINGLE
+  // REQUEST since the day it was wired. Every claim died on this line before a
+  // browser was ever launched. The 291 failures were not a flaky browser, a
+  // stale ASDA session or a changed page - they were one unconverted argument,
+  // repeating in a loop with no ceiling to make anyone look at it.
+  const manifest = (args.manifest !== null && typeof args.manifest === 'object')
+    ? args.manifest
+    : JSON.parse(fs.readFileSync(
+      args.manifest || path.join(REPO, 'Deliverables', '2026-08-17-asdair-frozen-manifest-SHOP-2026-08-19.json'),
+      'utf8',
+    ));
+  if (!manifest || !Array.isArray(manifest.lines)) {
+    throw new Error('runBasket: the manifest carries no `lines` array. Refusing to shop from an '
+      + 'unreadable manifest rather than reporting an empty basket as a successful one.');
+  }
   const shopRef = manifest.shop_ref || 'SHOP-UNKNOWN';
+  // WHERE THE MANIFEST CAME FROM, for the run artefact. An in-memory manifest
+  // is now the ORDINARY production case (the runtime builds it from durable
+  // rows), so the log says so rather than recording an object as a filename.
+  const manifestSource = (args.manifest !== null && typeof args.manifest === 'object')
+    ? 'in-memory, built from asdair.shop_line by consume-request.cjs'
+    : String(args.manifest || 'the default frozen manifest');
 
   // ── PER-RUN ARTEFACT PATHS. THE OVERWRITE BUG, CLOSED. ────────────────────
   //
@@ -425,7 +462,7 @@ async function runBasket(args = {}) {
       run_id: runId,
       started, finished: new Date().toISOString(),
       status,
-      manifest: manifestPath,
+      manifest: manifestSource,
       browser_method: method,
       method_policy: policy,
       household_rules: { count: ruleSet.count, ids: ruleSet.ids },
@@ -457,9 +494,24 @@ async function runBasket(args = {}) {
   }
 
   // ---- the browser ----------------------------------------------------
+  //
+  // ── THE SEAM, AND WHY IT EXISTS (WO-2026-08-18-06 REV 2) ─────────────────
+  // `ensureChrome` and `Session` were reached by direct construction, so this
+  // function could not be executed at all without a real Chrome and a real
+  // signed-in ASDA session. That is why a one-line argument defect survived 291
+  // failures and three weeks: NOTHING could run the lane end to end to see it.
+  //
+  // These two overrides default to the real implementations, so production is
+  // byte-identical, and they let the suite drive the REAL plan / ladder / judge
+  // / reconcile code over a fake session. A lane nobody can exercise offline is
+  // a lane whose failures are only ever discovered in production, which is
+  // precisely what happened here.
+  const acquireChrome = args.ensureChrome || ensureChrome;
+  const makeSession = args.makeSession || ((opts) => new Session(opts));
+
   let chrome;
   try {
-    chrome = await ensureChrome({ chromePath: args.chrome, profileDir: args.profile, port: args.port }, { log });
+    chrome = await acquireChrome({ chromePath: args.chrome, profileDir: args.profile, port: args.port }, { log });
   } catch (e) {
     if (e instanceof LauncherConfigError) {
       log(`LAUNCHER CONFIG ERROR: ${e.message}`);
@@ -482,7 +534,7 @@ async function runBasket(args = {}) {
   const lock = acquireLocalLock(path.join(HERE, 'state', `${shopRef}.lock`), runnerId, args.leaseMs, log);
   log(`runner ${runnerId} holds the local trolley lock`);
 
-  const session = new Session({ log });
+  const session = makeSession({ log });
   let exitCode = 0;
 
   try {

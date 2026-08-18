@@ -316,6 +316,22 @@ function regularCandidates(line, regulars, household) {
 // nothing, so no previously-resolving line can change its answer, and it
 // admits ONLY CONFIDENT tiers (termMatch.js) -- an advisory-grade similarity
 // can never establish which product this is.
+// EXACT ALIAS EQUALITY ONLY. Extracted from regularHits so that "was this a
+// LOOKUP or a JUDGEMENT?" is answerable by a caller rather than lost inside a
+// boolean. It is the distinction the whole architecture now rests on
+// (WO-2026-08-18-06): an exact, unambiguous alias match is a lookup and stays
+// deterministic; anything softer is a semantic decision and belongs to AsdAIr.
+function exactRegularHits(item, regulars, household) {
+  const list = Array.isArray(regulars) ? regulars : [];
+  const term = normaliseTerm(item && item.item_name);
+  if (term === '') return [];
+  return list.filter(function (r) {
+    if (!r || r.active === false) return false;             // only ACTIVE rows
+    if (!inHouseholdScope(r, household)) return false;      // no cross-household leak
+    return regularAliases(r).indexOf(term) !== -1;           // name or aka alias
+  });
+}
+
 function regularHits(item, regulars, household) {
   const list = Array.isArray(regulars) ? regulars : [];
   const term = normaliseTerm(item && item.item_name);
@@ -326,9 +342,7 @@ function regularHits(item, regulars, household) {
     return inHouseholdScope(r, household);                  // no cross-household leak
   });
 
-  const exact = eligible.filter(function (r) {
-    return regularAliases(r).indexOf(term) !== -1;           // name or aka alias
-  });
+  const exact = exactRegularHits(item, regulars, household);
   if (exact.length > 0) return exact;
 
   return eligible.filter(function (r) {
@@ -338,24 +352,36 @@ function regularHits(item, regulars, household) {
 
 function matchRegular(item, regulars, household) {
   const term = normaliseTerm(item && item.item_name);
-  if (term === '') return { regular: null, ambiguous: false };
+  if (term === '') return { regular: null, ambiguous: false, exact: false };
 
   const hits = regularHits(item, regulars, household);
+  // WAS IT A LOOKUP OR A JUDGEMENT? Reported, not decided here. The caller
+  // flags a tolerant hit and the pipeline demotes it to the semantic decision
+  // point - see runPipeline.demoteDeterministicDecisions.
+  //
+  // Measured reason, from the committed corpus (2026-08-18): the tolerant pass
+  // bound "1 TRESemme hair conditioner, blue label" to
+  // "TRESemme Rich Moisture HAIR SHAMPOO 680 ml" - the corpus forbids exactly
+  // that id on that line - and then bound line 32 to the same shampoo, so the
+  // basket bought one product twice and the conditioner not at all. The
+  // fixture's own header records this defect class as historical and
+  // unreproducible offline; it reproduces here.
+  const exact = exactRegularHits(item, regulars, household).length > 0;
 
   const scoped = hits.filter(function (r) {
     return r.household_id !== null && r.household_id !== undefined
       && sameHousehold(r.household_id, household);
   });
-  if (scoped.length === 1) return { regular: scoped[0], ambiguous: false };
-  if (scoped.length > 1) return { regular: scoped[0], ambiguous: true };
+  if (scoped.length === 1) return { regular: scoped[0], ambiguous: false, exact: exact };
+  if (scoped.length > 1) return { regular: scoped[0], ambiguous: true, exact: exact };
 
   const global = hits.filter(function (r) {
     return r.household_id === null || r.household_id === undefined;
   });
-  if (global.length === 1) return { regular: global[0], ambiguous: false };
-  if (global.length > 1) return { regular: global[0], ambiguous: true };
+  if (global.length === 1) return { regular: global[0], ambiguous: false, exact: exact };
+  if (global.length > 1) return { regular: global[0], ambiguous: true, exact: exact };
 
-  return { regular: null, ambiguous: false };
+  return { regular: null, ambiguous: false, exact: false };
 }
 
 // ---------------------------------------------------------------------
@@ -1584,6 +1610,12 @@ function planBasket(input) {
         if (display) {
           matchedProduct = display;
           pushFlag(flags, 'matched from regulars');
+          // A TOLERANT hit is a judgement wearing a lookup's clothes. The match
+          // itself is left exactly as it was, so this pure function's behaviour
+          // and every proof of it are unchanged - but it is FLAGGED, so the
+          // pipeline can hand it to AsdAIr instead of buying it. See
+          // runPipeline.demoteDeterministicDecisions.
+          if (regMatch.exact !== true) pushFlag(flags, 'matched tolerantly');
           // Surface the store identifier so a human / the browser half can act
           // on the exact product rather than re-searching by name.
           const pid = regMatch.regular.asda_product_id;
