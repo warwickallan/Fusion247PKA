@@ -260,6 +260,13 @@ function routeTypedText(msg, resolveAnswersByText, emptyReason) {
         shopRef: m.shopRef || null,
         answerText: typeof m.answerText === 'string' && m.answerText.trim() !== ''
           ? m.answerText.trim() : text,
+        // WO-2026-08-18-04. CARRIED, NEVER DECIDED HERE. Whether these words
+        // supersede an answer already given is settled by the correlator, which
+        // read the keyword off the board reply and knows which questions are
+        // already settled. This projection is EXPLICIT rather than a spread, so
+        // a field the correlator invents cannot ride into the adapter unseen -
+        // and that is exactly why the flag has to be named here to travel.
+        correction: m.correction === true,
       })),
     },
   };

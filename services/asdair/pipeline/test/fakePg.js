@@ -221,6 +221,10 @@ const QUESTION_ROW_COLUMNS = new Set([
   'id', 'list_item_id', 'question_key', 'question_text', 'candidates', 'status',
   'answer_text', 'answer_source', 'card_chat_id', 'card_message_id',
   'rendered_candidates', 'render_fingerprint', 'render_version', 'callback_index',
+  // Migration 017 + WO-2026-08-18-04. The correction path reads the round to
+  // derive its successor's, the parent to build the chain, and answered_at
+  // because AC2's audit trail must be able to say WHEN the original was given.
+  'question_round', 'parent_question_id', 'answered_at',
 ]);
 
 /**

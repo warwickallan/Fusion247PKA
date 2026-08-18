@@ -2548,6 +2548,70 @@ async function abandonOutstanding(deps, snapshot) {
   return retired;
 }
 
+/**
+ * A SUPERSEDED ANSWER MEANS THE PLAN IS STALE. (WO-2026-08-18-04)
+ *
+ * THIS STEP PLANS NOTHING AND DECIDES NOTHING. It does exactly two things:
+ * retires the correction commands that brought it here, and - only where the
+ * shop had already been planned - walks it back one state so the ORDINARY
+ * NEEDS_DECISION -> PROCESSING route recomputes the plan. That route already
+ * applies decisions newest-round-first through applyDecisionsToPlan, so the
+ * corrected answer is picked up by machinery that was already there and
+ * already tested. Nothing about planning is duplicated here.
+ *
+ * -- WHY THE TRANSITION EXISTS AT ALL -----------------------------------------
+ * applyDecisionsToPlan has ONE production call site, reached only from
+ * PROCESSING, and READY_TO_SHOP had no edge back. So a correction against a
+ * planned shop was recorded, audited, and completely inert: the row changed and
+ * the basket did not. The single edge READY_TO_SHOP -> NEEDS_DECISION (added to
+ * shopState.js by this Work Order) exists for this step and for nothing else.
+ *
+ * -- WHY IT DOES NOT TOUCH WAITING_FOR_BROWSER OR SHOPPING --------------------
+ * A supervised operator may already hold the packet there. `next.to` is null on
+ * those states, so the command is retired and the shop does not move - visible
+ * in the return, never silently dropped.
+ */
+async function stepReopenForCorrection(deps, snapshot, to) {
+  const shop = snapshot.shop;
+  const corrections = snapshot.pendingCommands.filter((c) => c.command === COMMANDS.CORRECT_ANSWER);
+
+  const applied = [];
+  for (const c of corrections) {
+    const payload = (c && c.payload) || {};
+    // The note is the audit sentence a human reads off the ledger without
+    // joining anything: what it was, what it became, and who said so.
+    await store.resolveCommand(deps, c.id, 'done',
+      `answer correction applied: "${payload.superseded_answer_text ?? '(skipped)'}" -> `
+      + `"${payload.answer_text ?? ''}" on ${payload.item_name ?? 'an unnamed line'} `
+      + `(round ${payload.question_round ?? '?'} -> ${payload.successor_question_round ?? '?'}, by ${payload.actor ?? 'unknown'})`);
+    applied.push({
+      question_key: payload.question_key ?? null,
+      successor_question_key: payload.successor_question_key ?? null,
+      item_name: payload.item_name ?? null,
+      superseded_answer_text: payload.superseded_answer_text ?? null,
+      answer_text: payload.answer_text ?? null,
+      actor: payload.actor ?? null,
+    });
+  }
+
+  if (!to) {
+    return {
+      stepped: false, from: shop.status, to: null,
+      corrections_applied: applied.length, corrections: applied,
+      reason: `this shop is ${shop.status}, which re-plans without being moved`,
+    };
+  }
+
+  const moved = await deps.shopStore.transition(shop.id, to,
+    applied.length > 0
+      ? `an answer was corrected after this shop was planned - re-planning from the corrected answer`
+      : `a question is open on a shop that was already planned - nothing goes in a basket until it is settled`);
+  return {
+    stepped: moved.changed, from: shop.status, to,
+    corrections_applied: applied.length, corrections: applied,
+  };
+}
+
 async function dispatchStep(deps, snapshot, next) {
   const shop = snapshot.shop;
   switch (next.step) {
@@ -2559,6 +2623,8 @@ async function dispatchStep(deps, snapshot, next) {
     }
     case STEPS.APPLY_CORRECTIONS:
       return stepApplyCorrections(deps, snapshot);
+    case STEPS.REOPEN_FOR_CORRECTION:
+      return stepReopenForCorrection(deps, snapshot, next.to);
     case STEPS.RESUME: {
       // shopState permits FAILED -> ONLY the state it failed from, and
       // shopStore reads that from the durable failure event inside the same

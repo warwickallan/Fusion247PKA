@@ -54,6 +54,10 @@ const EXPECTED_PROJECTION = [
   'id', 'list_item_id', 'question_key', 'question_text', 'candidates', 'status',
   'answer_text', 'answer_source', 'card_chat_id', 'card_message_id',
   'rendered_candidates', 'render_fingerprint', 'render_version', 'callback_index',
+  // WO-2026-08-18-04. Added to the statement for the audited correction path.
+  // Pinned here as well as in the fake, deliberately: the whole point of this
+  // literal is that changing the query and the fake together still reddens.
+  'question_round', 'parent_question_id', 'answered_at',
   'item_name', 'photographed_wording',
 ];
 
@@ -85,6 +89,7 @@ function questionSql(selectList) {
 const REAL_SELECT_LIST = `q.id, q.list_item_id, q.question_key, q.question_text, q.candidates, q.status,
             q.answer_text, q.answer_source, q.card_chat_id, q.card_message_id,
             q.rendered_candidates, q.render_fingerprint, q.render_version, q.callback_index,
+            q.question_round, q.parent_question_id, q.answered_at,
             li.item_name AS item_name,
             sl.raw_reading AS photographed_wording`;
 

@@ -604,8 +604,15 @@ test('A1: the consumer and the provider agree on the name', () => {
 test('A1: the production loop reads open questions BEFORE intake runs', () => {
   // ROUTE FIRST is an ORDER, and the order is the guarantee: the claim has to be
   // decided while the message is still in intake's hand and before its offset is
-  // acknowledged. If loadOpenQuestions moved below pollIntake, the claim would
+  // acknowledged. If the question load moved below pollIntake, the claim would
   // be taken against a stale picture - or not at all.
+  //
+  // The loader was `loadOpenQuestions` until WO-2026-08-18-04 and is now
+  // `loadBoardQuestions`, which returns the settled rows alongside the open ones
+  // so a correction can name one by its board number. The ORDER this test exists
+  // to protect is unchanged, and the rename is why the `notEqual(-1)` guard
+  // above it earns its keep: it reported the rename as a rename instead of
+  // silently comparing two -1s and passing.
   const at = runtimeSrc.indexOf('export async function runOnce');
   assert.notEqual(at, -1);
   // THE WINDOW IS THE FUNCTION, NOT A CHARACTER COUNT. A fixed 4000-char slice
@@ -615,7 +622,7 @@ test('A1: the production loop reads open questions BEFORE intake runs', () => {
   // the length of the code it inspects is not a control.
   const nextExport = runtimeSrc.indexOf('\nexport ', at + 1);
   const body = runtimeSrc.slice(at, nextExport === -1 ? runtimeSrc.length : nextExport);
-  const loadAt = body.indexOf('loadOpenQuestions');
+  const loadAt = body.indexOf('loadBoardQuestions');
   const pollAt = body.indexOf('pollIntake');
   // ASSERT BOTH WERE FOUND, then compare - otherwise a rename reads as a
   // comparison of two -1s, which is a verdict about nothing.

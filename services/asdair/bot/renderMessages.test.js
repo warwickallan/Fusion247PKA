@@ -916,15 +916,88 @@ test('B15-09 the board draws ONE control, and it is one the adapter answers', ()
 });
 
 test('B15-09 parseBoardReply reads one numbered answer, and several at once', () => {
+  // `correction: false` since WO-2026-08-18-04. Every entry carries the flag, and
+  // the BARE form is false - which is the half of AC1 that protects the accident.
   assert.deepEqual(parseBoardReply('3: the 12 skinless ones'),
-    [{ ordinal: 3, answerText: 'the 12 skinless ones' }]);
+    [{ ordinal: 3, answerText: 'the 12 skinless ones', correction: false }]);
 
   // The whole point: one message settling several questions.
   assert.deepEqual(parseBoardReply('1. Vanish Oxi Gold\n4) the 33 pack\n7 - any brand'), [
-    { ordinal: 1, answerText: 'Vanish Oxi Gold' },
-    { ordinal: 4, answerText: 'the 33 pack' },
-    { ordinal: 7, answerText: 'any brand' },
+    { ordinal: 1, answerText: 'Vanish Oxi Gold', correction: false },
+    { ordinal: 4, answerText: 'the 33 pack', correction: false },
+    { ordinal: 7, answerText: 'any brand', correction: false },
   ]);
+});
+
+// =====================================================================
+// WO-2026-08-18-04 - THE CORRECTION KEYWORD.
+//
+// AC1 lives here as much as it lives in commands.js: this parser is where the
+// line between an accident and a deliberate act is actually drawn, and it is
+// drawn on a WORD the human typed rather than on anything about the answer,
+// the timing or the state of the board.
+// =====================================================================
+
+test('B15-04 the keyword - and ONLY the keyword - marks a line as a correction', () => {
+  assert.deepEqual(parseBoardReply('change 3: actually the whole milk'),
+    [{ ordinal: 3, answerText: 'actually the whole milk', correction: true }]);
+  // `correct` is accepted as the same act. Two words, because he will reach for
+  // either one and being refused for using the wrong synonym is the kind of
+  // thing that sends a person back to cancelling the shop.
+  assert.deepEqual(parseBoardReply('correct 3: actually the whole milk'),
+    [{ ordinal: 3, answerText: 'actually the whole milk', correction: true }]);
+  // Case is not the signal.
+  assert.deepEqual(parseBoardReply('CHANGE 3: actually the whole milk'),
+    [{ ordinal: 3, answerText: 'actually the whole milk', correction: true }]);
+
+  // THE ANSWER TEXT IS IDENTICAL EITHER WAY. A correction and an answer are the
+  // same words on two different routes; nothing about the words decides which.
+  assert.equal(parseBoardReply('change 3: the blue one')[0].answerText,
+    parseBoardReply('3: the blue one')[0].answerText);
+});
+
+test('B15-04 a SECOND THOUGHT typed plainly is NOT a correction - the accident is still protected', () => {
+  // Warwick answers 3, then types 3 again with a different answer and no
+  // keyword. That must NOT read as a correction: downstream it becomes
+  // answerQuestion, which is a compare-and-set on status='open' and writes
+  // nothing over a settled row. This is the exact case first-answer-wins was
+  // built for and this Work Order was forbidden to weaken.
+  const [entry] = parseBoardReply('3: no wait, the other one');
+  assert.equal(entry.correction, false,
+    'a plain reply became a correction - first-answer-wins has been dismantled');
+});
+
+test('B15-04 the keyword does NOT relax the shopping-list guard', () => {
+  // The separator is still mandatory. The cost of a false positive here is
+  // unchanged and is the worst failure this system has: a week's shopping list
+  // eaten as an answer. A keyword must not buy a way around it.
+  for (const list of [
+    'change 3 tins of beans',
+    'correct 2 pints of milk',
+    'change of plan: buy nothing',
+    'change 4',
+    'change 4:',
+  ]) {
+    assert.deepEqual(parseBoardReply(list), [],
+      `a shopping-list shape was read as a correction: ${JSON.stringify(list)}`);
+  }
+});
+
+test('B15-04 the board TELLS him the route exists, and tells him the plain reply is safe', () => {
+  // A capability he cannot discover is not a capability. The board is the one
+  // surface he reads, so the instruction belongs on it - and it must say BOTH
+  // halves, or he learns to distrust plain replies.
+  const card = renderQuestionBoard({
+    shopRef: REF,
+    outstanding: [],
+    answered: [{ n: 3, item: 'Cravendale', answer: 'semi skimmed' }],
+    total: 3,
+    blocked: false,
+  });
+  assert.match(card.text, /change 3: actually the whole milk/,
+    'the board does not show him how to correct an answer');
+  assert.match(card.text, /NEVER overwrites an answer you have already given/,
+    'the board does not tell him a plain reply is safe, so he cannot trust either route');
 });
 
 test('B15-09 parseBoardReply REFUSES a shopping list - the failure that would cost a week', () => {
@@ -956,7 +1029,7 @@ test('B15-09 parseBoardReply takes NEITHER when he contradicts himself on one nu
   assert.deepEqual(parseBoardReply('2: the big one\n2: no, the small one'), []);
   // ...and it does not take the rest of the message down with it.
   assert.deepEqual(parseBoardReply('1: keep this\n2: the big one\n2: no, the small one'),
-    [{ ordinal: 1, answerText: 'keep this' }]);
+    [{ ordinal: 1, answerText: 'keep this', correction: false }]);
 });
 
 test('B15-09 the refusal card names what did NOT happen, which is the part he cannot see', () => {

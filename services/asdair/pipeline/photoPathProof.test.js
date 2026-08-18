@@ -521,20 +521,47 @@ test('AC4 re-opening the question is not a route either - openQuestion writes no
   assert.equal(questionRow(h, keys[0]).answer_text, 'the WRONG answer');
 });
 
-test('AC4 THE ENUMERATION: no command in the surface can amend a settled answer, and only TWO statements write the row', () => {
-  // (a) THE COMMAND SURFACE. The vocabulary is a closed allowlist, so this is
-  // an exhaustive check rather than a sample. The count is pinned to a literal
-  // held HERE, outside the source it checks, so adding a command without
-  // revisiting this finding fails the test.
-  assert.equal(COMMAND_NAMES.length, 12,
-    'the command surface changed - re-run the AC4 enumeration before trusting its answer');
-  const amending = COMMAND_NAMES.filter((n) => /reopen|amend|correctAnswer|changeAnswer|unanswer|clearAnswer/i.test(n));
-  assert.deepEqual(amending, [],
-    'a command that can amend a settled answer now exists - the AC4 finding is out of date');
+test('AC4 THE ENUMERATION, RE-CUT: exactly ONE command may supersede a settled answer, and the row is still written by only TWO statements', () => {
+  // -- WHY THIS TEST CHANGED, AND WHAT DID NOT ------------------------------
+  //
+  // WO-2026-08-18-03 recorded a FINDING here: no command in the surface could
+  // amend a settled answer, so a wrong answer was permanent and cancelling the
+  // week was the only way out. Warwick refused that residual, and
+  // WO-2026-08-18-04 closed it. The finding is therefore out of date BY DESIGN
+  // and this test is re-cut rather than deleted - deleting it would retire the
+  // control along with the finding, and the control is the valuable half.
+  //
+  // What it guards NOW is the narrower and more dangerous property: that the
+  // correction route did not become a second way to REWRITE a settled row.
+  // Superseding and overwriting look identical from a distance and are opposite
+  // things - one keeps the original, the other destroys it.
 
-  // correctLine is the nearest thing and it is NOT that route: it records a
-  // correction against a shop LINE by item name, and never touches
-  // asdair.shop_question or the decision row.
+  // (a) THE COMMAND SURFACE. A closed allowlist, so this is exhaustive rather
+  // than a sample. Both literals are pinned HERE, outside the source they
+  // check, so a command added without revisiting this reasoning reddens.
+  assert.equal(COMMAND_NAMES.length, 13,
+    'the command surface changed - re-run the AC4 enumeration before trusting its answer');
+
+  const amending = COMMAND_NAMES.filter((n) => /reopen|amend|correctAnswer|changeAnswer|unanswer|clearAnswer/i.test(n));
+  assert.deepEqual(amending, ['correctAnswer'],
+    'exactly one command may supersede a settled answer, and it is correctAnswer');
+
+  // (b) AND IT SUPERSEDES BY OPENING A NEW ROUND, NEVER BY REWRITING THE ROW.
+  // Read off the source, because this is the property that would decay quietly:
+  // a future edit that "simplified" correctAnswer into an UPDATE would still
+  // pass every behavioural test that only checks the CURRENT answer.
+  const correctAnswerBody = read('commands.js')
+    .split('export async function correctAnswer')[1]
+    .split('\nexport ')[0];
+  assert.match(correctAnswerBody, /parent_question_id: original\.id/,
+    'correctAnswer no longer chains the new round to the row it supersedes - the audit trail is gone');
+  assert.match(correctAnswerBody, /question_round: nextRound/,
+    'correctAnswer no longer opens a NEW round, so it must be writing over the old one');
+  assert.ok(!/superseded_answer_text:\s*answerText/.test(correctAnswerBody),
+    'correctAnswer records the replacement as though it were the original');
+
+  // correctLine is still NOT this route: it records a correction against a shop
+  // LINE by item name and never touches asdair.shop_question or the decision row.
   assert.ok(COMMAND_NAMES.includes(COMMANDS.CORRECT_LINE));
   const correctLineBody = read('commands.js')
     .split('export async function correctLine')[1]
@@ -542,9 +569,12 @@ test('AC4 THE ENUMERATION: no command in the surface can amend a settled answer,
   assert.ok(!/shop_question|answerQuestion/.test(correctLineBody),
     'correctLine now touches the question row - the AC4 finding is out of date');
 
-  // (b) THE WRITE INVENTORY. Two statements in the whole store touch
-  // asdair.shop_question: the INSERT in openQuestion (ON CONFLICT DO NOTHING)
-  // and the single UPDATE in answerQuestion, guarded by status='open'.
+  // (c) THE WRITE INVENTORY, UNCHANGED AND THAT IS THE POINT. Two statements in
+  // the whole store touch asdair.shop_question: the INSERT in openQuestion
+  // (ON CONFLICT DO NOTHING) and the single UPDATE in answerQuestion, guarded by
+  // status='open'. correctAnswer adds NO third statement - it reuses both, which
+  // is exactly why first-answer-wins still protects every settled row including
+  // the ones a correction creates.
   const storeSrc = fs.readFileSync(path.join(here, '..', 'shop', 'shopStore.js'), 'utf8');
   const writes = storeSrc.match(/(INSERT INTO|UPDATE) asdair\.shop_question/g) || [];
   assert.equal(writes.length, 2,

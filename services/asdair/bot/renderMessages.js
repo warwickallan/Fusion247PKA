@@ -922,6 +922,18 @@ export function renderQuestionBoard({
   lines.push('   1: the 12 skinless ones');
   lines.push('   4: the 33 pack');
   lines.push('');
+  // WO-2026-08-18-04. THE CORRECTION ROUTE, PRINTED WHERE HE IS ALREADY
+  // LOOKING. Until this line existed the only way out of a wrongly accepted
+  // answer was to abandon the week. It is stated as an instruction rather than
+  // offered as a button on purpose: the keyword IS the deliberate act, and a
+  // button that pre-typed it would put the accident back on a single tap.
+  lines.push('Got one wrong? Start the line with the word "change" and I will');
+  lines.push('replace what you said before. Your original answer is kept:');
+  lines.push('   change 3: actually the whole milk');
+  lines.push('');
+  lines.push('A plain reply NEVER overwrites an answer you have already given -');
+  lines.push('only a line beginning "change" does.');
+  lines.push('');
   lines.push('This card is rewritten in place every time you answer, so what you');
   lines.push('are reading now is always the current state.');
 
@@ -955,6 +967,27 @@ export const MAX_BOARD_REPLY_LINES = 40;
  * questions exist. Mapping a number onto a question is the caller's job, and a
  * number with no question behind it must be reported to the human rather than
  * silently dropped.
+ *
+ * -- THE CORRECTION KEYWORD (WO-2026-08-18-04) ------------------------------
+ *
+ * A line may OPEN with `change` (or `correct`), and that word - and nothing
+ * else about the line - marks it as a deliberate act to supersede an answer
+ * already given. Every entry therefore carries `correction: true|false`, and
+ * the bare form is false.
+ *
+ * THIS IS WHERE THE LINE BETWEEN ACCIDENT AND INTENT IS DRAWN, so it is worth
+ * saying exactly why it is drawn HERE and on a WORD:
+ *
+ *   * an accidental double tap produces no text at all;
+ *   * a redelivered Telegram message reproduces the same text, so it re-derives
+ *     the same correction and lands as a no-op on an already-answered row;
+ *   * a second thought typed as an ordinary "3: ..." is NOT a correction, goes
+ *     to answerQuestion, and is refused by first-answer-wins exactly as before.
+ *
+ * Nothing about the ANSWER decides this - only the keyword, which nobody types
+ * by accident. The separator stays mandatory, so "change 3 tins of beans" is
+ * still a shopping-list line and still refused: this parser's cost of a false
+ * positive is a week's list eaten as an answer, and that has not changed.
  */
 export function parseBoardReply(text) {
   if (typeof text !== 'string' || text.trim() === '') return [];
@@ -962,11 +995,12 @@ export function parseBoardReply(text) {
   const out = [];
   const seen = new Set();
   for (const raw of lines) {
-    // <n><separator><answer>. The separator is mandatory - that is the whole
-    // guard against a quantity at the head of a shopping-list line.
-    const m = /^\s*(\d{1,3})\s*[.:)\]–—-]\s*(\S.*)$/.exec(raw);
+    // [change ]<n><separator><answer>. The separator is STILL mandatory - that
+    // is the whole guard against a quantity at the head of a shopping-list line,
+    // and the keyword does not relax it.
+    const m = /^\s*(?:(change|correct)\s+)?(\d{1,3})\s*[.:)\]–—-]\s*(\S.*)$/i.exec(raw);
     if (!m) continue;
-    const ordinal = Number(m[1]);
+    const ordinal = Number(m[2]);
     if (!Number.isInteger(ordinal) || ordinal < 1) continue;
     if (seen.has(ordinal)) {
       // The human contradicting himself inside one message. Take NEITHER:
@@ -976,7 +1010,10 @@ export function parseBoardReply(text) {
       continue;
     }
     seen.add(ordinal);
-    out.push({ ordinal, answerText: m[2].trim() });
+    // `correction` is the ONLY thing the keyword changes. The answer text is
+    // taken verbatim from after the separator either way, so a correction and an
+    // answer are the same words travelling on two different routes.
+    out.push({ ordinal, answerText: m[3].trim(), correction: m[1] !== undefined });
   }
   return out;
 }

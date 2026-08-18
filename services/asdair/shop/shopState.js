@@ -100,6 +100,21 @@ const ABORT_STATUSES = ['FAILED', 'CANCELLED'];
 //                  ambiguity) OR from SHOPPING (an out-of-stock mid-shop), so
 //                  it must be able to return to either - plus straight to
 //                  READY_TO_SHOP when the answers settled everything.
+//   READY_TO_SHOP -> NEEDS_DECISION is the AUDITED ANSWER CORRECTION re-entry
+//                  (WO-2026-08-18-04). The ONLY backward edge on this map, and
+//                  it has exactly ONE writer: the correction step in
+//                  pipeline/stages.js. Without it a correction was INERT.
+//                  applyDecisionsToPlan has one production call site, reached
+//                  only from PROCESSING, and READY_TO_SHOP had no route back -
+//                  so a wrongly accepted answer stayed in the basket however
+//                  faithfully the correction was recorded. Warwick reads the
+//                  plan_ready card AT READY_TO_SHOP, which means the moment he
+//                  could first see an answer was wrong was the moment the
+//                  machine could no longer act on it.
+//                  Deliberately NOT extended to WAITING_FOR_BROWSER or
+//                  SHOPPING: a supervised operator may already hold the packet
+//                  there, and correcting mid-shop is a separate product choice
+//                  nobody has made.
 //   WAITING_FOR_BROWSER -> READY_TO_SHOP exists because a browser request can
 //                  be cancelled or released without the week being lost.
 //   BASKET_READY -> SHOPPING exists because Warwick may send the runner back
@@ -114,7 +129,7 @@ const ALLOWED_TRANSITIONS = {
   TRANSCRIBING: ['PROCESSING'],
   PROCESSING: ['NEEDS_DECISION', 'READY_TO_SHOP'],
   NEEDS_DECISION: ['PROCESSING', 'READY_TO_SHOP', 'SHOPPING'],
-  READY_TO_SHOP: ['WAITING_FOR_BROWSER'],
+  READY_TO_SHOP: ['WAITING_FOR_BROWSER', 'NEEDS_DECISION'],
   WAITING_FOR_BROWSER: ['SHOPPING', 'READY_TO_SHOP'],
   SHOPPING: ['BASKET_READY', 'NEEDS_DECISION'],
   BASKET_READY: ['ORDER_CONFIRMATION_RECEIVED', 'SHOPPING'],

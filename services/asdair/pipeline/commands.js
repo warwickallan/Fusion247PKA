@@ -432,6 +432,263 @@ export async function answerQuestion(spec, deps) {
   });
 }
 
+
+// =====================================================================
+// 6b. correctAnswer - "no, that is not what I meant"  (WO-2026-08-18-04)
+// =====================================================================
+/**
+ * SUPERSEDE A SETTLED ANSWER. THE DELIBERATE ACT, BESIDE FIRST-ANSWER-WINS.
+ *
+ * -- WHERE THE LINE BETWEEN ACCIDENT AND INTENT SITS, AND WHY IT SITS THERE --
+ *
+ * It sits on the ROUTE TAKEN, never on the content of the words.
+ *
+ *   * A bare board reply - "3: the blue one" - is answerQuestion. It is a
+ *     compare-and-set on status='open', so against a settled question it writes
+ *     NOTHING. An accidental double tap, a redelivered message, a second
+ *     thought typed into the same board: all still no-ops, exactly as before.
+ *     Nothing in this file weakens that, and it is the protection that rule was
+ *     built to give.
+ *   * A board reply that OPENS WITH THE WORD "change" is this command.
+ *
+ * Nothing about the answer decides which one you get. Only the act of typing a
+ * keyword - which a double tap cannot produce, a redelivery cannot invent, and
+ * nobody types by accident. That is the whole distinction, and it is why this
+ * is a separate COMMAND rather than a flag on answerQuestion: a flag would have
+ * to be trusted at every call site, whereas a second name simply cannot be
+ * reached by the path an accident takes.
+ *
+ * -- AUDITED MEANS THE ORIGINAL SURVIVES, AND IT SURVIVES BY CONSTRUCTION ----
+ *
+ * NOTHING here rewrites the settled row. A correction is a NEW ROUND - a new
+ * asdair.shop_question with question_round = N+1 and parent_question_id
+ * pointing at the row being superseded (migration 017). The original keeps its
+ * answer_text, answer_source and answered_at because no statement on this path
+ * can reach them, not because a trail was bolted on afterwards.
+ *
+ * The trail has two independent carriers, and either alone would answer "who
+ * changed it, when, and to what":
+ *
+ *   1. THE CHAIN. shop_question.parent_question_id walks back from the current
+ *      answer through every answer that preceded it, each with its answered_at.
+ *   2. THE COMMAND ROW. This command's durable payload records the superseded
+ *      text, its source, its timestamp and its status ALONGSIDE the replacement
+ *      - and `actor` says WHO, which the question row has never carried.
+ *
+ * -- AND IT IS ONE ATOMIC INTENT, PERFORMED IMMEDIATELY ---------------------
+ *
+ * Like answerQuestion, and for the same reason: he has already said what he
+ * meant, and making him answer a fresh card to complete a correction he just
+ * typed would be a second chance to lose it. The successor round is opened AND
+ * answered here. Advancing the shop is still the runner's job - see stages.js,
+ * which brings a shop that had already reached READY_TO_SHOP back to
+ * NEEDS_DECISION so the plan is actually recomputed.
+ *
+ * -- THE JOIN IS PROVEN AT WRITE TIME, NEVER HOPED FOR ----------------------
+ *
+ * applyDecisionsToPlan finds a line's decision by walking
+ * questionKeyFor(item_name, round) upward from round 1. So a successor whose
+ * key does not derive from the SAME item name at the NEXT round is invisible to
+ * the planner - recorded, audited, and inert, which is the exact failure this
+ * order exists to end. This function therefore reproduces the ORIGINAL key from
+ * the candidate name first and REFUSES if it cannot. A loud refusal is a
+ * recoverable defect; a silent mis-derivation is a basket built on a wrong
+ * answer that nobody can see was wrong.
+ *
+ * @param {{shopRef?:string, shopId?:*, actor:string, questionKey:string,
+ *          answerText:string, answerSource?:'button'|'typed'}} spec
+ */
+export async function correctAnswer(spec, deps) {
+  const actor = requireActor(spec && spec.actor);
+  const shop = await store.requireShop(deps, spec);
+  const questionKey = requireText(spec && spec.questionKey, 'questionKey');
+  // A correction with no replacement is a complaint, not a correction. Refusing
+  // it is what stops a bare "change 3:" from wiping a settled answer to null.
+  const answerText = requireText(spec && spec.answerText, 'answerText (the replacement answer)');
+  const answerSource = requireAnswerSource(spec && spec.answerSource);
+
+  const questions = await store.listQuestions(deps, shop.id);
+  const named = questions.find((q) => q.question_key === questionKey) || null;
+  if (!named) {
+    throw new Error(`commands: correctAnswer found no question "${questionKey}" on shop ${shop.shop_ref}. Nothing was written.`);
+  }
+
+  // -- CORRECT THE NEWEST ROUND, NOT THE ONE HE POINTED AT -------------------
+  // The board numbers a question by its position, so "change 3" keeps naming
+  // round 1 forever even after round 2 has superseded it. Correcting round 1
+  // twice would collide on one successor key and the second correction would
+  // silently no-op - his change lost, behind a receipt saying it landed.
+  // "Change what I most recently said about this line" is the only reading that
+  // composes, and it is the same reading applyDecisionsToPlan already takes
+  // when it walks the chain and keeps the highest round.
+  let original = named;
+  for (;;) {
+    const child = questions.find((q) => q.parent_question_id !== null
+      && q.parent_question_id !== undefined
+      && String(q.parent_question_id) === String(original.id));
+    if (!child) break;
+    original = child;
+  }
+
+  // -- THE TIP IS OPEN: ANSWER IT, DO NOT SUPERSEDE ANYTHING ----------------
+  // He typed "change 3" and the newest round of that line is a question still
+  // waiting on him - typically a clarification AsdAIr opened because it could
+  // not read his last answer. What he means is unambiguous, and answering an
+  // OPEN row overwrites nothing, so the correction becomes an ordinary answer
+  // and no round is opened.
+  //
+  // REFUSING HERE WAS THE FIRST DESIGN AND IT WAS WRONG. The refusal throws
+  // inside the inbound claim path, the claim is declined, and his words go on to
+  // intake as a NEW SHOPPING LIST - which is the single worst failure this
+  // system has, arrived at while protecting a rule that was not in danger.
+  if (original.status === 'open') {
+    const answeredOpen = await deps.shopStore.answerQuestion({
+      shop_id: shop.id,
+      question_key: original.question_key,
+      status: 'answered',
+      answer_text: answerText,
+      answer_source: answerSource,
+    });
+    const recordedOpen = await record(deps, {
+      command: COMMANDS.CORRECT_ANSWER, shop, actor,
+      discriminator: original.question_key,
+      payload: {
+        question_key: original.question_key,
+        question_round: Number(original.question_round || 1),
+        superseded_question_id: original.id,
+        superseded_status: 'open',
+        superseded_answer_text: null,
+        superseded_answer_source: null,
+        superseded_answered_at: null,
+        successor_question_key: null,
+        successor_question_round: null,
+        item_name: original.item_name || null,
+        answer_text: answerText,
+        answer_source: answerSource,
+        outcome: 'answered an open round - nothing was superseded',
+      },
+    });
+    return receipt(COMMANDS.CORRECT_ANSWER, shop, recordedOpen, {
+      question_key: original.question_key,
+      successor_question_key: null,
+      answered_open_round: true,
+      corrected: false,
+      opened: false,
+      duplicate: answeredOpen.changed === false,
+    });
+  }
+
+  // -- THE SAME WORDS AGAIN ARE NOT A SECOND CORRECTION --------------------
+  // Whether they arrive because Telegram redelivered the message or because he
+  // typed the same thing twice, the current answer for this line ALREADY says
+  // what he is asking for. Opening a round to change an answer into itself would
+  // grow the chain on every retry and make the audit trail unreadable.
+  //
+  // Compared on WORDS - whitespace and case only. Not normaliseTerm, which
+  // flattens punctuation: "500g" and "500 g" must stay different answers.
+  const sameAnswer = (a, b) => String(a == null ? '' : a).trim().replace(/\s+/g, ' ').toLowerCase()
+    === String(b == null ? '' : b).trim().replace(/\s+/g, ' ').toLowerCase();
+  if (original.status === 'answered' && sameAnswer(original.answer_text, answerText)) {
+    return receipt(COMMANDS.CORRECT_ANSWER, shop, null, {
+      question_key: original.question_key,
+      successor_question_key: null,
+      corrected: false,
+      opened: false,
+      duplicate: true,
+      unchanged: true,
+    });
+  }
+
+  // -- REPRODUCE THE KEY, OR REFUSE -----------------------------------------
+  // Two names can carry a line: the list item's own name, and what was actually
+  // written on the photographed page. Whichever produced this question's key is
+  // the one the planner derives the successor's from, so it is ESTABLISHED by
+  // re-derivation rather than chosen.
+  const round = Number(original.question_round || 1);
+  let itemName = null;
+  for (const candidate of [original.item_name, original.photographed_wording]) {
+    if (typeof candidate !== 'string' || candidate.trim() === '') continue;
+    let derived = null;
+    try { derived = questionKeyFor(candidate, round); } catch { derived = null; }
+    if (derived === original.question_key) { itemName = candidate; break; }
+  }
+  if (itemName === null) {
+    throw new Error(
+      `commands: correctAnswer cannot reproduce question key "${original.question_key}" (round ${round}) from any name `
+      + `this question carries on shop ${shop.shop_ref}. A successor derived from a different name would be invisible `
+      + 'to the planner - recorded, and inert. Refusing rather than writing one. Nothing was written.',
+    );
+  }
+
+  const nextRound = round + 1;
+  const nextKey = questionKeyFor(itemName, nextRound);
+
+  // THE AUDIT ROW. Written BEFORE the change it describes, and carrying both
+  // sides of it: what was there, and what replaces it. `actor` is the only
+  // record anywhere of WHO corrected it - asdair.shop_question has no such
+  // column - which is why AC2's "who changed it" lives here.
+  const recorded = await record(deps, {
+    command: COMMANDS.CORRECT_ANSWER, shop, actor,
+    discriminator: original.question_key,
+    payload: {
+      question_key: original.question_key,
+      question_round: round,
+      superseded_question_id: original.id,
+      superseded_status: original.status,
+      superseded_answer_text: original.answer_text ?? null,
+      superseded_answer_source: original.answer_source ?? null,
+      superseded_answered_at: original.answered_at ?? null,
+      successor_question_key: nextKey,
+      successor_question_round: nextRound,
+      item_name: itemName,
+      answer_text: answerText,
+      answer_source: answerSource,
+    },
+  });
+
+  const previously = original.status === 'skipped'
+    ? 'you skipped it'
+    : `you said "${original.answer_text}"`;
+
+  const opened = await deps.shopStore.openQuestion({
+    shop_id: shop.id,
+    question_key: nextKey,
+    // Inherited, never re-derived: the successor is about the SAME line, and a
+    // question that answered to no stored list item still answers to none.
+    list_item_id: original.list_item_id ?? null,
+    question_text: `About "${itemName}" - ${previously}, and you have changed that. Which did you mean?`,
+    // The same candidates that were offered the first time, so the correction
+    // keeps the deterministic no-model-call path in decideAnswer available to
+    // it exactly as the original answer had.
+    candidates: Array.isArray(original.candidates) ? original.candidates : [],
+    question_round: nextRound,
+    parent_question_id: original.id,
+  });
+
+  // Answered immediately, on the round just opened. A redelivery of the same
+  // correction re-derives the same key, finds it already answered, and changes
+  // nothing - first-answer-wins doing its ordinary job on the new row.
+  const answered = await deps.shopStore.answerQuestion({
+    shop_id: shop.id,
+    question_key: nextKey,
+    status: 'answered',
+    answer_text: answerText,
+    answer_source: answerSource,
+  });
+
+  return receipt(COMMANDS.CORRECT_ANSWER, shop, recorded, {
+    question_key: original.question_key,
+    successor_question_key: nextKey,
+    question_round: nextRound,
+    // AC2, carried out to the caller so a card can SAY it rather than infer it.
+    superseded_answer_text: original.answer_text ?? null,
+    superseded_answered_at: original.answered_at ?? null,
+    corrected: answered.changed === true,
+    opened: opened.created === true,
+    duplicate: answered.changed === false,
+  });
+}
+
 // =====================================================================
 // 7. requestBasketBuild / 8. pauseBasketBuild
 // =====================================================================
@@ -582,6 +839,7 @@ export const COMMAND_SURFACE = Object.freeze({
   [COMMANDS.CORRECT_LINE]: correctLine,
   [COMMANDS.BUILD_SHOP]: buildShop,
   [COMMANDS.ANSWER_QUESTION]: answerQuestion,
+  [COMMANDS.CORRECT_ANSWER]: correctAnswer,
   [COMMANDS.REQUEST_BASKET_BUILD]: requestBasketBuild,
   [COMMANDS.PAUSE_BASKET_BUILD]: pauseBasketBuild,
   [COMMANDS.SUBMIT_CONFIRMATION]: submitConfirmation,

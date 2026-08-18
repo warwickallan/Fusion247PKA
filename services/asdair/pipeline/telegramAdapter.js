@@ -129,6 +129,33 @@ export function intentToCommand(intent, deps = {}) {
         const mapped = Array.isArray(intent.raw.mappings)
           ? intent.raw.mappings.find((m) => m && m.questionKey === intent.arg)
           : null;
+        // -- THE FORK (WO-2026-08-18-04) --------------------------------------
+        //
+        // The SAME words, on the SAME wire, become one of two different commands
+        // depending on a flag the correlator set from a keyword the human typed.
+        // That is the whole of the accident/intent distinction as it reaches the
+        // command surface, and it is one line rather than a mode because a mode
+        // would have to be exited.
+        //
+        // Absent, false, or any other value: answerQuestion, and first-answer-
+        // wins protects a settled row exactly as it always has. ONLY an explicit
+        // `true` reaches correctAnswer.
+        if (mapped && mapped.correction === true) {
+          return {
+            ok: true,
+            command: COMMANDS.CORRECT_ANSWER,
+            spec: {
+              shopRef,
+              actor,
+              questionKey: intent.arg,
+              answerText: mapped.answerText || intent.raw.text,
+              // A correction is TYPED by definition: there is no button that
+              // produces one, deliberately, because a tap is the accident this
+              // route exists to stay distinguishable from.
+              answerSource: 'typed',
+            },
+          };
+        }
         return {
           ok: true,
           command: COMMANDS.ANSWER_QUESTION,
