@@ -1,6 +1,43 @@
 -- =====================================================================
 -- AsdAIr - migration 012: THE COMPLETE asdair_ro / asdair_rw GRANT MATRIX
 --
+-- == CORRECTION, 2026-08-19. THE BODY BELOW IS WHAT RAN. ==================
+-- This header used to deny two things its own SQL does. Both statements are
+-- corrected in place below rather than annotated, because a migration whose
+-- prose contradicts its own statements will be believed by the next reader
+-- over the statements themselves. The BODY is unchanged and is the record
+-- of what the database was actually told.
+--
+--   1. This file DOES grant asdair_rw SELECT on asdair.budget_settings and
+--      asdair.product_alternatives - see the READ-ONLY tier of the asdair_rw
+--      block below. The header previously asserted the opposite. That grant
+--      is an OVER-GRANT: no asdair_rw code path in the estate reads either
+--      table (every reader goes through ASDAIR_DB_URL / asdair_ro, traced in
+--      022's header), and 010 deliberately withheld it. It reached git
+--      because this file was enumerated from the LIVE database, and an
+--      enumeration cannot tell an intended grant from an accident.
+--      It is SUPERSEDED, forward-only, by
+--      022_revoke_rw_budget_and_alternatives.sql.
+--
+--   2. This file does NOT apply cleanly to an empty PostgreSQL built from
+--      git alone, which is the property the header claimed for it. Proven
+--      by execution on a disposable PostgreSQL 17.4 cluster, 2026-08-19:
+--      applying 001-021 in order and then this file ABORTS with
+--      `relation "asdair.command_request" does not exist`. Three objects
+--      named below are not created by anything in services/asdair/db/:
+--        * asdair.command_request  - created by
+--          services/control-plane/db/mypka/030_command_request.sql, i.e. an
+--          UNDECLARED CROSS-SERVICE DEPENDENCY of this migration;
+--        * asdair.previously_ordered, asdair.skill_steps - created by NO
+--          committed SQL anywhere in the repository. They exist only in the
+--          live database. 016's numbering note already records these three
+--          as parked table drift that nothing reconciles.
+--      So the very failure mode this file was written to prevent - a
+--      database rebuilt from git that does not match - still applies to
+--      this file itself. Recorded here, NOT fixed here: repatriating those
+--      three objects is a schema decision and is not this migration's.
+-- =========================================================================
+--
 -- WHY THIS FILE EXISTS. Migration 010 closed a provenance gap for five
 -- tables after `permission denied for table households` killed a live shop
 -- twice on 2026-08-03. It fixed the instance. This file closes the CLASS.
@@ -24,11 +61,16 @@
 -- DEFECT-LEDGER.md - loadRegulars vs loadBudget, D-06 vs D-13, and 010
 -- itself). This file is the enumeration.
 --
--- IDEMPOTENT AND SAFE. Every statement below grants a privilege the live
--- database ALREADY has, so applying it there is a no-op. Its value is that
--- an empty PostgreSQL, built from git, ends up in the same state. GRANT is
--- idempotent in Postgres and the role guards make it a no-op where the roles
--- are not provisioned.
+-- IDEMPOTENT AND SAFE ON THE LIVE DATABASE. Every statement below grants a
+-- privilege the live database ALREADY had when this file was enumerated, so
+-- applying it there is a no-op. GRANT is idempotent in Postgres and the role
+-- guards make it a no-op where the roles are not provisioned.
+--
+-- IT DOES NOT REACH THE GOAL IT CLAIMED. This paragraph used to end "its
+-- value is that an empty PostgreSQL, built from git, ends up in the same
+-- state." That is FALSE and is corrected here: on a from-git build this file
+-- aborts on the first of three objects git does not create. See CORRECTION
+-- item 2 at the top of this file for the executed evidence.
 --
 -- WHAT THIS FILE DELIBERATELY DOES NOT DO:
 --   * It does not re-state the COLUMN-level grants on asdair.regulars. Those
@@ -37,10 +79,15 @@
 --     no UPDATE on name/household_id/active). `regulars` therefore appears
 --     below for asdair_rw as SELECT only - matching what the live table-level
 --     matrix reports - because its write path is column-scoped by design.
---   * It grants NOTHING new. If a privilege is absent here it is absent live,
+--   * It grants nothing that was not ALREADY LIVE when it was enumerated -
+--     which is not the same as granting nothing new IN GIT, and this bullet
+--     used to conflate the two. Against git it grants plenty that no earlier
+--     migration did, including the asdair_rw SELECT on budget_settings and
+--     product_alternatives that 010 had deliberately withheld. See
+--     CORRECTION item 1 at the top; that pair is superseded by 022.
+--     Where a privilege is absent here it was absent live at enumeration,
 --     and 010's SAFETY MODEL reasoning applies: absence is often deliberate
---     (asdair_rw has no grant on budget_settings or product_alternatives, and
---     no UPDATE on rules).
+--     (no UPDATE on rules, for one).
 --   * It does not touch cp_worker or cp_directus. Their matrix is unaudited -
 --     recorded as an open risk in DEFECT-LEDGER.md D-2026-08-03-07.
 --
