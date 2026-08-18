@@ -126,7 +126,15 @@ ask, which TEN gap 5 already permits.
 
 ## 8. Parked, deliberately
 
-- **The correction / reopen command** — TEN gap 6, parked by Warwick on his own reasoning. Not built.
+- ~~**The correction / reopen command** — TEN gap 6, parked by Warwick on his own reasoning. Not built.~~
+  ⚑ **NO LONGER PARKED. UNPARKED BY WARWICK the same day, 2026-08-18**, when he ruled CORRELATION
+  POLICY = A and refused to accept the residual that ruling leaves: *"an answer that matches nothing at
+  all is still accepted and cannot be changed afterwards. That permanence is not acceptable as the
+  completed North Star."* It is **required work before Veritas**, dispatched as
+  `Deliverables/2026-08-18-wo-b15-audited-answer-correction.md`. **This line is corrected rather than
+  left standing** — the order that falsified it declared `document_impact: []`, which was untrue, and
+  the worker named it at read-back rather than letting a parked-and-not-built row survive beside a
+  ruling that had already overtaken it.
 - **Two secret-scan hits** in `transcribe/cli.test.js` and `transcribeList.test.js` — self-declared
   synthetic redaction sentinels, untouched by this work, predating it. Not credentials.
 - **Five stale live shops** (ids 7, 26, 28, 31 and 35) that the runtime advances every pass. Residue,

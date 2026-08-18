@@ -41,12 +41,12 @@ tags: [build-015, ten-gap-6, defect-3]
 # --- scope ---
 outcome: When an answer has been recorded against the wrong question, Warwick can correct it himself through the normal product surface, and the shop then uses the corrected answer. The original answer is never destroyed — it remains readable in the audit trail with who changed it, when, and to what. Abandoning the shop stops being the only route out.
 # guidance: one sentence — what is TRUE when this is done. If AUTOMATIC, acceptance must exercise the real production event; if manual, say so. See work-order template § intended-automatic.
-acceptance_property: Replay the 17 August corpus with an answer deliberately bound to the wrong question. Warwick corrects it through the ordinary surface, with no shell, no request id and no Larry. The planner then resolves the line from the CORRECTED answer, and the ORIGINAL is still recoverable from the audit trail. Mutation-proven: revert the correction path and the replay must fail.
+acceptance_property: [AMENDED 2026-08-18, Contradiction 3 — ASSUMPTION A1 CONFIRMED: "correction" means SUPERSEDING the answer on the question that wrongly holds it, NEVER re-homing that answer onto a different question. Re-homing is a second, different operation and the corpus cannot supply row 6's true target; inventing one would be the fabricated-corpus failure. The corpus rows that still bind under policy A are 6 and 8, bound WITHOUT an established target — that is Warwick's residual and that is the row to supersede.] Replay the 17 August corpus with an answer bound to a question it does not answer. Warwick corrects it through the ordinary surface, with no shell, no request id and no Larry. The planner then resolves the line from the CORRECTED answer, and the ORIGINAL is still recoverable from the audit trail. Mutation-proven: revert the correction path and the replay must fail.
 # guidance: the ONE property whose truth decides this WP, checkable without being told the answer. "Tests pass" is not one.
 integration_owner: larry
 veritas_gate: 1
 # guidance: 1 = integrated WP · 2 = phase/vertical slice · 3 = documentation and Git truth
-document_impact: []
+document_impact: [Deliverables/2026-08-18-photo-door-readiness-record.md §8 — "The correction / reopen command … parked by Warwick … Not built." FALSIFIED by this order; LARRY'S to re-cut, and re-cut on 2026-08-18. The Wayfinder's TEN gap 6 row was already re-cut when Warwick unparked it.] — you write no document and amend no map; the worker was right that the bare [] was untrue
 # guidance: every affected active document with its owner, or [] with the check actually run. IDENTIFIES; never AUTHORISES.
 
 file_surface:
@@ -112,6 +112,36 @@ operational_handoff: none
 
 ## Acceptance criteria
 
+> ## ⛔ AMENDED BY LARRY 2026-08-18 — CONTRADICTION 4. **AC4 was not reachable at the moment Warwick
+> would actually use it, and the worker found it before building. This is the ruling.**
+>
+> **The defect, as established from source:** `ALLOWED_TRANSITIONS` gives `READY_TO_SHOP` exactly one
+> edge — `['WAITING_FOR_BROWSER']`. `applyDecisionsToPlan` has one production call site, reached only
+> from `PROCESSING`. `decideNextStep` at `READY_TO_SHOP` consults only a pending basket-build request
+> and never looks at open questions. **The shop reaches `READY_TO_SHOP` within one pass of the last
+> answer landing, and the `plan_ready` card is the FIRST thing that shows Warwick what his answer
+> did.** So the moment he discovers the answer was wrong is the moment the machine can no longer act
+> on a correction: it would be recorded, audited, and **silently inert**. That is the exact failure
+> this order was written to prevent, hiding one layer below where the order was looking.
+>
+> **RULING — option 1. Add ONE edge, `READY_TO_SHOP → NEEDS_DECISION`, written ONLY by the correction
+> path.** It reuses the existing `NEEDS_DECISION → PROCESSING` re-plan route, so nothing is invented
+> and the newest-wins chain walk does the rest. `WAITING_FOR_BROWSER` and `SHOPPING` are untouched and
+> the edge has exactly one writer.
+>
+> **This is not a product choice between three options, which is why it is not going to Warwick.**
+> Option 2 confines correction to a window measured in seconds and therefore does not satisfy his
+> stated requirement — *"so a wrongly accepted answer is not immutable forever"* — so it is not a
+> candidate. Option 3 reaches into `SHOPPING` where the browser runner may already hold the packet;
+> **you were right not to recommend it, and it is explicitly OUT OF SCOPE here.** If real use later
+> shows he needs to correct mid-shop, that is a genuinely new product choice and it goes to him then.
+>
+> **⛔ AC4-b — MANDATORY, and it is the hole you named yourself.** *"Opening a correction question at
+> `READY_TO_SHOP` leaves the basket build free to proceed over an unanswered question."* **While a
+> correction question is open, the basket build must NOT proceed.** Prove it: with a correction open,
+> a basket-build request must not be claimed or executed. A correction that lets the trolley be built
+> from the answer it is in the middle of superseding is worse than no correction at all.
+
 **AC1 — Correction exists, and it is DELIBERATE.** A settled answer can be changed. The route must be
 an explicit act — never a second bare message that silently overwrites the first. **First-answer-wins
 must still hold for the case it was built for:** an accidental double tap, or a second thought typed
@@ -133,6 +163,21 @@ re-resolve the affected line from the corrected answer and the shop must move on
 correction that lands in a row nothing reads is the "rules that never reached the decision point"
 failure**, and it is the single most repeated defect class in this build.
 
+> **AMENDED 2026-08-18, Contradiction 2 — there are THREE allowlists and AC5 named one while pointing at another.**
+> (i) `pipeline/commandNames.js` — 12 COMMAND names, the "12-name vocabulary" below. **Yours.**
+> (ii) `bot/callbackProtocol.js` `ACTION_VALUES` — 15 WIRE ACTION names, and **what `noPolling.test.js`
+> actually asserts over**. **Yours.** Mind the budget: `BUDGET_TOTAL` is exactly 64 and
+> `callbackProtocol.js` **throws at import** when exceeded — that is a load failure that takes the whole
+> bot down, not a red test.
+> (iii) `cockpit-api/commandSurface.js` — 11 names, the gate the Cockpit HTTP layer routes on, **NOT in
+> your file_surface**. So AC3's parenthetical *"or the Cockpit, which shares commands.js"* is **false as
+> to routing** and is withdrawn: the Cockpit shares the implementation and gates on its own list.
+>
+> **RULING: Telegram-only. Deliver AC3 through Telegram, and REPORT the Cockpit gap without fixing it.**
+> One working route through a normal surface satisfies AC3, and widening the surface mid-order into a
+> module with its own gate is how a bounded correction becomes a programme. The gap is real and it is
+> mine to schedule.
+
 **AC5 — The allowlist change is minimal and explicit.** The 12-name vocabulary in `commandNames.js`
 gains what it must and nothing more. Warwick's original reason for parking this was *"a new name in a
 closed allowlist days before a real shop"* — the caution was right and only the timing has changed.
@@ -151,7 +196,7 @@ replay from WO-2026-08-18-03. Corroboration policy A is untouched by this order.
 - The AC1–AC4 journey as ONE executed replay: wrong binding → correction through the ordinary surface → planner re-resolves → original still readable. Print the audit row
 - The MUTATION: disable the correction path, show the replay failing, restore, show it passing
 # guidance: the exact command that must be EXECUTED — assert the reported count, never the exit code alone
-- `bash scripts/secret-scan.sh --surface services/asdair/pipeline services/asdair/bot services/asdair/shop` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
+- `bash scripts/secret-scan.sh` over the DELIVERABLE surface — **AMENDED 2026-08-18, Contradiction 1.** The surface as declared exits 1 on untouched code: three hits, all in `services/asdair/pipeline/node_modules/pg-connection-string/README.md` (example connection URLs in third-party documentation, gitignored at `.gitignore:59`, predating this order). As issued, COMPLETED was structurally unreachable no matter how good the work was. **Scan the surface MINUS the installed dependency tree, report that exit code, and report those three separately as pre-existing third-party documentation.** Report coverage honestly; exit 2 is NOT SCANNED and never a pass. **Do not scan them away silently** — naming them is the point.
 
 ## Inputs supplied
 
