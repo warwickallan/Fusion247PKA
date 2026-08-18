@@ -109,12 +109,27 @@ operational_handoff: none
 
 ## Acceptance criteria
 
-**AC1 — The positional slide is closed.** `correlateTypedAnswer` step 2 binds a free-text reply to
-"the single open question" — that is where the slide of 2026-08-17 rode, and it is ALSO Warwick's own
-quoted requirement of 2026-08-09, so it may not simply be deleted. Keep it where it is genuinely
-unambiguous; make it impossible where it is not. **The bar is behavioural, not structural: with more
-than one question open, a free-text reply that is not a reply to a specific card must never be
-recorded against any question by position.**
+**AC1 — ⛔ RE-CUT BY LARRY 2026-08-18. The bar as issued was ALREADY TRUE and is withdrawn.**
+
+> **What I wrote was wrong, and building to it would have produced a repair that changed nothing and a
+> mutation that could not bite.** `correlateTypedAnswer` step 2 is guarded by `scoped.length === 1`
+> (`pipeline/runtime.js:665`) and cannot fire while more than one question is open. All nine questions
+> of 17 August were opened in **one** planning pass (`runPipeline.js:1176`), so at the moment the
+> answers arrived the open set was never of size one. Step 2 was structurally unreachable. The worker
+> established this by execution and refused to build to my bar; that refusal is correct.
+
+**THE ACTUAL BAR: a model mapping is not evidence.** Production wires `correlateAnswer:
+realCorrelateAnswer` — Terra — at `pipeline/deps.js:836`, and `runtime.js:743-750` writes a
+`confidence: 'high'` mapping **straight through onto a compare-and-set row that can never be
+corrected**. That is the reachable defect: not positional binding, but **binding on an uncorroborated
+model mapping into a permanent write**.
+
+**Accept Terra's mapping only when the answer text independently corroborates the question it was
+mapped to. Otherwise refuse the bind and ask.** *"Ice lollies are in favourites"* corroborates
+*"1 pk fruit lolly ice"* and does not corroborate *"1 x 4pk Ben & Jerry's cookie dough"*.
+
+**Step 2 stays exactly as it is.** With one question open there is genuinely nothing to choose between,
+and that is the case Warwick's 2026-08-09 requirement protects.
 
 **AC2 — Asking is the fallback, and it is not a failure.** When a typed answer cannot be attributed,
 AsdAIr asks which question it answers, through the normal Telegram surface. It does not park, does not
@@ -122,11 +137,54 @@ guess, does not silently drop it. The North Star permits asking about genuine am
 unattributable reply IS genuine ambiguity. What it does not permit is a technical bridge through
 Warwick, so the question must be answerable by an ordinary tap or reply.
 
-**AC3 — The nine real answers are the acceptance corpus.** Replay all nine from
-`Deliverables/2026-08-17-b15-5-real-run-defects.md` against a nine-question PHOTO queue built the way
-your own `photoPathProof.test.js` builds one. Assert per answer: bound-correctly, or bound-to-nothing
--and-asked. **Assert the count of answers bound to a DIFFERENT question is exactly 0**, pinned to a
-literal in the test. Not "no failures" — the explicit zero.
+**AC3 — ⛔ RE-CUT BY LARRY 2026-08-18. The corpus is supplied below; it was NOT in the cited file.**
+
+> The worker was right that the file records only four answer strings, and right to refuse to invent
+> five and call them Warwick's. **The other five were never missing — they were in the durable rows,
+> where the defect record said they were.** I read `asdair.shop_question` for shop 33 as `asdair_ro`
+> and recovered all nine. **Diagnose from the durable rows**: the corpus below is Warwick's actual
+> words, with the question each was actually written against, verbatim.
+
+**And it changes the diagnosis again — read the timestamps before you build.** All seven answers were
+written between `18:19:19.475Z` and `18:19:21.938Z` — **2.5 seconds, ~350 ms apart**. This is not a
+man typing nine replies over several minutes; it is a batch applied in one sweep. **The first THREE
+bound CORRECTLY. The slide begins at question 4**, where the answer belonging to the Ben & Jerry's
+question is absent entirely and everything after it shifts up by one. A repair that assumes all nine
+were mis-bound will be measuring the wrong thing.
+
+**Build the replay against this corpus** — real `question_text`, real `candidates`, real `answer_text`.
+Assert per answer: bound-correctly, or bound-to-nothing-and-asked. **Assert the count bound to a
+DIFFERENT question is exactly `0`, pinned to a literal.**
+
+**The harness must discriminate.** With no injected correlator, all nine bind to nothing and the
+literal zero passes on the UNREPAIRED code — a vacuous green, and the worker named it as SOP-022 §2a.
+**Inject a correlator that reproduces the observed slide** — correct for rows 1–3, then mapped
+`high` to the question above from row 4 on — so the mutation bites and the test measures the product
+rather than a stub.
+
+### THE CORPUS — `asdair.shop_question`, shop 33 (`SHOP-2026-08-17`, photo), 9 rows
+
+| # | id | question_text | answer_text (typed) | what it actually answers |
+|---|---|---|---|---|
+| 1 | 76490 | Which product is "6 Asda large free range eggs"? | `6 eggs?! Ffs` | **itself — CORRECT** |
+| 2 | 76491 | Which product is "2 skinny cow bars"? | `have no idea what the hell skinny cow bars are?! can't see anything remotely close.` | **itself — CORRECT** (and note: the invented line) |
+| 3 | 76492 | Which product is "1 x 6pk Heinz baked beans"? | `6 pack heinz beans 415g` | **itself — CORRECT** |
+| 4 | 76493 | Which product is "1 x 4pk Ben & Jerry's cookie dough"? | `Ice lollies are in favourites. stupid question` | ⛔ **answers row 5** |
+| 5 | 76494 | Which product is "1 pk fruit lolly ice"? | `new item. wet body wipes for women` | ⛔ **answers row 6** |
+| 6 | 76495 | Which product is "1 wet wipes"? | `there is a rule about this` | ⛔ **answers row 6 or 7 — AMBIGUOUS, and it must be treated as such** |
+| 7 | 76496 | Which product is "2 Sure deodorant male"? | *(null — **open**, never recorded)* | — |
+| 8 | 76497 | Which product is "2 pkts Asda plain toffees"? | `n favourites FFS stupid question` | ⛔ **answers row 8 — plausibly correct, NOT established** |
+| 9 | 76498 | Which product is "1 Sweetex"? | *(null — **open**, never recorded)* | — |
+
+**Where the fourth column says AMBIGUOUS or NOT ESTABLISHED, that is the honest state and you must not
+resolve it to make a cleaner test.** The discriminating assertions are rows 4 and 5, where the correct
+target is unarguable from the text. Rows 1–3 must not regress. Rows 7 and 9 are the "two never
+recorded".
+
+**Commit this corpus as a fixture in your worktree** under `services/asdair/pipeline/testdata/`.
+Household shopping content is explicitly permitted in this public repository (GL-009; Warwick has
+ruled it three times) — and the reason the fixture belongs in Git is the same reason `bcf222d` exists:
+a defect nobody can reproduce without database credentials is a defect nobody can fix.
 
 **AC4 — Defect 3, and its boundary.** Establish whether closing AC1 removes the REACHABLE cause of the
 first-answer-wins trap, or merely narrows it. The trap is that a wrong answer is permanent and only
@@ -146,7 +204,14 @@ WO-2026-08-18-01 is unskipped and passing, or you say why it is not.
 - The AC3 replay result as a nine-row table: answer, question it actually answers, what it bound to, verdict
 - The MUTATION: revert the repair, show the replay failing, restore, show it passing
 # guidance: the exact command that must be EXECUTED — assert the reported count, never the exit code alone
-- `bash scripts/secret-scan.sh --surface services/asdair/pipeline services/asdair/bot` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
+- `bash scripts/secret-scan.sh --surface services/asdair/pipeline services/asdair/bot` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass.
+  **⛔ AMENDED BY LARRY 2026-08-18 — three PRE-EXISTING hits are PARKED BY NAME, exactly as the other two were.** All three are in
+  `services/asdair/pipeline/node_modules/pg-connection-string/README.md` — third-party dependency
+  documentation, gitignored and untracked (`git ls-files` returns 0 files under that path), present
+  before this order was issued. `--surface` mode enumerates from the filesystem with no git
+  involvement, so it walks `node_modules` by design. **Report the exit code honestly and name these
+  three as parked. Do NOT narrow the declared scan paths to manufacture a green** — the worker was
+  right to refuse to do that silently, and it is not being asked to now.
 
 ## Inputs supplied
 
