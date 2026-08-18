@@ -1,0 +1,103 @@
+{
+  "_source": "asdair.shop_question, shop id 33 (SHOP-2026-08-17, source_kind=photo), read as asdair_ro and transcribed into the Work Order WO-2026-08-18-03 by Larry on 2026-08-18.",
+  "_why_this_is_in_git": "A defect nobody can reproduce without database credentials is a defect nobody can fix. Household shopping content is explicitly committable to this public repository (GL-009 'Household operations content'); Warwick has ruled it three times. There are no credentials, ids or personal identifiers here - product names and his own words about groceries.",
+  "_what_happened": "Nine questions were opened in ONE planning pass. Seven answers were written between 18:19:19.475Z and 18:19:21.938Z - 2.5 seconds, ~350ms apart, a batch and not a man typing. The first THREE bound correctly. From the fourth on each answer landed on the question ABOVE the one it answers, and two were never recorded at all.",
+  "_reading_the_columns": {
+    "questionText": "verbatim from the row",
+    "answerText": "verbatim from the row - Warwick's own words - or null where nothing was ever recorded",
+    "answersQuestion": "the ordinal of the question these words ACTUALLY answer, where that is unarguable from the text; null where it is not",
+    "establishment": "established | ambiguous | not-established | never-recorded. ONLY 'established' rows may be used to judge a mis-bind. The ambiguous ones are honest and must NOT be resolved to make a cleaner test."
+  },
+  "rows": [
+    {
+      "n": 1,
+      "id": 76490,
+      "questionText": "Which product is \"6 Asda large free range eggs\"?",
+      "item": "6 Asda large free range eggs",
+      "answerText": "6 eggs?! Ffs",
+      "answersQuestion": 1,
+      "establishment": "established",
+      "note": "bound CORRECTLY on the real run. Must not regress."
+    },
+    {
+      "n": 2,
+      "id": 76491,
+      "questionText": "Which product is \"2 skinny cow bars\"?",
+      "item": "2 skinny cow bars",
+      "answerText": "have no idea what the hell skinny cow bars are?! can't see anything remotely close.",
+      "answersQuestion": 2,
+      "establishment": "established",
+      "note": "bound CORRECTLY. This is also the INVENTED line from defect 1 - Terra read 'skinny cow bars' off a photograph line that said sliced roast beef. Out of scope here; recorded so the row is not mistaken for a real product."
+    },
+    {
+      "n": 3,
+      "id": 76492,
+      "questionText": "Which product is \"1 x 6pk Heinz baked beans\"?",
+      "item": "1 x 6pk Heinz baked beans",
+      "answerText": "6 pack heinz beans 415g",
+      "answersQuestion": 3,
+      "establishment": "established",
+      "note": "bound CORRECTLY. Must not regress."
+    },
+    {
+      "n": 4,
+      "id": 76493,
+      "questionText": "Which product is \"1 x 4pk Ben & Jerry's cookie dough\"?",
+      "item": "1 x 4pk Ben & Jerry's cookie dough",
+      "answerText": "Ice lollies are in favourites. stupid question",
+      "answersQuestion": 5,
+      "establishment": "established",
+      "note": "THE SLIDE STARTS HERE. These words are about ice lollies and were written onto the Ben & Jerry's question. The answer that belonged to this question is absent entirely."
+    },
+    {
+      "n": 5,
+      "id": 76494,
+      "questionText": "Which product is \"1 pk fruit lolly ice\"?",
+      "item": "1 pk fruit lolly ice",
+      "answerText": "new item. wet body wipes for women",
+      "answersQuestion": 6,
+      "establishment": "established",
+      "note": "wet body wipes written onto the fruit lolly ice question."
+    },
+    {
+      "n": 6,
+      "id": 76495,
+      "questionText": "Which product is \"1 wet wipes\"?",
+      "item": "1 wet wipes",
+      "answerText": "there is a rule about this",
+      "answersQuestion": null,
+      "establishment": "ambiguous",
+      "note": "answers row 6 or row 7 - the Work Order says so and it must NOT be resolved to make a cleaner test. It carries no product word at all, so it cannot be attributed by any evidence this product holds."
+    },
+    {
+      "n": 7,
+      "id": 76496,
+      "questionText": "Which product is \"2 Sure deodorant male\"?",
+      "item": "2 Sure deodorant male",
+      "answerText": null,
+      "answersQuestion": null,
+      "establishment": "never-recorded",
+      "note": "one of the two that were never recorded. Left open."
+    },
+    {
+      "n": 8,
+      "id": 76497,
+      "questionText": "Which product is \"2 pkts Asda plain toffees\"?",
+      "item": "2 pkts Asda plain toffees",
+      "answerText": "n favourites FFS stupid question",
+      "answersQuestion": null,
+      "establishment": "not-established",
+      "note": "plausibly correct for this question, NOT established. Treated as unestablished throughout; it may not be counted either as a correct bind or as a mis-bind."
+    },
+    {
+      "n": 9,
+      "id": 76498,
+      "questionText": "Which product is \"1 Sweetex\"?",
+      "item": "1 Sweetex",
+      "answerText": null,
+      "answersQuestion": null,
+      "establishment": "never-recorded",
+      "note": "the second of the two that were never recorded. Left open."
+    }
+  ]
+}

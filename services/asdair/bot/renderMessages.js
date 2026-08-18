@@ -1364,6 +1364,60 @@ export function renderReplyNotTaken({ shopRef, answeredAlready } = {}) {
   };
 }
 
+/**
+ * I COULD NOT TELL WHICH QUESTION THAT ANSWERS. (WO-2026-08-18-03 AC2)
+ *
+ * The voice of the corroboration gate. Terra mapped his words onto a question
+ * and nothing he typed supported it, so nothing was written - and on
+ * 2026-08-17 the version of this product that wrote it anyway cost him the
+ * whole shop, because `answerQuestion` is first-answer-wins and a wrong answer
+ * cannot be taken back.
+ *
+ * THE ASK MUST BE ANSWERABLE WITHOUT A TECHNICAL BRIDGE. It carries the board's
+ * own numbers and asks for "5: ..." - the shape `parseBoardReply` has always
+ * accepted and the shape the board itself already teaches. No new command, no
+ * new callback action, and the one button is the existing ANSWER action.
+ *
+ * IT SAYS WHAT WAS NOT DONE, in his words rather than ours: nothing recorded,
+ * nothing ordered, nothing lost.
+ */
+export function renderAnswerNotAttributed({ shopRef, words, questions = [] } = {}) {
+  assertShopRef(shopRef);
+  const open = Array.isArray(questions) ? questions : [];
+  const lines = [
+    '🤔 I could not tell which question that answers',
+    `Ref: ${value(shopRef)}`,
+    '',
+    'You said:',
+    `   ${value(words)}`,
+    '',
+    'I have NOT recorded it against anything. I could not tell which question',
+    'you meant, and an answer on the wrong question cannot be taken back.',
+    '',
+    `STILL OPEN — ${count(open.length)}`,
+  ];
+
+  if (open.length === 0) {
+    lines.push('  (nothing)');
+  } else {
+    for (const q of open) lines.push(`  ${count(q && q.n)}. ${value(q && q.item)}`);
+  }
+
+  lines.push('');
+  lines.push('Tell me which one by starting your reply with its number:');
+  lines.push('   5: the ones in favourites');
+  lines.push('');
+  lines.push('You can answer several at once, one per line. Nothing has been');
+  lines.push('added to a basket and nothing has been ordered.');
+
+  return {
+    text: block(lines),
+    reply_markup: keyboard([
+      [button('Show me what is waiting', ACTIONS.ANSWER, shopRef)],
+    ]),
+  };
+}
+
 export const MESSAGES = Object.freeze({
   receipt: renderReceipt,
   plan_ready: renderPlanReady,
@@ -1381,6 +1435,11 @@ export const MESSAGES = Object.freeze({
   reconciliation_summary: renderReconciliationSummary,
   clarification_deferred: renderClarificationDeferred,
   photo_read: renderPhotoRead,
+  // WO-2026-08-18-03 AC2. The corroboration gate's voice: it refused to place
+  // his words, so it has to ASK. Registered here because drainOutbox looks the
+  // renderer up by kind and abandons a row it cannot render - an enqueue with
+  // no entry in this catalogue would be a silent loss wearing a fix's clothes.
+  answer_not_attributed: renderAnswerNotAttributed,
   // ADDITIVE (AC4, AMENDMENT 2) - the three-shape Cockpit-notification role.
   // The 16 kinds above stay exactly as they are: their runtime.js/
   // runPipeline.js callers are unchanged (out of scope for this WP), so

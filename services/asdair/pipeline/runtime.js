@@ -53,6 +53,9 @@ import * as shopDecisions from './shopDecisions.js';
 import { STEPS, everIssued } from './stages.js';
 import { COMMANDS } from './commandNames.js';
 import { LEDGER_KINDS, ledgerFamilyKey, outboxKeyFor } from './keys.js';
+// WO-2026-08-18-03 AC1. A MODEL MAPPING IS NOT EVIDENCE. Pure, zero-dep, opens
+// no connection - same reasoning as the shopDecisions import above.
+import { corroboration } from './answerCorroboration.js';
 // The bot folder is PURE and zero-dependency (it opens no connection; a test in
 // that folder enforces it), so importing these three statically does NOT break
 // the property the dynamic import of deps.js below protects: this file must stay
@@ -740,6 +743,21 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
     .filter((q) => !ambiguousKeys.has(q.questionKey))
     .map((q) => [q.questionKey, q]));
   const mappings = [];
+  // ── THE CORROBORATION GATE (WO-2026-08-18-03 AC1) ────────────────────────
+  //
+  // Mappings the model claimed at `high` confidence and NOTHING HE TYPED
+  // SUPPORTS. This is the 2026-08-17 defect: seven answers written in 2.5
+  // seconds, the first three right, and from the fourth on every one landed on
+  // the question above. `answerQuestion` is a compare-and-set, so each of those
+  // writes was permanent on arrival and the only way out was cancelling the
+  // shop - which is what Warwick did.
+  //
+  // The model's `confidence` is its opinion of itself. It is not evidence about
+  // the row we are about to write forever, so it is no longer accepted as if it
+  // were. These are carried back to the caller rather than dropped, because a
+  // refusal he is not told about is a silent loss and that is the failure this
+  // whole path already exists to prevent.
+  const uncorroborated = [];
   let refusedForShop = 0;
   for (const m of returned.mappings) {
     if (!m || m.confidence !== 'high') continue;
@@ -747,19 +765,50 @@ export async function correlateTypedAnswer(deps, { text, open, boardShopId = nul
     const q = byKey.get(m.question_key);
     // A key the correlator was never shown is dropped, not corrected.
     if (!q) continue;
-    mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText: m.answer_text || words });
+    const answerText = m.answer_text || words;
+
+    const support = corroboration({ answerText, question: q, scoped });
+    if (!support.corroborated) {
+      uncorroborated.push({
+        questionKey: q.questionKey,
+        shopRef: q.shopRef,
+        shopId: q.shopId,
+        ordinal: q.ordinal,
+        itemName: q.itemName || q.questionText || null,
+        answerText,
+      });
+      log('answer_mapping_uncorroborated', {
+        shop_ref: q.shopRef,
+        question_key: q.questionKey,
+        open_questions: scoped.length,
+        detail: 'the model mapped these words to this question and nothing in the words supports it - REFUSED, not written',
+      });
+      continue;
+    }
+
+    mappings.push({ questionKey: q.questionKey, shopRef: q.shopRef, answerText });
   }
   if (refusedForShop > 0) {
     log('answer_correlation_shop_ambiguous', {
       refused: refusedForShop, open_questions: scoped.length,
     });
   }
-  if (mappings.length === 0) {
+  if (mappings.length === 0 && uncorroborated.length === 0) {
     log('answer_correlation_low_confidence', { open_questions: scoped.length, offered: returned.mappings.length });
     return null;
   }
 
-  return { mappings, unmapped: returned.unmapped_text || null, modelCalled: true };
+  // ── WHY THIS IS NOT `null` WHEN EVERYTHING WAS REFUSED ────────────────────
+  //
+  // `null` means "not ours", and the caller hands a message that is not ours to
+  // intake - where it becomes a NEW SHOPPING LIST. Returning null here would
+  // turn a refused answer into a phantom shop, which is a worse failure than
+  // the one being fixed. An empty `mappings` with a populated `uncorroborated`
+  // says the opposite: this IS ours, we refused to place it, and the caller
+  // owes him a question.
+  return {
+    mappings, unmapped: returned.unmapped_text || null, modelCalled: true, uncorroborated,
+  };
 }
 
 /**
@@ -2208,6 +2257,81 @@ export async function runOnce(deps, wiring = {}) {
           updateId: verdict.updateId, open_questions: openQuestions.length,
         });
         return false;
+      }
+
+      // ── ASKING IS THE FALLBACK, AND IT IS NOT A FAILURE (AC2) ────────────
+      //
+      // The corroboration gate refused to place at least part of this message.
+      // He gets told, through the ordinary surface, with the board numbers he
+      // is already looking at - so answering is "5: the ones in favourites",
+      // an ordinary typed reply on a path that already exists. NO new command,
+      // NO new callback action, nothing added to the allowlist.
+      //
+      // It does NOT park and it does NOT drop. The North Star permits asking
+      // about genuine ambiguity; an answer nothing supports IS genuine
+      // ambiguity. What it forbids is guessing, and guessing is what this
+      // replaces.
+      const unplaced = Array.isArray(correlation.uncorroborated) ? correlation.uncorroborated : [];
+      if (unplaced.length > 0) {
+        const target = unplaced[0];
+        const stillOpen = openQuestions.filter((q) => String(q.shopId) === String(target.shopId));
+        const noticeKey = outboxKeyFor(target.shopRef, `answer_not_attributed.${verdict.updateId}`);
+        try {
+          // ONE QUESTION PER MESSAGE, EVER - the same family guard as the two
+          // notices above, for the same reason: a redelivery must never mint a
+          // new generation on every pass and rebuild the storm.
+          const family = ledgerFamilyKey({
+            kind: LEDGER_KINDS.OUTBOX,
+            householdId: wiring.householdId,
+            name: 'answer_not_attributed',
+            key: noticeKey,
+          });
+          if ((await store.spentLedgerGenerations(deps, family)) === 0) {
+            await store.enqueueMessage(deps, {
+              householdId: wiring.householdId,
+              shopId: target.shopId,
+              kind: 'answer_not_attributed',
+              key: noticeKey,
+              payload: {
+                shopRef: target.shopRef,
+                words: target.answerText,
+                questions: stillOpen.map((q) => ({
+                  n: q.ordinal,
+                  item: q.itemName || q.questionText || null,
+                })),
+              },
+            });
+          }
+        } catch (err) {
+          // TOLD HIM NOTHING => DO NOT CLAIM. Never a silent drop. Returning
+          // false holds the offset and lets Telegram redeliver, which is the
+          // recovery this loop already has.
+          log('answer_not_attributed_notice_failed', {
+            updateId: verdict.updateId,
+            shop_ref: target.shopRef,
+            detail: String(err && err.message ? err.message : err),
+          });
+          return false;
+        }
+        log('typed_answer_not_attributed', {
+          updateId: verdict.updateId,
+          shop_ref: target.shopRef,
+          refused: unplaced.length,
+          also_bound: correlation.mappings.length,
+        });
+
+        // NOTHING PLACEABLE AT ALL: he has been asked, so the message is
+        // CLAIMED. Handing it back to intake would turn his answer into a new
+        // shopping list, which is the failure this branch exists to prevent.
+        if (correlation.mappings.length === 0) {
+          refusals.push({
+            updateId: verdict.updateId, shop_ref: target.shopRef, reason: 'answer_not_attributed',
+          });
+          claimedUpdateIds.add(verdict.updateId);
+          return true;
+        }
+        // Otherwise part of the message DID place. Those mappings are settled
+        // below on their own rows, and the question above covers the rest.
       }
 
       const intent = wiring.bot.routeAsdairUpdate(update, {

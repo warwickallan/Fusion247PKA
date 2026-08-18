@@ -119,6 +119,16 @@ const SAMPLES = {
   list_read: { shopRef: REF, lines: 41, regularsAdded: 3, needAttention: 5, cockpitLink: 'https://cockpit.example.ts.net:8443/asdair' },
   shop_ready: { shopRef: REF, resolvedCount: 41, totalCount: 41, cockpitLink: 'https://cockpit.example.ts.net:8443/asdair' },
   basket_built: { shopRef: REF, added: 39, missing: 2, cockpitLink: 'https://cockpit.example.ts.net:8443/asdair' },
+  // WO-2026-08-18-03 AC2. Warwick's actual words from 2026-08-17, against the
+  // question they were actually written to. This sample is the incident.
+  answer_not_attributed: {
+    shopRef: REF,
+    words: 'Ice lollies are in favourites. stupid question',
+    questions: [
+      { n: 4, item: '1 x 4pk Ben & Jerry\'s cookie dough' },
+      { n: 5, item: '1 pk fruit lolly ice' },
+    ],
+  },
 };
 
 function everyButton(rendered) {
@@ -152,11 +162,17 @@ test('the catalogue covers every message the directive specifies', () => {
   // COCKPIT-BE-01 AC4 (AMENDMENT 2) - Telegram's three-shape notification-only
   // role under the Cockpit redesign. ADDITIVE: nothing above was removed -
   // their runtime.js/runPipeline.js enqueue callers are a separate, later WP.
+  // 'answer_not_attributed' added by WO-2026-08-18-03 AC2 - the corroboration
+  // gate's voice. It is registered here for exactly the reason this control
+  // exists: runtime.js now ENQUEUES that kind, and an unregistered renderer
+  // would have drainOutbox resolve it 'abandoned' and discard the one message
+  // that stops a refused answer being a silent loss.
   assert.deepEqual(Object.keys(MESSAGES).sort(), [
-    'basket_built', 'basket_ready', 'clarification_deferred', 'confirm_interpretation',
-    'confirmation_received', 'control_refused', 'failure', 'lines_unresolved', 'list_read',
-    'photo_read', 'plan_ready', 'progress', 'question', 'question_board', 'receipt',
-    'reconciliation_summary', 'reply_not_taken', 'shop_ready', 'status',
+    'answer_not_attributed', 'basket_built', 'basket_ready', 'clarification_deferred',
+    'confirm_interpretation', 'confirmation_received', 'control_refused', 'failure',
+    'lines_unresolved', 'list_read', 'photo_read', 'plan_ready', 'progress', 'question',
+    'question_board', 'receipt', 'reconciliation_summary', 'reply_not_taken', 'shop_ready',
+    'status',
   ]);
 });
 

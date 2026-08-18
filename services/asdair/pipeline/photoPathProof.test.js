@@ -429,46 +429,47 @@ test('AC3 THE COMMITTED GUARD WORKS FOR A CANDIDATE LABEL: a late answer naming 
   assert.equal(questionRow(h, second).answer_text, null);
 });
 
-test('AC3 THE 2026-08-17 SIGNATURE ITSELF: a FREE-TEXT late answer still lands on the following question',
-  {
-    todo: 'DEFECT 2 - WO-2026-08-18-01. The committed late-answer guard resolves a late answer only through '
-        + 'shopDecisions.resolveExactCandidate, which requires the typed words to EQUAL a rendered candidate '
-        + 'label. Every one of the nine real answers on 2026-08-17 was free text ("Ice lollies are in '
-        + 'favourites. stupid question"), so the guard never fires on them and the slide is unchanged. '
-        + 'Unskip with the repair.',
-  },
-  async () => {
-    const h = makeHarness();
-    const bot = await makeAskingBot(h);
-    const { keys } = await photoShopWithQuestions(h, bot, [NINE[0], NINE[1]]);
-    const [first, second] = keys;
+// ── ⛔ RE-CUT BY WO-2026-08-18-03. The `{ todo }` that stood here asserted a
+//    MECHANISM THAT DOES NOT EXIST, and it is withdrawn rather than unskipped.
+//
+//    It drove two open questions with a bare free-text message and expected the
+//    first to absorb it "because it is the sole open question". It is not: with
+//    two open, `correlateTypedAnswer` step 2 is guarded by `scoped.length === 1`
+//    and cannot fire, step 1 needs the words to EQUAL a candidate label, and the
+//    plain harness wires no correlator - so the message bound to NOTHING and the
+//    test failed at its first assertion, not its last. It was diagnosing the
+//    wrong step.
+//
+//    The real 17 August binder was step 3 - Terra, wired in production at
+//    deps.js `correlateAnswer: realCorrelateAnswer` - returning `high` on nine
+//    questions that were all opened in one planning pass. The proof of that
+//    defect, and of its repair, is the corpus replay in
+//    answerBindingReplay.test.js, driven by the durable rows.
+//
+//    What is kept here is the fact the old test needed and never established:
+//    with more than one question open and no correlator wired, a free-text
+//    answer places nowhere. That is the baseline the replay's injected
+//    correlator exists to move, and pinning it is what stops the replay being
+//    mistaken for a test of its own stub.
+test('AC3 WITH MORE THAN ONE QUESTION OPEN, a bare free-text message places NOWHERE without a correlator', async () => {
+  const h = makeHarness();
+  const bot = await makeAskingBot(h);
+  const { keys } = await photoShopWithQuestions(h, bot, [NINE[0], NINE[1]]);
+  const [first, second] = keys;
 
-    // PASS 1 - he answers the FIRST question in his own words. Not a candidate
-    // label: a sentence. It binds, because it is the sole open question.
-    await runOnce(h.deps, {
-      householdId: HOUSEHOLD_ID,
-      bot,
-      questions: bot.questions,
-      intake: makeIntake([typed({ updateId: 830, text: 'Ice lollies are in favourites. stupid question' })]),
-    });
-    assert.equal(questionRow(h, first).status, 'answered');
-    assert.equal(questionRow(h, second).status, 'open');
-
-    // PASS 2 - a second thought about the SAME question, again in his own
-    // words. It is a late answer to a question that is already settled, and it
-    // must NOT be written onto the one that happens to be open now.
-    await runOnce(h.deps, {
-      householdId: HOUSEHOLD_ID,
-      bot,
-      questions: bot.questions,
-      intake: makeIntake([typed({ updateId: 831, text: 'no, the ice lollies, the ones in favourites' })]),
-    });
-
-    const row = questionRow(h, second);
-    assert.equal(row.status, 'open',
-      'his words about the FIRST question settled the SECOND one - this is the 17 August defect, unchanged');
-    assert.equal(row.answer_text, null);
+  await runOnce(h.deps, {
+    householdId: HOUSEHOLD_ID,
+    bot,
+    questions: bot.questions,
+    intake: makeIntake([typed({ updateId: 830, text: 'Ice lollies are in favourites. stupid question' })]),
   });
+
+  assert.equal(questionRow(h, first).status, 'open',
+    'step 2 is guarded by scoped.length === 1 and cannot fire with two questions open');
+  assert.equal(questionRow(h, first).answer_text, null);
+  assert.equal(questionRow(h, second).status, 'open');
+  assert.equal(questionRow(h, second).answer_text, null);
+});
 
 // =====================================================================
 // AC4 - DEFECT 3, FIRST-ANSWER-WINS AS A TRAP.
