@@ -130,7 +130,7 @@
 
 **Resolution order, settled and not to be re-derived:** stored id if present → **otherwise Favourites/Regulars identity by canonical ASDA description** → otherwise live ASDA search on that description → model evaluates real candidates → choose when clear → abstain only on genuine ambiguity → **harvested id persisted afterwards only as an optimisation.** **Product id is NOT the identity and must never become a prerequisite.**
 
-**Route to acceptance:** close the ten gaps → **Veritas** against the new Goal Contract, made to fail, graded on the North Star and not on component health → **bounded estate reconcile** so one canonical truth sits on main → **Codex** external release QA against the release claim → **24 August real shop.** Veritas does not replace Codex; Warwick's authority does not replace Codex.
+**Route to acceptance:** close the ten gaps → **Veritas** against the new Goal Contract, made to fail, graded on the North Star and not on component health → **bounded estate reconcile** so one canonical truth sits on main → **Codex** external release QA against the release claim → **Tuesday 25 August 2026 real shop.** Veritas does not replace Codex; Warwick's authority does not replace Codex.
 
 ### 🔧 THE SEVEN RUNTIME CAPABILITIES — superseded by the TEN GAPS above, 2026-08-17. Kept for the owner column only.
 
@@ -6041,7 +6041,7 @@ exists.**
 >
 > ### Route to done
 > close 1–7 → exercise the joined route on the photo door → **Veritas made-to-fail** → bounded estate
-> reconcile → **Codex** external release QA → the 24 August shop is the real acceptance.
+> reconcile → **Codex** external release QA → the Tuesday 25 August 2026 shop is the real acceptance.
 
 
 > **⛔ This section was REPLACED, not appended to.** The 2026-08-11 §12 — *"INPUT TRUTH IS THE FRONTIER…
