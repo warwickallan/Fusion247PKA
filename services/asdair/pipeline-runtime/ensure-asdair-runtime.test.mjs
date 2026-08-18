@@ -36,6 +36,7 @@ const {
   preflight, BLOCKING, ADVISORY,
   GRANT_MATRIX, MATRIX_PRIVILEGES, COLUMN_DENIALS,
   grantExpectations, evaluateGrants, evaluateColumnDenials,
+  MATRIX_SOURCE_MIGRATIONS, MIGRATIONS_DIR, compareMatrixProvenance, readMigrationFilenames,
   extractModelIds, evaluateVisionModel, VISION_MODEL_DEFAULT,
   launcherPathFromTaskArguments, evaluateScheduledTask, SCHEDULED_TASK_NAME,
   looksLikeTelegramToken, PG_CONSUMERS, CHROME_DEFAULT_PROFILE_DIR, samePath,
@@ -321,10 +322,14 @@ test('AC3 never puts a connection string into its output', async () => {
 
 test('the matrix is derived from the migrations, not invented: both roles, and the documented negatives', () => {
   assert.deepEqual(Object.keys(GRANT_MATRIX), ['asdair_ro', 'asdair_rw']);
-  // 010 states these two get NO asdair_rw grant. If someone "helpfully" adds
-  // one, this fails - which is the point.
-  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], {});
-  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], {});
+  // -- RE-CUT 2026-08-19 (WO-2026-08-19-01). THIS TEST PINNED THE BUG. ------
+  // It used to assert both of these were `{}`, citing 010. 012:96-101 grants
+  // asdair_rw SELECT on both, so the assertion was enshrining a stale literal
+  // and the preflight emitted a false warning on every start because of it.
+  // Changed to match THE REQUIREMENT - the matrix must state what the committed
+  // migrations actually grant - never to match the code.
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], { table: ['SELECT'] });
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], { table: ['SELECT'] });
   // 005 grants insert/update on regulars per COLUMN, never per table.
   assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.regulars'].column, ['INSERT', 'UPDATE']);
   // No migration grants DELETE to asdair_rw on anything.
@@ -371,13 +376,21 @@ test('evaluateGrants CATCHES a missing grant - the D-07 failure', () => {
 test('evaluateGrants CATCHES an over-grant - a privilege no migration commits', () => {
   const exp = grantExpectations();
   const rows = correctPrivilegeRows((rs) => {
-    const target = rs.find((r) => r.role === 'asdair_rw' && r.tbl === 'asdair.budget_settings' && r.priv === 'SELECT');
+    // -- FIXTURE MOVED 2026-08-19 (WO-2026-08-19-01). ----------------------
+    // This proof used to perturb asdair_rw SELECT on asdair.budget_settings
+    // and call it 'a privilege no migration commits'. 012:96-101 commits
+    // exactly that privilege, so the mutation stood on a legitimately granted
+    // one. asdair_rw INSERT on asdair.source_documents is granted by NO
+    // migration - 012 puts source_documents in the read-only list - so the
+    // control keeps its teeth and now points at something true.
+    const target = rs.find((r) => r.role === 'asdair_rw' && r.tbl === 'asdair.source_documents' && r.priv === 'INSERT');
+    assert.ok(target, 'the fixture pair left the matrix - this proof would pass vacuously');
     target.table_priv = true; target.any_col_priv = true;
   });
   const v = evaluateGrants(exp, new Map(rows.map((r) => [`${r.role}|${r.tbl}|${r.priv}`, r])));
   assert.equal(v.missing.length, 0, 'an over-grant is not a missing grant');
   assert.equal(v.overGranted.length, 1);
-  assert.match(v.overGranted[0], /asdair_rw HAS SELECT on asdair\.budget_settings/);
+  assert.match(v.overGranted[0], /asdair_rw HAS INSERT on asdair\.source_documents/);
 });
 
 test('evaluateGrants CATCHES asdair_rw holding DELETE, which no migration ever grants', () => {
@@ -832,4 +845,59 @@ test('every check the runtime can fail carries a severity, so nothing is unclass
   }
   assert.equal(r.problems.length + r.warnings.length, failures.length,
     'every failed check lands in exactly one of the two exit classes');
+});
+
+// =====================================================================
+// AC4 / WO-2026-08-19-01 - IS THE MATRIX ITSELF CURRENT?
+//
+// GRANT_MATRIX is a hand-maintained literal. The defect it caused was not that
+// it was hand-maintained - it was that nothing noticed when a migration landed
+// and nobody folded it in. 012 was missed for months and the live preflight
+// warned falsely on every start as a result.
+//
+// These proofs cover the CLASS rather than that instance: the matrix declares
+// what it was read from, and the declaration is checked against the disk.
+// =====================================================================
+
+test('the declared migration sources match what is actually on disk RIGHT NOW', () => {
+  const onDisk = readMigrationFilenames();
+  const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, onDisk);
+  assert.ok(onDisk.length > 0, 'no migrations were enumerated - this proof would pass vacuously');
+  assert.deepEqual(prov.unaccounted, [],
+    'a migration exists that the grant matrix was never read from - fold it in, do not add it to the list to silence this');
+  assert.deepEqual(prov.vanished, [],
+    'the matrix declares a migration file that is no longer on disk');
+  assert.ok(prov.ok);
+});
+
+test('an UNFOLDED migration is caught by name - the 022 case, before it happens', () => {
+  const onDisk = [...MATRIX_SOURCE_MIGRATIONS, '022_revoke_unnecessary_rw_reads.sql'];
+  const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, onDisk);
+  assert.equal(prov.ok, false, 'a migration nobody folded in was reported as fine');
+  assert.deepEqual(prov.unaccounted, ['022_revoke_unnecessary_rw_reads.sql']);
+  assert.deepEqual(prov.vanished, []);
+});
+
+test('a DECLARED but absent migration is caught too - the claim is false in both directions', () => {
+  const onDisk = MATRIX_SOURCE_MIGRATIONS.filter((n) => n !== '012_complete_grant_matrix.sql');
+  const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, onDisk);
+  assert.equal(prov.ok, false);
+  assert.deepEqual(prov.vanished, ['012_complete_grant_matrix.sql']);
+});
+
+test('readMigrationFilenames THROWS on an unreadable directory - it never returns an empty pass', () => {
+  assert.throws(() => readMigrationFilenames(new URL('./no-such-migrations-dir/', import.meta.url)));
+  // And the shape that would be worst: a real directory holding no .sql at all.
+  const empty = path.join(TEST_STATE_DIR, 'empty-migrations');
+  fs.mkdirSync(empty, { recursive: true });
+  assert.throws(() => readMigrationFilenames(empty), /no .sql migrations found/,
+    'an empty directory returned a list instead of throwing - every grant claim would then pass vacuously');
+});
+
+test('012 is DECLARED, and the two privileges it grants are in the matrix', () => {
+  // The specific regression, pinned so it cannot silently revert.
+  assert.ok(MATRIX_SOURCE_MIGRATIONS.includes('012_complete_grant_matrix.sql'),
+    '012 is the migration whose absence caused the false warning');
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], { table: ['SELECT'] });
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], { table: ['SELECT'] });
 });

@@ -1877,7 +1877,9 @@ async function stepReplan(deps, snapshot) {
   const learned = [];
   const decided = [];
 
-  for (const q of await store.listQuestions(deps, shop.id)) {
+  const questions = await store.listQuestions(deps, shop.id);
+
+  for (const q of questions) {
     if (q.status !== 'answered' && q.status !== 'skipped') continue;
 
     // ── WHAT THE ANSWER MEANT FOR THIS WEEK (WP-B15-2) ────────────────────
@@ -1952,9 +1954,41 @@ async function stepReplan(deps, snapshot) {
     learned.push({ question_key: q.question_key, learned: true, log_id: receipt.log_id });
   }
 
-  const moved = await deps.shopStore.transition(
-    shop.id, 'PROCESSING', 'every question is answered - re-planning with the answers in place',
-  );
+  // -- AC1 (WO-2026-08-19-01). SAY WHAT IS TRUE, NOT WHAT THE HAPPY PATH
+  // ASSUMES. -----------------------------------------------------------------
+  // This transition used to announce, unconditionally, "every question is
+  // answered - re-planning with the answers in place". IT NEVER EVALUATED THAT
+  // PREDICATE. The loop above `continue`s past every question that is not
+  // answered or skipped, so it arrives here just the same on a shop whose
+  // questions are all open - and on 2026-08-18 at 22:42:45Z shop 37 was
+  // superseded into PROCESSING announcing exactly that sentence with ALL SEVEN
+  // of its questions open and none of them answered.
+  //
+  // THE TRANSITION WAS RIGHT. Supersession re-plans a parked shop on purpose,
+  // and stages.js's NEEDS_DECISION gate is what refuses to re-plan while
+  // questions are open. What was false was the SENTENCE - and the sentence is
+  // the whole of what a human ever reads back out of shop_event. A state
+  // machine that narrates a false predicate is how nobody notices the real one.
+  //
+  // The reason is now DERIVED from the same rows the loop just walked: no extra
+  // query, no clock, and no second source of truth to drift from the first.
+  const open = questions.filter((q) => q.status !== 'answered' && q.status !== 'skipped');
+  const settled = questions.length - open.length;
+  // Each branch states ONLY what this function checked. It deliberately does
+  // NOT say why an unsettled question failed to block: `blockingNow` is the
+  // gate's count, derived by classifyQuestionBoards from a separate read, and
+  // re-deriving it here would put a second source of truth beside the first.
+  // What IS true by construction is that stages.js already cleared this shop to
+  // re-plan - stepReplan is unreachable otherwise - so the reason says that and
+  // stops, rather than guessing at supersession it has not looked at.
+  const reason = questions.length === 0
+    ? 're-planning - this shop has no questions'
+    : open.length === 0
+      ? `re-planning with the answers in place - all ${questions.length} question(s) answered or skipped`
+      : `re-planning - ${settled} of ${questions.length} question(s) answered or skipped, ${open.length} not;`
+        + ' the gate cleared this shop to re-plan regardless';
+
+  const moved = await deps.shopStore.transition(shop.id, 'PROCESSING', reason);
   return {
     stepped: moved.changed, from: shop.status, to: 'PROCESSING',
     answer_learning: learned, decisions: decided,
