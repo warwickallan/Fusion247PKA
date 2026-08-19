@@ -47,6 +47,7 @@ import {
   ASDAIR_LIST_ROUTE, proxyAsdairList,
   ASDAIR_CHECK_ITEM_ROUTE, proxyAsdairCheckItem,
   ASDAIR_DISPLAY_NAME_ROUTE, proxyAsdairDisplayName,
+  ASDAIR_COMMAND_ROUTE, proxyAsdairCommand,
 } from './asdair-list.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -427,6 +428,12 @@ const server = http.createServer(async (req, res) => {
     // WARWICK'S DISPLAY NAME (WP-B15-51). He sets what Mum reads for one product. It writes exactly
     // one column of one catalogue row; `name` and `aka` are not reachable from it.
     if (req.url.startsWith(ASDAIR_DISPLAY_NAME_ROUTE)) return proxyAsdairDisplayName(req, res, ASDAIR_ORIGIN);
+    // THE SHARED COMMAND SURFACE. The route the workspace's ONE write path calls, and the reason the
+    // Cockpit is a control surface rather than a mirror. It names no command: what may be asked for
+    // is decided upstream by cockpit-api/commandSurface.js, whose deny list refuses checkout, payment,
+    // slots and credentials BY NAME. See the comment on ASDAIR_COMMAND_ROUTE for why nothing is
+    // validated here.
+    if (req.url.startsWith(ASDAIR_COMMAND_ROUTE)) return proxyAsdairCommand(req, res, ASDAIR_ORIGIN);
     // Private-app same-origin bridge (opt-in via COCKPIT_PRIVATE_API). Must run before static.
     if (req.url.startsWith(PRIVATE_API_PREFIX)) return servePrivateApi(req, res, PRIVATE_API);
     if (req.url.startsWith('/api/mine') && req.method === 'POST') {

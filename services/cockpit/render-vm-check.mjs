@@ -684,6 +684,53 @@ const WS_LINE_PROV = ws({}, {
 const WS_SKIP_CMD = ws({ human_state: 'NEEDS_WARWICK' },
   { command_names: [...(WS.command_names || []), 'skipThisWeek'] });
 
+// ══ ANSWER CORRECTION FIXTURES ═══════════════════════════════════════════════════════════════════
+// The committed workspace carries ONE resolved question and no `correctAnswer` in command_names —
+// exactly the live service's state today — so the base fixture already proves the greyed case and
+// only the published cases need building.
+//
+// ⛔ THE CHAIN FIELDS BELOW ARE THE API'S TO PUBLISH, AND THE UI READS THEM DEFENSIVELY:
+// `question_round`, `supersedes_question_key` and `superseded_by_question_key` on a resolved item.
+// If assembleWorkspace.js ships them under different names, the second scenario goes red — which is
+// the correct outcome. The screen would then be showing nothing rather than something wrong, and a
+// silently absent correction chain is exactly what a fixture exists to catch.
+// The reply the API actually publishes on a resolved item (assembleWorkspace.js). The UI reads THIS
+// in preference to any name of its own.
+const CORRECT_REPLY = [{ key: 'correct', label: 'Change this answer', command: 'correctAnswer' }];
+// ⛔ THE POISONED PAYLOAD. A resolved item whose 'correct' reply names `answerQuestion` — the
+// compare-and-set command that silently writes nothing against a settled row. The API now has a
+// test forbidding it; this is the SAME rule asserted from the CLIENT end, because a UI that obeys
+// whatever it is handed would resurrect the defect the moment a payload regressed.
+const WS_POISONED = ws({ human_state: 'NEEDS_WARWICK' }, {
+  // ⚠️ `answerQuestion` IS ON THE SURFACE HERE, DELIBERATELY. Without it the row would be
+  // refused merely because the command is unpublished, and the scenario would pass without
+  // ever exercising the guard — which is exactly what it did until mutation testing showed the
+  // assertion surviving the guard's removal. Both names present means the ONLY thing that can
+  // refuse this payload is the explicit answerQuestion check.
+  command_names: [...(WS.command_names || []), 'correctAnswer', 'answerQuestion'],
+  questions: { ...WS.questions,
+    resolved: WS.questions.resolved.map((q) => ({ ...q,
+      allowed_replies: [{ key: 'correct', label: 'Change this answer', command: 'answerQuestion' }] })) },
+});
+const WS_CORRECT_CMD = ws({ human_state: 'NEEDS_WARWICK' },
+  { command_names: [...(WS.command_names || []), 'correctAnswer'] });
+// The SAME shop after one correction: round 1 superseded, round 2 answered. BOTH rows are present
+// and both are still `answered` — a correction adds a round, it never removes one.
+const R1 = WS.questions.resolved[0];
+const WS_CORRECTED = ws({ human_state: 'NEEDS_WARWICK' }, {
+  command_names: [...(WS.command_names || []), 'correctAnswer'],
+  questions: { ...WS.questions, resolved_count_display: '2',
+    resolved: [
+      { ...R1, allowed_replies: CORRECT_REPLY, question_round: 1, supersedes_question_key: null,
+        superseded_by_question_key: 'q_placeholder_2#2' },
+      { ...R1, allowed_replies: CORRECT_REPLY, id: 77, question_key: 'q_placeholder_2#2', question_round: 2,
+        answer_text_display: 'Placeholder Butcher Sausages 600g',
+        answered_at_display: '2 Jan, 18:02',
+        resolution_display: 'Resolved to Placeholder Butcher Sausages 600g.',
+        supersedes_question_key: 'q_placeholder_2', superseded_by_question_key: null },
+    ] },
+});
+
 // ══ WP-B15-42 FIXTURES ═══════════════════════════════════════════════════════════════════════════
 //
 // SYNTHETIC VALUES, REAL SHAPE. The field names below are taken from the artefact this UI must
@@ -899,6 +946,69 @@ const ASDAIR_PLAN = [
         (p) => !hasText(p, 'AsdAIr has no command for this yet')],
     ]],
     ['SHOP · the API publishes a skip command', 'shop', { asdairWs: WS_SKIP_CMD, asdairWsErr: null }],
+
+    // ══ ANSWER CORRECTION ═══════════════════════════════════════════════════════════════════════
+    // The defect being closed: "Change this answer" used to call answerQuestion, which is a
+    // compare-and-set on status='open'. Against a settled row it wrote NOTHING and returned a
+    // successful receipt, so the screen said Saved for a write that never happened. The control is
+    // now gated on the API's own published surface and calls correctAnswer.
+    ['QUESTIONS · correction command NOT published — the control is greyed and SAYS SO', 'questions',
+      { asdairWs: WS, asdairWsErr: null }, {}, [
+        ['the resolved question is still on screen — an answer you cannot find is one you cannot correct',
+          (p) => hasText(p, 'Placeholder Sausages 400g')],
+        ['the honest greyed-out explanation is rendered, not a button that pretends to work',
+          (p) => hasText(p, 'does not yet publish a command for correcting a settled answer')],
+        ['and nothing claims the answer was superseded',
+          (p) => !hasText(p, 'Superseded')],
+      ]],
+    ['QUESTIONS · correction command published — no greyed-out excuse remains', 'questions',
+      { asdairWs: WS_CORRECT_CMD, asdairWsErr: null }, {}, [
+        ['the greyed-out explanation is GONE the moment correctAnswer is published',
+          (p) => !hasText(p, 'does not yet publish a command for correcting a settled answer')],
+        ['the control is still offered',
+          (p) => hasText(p, 'Change this answer')],
+      ]],
+    // ⛔ THE SAME RULE AS THE API's, ASSERTED FROM THE CLIENT END. assembleWorkspace.js now carries a
+    // test that no `allowed_replies` entry may name answerQuestion on a settled question. This is
+    // the other half: even when HANDED that payload, the UI must refuse it. A client that obeys
+    // whatever it is given would resurrect "Saved for a write that never happened" the moment the
+    // payload regressed — and a regressed payload is not the only way this defect can come back.
+    ['QUESTIONS · a payload naming answerQuestion on a settled row is REFUSED, not obeyed', 'questions',
+      { asdairWs: WS_POISONED, asdairWsErr: null }, {}, [
+        ['the control is greyed even though correctAnswer IS on the surface',
+          (p) => hasText(p, 'does not yet publish a command for correcting a settled answer')],
+      ]],
+    ['QUESTIONS · after a correction, BOTH rounds are on record and neither is a deletion', 'questions',
+      { asdairWs: WS_CORRECTED, asdairWsErr: null }, {}, [
+        ['the ORIGINAL answer is still readable — it is superseded, never destroyed',
+          (p) => hasText(p, 'Placeholder Sausages 400g')],
+        ['the correction is readable too',
+          (p) => hasText(p, 'Placeholder Butcher Sausages 600g')],
+        // ⚠️ COUNTED, NOT MERELY PRESENT — AND THAT IS A CORRECTION MADE UNDER MUTATION.
+        // This first read `hasText(p, 'Superseded')`, which passed even with asdairIsSuperseded()
+        // stubbed to false: the word also appears in the CHAIN sentence below, so one assertion was
+        // silently covering two independent carriers and pinning neither. There are two on purpose —
+        // the collapsed summary must carry the label (so it is visible without expanding) AND the
+        // chain sentence must carry it. Breaking either one now drops the count and goes red.
+        ['the superseded round is LABELLED as superseded in BOTH the summary and the chain',
+          (p) => (p.join(' ').match(/Superseded/g) || []).length >= 2],
+        ['it says in words that the original is kept, so this cannot read as a delete',
+          (p) => hasText(p, 'kept on record')],
+        // The chain is readable from BOTH ends, and each end has its own binding. Without this the
+        // forward direction (asdairSupersedes) was unpinned — proven by mutation, not assumed.
+        ['the correction declares what it replaced — the chain reads from both ends',
+          (p) => /This replaced/.test(p.join(' '))],
+        ['the ORIGINAL time it was given survives beside it',
+          (p) => hasText(p, '1 Jan, 09:41')],
+        ['and so does the time of the correction',
+          (p) => hasText(p, '2 Jan, 18:02')],
+        // ⚠️ p.join(' '), NOT p.text — `p` is the ARRAY of visible text parts (see hasText above).
+        // Written as `p.text || ''` this tested the empty string and passed unconditionally, which
+        // mutation testing caught. A negative assertion that cannot fail is worse than none: it
+        // reads as protection against the exact word that would betray this feature.
+        ['⛔ NOTHING anywhere calls this a deletion',
+          (p) => !/\b(deleted|deletes|delete|removed|discarded|erased)\b/i.test(p.join(' '))],
+      ]],
 
     // ══ WP-B15-42 ═════════════════════════════════════════════════════════════════════════════
     // AC5 — THE FINAL LIST, SORTED BY BRAND. "not database order, not provenance order, not

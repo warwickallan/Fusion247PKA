@@ -61,6 +61,25 @@ export const CHECK_ITEM_UPSTREAM_PATH = '/asdair/check-item';
 export const ASDAIR_DISPLAY_NAME_ROUTE = '/api/asdair/display-name';
 export const DISPLAY_NAME_UPSTREAM_PATH = '/asdair/display-name';
 
+// ── THE GENERIC COMMAND DOOR, in this module for the same closure reason as the
+// three above: `provenance.mjs` declares the cockpit's sources module by module,
+// so a new `.mjs` would have to be declared there as well to gain nothing.
+//
+// ⛔ THIS ROUTE NAMES NO COMMAND, AND THAT IS THE WHOLE OF ITS SAFETY.
+// It is a dumb forwarder. The set of things it can cause is decided upstream by
+// cockpit-api/commandSurface.js, which allows only its own COMMAND_NAMES and
+// refuses FORBIDDEN_COMMAND_PATTERNS — checkout, payment, slots, credentials —
+// by name. Nothing here validates a command, because anything that did would be
+// a SECOND opinion about the surface, free to drift from the first. An unknown
+// command comes back from upstream as HTTP 400 `unknown_command` carrying the
+// real `command_names`, which is a far better answer than a guess made here.
+//
+// It exists because a control surface that can only read is not a control
+// surface. The operational contract names Telegram AND the Cockpit; a capability
+// on one and not the other is the defect this route closes.
+export const ASDAIR_COMMAND_ROUTE = '/api/asdair/command';
+export const COMMAND_UPSTREAM_PATH = '/asdair/command';
+
 // Same cap as the existing POST route in server.mjs (/api/decide, 1e5). A weekly shopping list is a
 // few hundred bytes; 100 kB is generous enough that no honest submission meets it, and small enough
 // that a malformed client cannot spend this process's memory.
@@ -187,7 +206,33 @@ export async function proxyAsdairDisplayName(req, res, origin, deps) {
 }
 
 /**
- * The shared body: read once, cap, forward, hand back JSON. All three routes above are this function
+ * POST /api/asdair/command  ->  POST <origin>/asdair/command
+ *
+ * The shared command surface, reached from Warwick's screen. Identical mechanics to the three
+ * proxies above.
+ *
+ * ⛔ THE FAILURE SENTENCES SAY "NOTHING WAS CHANGED" ONLY WHERE THAT IS PROVABLE.
+ * `unreachable` and `notJson` are both states in which this process never got a usable answer —
+ * but only ONE of them proves nothing was written. An unreachable upstream was never asked, so
+ * nothing happened and a retry is safe. An upstream that answered unreadably MAY ALREADY HAVE
+ * WRITTEN, and telling Warwick "nothing was changed" there would be the same lie this whole Work
+ * Order exists to remove, merely relocated into the proxy. So that one says what is true: the
+ * answer was lost, and the screen is the place to look.
+ */
+export async function proxyAsdairCommand(req, res, origin, deps) {
+  return proxyJson(req, res, origin, deps, {
+    upstreamPath: COMMAND_UPSTREAM_PATH,
+    notPost: 'A command is sent with POST.',
+    unreachable: (why) => 'I could not reach AsdAIr — ' + why + '. Nothing was changed.',
+    unreadable: (why) => 'AsdAIr started to answer and then stopped — ' + why
+      + '. I cannot tell whether that went through; check the board before trying again.',
+    notJson: (status) => 'AsdAIr answered in a form I could not read (HTTP ' + status + ')'
+      + '. I cannot tell whether that went through; check the board before trying again.',
+  });
+}
+
+/**
+ * The shared body: read once, cap, forward, hand back JSON. All four routes above are this function
  * with a different upstream path and different sentences — extracted rather than copied so a fix to
  * the error handling cannot land on one route and miss the others.
  */

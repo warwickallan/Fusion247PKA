@@ -294,6 +294,66 @@ details[open] > .as-line-sum > .as-line-chev { transform:rotate(90deg); }
 /* An honest absence. Italic + the muted token, so "nothing was recorded" never reads as content. */
 .as-note { font-size:12.5px; color:var(--ink2); margin-top:3px; font-style:italic; }
 
+/* ── ANSWER CORRECTION: SUPERSEDED IS HISTORY, NOT DELETION ──────────────────────────────────────
+   ⛔ THE WHOLE VISUAL BRIEF IN ONE LINE: this must not look like a delete.
+   A corrected answer is a new round of the SAME question and the original is deliberately kept, so
+   nothing here uses --stop (the destructive/error token), no strikethrough, and no red. The
+   superseded state is built from --park, the muted token this design system already uses for "set
+   aside, still real" — it recedes, it does not read as damage. Recolouring these to --stop would
+   tell Warwick his answer was destroyed, which is the opposite of what the command does. */
+.as-chip-old, .as-chip-new {
+  display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.02em; text-transform:uppercase;
+  padding:1px 6px; border-radius:999px; margin-right:6px; vertical-align:baseline; white-space:nowrap;
+}
+/* ⚠️ TEXT IS --ink2, NOT --park, AND THAT IS A CORRECTION MADE UNDER MEASUREMENT.
+   --park reads like the right token for "set aside" and it is wrong for TEXT twice over: --park on
+   --panel2 measures 4.49:1 in light (AA needs 4.5 — it misses by 0.01) and 3.14:1 in dark, because
+   --park is the one colour token the dark-mode block does not redefine. This file's own convention
+   is already the correct one: every other --park use is a border-left-color, and status panels like
+   .act.accept and .rr-chip.t-positive carry the status in the BORDER while the text stays
+   --ink/--ink2. These follow that. --ink2 on --panel2 is 7.08:1 light, 6.78:1 dark. */
+.as-chip-old { color:var(--ink2); background:var(--panel2); border:1px solid var(--hair); }
+/* The replacement is the answer that now counts, so it takes the accent — the same token every
+   other "this is the live value" affordance on this surface uses. */
+.as-chip-new { color:var(--accent-ink); background:var(--accent-w); border:1px solid var(--accent-w); }
+/* The superseded row still renders in full. It is de-emphasised by a rule on its leading edge, not
+   by hiding, shrinking or striking through its text — it must stay READABLE, which is the point. */
+.as-superseded > summary { color:var(--ink2); }
+.as-chain {
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 4px;
+  font-size:12.5px; color:var(--ink2); margin-top:6px; padding-left:8px;
+  border-left:2px solid var(--hair); overflow-wrap:anywhere;
+}
+
+/* "On record now" inside the correction sheet. Held in a panel above the field so the old answer is
+   in view while the replacement is typed — the change is made against it, not from memory of it. */
+.as-was {
+  background:var(--panel2); border:1px solid var(--hair); border-radius:8px;
+  padding:8px 10px; margin:8px 0 4px;
+}
+.as-was-h { font-size:11px; font-weight:650; color:var(--ink2); text-transform:uppercase; letter-spacing:.02em; }
+.as-was-a { font-size:14px; font-weight:650; color:var(--ink); margin-top:3px; overflow-wrap:anywhere; }
+.as-was-w { font-size:12.5px; color:var(--ink2); margin-top:2px; }
+
+/* The completed pair — what it was, what it now is. Built exactly like .act.accept: the SUCCESS is
+   carried by --ok-w behind and --ok around it, and the text is --ink. --ok as a text colour on
+   --ok-w measures 3.06:1 in light and is not available to me, which is precisely why the existing
+   success affordances in this file do not use it either. */
+.as-done { background:var(--ok-w); border:1px solid var(--ok); border-radius:8px; padding:8px 10px; margin:8px 0 4px; }
+.as-done-h { font-size:11px; font-weight:700; color:var(--ink); text-transform:uppercase; letter-spacing:.02em; }
+.as-done-b { font-size:13.5px; color:var(--ink); margin-top:4px; overflow-wrap:anywhere; }
+
+/* THE DELIBERATE ACT — the screen's equivalent of typing the word "change".
+   44px min target (WCAG 2.5.8 / 2.5.5), the whole row is the label so the tap area is the sentence
+   and not just the box, and the focus ring is the same --accent outline every other control here
+   uses. Deliberately NOT styled as a warning: ticking it is a normal, reversible thing to do. */
+.as-confirm {
+  display:flex; align-items:center; gap:9px; min-height:44px; margin:6px 0 2px; cursor:pointer;
+  font-size:13px; color:var(--ink); overflow-wrap:anywhere;
+}
+.as-confirm input { width:20px; height:20px; flex:none; accent-color:var(--accent); cursor:pointer; }
+.as-confirm:focus-within { outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
+
 /* Key/value facts as a real <dl>, so a screen reader announces the pairing rather than two loose
    strings. Single column on a phone, two from 560px. */
 .as-kv { display:grid; grid-template-columns:1fr; gap:2px 12px; margin:2px 0 0; }
