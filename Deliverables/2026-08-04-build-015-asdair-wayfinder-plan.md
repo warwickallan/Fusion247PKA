@@ -6002,6 +6002,24 @@ exists.**
 
 > ## 🔴 CURRENT STATE — 2026-08-19, 01:30. THIS BLOCK SUPERSEDES EVERYTHING BELOW IT IN §12.
 >
+> **ROTATION 2026-08-19.** Closing head named in the commit that adds this line. Branch `main`, clean,
+> `main == origin/main`, every branch merged with containment asserted.
+>
+> **Session report:** `Deliverables/2026-08-19-session-report-b15-agentic.md` — **OUTSTANDING ON
+> ARRIVAL.** Commissioned from Pax at this rotation and may return AFTER the `/clear`. Inputs handed to
+> him: `Deliverables/2026-08-19-subagent-token-ledger-b15-agentic.md` (committed) and
+> `~/.mypka/governor/capae-opening.json`. **When it lands: write it to `Deliverables/`, commit, run
+> `populate.mjs --file` then `capae-sync.mjs` POSITIONALLY on its payload, and re-cut this line.**
+>
+> **⛔ THE EXACT NEXT ACTION.** Nothing further is owed from engineering. **On 20 AUGUST OR LATER —
+> NOT the 19th** (a photo sent on the 19th computes ref `SHOP-2026-08-19`, which is id 35,
+> `READY_TO_SHOP` and therefore LIVE, and would fold into Mum's delivered basket) — send Warwick
+> **one** message, and it says only: **SEND THE PHOTO TO @Fusion247shopperbot.** Then observe the joined
+> route end to end from the durable rows, fix whatever it exposes, repeat until it genuinely works, and
+> send the SAME integrated route back to **Veritas Gate 2** with the twelve prior findings as regression
+> targets. Then bounded estate reconcile, then Codex. **Do not ask Warwick to approve the architecture
+> again — he has ruled on it three times.**
+>
 > **⛔ The 2026-08-18-morning block that stood here is REPLACED, not appended to.** It described seven
 > open gaps and a route that had never run. Both are overtaken by what follows.
 >
