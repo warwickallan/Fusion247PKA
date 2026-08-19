@@ -142,11 +142,19 @@ async function consumeOneBrowserBuildRequest(io, { leaseMs = lease.DEFAULT_LEASE
   }, Math.max(5000, Math.floor(leaseMs / 3)));
   if (typeof heartbeat.unref === 'function') heartbeat.unref();
 
+  // Hoisted so the CATCH can name the shop. Inside the try they are unreachable
+  // from the error path, and an announcement that cannot say which shop failed
+  // is barely an announcement.
+  let manifestRef = null;
+  let householdId = null;
+
   try {
     const { shop, lines } = await loadShop(claimed.shop_id);
+    householdId = shop && shop.household_id != null ? shop.household_id : null;
     const catalogue = loadCatalogue ? await loadCatalogue() : null;
     const rules = loadRules ? await loadRules() : null;
     const manifest = buildManifest({ shop, lines, catalogue });
+    manifestRef = manifest.shop_ref;
     log(`request ${claimed.id}: manifest built from durable rows - ${manifest.line_count} line(s)`);
 
     const result = await runBasket({
@@ -242,9 +250,29 @@ async function consumeOneBrowserBuildRequest(io, { leaseMs = lease.DEFAULT_LEASE
     // and ONLY when the reconciliation is truthful. A blocked basket reports
     // the blockers instead - it does not go quiet, and it does not announce.
     if (announce) {
+      // shop_id and household_id are carried on BOTH branches now. They were
+      // on the environment payload only, and `announceBasketOutcome` returns
+      // null without them - so `basket_not_ready` could not have produced an
+      // outbox row even once the announcer learned to write one. AC5.
       await announce(ready
-        ? { kind: 'basket_ready', shop_ref: manifest.shop_ref, request_id: claimed.id, reconciliation: result.reconciliation, text: "Mum's basket is ready." }
-        : { kind: 'basket_not_ready', shop_ref: manifest.shop_ref, request_id: claimed.id, blockers: (result && result.blockers) || [], reconciliation: result && result.reconciliation });
+        ? {
+          kind: 'basket_ready',
+          shop_ref: manifest.shop_ref,
+          shop_id: claimed.shop_id,
+          household_id: shop.household_id,
+          request_id: claimed.id,
+          reconciliation: result.reconciliation,
+          text: "Mum's basket is ready.",
+        }
+        : {
+          kind: 'basket_not_ready',
+          shop_ref: manifest.shop_ref,
+          shop_id: claimed.shop_id,
+          household_id: shop.household_id,
+          request_id: claimed.id,
+          blockers: (result && result.blockers) || [],
+          reconciliation: result && result.reconciliation,
+        });
     }
 
     log(`request ${claimed.id} finished: ${ready ? 'basket ready' : 'NOT announceable'}`);
@@ -255,12 +283,42 @@ async function consumeOneBrowserBuildRequest(io, { leaseMs = lease.DEFAULT_LEASE
     // countAttempt: TRUE - this is the ERROR path, and it is the one release
     // that may consume a retry. Request id 1 was released here 291 times
     // between 2026-07-28 and the Gate 2 review with nothing counting them.
-    await lease.release(query, {
+    const released = await lease.release(query, {
       requestId: claimed.id, runnerId, countAttempt: true,
       reason: String(err && err.message ? err.message : err).slice(0, 300),
     })
-      .catch(() => { /* the lease will expire on its own; never mask the real error */ });
-    log(`request ${claimed.id} released after an error: ${err && err.message}`);
+      .catch(() => null /* the lease will expire on its own; never mask the real error */);
+
+    // ── AND THE ERROR PATH IS NOT SILENT EITHER (WO-2026-08-19-01 AC5) ──────
+    //
+    // THE GAP THIS CLOSES. Every other terminal condition on this lane
+    // announces. This one - the generic error path - did not, and it is the
+    // one that consumes an attempt. At the ceiling `lease.release` sets the
+    // request `failed` PERMANENTLY, and because this release names no
+    // `failureClass`, `requeueEnvironmentFailures` will never resurrect it
+    // either. A shop could therefore reach a dead end that nothing announced
+    // and nothing could recover - which is the 291-failure shape with a
+    // counter bolted on rather than the silence removed.
+    //
+    // It announces and THEN rethrows. The throw is how the caller learns the
+    // pass failed and is not swallowed; the announcement is how a human does.
+    const attempts = Number(released && released.attempts) || 0;
+    const terminal = !!(released && released.status === 'failed');
+    if (announce) {
+      await announce({
+        kind: 'basket_run_error',
+        shop_ref: (manifestRef || String(claimed.shop_id)),
+        shop_id: claimed.shop_id,
+        household_id: householdId,
+        request_id: claimed.id,
+        detail: String(err && err.message ? err.message : err).slice(0, 300),
+        attempts,
+        max_attempts: lease.MAX_ATTEMPTS,
+        terminal,
+      }).catch((e) => log(`announce failed on the error path: ${e && e.message}`));
+    }
+    log(`request ${claimed.id} released after an error (attempt ${attempts}/${lease.MAX_ATTEMPTS}`
+      + `${terminal ? ', TERMINAL' : ''}): ${err && err.message}`);
     throw err;
   } finally {
     clearInterval(heartbeat);
