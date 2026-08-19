@@ -909,7 +909,26 @@ export function renderQuestionBoard({
     if (blockedReason) lines.push(`   ${value(blockedReason)}`);
     else lines.push('   The questions above need answering.');
   } else if (blocked === false) {
-    lines.push('✅ NOTHING IS BLOCKING THIS SHOP — every question is answered.');
+    // -- WO-2026-08-19-01 AC1. TWO CLAIMS, ONLY ONE OF THEM CHECKED. --------
+    // This line read "NOTHING IS BLOCKING THIS SHOP - every question is
+    // answered." The first clause IS what `blocked === false` means. The second
+    // was never established by anything, and on 2026-08-18 it was false for
+    // shop 37: supersession had cleared the board while all seven question rows
+    // were still `open` and NONE had been answered.
+    //
+    // An empty `waiting` list cannot carry that claim either - a superseded card
+    // LEAVES the board by design, so the board going quiet is exactly what
+    // supersession looks like, and it is indistinguishable here from Warwick
+    // having answered everything. The renderer does not hold the evidence, so it
+    // does not make the claim.
+    //
+    // This is the card on his PHONE. The counts above already tell him how many
+    // were answered; this line now says only the thing `blocked` actually means.
+    lines.push('✅ NOTHING IS BLOCKING THIS SHOP.');
+    if (waiting.length > 0) {
+      // Follows directly from `blocked === false`, and nothing more.
+      lines.push(`   ${count(waiting.length)} question(s) above are still open — none of them is holding the shop up.`);
+    }
   } else {
     // The third state is real, and it is never dressed up as either of the
     // other two.

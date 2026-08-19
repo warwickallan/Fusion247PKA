@@ -1064,3 +1064,56 @@ test('B15-09 the not-taken card reads correctly for BOTH readers', () => {
   // ...and the one who was genuinely sending next week's list.
   assert.match(out.text, /NEW shopping list, it has not been taken/);
 });
+
+// =====================================================================
+// WO-2026-08-19-01 AC1 - THE CARD ON WARWICK'S PHONE.
+//
+// The board used to print "NOTHING IS BLOCKING THIS SHOP - every question is
+// answered." `blocked === false` establishes the first clause and says nothing
+// whatever about the second. On 2026-08-18 shop 37 had all seven question rows
+// `open` and none answered, and supersession had emptied the board - which is
+// indistinguishable, from inside this renderer, from Warwick having answered
+// everything.
+//
+// This is the surface he actually reads, so it is the worse of the two places
+// the false predicate lived.
+// =====================================================================
+
+test('AC1: an unblocked board never claims the questions were ANSWERED', () => {
+  // The shop-37 shape: nothing blocking, nothing on the board, NOTHING answered.
+  const superseded = renderQuestionBoard({
+    shopRef: REF, total: 7, outstanding: [], answered: [], blocked: false,
+  });
+  assert.match(superseded.text, /NOTHING IS BLOCKING THIS SHOP/,
+    'the honest half of the sentence was lost');
+  assert.doesNotMatch(superseded.text, /every question is answered/i,
+    'the board told Warwick his questions were answered when none of them was');
+  assert.doesNotMatch(superseded.text, /questions are answered/i);
+});
+
+test('AC1: an unblocked board with questions STILL OPEN says so, and says they are not the blocker', () => {
+  const open = renderQuestionBoard({
+    shopRef: REF, total: 3, blocked: false,
+    outstanding: [{ n: 2, item: 'wet wipes' }, { n: 3, item: 'toffees' }],
+    answered: [{ n: 1, item: 'beef', answer: 'sliced' }],
+  });
+  assert.match(open.text, /NOTHING IS BLOCKING THIS SHOP/);
+  assert.match(open.text, /still open/i,
+    'two questions were open and the card did not mention them');
+  assert.match(open.text, /none of them is holding the shop up/i,
+    'the card left him unable to tell whether the open questions mattered');
+  assert.doesNotMatch(open.text, /every question is answered/i);
+});
+
+test('AC1: a fully answered board is not made vaguer by the fix', () => {
+  // The fix must not have been made by deleting information. A board where
+  // everything really is answered still reads as clear, and does not sprout a
+  // still-open line it has no basis for.
+  const clear = renderQuestionBoard({
+    shopRef: REF, total: 2, outstanding: [], blocked: false,
+    answered: [{ n: 1, item: 'a', answer: 'x' }, { n: 2, item: 'b', answer: 'y' }],
+  });
+  assert.match(clear.text, /NOTHING IS BLOCKING THIS SHOP/);
+  assert.doesNotMatch(clear.text, /still open/i);
+  assert.match(clear.text, /ALREADY ANSWERED/);
+});
