@@ -4,8 +4,8 @@ inspector: vera
 date: 2026-08-19
 subject: AsdAIr answer-correction control, Fusion247 Cockpit
 verdict: PASS
-verdict_history: [FAIL @ 2e7ff43, PASS @ 2617c59]
-governance_head: 2617c59b8e1d23784f5b61d1fc0bec67a15032f9
+verdict_history: [FAIL @ 2e7ff43, PASS @ 2617c59, PASS @ dbdf041 (final)]
+governance_head: dbdf04102587d117bd3151a578ff094a2f9af5ae
 first_gate_head: 2e7ff43de6577e9424aa72e526010c70a83ab62e
 linked_guidelines: [GL-003-design-system]
 linked_sops: [SOP-005-vera-quality-gate, SOP-022-work-order-preflight]
@@ -18,9 +18,10 @@ linked_sops: [SOP-005-vera-quality-gate, SOP-022-work-order-preflight]
 | Gate | Build | Verdict |
 |---|---|---|
 | 1 | `2e7ff43` | **FAIL** — 3 HIGH |
-| 2 (re-inspection) | `2617c59` | **PASS** — 0 CRITICAL, 0 HIGH, 1 new MEDIUM |
+| 2 (re-inspection) | `2617c59` | **PASS** — 0 CRITICAL, 0 HIGH, 1 new MEDIUM (V-10) |
+| 3 (final, narrow) | `dbdf041` | **PASS** — V-10 closed, nothing open above LOW |
 
-**Sections 1-9 below are the FIRST gate and are left as written.** The re-inspection is section 10.
+**Sections 1-9 below are the FIRST gate and are left as written.** Re-inspection is section 10; the final narrow gate is section 11.
 
 Evidence folder: `Deliverables/2026-08-19-vera-cockpit-correction-control-gate/`
 (12 screenshots + the 8-file read-only inspection harness, prefixed `harness-`)
@@ -571,3 +572,113 @@ one thing no gate here has proven.
 
 **Open against this build:** V-10 (MEDIUM, one line), V-9 (LOW, advisory), V-8 (LOW, pre-existing,
 parked with D-18), and V-7's residual `aria-disabled` note.
+
+---
+
+# 11. FINAL GATE — build `dbdf041` — **PASS**
+
+V-10 fix at `c66f14c`, merged to `main` at `dbdf041`. Narrow re-inspection, 2026-08-19.
+Evidence prefixed `R3-`.
+
+## 11.1 Scope, and why it is narrow
+
+`git diff 2617c59..dbdf041` touches **`app.js` (+46/-15) and `render-vm-check.mjs` (+47) only**.
+`styles.css` is byte-identical (`ae9ae5b71821f13312eef199662f463b`), so the 16-pairing contrast sweep
+from gate 2 carries; I confirmed no new class was introduced and re-measured `.err` in place.
+Bytes on the wire match disk (`dbe34dd084f66fee1005e033e21f0df0`). `app.js` is served off disk, so
+this build is live.
+
+**`:8090` workspace still returns `questions.resolved: []`.** Unchanged across all three gates. The
+banner at the top of this report stands.
+
+## 11.2 V-10 — CLOSED
+
+`r.duplicate === true` is now tested before `r.answered_open_round === true`, and before `corrected`.
+The shipped function was extracted from `app.js` and executed standalone across **twelve** shapes:
+
+| Shape | kind | ok |
+|---|---|---|
+| open round, LANDED | `answered_open_round` | true |
+| open round, **RACE LOST** | `open_round_already_answered` | **false** |
+| unchanged (same words) | `unchanged` | false |
+| corrected (supersede) | `corrected` | true |
+| redelivery of his own correction | `duplicate` | false |
+| corrected, no `superseded_answer_text` | `corrected` | true (`was=null`) |
+| **contradictory** `corrected+duplicate` | `duplicate` | **false — fails closed** |
+| **contradictory** + `answered_open_round` | `open_round_already_answered` | **false** |
+| `unchanged+corrected` | `unchanged` | false |
+| novel future shape / `null` / `{}` | `unknown` | false |
+
+**Over-claiming outcomes: 0.** Every `ok:true` is backed by a receipt that reports a real write.
+
+## 11.3 The two new sentences — the part worth the eye
+
+Both were exercised through the UI at 1280 and 375. Neither names who answered, and neither asserts
+what is recorded:
+
+- **Race lost** — *"AsdAIr had already asked about this line again, and that question had been
+  answered before this arrived — so «X» is not what is recorded. It may have been answered on
+  Telegram. Reload to see what AsdAIr has."*
+- **Duplicate** — *"AsdAIr already has an answer recorded for this line, so «X» was not taken. It may
+  have been answered on Telegram. Reload to see what AsdAIr has."*
+
+The old sentence had two halves and both could be false — the winning answer may have come from
+Telegram, and first-answer-wins means the stored value need not be `X`. **Naming the other control
+surface is the substantive improvement**: it turns "something odd happened" into a place to look,
+which is what the single non-technical user of this screen actually needs.
+
+`R3-openRoundDup-2-after-1280-light.png`, `R3-dupOpened-2-after-1280-light.png`, `R3-newcopy-375.png`
+
+**One observation, non-blocking, no action recommended.** On the redelivery shape the answer *is*
+recorded as `X`, so *"so «X» was not taken"* under-claims. The trade is deliberate and documented in
+the code: it refuses to assert a stored value it cannot know, and the next sentence sends him to look.
+**Under-claiming with a stated remedy is the safe direction** and I would not change it.
+
+## 11.4 Regression — the three HIGH still closed
+
+Re-verified by execution at **1280 and 375**:
+
+| | Result |
+|---|---|
+| V-1 | 2 controls; tip enabled, superseded `disabled=true`, `aria-describedby` resolves |
+| V-2 | un-raced open round still succeeds honestly — sheet closes, honest flash, no WAS/NOW |
+| V-3 | `.err-region` present before any error, `role=alert` / `assertive` / `atomic` |
+| V-6 | `.as-sep` present |
+| Overflow | `scrollWidth == clientWidth` at both widths |
+| Longer copy | error not clipped (`errBottom` inside `cardBottom`), no intra-element scroll |
+| Vocabulary | **CLEAN** across all five outcome sentences |
+
+## 11.5 Coverage verified independently
+
+Gate: **71 scenarios, 284 assertions, 0 failed** (up from 277). Three mutants of my own, with
+**whole-line anchors required to occur exactly once** — the discipline the builder's own
+substring-anchor defect argues for:
+
+| Mutant | Result |
+|---|---|
+| V-10 restored (duplicate no longer short-circuits the open round) | **RED** (1) |
+| duplicate-first block removed entirely | **RED** (5) |
+| blanket refusal — the un-raced open round becomes a failure | **RED** (2) |
+
+`applied 3/3, RED 3/3`. Source restored under `finally`, md5 `dbe34dd084f66fee1005e033e21f0df0`
+identical, `git status -- services/` clean.
+
+**The third mutant is the one that matters most and is easy to omit.** It proves the fix did not
+over-correct into refusing every open-round receipt — caught by *"the un-raced open round is STILL a
+successful write — the fix is not a blanket refusal"*. **A guard in both directions, not just against
+the reported defect.**
+
+## 11.6 Verdict
+
+**PASS** at `dbdf041`. Zero CRITICAL, zero HIGH, zero MEDIUM.
+
+**Open, all LOW and none blocking:** V-9 (radius drift, advisory, GL-003 section 4 is `<unset>`),
+V-8 (pre-existing `.act:disabled` opacity, WCAG-exempt, parked with D-18), V-7 residual
+(`disabled` rather than `aria-disabled`, reason present in reading order).
+
+**Coverage of this PASS, stated plainly.** Inspected: every receipt shape `correctAnswer` can return,
+plus three contradictory and three malformed shapes, executed against the function as shipped; both
+new sentences rendered at two breakpoints; the three prior HIGH re-verified; vocabulary re-scanned;
+three independent mutants. **NOT inspected, across all three gates: a real end-to-end correction
+against a live shop** — impossible while `questions.resolved` is empty. That remains the single
+outstanding piece of evidence for this control, and it is a fact about the shop, not about the code.
