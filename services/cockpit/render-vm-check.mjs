@@ -952,6 +952,141 @@ const ASDAIR_PLAN = [
     // compare-and-set on status='open'. Against a settled row it wrote NOTHING and returned a
     // successful receipt, so the screen said Saved for a write that never happened. The control is
     // now gated on the API's own published surface and calls correctAnswer.
+    // ══ RECEIPT SHAPES, EXECUTED NOT RENDERED ══════════════════════════════════════
+    //
+    // ⛔ THIS BLOCK EXISTS BECAUSE ITS ABSENCE WAS THE REAL FINDING OF VERA'S GATE.
+    //
+    // The first mutation matrix proved asdairSupersededBy, asdairSupersedes, asdairCanCorrect and
+    // the answerQuestion guard. Every one of those is RENDERING or GATING. Not one assertion named
+    // `duplicate`, `corrected`, `answered_open_round` or the submit path, so the guard deciding
+    // success-versus-refusal was never reached by any test -- and it was wrong. It read
+    // `duplicate !== true` as success and rendered CHANGED, a WAS/NOW pair and "took your new
+    // answer" for a receipt whose own audit row says "answered an open round - nothing was
+    // superseded". A mutation matrix proves only what it aims at, and mine aimed at the screen.
+    //
+    // asdairCorrectionOutcome is pure and synchronous precisely so this can call it. The receipts
+    // below are COPIED FROM commands.js, not invented, and their line numbers are named so a future
+    // change to that function can be traced to the assertion it should break.
+    ['QUESTIONS (correction receipts, executed not rendered)', 'questions',
+      { asdairWs: WS_CORRECTED, asdairWsErr: null }, {}, [
+        // commands.js ~571-578, the open-round branch. THE ONE THAT SHIPPED WRONG.
+        ['⛔ answered_open_round is NOT a supersede and must never render as one',
+          () => {
+            const o = bindings.asdairCorrectionOutcome(
+              { ok: true, command: 'correctAnswer', question_key: 'milk#1', successor_question_key: null,
+                answered_open_round: true, corrected: false, opened: false, duplicate: false },
+              { text: 'whole milk', tipWhen: '1 Jan, 09:41' });
+            return o.kind === 'answered_open_round' && o.done === null && o.ok === true;
+          }],
+        ['and it SAYS nothing was superseded, rather than staying quiet about it',
+          () => /[Nn]othing was superseded/.test(bindings.asdairCorrectionOutcome(
+            { answered_open_round: true, corrected: false, opened: false, duplicate: false },
+            { text: 'x', tipWhen: null }).message)],
+        // commands.js ~593-600, the same-words branch.
+        ['unchanged is a refusal, and the only receipt allowed to claim nothing was written',
+          () => {
+            const o = bindings.asdairCorrectionOutcome(
+              { corrected: false, opened: false, duplicate: true, unchanged: true },
+              { text: 'x', tipWhen: null });
+            return o.kind === 'unchanged' && o.ok === false && /[Nn]othing was written/.test(o.message);
+          }],
+        // commands.js ~683-696, the real supersede.
+        ['corrected:true is the ONLY success, and it carries a WAS/NOW pair',
+          () => {
+            const o = bindings.asdairCorrectionOutcome(
+              { corrected: true, opened: true, duplicate: false, question_round: 2,
+                superseded_answer_text: 'Arla Cravendale Whole Milk 2L',
+                superseded_answered_at: '2026-08-17T10:00:00Z' },
+              { text: 'oat milk', tipWhen: '1 Jan, 09:41' });
+            return o.kind === 'corrected' && o.ok === true && o.done !== null
+              && o.done.now === 'oat milk' && o.done.round === 2;
+          }],
+        // V-1. The WAS comes from the RECEIPT, because the backend corrects the chain TIP and the
+        // tapped row is frequently not the row that was superseded.
+        ['⛔ WAS is the receipt\'s superseded_answer_text, never the row Warwick tapped',
+          () => bindings.asdairCorrectionOutcome(
+            { corrected: true, superseded_answer_text: 'Arla Cravendale Whole Milk 2L' },
+            { text: 'oat milk', tipWhen: null }).done.was === 'Arla Cravendale Whole Milk 2L'],
+        ['and WHEN is the server-formatted string, never a timestamp formatted here',
+          () => {
+            const o = bindings.asdairCorrectionOutcome(
+              { corrected: true, superseded_answer_text: 'a', superseded_answered_at: '2026-08-17T10:00:00Z' },
+              { text: 'b', tipWhen: '1 Jan, 09:41' });
+            return o.done.when === '1 Jan, 09:41' && !/2026-08-17T/.test(JSON.stringify(o.done));
+          }],
+        ['an unavailable time is ABSENT rather than raw',
+          () => bindings.asdairCorrectionOutcome(
+            { corrected: true, superseded_answer_text: 'a', superseded_answered_at: '2026-08-17T10:00:00Z' },
+            { text: 'b', tipWhen: null }).done.when === null],
+        // The redelivery.
+        ['a duplicate is a refusal and does not say Saved',
+          () => {
+            const o = bindings.asdairCorrectionOutcome(
+              { corrected: false, opened: false, duplicate: true }, { text: 'x', tipWhen: null });
+            return o.kind === 'duplicate' && o.ok === false && !/Saved|Changed to/.test(o.message);
+          }],
+        // ⛔ THE DEFAULT. A shape nobody anticipated must not inherit success.
+        ['⛔ an UNRECOGNISED receipt is unknown, never success',
+          () => {
+            const o = bindings.asdairCorrectionOutcome({ ok: true, command: 'correctAnswer' }, { text: 'x', tipWhen: null });
+            return o.kind === 'unknown' && o.ok === false && o.done === null;
+          }],
+        ['a null receipt is unknown, never success',
+          () => bindings.asdairCorrectionOutcome(null, { text: 'x', tipWhen: null }).ok === false],
+        // V-4. "Nothing was written just now" is an absolute, and only one exit earns it.
+        ['⛔ only `unchanged` claims nothing was written -- duplicate runs AFTER the audit row',
+          () => {
+            const dup = bindings.asdairCorrectionOutcome({ corrected: false, duplicate: true }, { text: 'x', tipWhen: null });
+            const unc = bindings.asdairCorrectionOutcome({ duplicate: true, unchanged: true }, { text: 'x', tipWhen: null });
+            return !/[Nn]othing was written/.test(dup.message) && /[Nn]othing was written/.test(unc.message);
+          }],
+        // V-5. A developer sentence is not Warwick's error message.
+        ['⛔ a raw pipeline error becomes a plain sentence',
+          () => {
+            const raw = 'commands: correctAnswer cannot reproduce question key "milk#1" (round 1) from any name '
+              + 'this question carries on shop S1. A successor derived from a different name would be invisible '
+              + 'to the planner - recorded, and inert. Refusing rather than writing one. Nothing was written.';
+            const m = bindings.asdairCommandMessage(new Error(raw));
+            return m !== raw && m.length < raw.length && /[Nn]othing was written/.test(m);
+          }],
+        ['and the raw text is KEPT rather than discarded',
+          () => {
+            const raw = 'commands: correctAnswer found no question "milk#1" on shop S1. Nothing was written.';
+            bindings.asdairCommandMessage(new Error(raw));
+            return unwrap(bindings.asdairSheetErrDetail) === raw;
+          }],
+        // ⛔ THE SUBMISSION-PATH LOCKOUT, asserted directly. asdairCorrectDisabledReason greys the
+        // BUTTON; asdairCorrectCommandFor is what refuses the WRITE. Two guards, two failure modes,
+        // and the rendered assertions above reach only the first -- proven by a mutant that removed
+        // this one and left the gate green.
+        // ⚠ THESE SET THEIR OWN WORKSPACE STATE, AND THAT IS NOT DEFENSIVENESS.
+        // A `checks` closure runs AFTER every scenario has rendered, so it sees whatever refs the
+        // LAST scenario left behind. The rendered assertions are immune -- their text was captured
+        // at render time -- but a closure that CALLS a binding is not. The first version of the tip
+        // assertion below read another fixture's command_names and failed for that reason alone.
+        // setRefs() is not reachable from here, so the ref is written directly, exactly as it does.
+        ['⛔ a superseded row yields NO command, so a correction cannot be submitted from it',
+          () => {
+            bindings.asdairWs.value = WS_CORRECTED;
+            return bindings.asdairCorrectCommandFor({ question_key: 'a', superseded_by_question_key: 'b',
+              allowed_replies: [{ key: 'correct', command: 'correctAnswer' }] }) === null;
+          }],
+        ['the TIP of the same chain DOES yield it, so the lockout is not simply refusing everything',
+          () => {
+            bindings.asdairWs.value = WS_CORRECTED;
+            return bindings.asdairCorrectCommandFor({ question_key: 'b', superseded_by_question_key: null,
+              allowed_replies: [{ key: 'correct', command: 'correctAnswer' }] }) === 'correctAnswer';
+          }],
+        ['and the two disabled reasons are distinct, so neither explanation can be given falsely',
+          () => {
+            bindings.asdairWs.value = WS_CORRECTED;
+            return bindings.asdairCorrectDisabledReason({ superseded_by_question_key: 'b' }) === 'superseded'
+              && bindings.asdairCorrectDisabledReason({ allowed_replies: [] }) === 'unpublished';
+          }],
+        ['an unrecognised error is passed through verbatim rather than mistranslated',
+          () => bindings.asdairCommandMessage(new Error('something nobody mapped')) === 'something nobody mapped'],
+      ]],
+
     ['QUESTIONS · correction command NOT published — the control is greyed and SAYS SO', 'questions',
       { asdairWs: WS, asdairWsErr: null }, {}, [
         ['the resolved question is still on screen — an answer you cannot find is one you cannot correct',
@@ -998,6 +1133,16 @@ const ASDAIR_PLAN = [
         // forward direction (asdairSupersedes) was unpinned — proven by mutation, not assumed.
         ['the correction declares what it replaced — the chain reads from both ends',
           (p) => /This replaced/.test(p.join(' '))],
+        // V-1c. A superseded round is HISTORY: its Change button stays greyed, because the backend
+        // walks past it to the tip and would change a different answer than the one the button sits
+        // under. Without the lockout this sentence is absent entirely.
+        ['⛔ the superseded round does NOT offer a live correction control',
+          (p) => hasText(p, 'kept here as history rather than offered for editing')],
+        // ...and it gives the RIGHT reason. correctAnswer IS published in this fixture, so the
+        // "does not yet publish a command" sentence would be a false explanation that sends Warwick
+        // to wait for a capability that already shipped.
+        ['⛔ and it does NOT claim the capability is missing, because it is not',
+          (p) => !hasText(p, 'does not yet publish a command for correcting a settled answer')],
         ['the ORIGINAL time it was given survives beside it',
           (p) => hasText(p, '1 Jan, 09:41')],
         ['and so does the time of the correction',

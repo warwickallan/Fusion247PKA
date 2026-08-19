@@ -788,3 +788,14 @@ details[open] > .as-line-sum > .as-line-chev { transform:rotate(90deg); }
 .home-attn-b { font-size:13px; color:var(--ink2); line-height:1.4; margin-top:4px; overflow-wrap:anywhere; }
 .home-attn-go { font-size:12.5px; font-weight:700; color:var(--accent-ink); margin-top:6px; }
 .home-attn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* The refusal region inside the AsdAIr sheet. Present from first paint and EMPTY until something
+   goes wrong — the house pattern for a live region (see app.js, Vera HIGH-1). It must occupy no
+   space when silent, so an always-present region does not push the form around. */
+.err-region:empty { display:none; }
+.err-region > .tech { margin-top:4px; }
+/* The separator between the Superseded chip and the status word in a collapsed summary. Its own
+   class rather than a bare string so it cannot be lost in a future template edit. */
+/* --ink2, not --ink3. Measured: --ink3 on --panel is 3.80:1 light and 3.72:1 dark, and a visible
+   glyph in a summary line is not incidental text. --ink2 is 7.47/7.37 and matches its neighbours. */
+.as-sep { color:var(--ink2); }
