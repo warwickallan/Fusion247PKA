@@ -14,9 +14,39 @@
 // logic. It does exactly three things:
 //
 //   1. names the surface (COMMAND_NAMES) so a typo cannot invent a command;
-//   2. binds to the pipeline module when it is present, and asserts it exposes
-//      EXACTLY these names - no more, no fewer;
+//   2. binds to the pipeline module when it is present, and asserts that EVERY
+//      name on this surface is present on it, and that NOTHING FORBIDDEN is
+//      exported alongside them;
 //   3. refuses, by name, anything a cockpit must never be able to ask for.
+//
+// -- WO-2026-08-19-03 AC3: WHAT (2) DOES NOT SAY, AND WHY -------------------
+//
+// This comment used to read "asserts it exposes EXACTLY these names - no more,
+// no fewer". THE CODE HAS NEVER DONE THAT, and the gap mattered: a reader who
+// believed it stops looking for the check that is missing. The comment now
+// describes the control that EXISTS, because a comment describing a control
+// that does not exist is worse than silence.
+//
+// The strict form was considered and DELIBERATELY REJECTED, not overlooked.
+// pipeline/commands.js legitimately exports helpers beside the commands -
+// `dispatch`, `questionKeyFor`, `COMMAND_SURFACE`, `COMMANDS` - so a literal
+// "no more" would throw AT BIND TIME the next time the pipeline grew one. That
+// is a LOAD FAILURE taking the cockpit's whole command layer down rather than
+// reddening a test, which is precisely the failure mode
+// bot/callbackProtocol.js's BUDGET_TOTAL already carries once in this estate.
+// One is a known hazard; two would be a pattern.
+//
+// So the bind is protected from the two directions that can actually hurt:
+//   * MISSING   -> refused. A command this cockpit offers and the pipeline does
+//                  not implement is a broken button, and binding fails loudly.
+//   * FORBIDDEN -> refused. An extra export whose NAME normalises onto the deny
+//                  list stops the bind dead, whatever else is going on.
+//   * extra, harmless, non-command exports -> tolerated, on purpose.
+//
+// The "exactly these names" contract lives where it can be enforced without
+// that hazard: pipeline/commandNames.js `assertCommandName`, an allowlist over
+// the vocabulary itself, and commandSurface.test.js, which pins this array
+// longhand so the number cannot move without somebody typing it.
 //
 // If pipeline/commands.js is not on this branch yet, loadCommands() throws a
 // named, actionable error. It does NOT fall back to a local implementation:
@@ -45,6 +75,31 @@ const COMMAND_NAMES = Object.freeze([
   'correctLine',            // fix a line: different regular, different qty, new item
   'buildShop',              // plan the shop from the confirmed interpretation
   'answerQuestion',         // answer one open shop_question (button OR free text)
+  // WO-2026-08-19-03 AC1. THE PARITY GAP, CLOSED.
+  //
+  // pipeline/commandNames.js has carried `correctAnswer` since 2026-08-18 and
+  // Telegram has been able to reach it since the same day. This array did not,
+  // so `POST /asdair/command` answered "unknown_command" and the Cockpit could
+  // not perform an operation the goal contract says its control surfaces
+  // support. That is a defect in the PRODUCT, not a missing nice-to-have: the
+  // contract names Telegram/ShopperBot AND the Cockpit as the normal control
+  // surfaces, so a capability on one and not the other is the whole of the
+  // failure.
+  //
+  // It reaches NO consequential capability. It opens a question and records an
+  // answer, exactly like the two names either side of it - see the deny-list
+  // proof in commandSurface.test.js, which runs over this array rather than
+  // over a fixture copy of it.
+  //
+  // THE COCKPIT'S DELIBERATE ACT IS NAMING THE COMMAND. Telegram distinguishes
+  // an accidental double tap from an intentional correction on the ROUTE - a
+  // board reply opening with the word `change` sets `correction: true` and only
+  // an explicit `true` reaches correctAnswer. The Cockpit has no correlator and
+  // no keyword; its equivalent is that the caller asks for `correctAnswer` BY
+  // NAME rather than for `answerQuestion`. `answerQuestion` remains
+  // first-answer-wins on this surface too, so nothing here weakens the
+  // protection an accidental repeat needs.
+  'correctAnswer',          // supersede a settled answer - a DELIBERATE act, never a repeat
   'requestBasketBuild',     // create a DURABLE browser_build_request. Nothing more.
   'pauseBasketBuild',       // ask the supervised runner to stop
   'submitConfirmation',     // hand in the ASDA order confirmation for reconciliation
@@ -114,8 +169,11 @@ function isForbiddenName(name) {
 /**
  * Assert a candidate module IS the shared surface.
  *
- * Exactly the named functions, nothing extra that looks like a command, and
- * nothing on the deny list. Returns the module so callers can chain.
+ * EVERY named command present as a function, and NOTHING FORBIDDEN exported
+ * alongside them. Extra non-command exports are tolerated deliberately - see
+ * AC3 in this file's header for why the strict "no more" form is a load-failure
+ * hazard rather than a stronger control. Returns the module so callers can
+ * chain.
  */
 function assertCommandSurface(mod) {
   if (!mod || (typeof mod !== 'object' && typeof mod !== 'function')) {

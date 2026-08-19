@@ -597,3 +597,138 @@ function workspaceInput(over) {
     all_stages: ['RECEIVED', 'PROCESSING'],
   }, o);
 }
+
+// =====================================================================
+// WO-2026-08-19-03 AC2 - A SUPERSEDED QUESTION IS NOT OPEN.
+//
+// THE DEFECT, STATED AS THE TWO SURFACES DISAGREEING: the Telegram board
+// retires a round a later round replaced (runtime.boardStateOf, since
+// WO-2026-08-18-07). This module counted `status` on its own and did not, so
+// the same shop said "1 still needs you" in the Cockpit about a card the phone
+// had already taken down.
+// =====================================================================
+
+// Round 1 was asked and answered; the model then decided the binding was wrong
+// and opened round 2 against the SAME line. Round 1 is history. In the failing
+// case round 1 is still 'open' - the row was never answered, it was REPLACED.
+function supersededFixture() {
+  return [
+    { id: 10, question_key: 'shop:1:line:3:r1', status: 'open', question_round: 1, parent_question_id: null },
+    { id: 11, question_key: 'shop:1:line:3:r2', status: 'open', question_round: 2, parent_question_id: 10 },
+    { id: 12, question_key: 'shop:1:line:7:r1', status: 'open', question_round: 1, parent_question_id: null },
+  ];
+}
+
+test('AC2: a superseded round is not counted as open, and the successor still is', () => {
+  const facts = A.countShop({
+    stage: 'PROCESSING', human_state: 'ASDAIR_WORKING',
+    questions: supersededFixture(), lines: [], items: [],
+  });
+
+  // THE ASSERTION THIS WORK ORDER EXISTS FOR. Three rows say status='open';
+  // only two of them are questions Warwick still has.
+  assert.equal(facts.questions_open_live, 2,
+    'the replaced round must not read as still open - the board retired it');
+  assert.equal(facts.decisions_needing_warwick, 2);
+
+  // EXCLUDED, THEREFORE SAID. A number that quietly went down is its own defect.
+  assert.equal(facts.superseded_questions_suppressed, 1);
+  assert.deepEqual([...facts.superseded_question_keys], ['shop:1:line:3:r1']);
+
+  // AND THE TOTALITY INVARIANT SURVIVES (AC4). The raw bucket is a fact about
+  // the status column and still sums; the suppression lives beside it, never
+  // inside it.
+  assert.equal(facts.questions_open, 3);
+  const bucketed = facts.questions_open + facts.questions_answered
+    + facts.questions_skipped + facts.questions_unknown_status;
+  assert.equal(bucketed, facts.questions_total,
+    'subtracting the supersession from the raw bucket would make a question fall out of the '
+    + 'arithmetic, which is exactly what the four buckets exist to prevent');
+});
+
+test('AC2: with no supersession anywhere, nothing moves', () => {
+  const facts = A.countShop({
+    stage: 'PROCESSING', human_state: 'ASDAIR_WORKING',
+    questions: [
+      { id: 1, question_key: 'a', status: 'open' },
+      { id: 2, question_key: 'b', status: 'open' },
+    ],
+    lines: [], items: [],
+  });
+  assert.equal(facts.questions_open, 2);
+  assert.equal(facts.questions_open_live, 2);
+  assert.equal(facts.superseded_questions_suppressed, 0);
+  assert.deepEqual([...facts.superseded_question_keys], []);
+});
+
+test('AC2: SUPERSEDED and STALE are counted separately - neither hides inside the other', () => {
+  // q10 is replaced by q11 (superseded). q12 is a real open question whose line
+  // has since been settled elsewhere (stale). Two different facts about the
+  // shop, and collapsing them would lose one.
+  const facts = A.countShop({
+    stage: 'PROCESSING', human_state: 'ASDAIR_WORKING',
+    questions: [
+      { id: 10, question_key: 'k10', status: 'open', parent_question_id: null, list_item_id: 300 },
+      { id: 11, question_key: 'k11', status: 'open', parent_question_id: 10, list_item_id: 300 },
+      { id: 12, question_key: 'k12', status: 'open', parent_question_id: null, list_item_id: 900 },
+    ],
+    lines: [],
+    items: [{ id: 900, status: 'added' }],
+  });
+  assert.equal(facts.superseded_questions_suppressed, 1);
+  assert.equal(facts.stale_questions_suppressed, 1);
+  assert.equal(facts.questions_open, 3, 'the raw bucket still counts all three');
+  assert.equal(facts.questions_open_live, 2, 'the superseded one leaves the board');
+  assert.equal(facts.decisions_needing_warwick, 1, 'and the stale one does not need him');
+});
+
+test('AC2: ids are compared as STRINGS - a bigint from one driver is a number from another', () => {
+  // decisionSpine.test.js pins this on applyDecisions.js source for the same
+  // reason: an `===` between two ids passes every offline suite and silently
+  // finds nothing live. Proven here THROUGH this module, with mismatched types.
+  const facts = A.countShop({
+    stage: 'PROCESSING', human_state: 'ASDAIR_WORKING',
+    questions: [
+      { id: '10', question_key: 'k10', status: 'open', parent_question_id: null },
+      { id: 11, question_key: 'k11', status: 'open', parent_question_id: '10' },
+    ],
+    lines: [], items: [],
+  });
+  assert.equal(facts.superseded_questions_suppressed, 1,
+    'a string id and a numeric parent_question_id must still match');
+  assert.equal(facts.questions_open_live, 1);
+});
+
+test('AC2: a database WITHOUT migration 017 loses the refinement and nothing else', () => {
+  // No question_round, no parent_question_id - readWorkspace probes for them
+  // and omits them when absent. Every count must still be produced.
+  const facts = A.countShop({
+    stage: 'PROCESSING', human_state: 'ASDAIR_WORKING',
+    questions: [
+      { id: 1, question_key: 'a', status: 'open' },
+      { id: 2, question_key: 'b', status: 'answered' },
+    ],
+    lines: [], items: [],
+  });
+  assert.equal(facts.superseded_questions_suppressed, 0);
+  assert.equal(facts.questions_open_live, 1);
+  assert.equal(facts.questions_open, 1);
+});
+
+test('AC2: the supersession rule is the PIPELINE\'s, and this import must keep resolving', () => {
+  // ⛔ THE SILENT FAILURE THIS EXISTS TO MAKE LOUD.
+  //
+  // shopArithmetic.js is CommonJS and require()s an ESM module. That works on
+  // Node >= 20.17/22.12 ONLY while pipeline/applyDecisions.js has no TOP-LEVEL
+  // `await`. The day one is added, the require throws ERR_REQUIRE_ASYNC_MODULE
+  // - and it would NOT surface as a red test in the pipeline's own suite. It
+  // would surface as Warwick's workspace failing to load.
+  //
+  // So the estate finds out here instead.
+  const mod = require('../pipeline/applyDecisions.js');
+  assert.equal(typeof mod.supersededQuestionIds, 'function',
+    'pipeline/applyDecisions.js must keep exporting supersededQuestionIds AND must stay '
+    + 'require()-able from CommonJS - the cockpit consumes it rather than re-deriving the rule');
+  // And it is the same rule, not a copy that happens to agree today.
+  assert.deepEqual([...mod.supersededQuestionIds(supersededFixture())], ['10']);
+});

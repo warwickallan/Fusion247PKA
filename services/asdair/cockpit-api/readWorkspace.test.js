@@ -298,3 +298,55 @@ test('checkDependencies never returns a connection string', async () => {
   assert.ok(!blob.includes('user:pw'), 'credentials leaked out of the dependency check');
   assert.ok(blob.includes('[redacted-connection-string]'));
 });
+
+// =====================================================================
+// WO-2026-08-19-03 AC2 - THE SUPERSESSION COLUMNS ARE READ, SAFELY.
+//
+// The cockpit could not have applied the board's supersession rule even if
+// somebody had written it here: QUESTIONS_SQL never selected
+// `parent_question_id`, so the data never arrived. These prove it now does,
+// and that a database without migration 017 still gets a working read.
+// =====================================================================
+
+test('AC2: the questions SELECT gains the round columns when the database has them', () => {
+  const sql = RW._internal.buildQuestionSelect(
+    ['id', 'question_key', 'status', 'question_round', 'parent_question_id']);
+  assert.match(sql.trim(), /^SELECT\b/);
+  assert.ok(sql.includes('parent_question_id'), 'parent_question_id did not reach the statement');
+  assert.ok(sql.includes('question_round'), 'question_round did not reach the statement');
+  // ALONGSIDE the base columns, never instead of them.
+  ['id', 'question_key', 'question_text', 'candidates', 'status', 'answer_text', 'answer_source']
+    .forEach((c) => assert.ok(sql.includes(c), c + ' was displaced'));
+  assert.ok(sql.includes('FROM asdair.shop_question'));
+  assert.ok(sql.includes('ORDER BY id ASC'));
+  assert.doesNotMatch(sql, /\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|DROP|CREATE|GRANT)\b/i);
+});
+
+test('AC2: a database WITHOUT migration 017 gets the base SELECT and does not 500', () => {
+  // Not hypothetical. This file already treats asdair.shop_decision (also 017)
+  // as optional for exactly this reason - a blind column list would take
+  // Warwick's whole workspace read down against a database where 017 has not
+  // landed, to buy a refinement to one count.
+  const sql = RW._internal.buildQuestionSelect(['id', 'question_key', 'status']);
+  assert.ok(!sql.includes('parent_question_id'), 'a column the database lacks reached the statement');
+  assert.ok(!sql.includes('question_round'));
+  assert.equal(sql, RW._internal.QUESTIONS_SQL);
+  // A probe that could not answer at all degrades the same way rather than
+  // guessing.
+  assert.equal(RW._internal.buildQuestionSelect([]), RW._internal.QUESTIONS_SQL);
+});
+
+test('AC2: ONE of the two columns present is honoured without inventing the other', () => {
+  const sql = RW._internal.buildQuestionSelect(['id', 'status', 'parent_question_id']);
+  assert.ok(sql.includes('parent_question_id'));
+  assert.ok(!sql.includes('question_round'));
+});
+
+test('AC2: a question column outside the whitelist can never reach a statement', () => {
+  const sql = RW._internal.buildQuestionSelect(
+    ['id', 'status', 'parent_question_id; DROP TABLE x', 'secret_column', 'answer_text']);
+  assert.ok(!sql.includes('DROP'), 'an injected fragment reached the statement');
+  assert.ok(!sql.includes('secret_column'), 'an unwhitelisted column reached the statement');
+  // The mangled name must not have matched the whitelist either.
+  assert.equal(sql, RW._internal.QUESTIONS_SQL);
+});
