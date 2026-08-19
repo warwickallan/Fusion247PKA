@@ -3,15 +3,24 @@ type: qa-report
 inspector: vera
 date: 2026-08-19
 subject: AsdAIr answer-correction control, Fusion247 Cockpit
-verdict: FAIL
-governance_head: 2e7ff43de6577e9424aa72e526010c70a83ab62e
+verdict: PASS
+verdict_history: [FAIL @ 2e7ff43, PASS @ 2617c59]
+governance_head: 2617c59b8e1d23784f5b61d1fc0bec67a15032f9
+first_gate_head: 2e7ff43de6577e9424aa72e526010c70a83ab62e
 linked_guidelines: [GL-003-design-system]
 linked_sops: [SOP-005-vera-quality-gate, SOP-022-work-order-preflight]
 ---
 
 # QA Report: AsdAIr answer-correction control (Fusion247 Cockpit)
 
-**Inspector:** Vera · **Date:** 2026-08-19 · **Verdict: FAIL**
+**Inspector:** Vera · **Date:** 2026-08-19
+
+| Gate | Build | Verdict |
+|---|---|---|
+| 1 | `2e7ff43` | **FAIL** — 3 HIGH |
+| 2 (re-inspection) | `2617c59` | **PASS** — 0 CRITICAL, 0 HIGH, 1 new MEDIUM |
+
+**Sections 1-9 below are the FIRST gate and are left as written.** The re-inspection is section 10.
 
 Evidence folder: `Deliverables/2026-08-19-vera-cockpit-correction-control-gate/`
 (12 screenshots + the 8-file read-only inspection harness, prefixed `harness-`)
@@ -408,3 +417,157 @@ that has no settled answer to refuse against. Both were resolved by the harness 
 - `services/cockpit/README.md` — the estate SSOT for "the Cockpit serves `public/*` straight off disk"
 - `services/asdair/pipeline/commands.js` — `correctAnswer`, the authority for section 6
 - `services/asdair/cockpit-api/assembleWorkspace.js:617-669` — the resolved-item payload contract
+
+---
+
+# 10. RE-INSPECTION — build `2617c59` — **PASS**
+
+Fixes at `ed03ba7`, merged to `main` at `2617c59`. Re-inspected 2026-08-19.
+Evidence prefixed `R2-` in the evidence folder.
+
+## 10.1 Live state, established by execution
+
+| Check | Result |
+|---|---|
+| `main` HEAD | `2617c59b8e1d23784f5b61d1fc0bec67a15032f9`, worktree clean |
+| `:8710/asdair/health` | 12 command names, `correctAnswer` present |
+| `POST :8090/api/asdair/command` | 400 — route exists |
+| `:8090` workspace | **`questions.resolved: []` — STILL EMPTY** |
+
+**The banner at the top of this report still applies.** The control remains absent from the live DOM.
+Larry did not assert otherwise this time; I checked, and it is unchanged.
+
+## 10.2 A NEAR-MISS THAT ALMOST BECAME A SECOND FALSE FAIL
+
+**On first re-run, V-2 reproduced exactly** — same false "CHANGED", same WAS/NOW pair, same flash.
+
+It was a **stale service-worker bundle in my own harness**, not a defect. The Cockpit ships a
+cache-first `sw.js`; my Edge profile persisted between runs and executed the old `app.js` while the
+network served the new one.
+
+Three checks, and **two of them were misleading**:
+
+1. `md5` on the wire — disk equals 8090 equals 8098, new function present. Proved transport only.
+2. Byte length inside the page — 332,026 against 334,143 on disk. **Nearly written up as staleness.
+   It is UTF-8 bytes versus UTF-16 code units.** A false finding, caught only by asking why the gap
+   was 2,117 rather than large.
+3. A DOM marker present only in the fixed build (`.as-sep`). **Decisive and cheap.**
+
+**The harness now refuses to inspect without proof of provenance**: service workers unregistered and
+caches cleared on navigate, `Network.setBypassServiceWorker` and `setCacheDisabled` on, and
+`assertFreshBundle` throwing before any assertion runs.
+
+Recorded here rather than quietly fixed, because a QA instrument that cannot prove which bytes it
+measured is the same class of defect as the control it was inspecting.
+
+## 10.3 The decision function, executed standalone from the shipped file
+
+`asdairCorrectionOutcome` extracted from `services/cockpit/public/app.js` by brace-matching and run
+in Node — possible **only because Felix separated it from the write**, which is the actual repair.
+
+| Receipt shape | kind | ok | done |
+|---|---|---|---|
+| `answered_open_round:true, corrected:false, duplicate:false` | `answered_open_round` | true | null |
+| `answered_open_round:true, duplicate:true` | `answered_open_round` | true | null — **V-10** |
+| `duplicate:true, unchanged:true` | `unchanged` | false | null |
+| `corrected:true, superseded_answer_text` present | `corrected` | true | `was` from the receipt |
+| `corrected:false, duplicate:true, opened:true` | `duplicate` | false | null |
+| `corrected:true`, **no** `superseded_answer_text` | `corrected` | true | **`was=null`** — absent, not wrong |
+| novel shape | `unknown` | **false** | null |
+| `null` | `unknown` | **false** | null |
+| `corrected:true, unchanged:true` | `unchanged` | false | null |
+
+An unrecognised shape returns `unknown` and never success. The `was=null` row is the one that proves
+V-1 is genuinely receipt-sourced rather than coincidentally matching the tapped row.
+
+## 10.4 Findings from gate 1 — status
+
+| ID | Sev | Status | Verified by |
+|---|---|---|---|
+| **V-1** | HIGH | **CLOSED** | Superseded row `disabled=true`, title "Already changed — the later answer is the one to edit", tapping opens nothing. WAS from `r.superseded_answer_text`. Sheet opens on the chain tip. `R2-V1-board.png` |
+| **V-2** | HIGH | **CLOSED** | `answered_open_round` closes the sheet with the honest sentence. No CHANGED, no WAS/NOW. `R2-openround-2-after-1280-light.png` |
+| **V-3** | HIGH | **CLOSED** | `.err-region` present **before** any error, `role="alert" aria-live="assertive" aria-atomic="true"`. `R2-a11y-region.png` |
+| **V-4** | MED | **CLOSED** | The absolute "nothing was written just now" is now reserved for `unchanged`. |
+| **V-5** | MED | **CLOSED** | Plain English, with the raw text kept in a "What AsdAIr actually said" drawer. `R2-refuseKey-2-after-1280-light.png` |
+| **V-6** | LOW | **CLOSED** | `.as-sep` separator — renders `SUPERSEDED · ANSWERED · ...` |
+| **V-7** | LOW | **CLOSED** | `aria-describedby="as-nocorrect-a1"`, resolves. Residual, non-blocking: still `disabled` rather than `aria-disabled`, so it is not announced on focus; the reason sits in reading order immediately after. |
+| **V-8** | LOW | **PARKED** | Unchanged, pre-existing. Measured **3.17 light / 4.32 dark**. WCAG 1.4.3 exempts inactive components. Parked with D-18 per Larry's ruling. |
+| **V-9** | LOW | Open, advisory | Radius drift. GL-003 section 4 is `<unset>`. |
+
+**The disabled copy is materially better, and it is worth naming.** The old note claimed *"AsdAIr does
+not yet publish a command for correcting a settled answer"* on a superseded row — **false, and it
+would have sent Warwick to wait for a capability that had already shipped.** It now reads: *"This
+answer has already been changed, so it is kept here as history rather than offered for editing. The
+answer that counts now is the later one — change that one instead."* True, and actionable.
+
+## 10.5 The coverage gap — closed, and verified independently
+
+`render-vm-check.mjs` went from **zero** assertions naming the receipt fields to **12 direct calls**
+to `asdairCorrectionOutcome`. Gate: **71 scenarios, 277 assertions, 0 failed.**
+
+I did not take the mutation claim on trust. **Four mutants of my own**, run by restoring the shipped
+defect in `app.js` and re-running Felix's gate:
+
+| Mutant | Result | Assertion that fired |
+|---|---|---|
+| `answered_open_round` branch disabled | **RED** (2 assertions) | "answered_open_round is NOT a supersede and must never render as one" |
+| success gated on not-duplicate | **RED** (1) | "an UNRECOGNISED receipt is unknown, never success" |
+| WAS ignores `superseded_answer_text` | **RED** (1) | "WAS is the receipt's superseded_answer_text, never the row Warwick tapped" |
+| unknown-shape guard removed | **RED** (1) | "an UNRECOGNISED receipt is unknown, never success" |
+
+Source restored under `finally` and verified: md5 `0a26133dea73a370b17b4b6e0bed5d7e`, identical
+before and after; `git status` clean. Runner at `harness-vera-mutate.mjs`.
+
+**Method note:** the fourth mutant first reported SKIP because the file is **CRLF** and my multi-line
+pattern used a bare newline. My runner then printed "AT LEAST ONE MUTANT SURVIVED" — **conflating
+skipped with survived, which is a control misreporting its own coverage.** Fixed by deriving the line
+ending from the source. Both halves are recorded in the session log.
+
+## 10.6 NEW — MEDIUM · V-10: a raced no-op on an open round reports as a successful write
+
+**Where:** `app.js`, `asdairCorrectionOutcome` — `r.answered_open_round === true` is tested **before**
+`r.duplicate === true`.
+**Evidence:** `R2-openrounddup-2-after-1280-light.png`
+
+`commands.js:571-578` sets `duplicate: answeredOpen.changed === false`. When the tip was open but the
+write changed nothing — Warwick answered the same clarification **in Telegram** seconds earlier, the
+two named control surfaces racing — the receipt is `answered_open_round:true` with `duplicate:true`.
+
+Measured: the sheet closes and the flash says *"...your answer went to that open question."* **His
+answer did not land; someone else's did.**
+
+Narrow and self-correcting — it needs a sub-second race, it claims no supersede, and the board
+reloads immediately with the truth on screen. **Non-blocking.**
+
+**Fix, one line:** test `r.duplicate === true` before `r.answered_open_round === true`, or gate the
+open-round branch on `r.duplicate !== true`, and say *"AsdAIr already had an answer for that question
+— nothing was written just now. Check the board."*
+
+## 10.7 Presentation re-swept — both files changed, so nothing was carried over
+
+- **Contrast:** all pairings AA at 375 / 768 / 1280 in both schemes, including the new `.as-sep`
+  (7.08 / 6.78). Model self-validated against three GL-003 anchors before printing. The only measured
+  sub-AA figure is the **exempt** disabled state (V-8).
+- **Responsive:** `scrollWidth == clientWidth` at all three widths, both schemes.
+- **Tap targets:** unchanged and compliant — 44px buttons, 44px confirm label.
+- **Deletion vocabulary:** re-scanned across the **new** copy in four scenarios and both outcomes.
+  **CLEAN.** The only hits remain "wet wipes" and "baby wipes" from Warwick's own list.
+
+## 10.8 Verdict
+
+**PASS** at `2617c59`. Zero CRITICAL, zero HIGH. SOP-005: *"PASS — no CRITICAL or HIGH findings.
+MEDIUM and LOW findings are documented but don't block."*
+
+All three HIGH findings are closed and each was verified by execution rather than by reading the
+diff. V-2's repair is the one that matters: **the decision was moved out of the write and made pure,
+which is why it could be tested at all** — the defect survived the first gate precisely because it sat
+where no test could reach it.
+
+**Coverage of this PASS, stated plainly.** Inspected: the rendered control at three breakpoints in two
+colour schemes; every receipt shape `correctAnswer` can return; the decision function executed
+standalone from the shipped file; four independent mutants. **NOT inspected: a real end-to-end
+correction against a live shop** — impossible while `questions.resolved` is empty, and it remains the
+one thing no gate here has proven.
+
+**Open against this build:** V-10 (MEDIUM, one line), V-9 (LOW, advisory), V-8 (LOW, pre-existing,
+parked with D-18), and V-7's residual `aria-disabled` note.

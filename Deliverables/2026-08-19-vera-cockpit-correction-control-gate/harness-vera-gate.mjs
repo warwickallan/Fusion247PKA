@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { launch, viewport, go, evalJs, shot } from './vera-cdp.mjs';
+import { launch, viewport, go, evalJs, shot, assertFreshBundle } from './vera-cdp.mjs';
 const INJ = fs.readFileSync('./vera-inject.js', 'utf8');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -12,6 +12,7 @@ export async function setScenario(s, r) {
 export async function toBoard(cdp, w, h, dark) {
   await viewport(cdp, w, h, dark);
   await go(cdp, 'http://127.0.0.1:8098/', 4200);
+  await assertFreshBundle(cdp, 'asdairCorrectionOutcome');
   await evalJs(cdp, INJ);
   await evalJs(cdp, "VERA.clickText('Apps','button,.tile,a,.nav-btn')"); await sleep(900);
   await evalJs(cdp, "VERA.clickText('AsdAIr','.tile')"); await sleep(2200);
@@ -33,4 +34,4 @@ export async function openCorrect(cdp, n) {
   return r;
 }
 
-export { launch, viewport, go, evalJs, shot, sleep, INJ };
+export { launch, viewport, go, evalJs, shot, sleep, INJ, assertFreshBundle };

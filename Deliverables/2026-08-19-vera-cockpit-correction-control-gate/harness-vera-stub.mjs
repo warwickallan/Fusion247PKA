@@ -80,6 +80,18 @@ const RECEIPTS = {
   openRound: { status: 200, body: { ok: true, command: 'correctAnswer', result: {
     question_key: 'milk:2', successor_question_key: null,
     answered_open_round: true, corrected: false, opened: false, duplicate: false } } },
+  // commands.js:571-578 with answeredOpen.changed === false — the tip was OPEN but the write
+  // changed nothing (a race: answered elsewhere between listQuestions and the write).
+  openRoundDup: { status: 200, body: { ok: true, command: 'correctAnswer', result: {
+    question_key: 'milk:2', successor_question_key: null,
+    answered_open_round: true, corrected: false, opened: false, duplicate: true } } },
+  // A shape commands.js does not currently emit — the "future branch" guard.
+  novel: { status: 200, body: { ok: true, command: 'correctAnswer', result: {
+    question_key: 'milk:2', some_future_field: true } } },
+  // corrected:true but the receipt omits superseded_answer_text (migration 017 not applied)
+  correctedNoWas: { status: 200, body: { ok: true, command: 'correctAnswer', result: {
+    question_key: 'milk:2', successor_question_key: 'milk:3', question_round: 3,
+    corrected: true, opened: true, duplicate: false } } },
   // commands.js:615-620 — the key cannot be reproduced. httpApi.js:780 forwards safeMessage verbatim.
   refuseKey: { status: 500, body: { ok: false, error: 'command_failed', command: 'correctAnswer',
     message: 'commands: correctAnswer cannot reproduce question key "milk:2" (round 2) from any name this '

@@ -28,7 +28,12 @@ export async function launch() {
   let id = 0; const pending = new Map();
   ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && pending.has(d.id)) { const p = pending.get(d.id); pending.delete(d.id); d.error ? p.rej(new Error(JSON.stringify(d.error))) : p.res(d.result); } };
   const send = (method, params) => new Promise((res, rej) => { const i = ++id; pending.set(i, { res, rej }); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
-  await send('Page.enable'); await send('Runtime.enable');
+  await send('Page.enable'); await send('Runtime.enable'); await send('Network.enable');
+  // ⛔ THE COCKPIT SHIPS A CACHE-FIRST SERVICE WORKER (sw.js). A persistent browser profile will
+  // execute a STALE app.js and the fix under inspection will appear never to have landed. This
+  // cost one nearly-reported false FAIL on 2026-08-19. Bypass is not optional in a QA harness.
+  await send('Network.setCacheDisabled', { cacheDisabled: true });
+  await send('Network.setBypassServiceWorker', { bypass: true });
   return { send, close: () => { try { ws.close(); } catch {} proc.kill(); } };
 }
 
@@ -39,7 +44,24 @@ export async function viewport(cdp, w, h, dark) {
 
 export async function go(cdp, url, waitMs = 3500) {
   await cdp.send('Page.navigate', { url });
+  await sleep(1200);
+  // Belt and braces: tear down any registration/cache this origin already installed, then reload.
+  try {
+    await cdp.send('Runtime.evaluate', { awaitPromise: true, expression:
+      "(async function(){ if (navigator.serviceWorker) { const rs = await navigator.serviceWorker.getRegistrations(); for (const r of rs) await r.unregister(); } if (window.caches) { const ks = await caches.keys(); for (const k of ks) await caches.delete(k); } return 1; })()" });
+  } catch {}
+  await cdp.send('Page.navigate', { url: 'about:blank' });
+  await sleep(200);
+  await cdp.send('Page.navigate', { url });
   await sleep(waitMs);
+}
+
+/** Proves WHICH bytes executed. Never trust a render without it. */
+export async function assertFreshBundle(cdp, marker) {
+  const r = await cdp.send('Runtime.evaluate', { returnByValue: true, awaitPromise: true, expression:
+    "fetch('/app.js',{cache:'reload'}).then(t=>t.text()).then(t=>t.indexOf(" + JSON.stringify(marker) + ")>=0)" });
+  if (r.result.value !== true) throw new Error('STALE BUNDLE: marker not found: ' + marker);
+  return true;
 }
 
 export async function evalJs(cdp, expr) {
