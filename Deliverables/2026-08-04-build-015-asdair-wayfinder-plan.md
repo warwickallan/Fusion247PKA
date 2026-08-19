@@ -6000,66 +6000,106 @@ exists.**
 
 ## 12. RESUMABLE STATE AFTER `/clear` OR A FRESH SESSION — **REPLACED WHOLE 2026-08-17**
 
-> ## 🔴 CURRENT STATE — 2026-08-18 morning. THIS BLOCK SUPERSEDES EVERYTHING BELOW IT IN §12.
+> ## 🔴 CURRENT STATE — 2026-08-19, 01:30. THIS BLOCK SUPERSEDES EVERYTHING BELOW IT IN §12.
 >
-> **Integrated head:** `80944ae` on `main`, clean, `main == origin/main`.
+> **⛔ The 2026-08-18-morning block that stood here is REPLACED, not appended to.** It described seven
+> open gaps and a route that had never run. Both are overtaken by what follows.
 >
-> **Session report:** `Deliverables/2026-08-18-session-report-b15-recovery.md` — **LANDED AND DISCHARGED 2026-08-18, committed at `519803b`** with its payload `Deliverables/2026-08-18-session-report-payload.json`. `populate.mjs` wrote rotation `b24b6d66` (verified); `capae-sync.mjs` synced 4 families — `record-amended-body-not-recut` took its **first clean exposure in five**, the other three recurred. **Pax survived the `/clear` and returned normally; the earlier statement that its return path died with the session was an unsupported inference from an absent file and is withdrawn.** Both build branches are
-> MERGED (`wo/b15-intake`, `wo/b15-runtime`). Nothing of value is left on a branch or worktree.
+> ### THE ONE THING THAT CHANGED EVERYTHING, and it is not a code change
 >
-> ### FRONTIER — REMEDIATE. Close the remaining North-Star gaps, then Veritas.
+> **Warwick, 2026-08-19:** the defect was never stale documentation. It was **THE APPROVED CONTRACT DID
+> NOT BECOME LOAD-BEARING RUNTIME BEHAVIOUR.** The goal contract was correctly re-cut on 2026-08-17
+> (`cc6d906`), banked in this map, and intact — and **it never reached the specialist contract, the
+> shim, or the runtime.** A full day of 2026-08-18 was spent improving deterministic components because
+> the authority a worker actually reads still described the deterministic pipeline as the architecture.
+> Warwick said it four times.
 >
-> **NEXT ACTION:** exercise the JOINED production route end to end on the PHOTO door, then dispatch
-> Veritas made-to-fail against the full autonomous route. Not another defect list.
+> Propagation is now done: specialist contract and shim (`a0a71f5`), SOP-021/021a and eleven other
+> surfaces (`7392c29`), this map's own body rows (`34ead26`). **None of that closed the defect. The
+> runtime did.**
 >
-> ### Genuinely closed, with evidence
+> ### ⭐ THE DECISION POINT EXECUTED IN PRODUCTION — 2026-08-18T22:44:14Z, first time ever
+>
+> `decisionEvidence` for shop 37, the first row of its kind in the database:
+>
+> | | |
+> |---|---|
+> | model | `gpt-5.6-terra`, `consulted: true` |
+> | context | 109 catalogue rows · **39** rules · 37 lines |
+> | contract | **45,932 bytes, sha256 recorded, per-source digests for both files** |
+> | outcome | `selected [14,15,30,33]` · `searched [18,19]` · `asked [29]` · `rejected []` · `undecided []` |
+>
+> **Seven legacy questions became one.** It resolved on its own the four that failed on 17 August —
+> sliced roast beef, the Heinz 6-pack, `Sure deodorant MALE`, plain toffees — sent Ben & Jerry's and the
+> fruit lolly ices to a live search as genuinely new, and asked only about wet wipes, offering *Body
+> wipes / Toilet wipes / Baby wipes* where the old planner had offered **cat food**.
+>
+> The contract digest is the part that matters beyond this run: **a reviewer can verify WHICH contract
+> governed a decision** instead of taking anyone's word that one did.
+>
+> ### Closed since the last block, each with executed evidence
 >
 > | Gap | Evidence |
 > |---|---|
-> | Intake identity/rules | Mum's real list, measured: unauthorised identities **1→0**, lines needing a human **7→0**, correct **29/37→37/37**, deterministic rules **5→7**. `node services/asdair/interpret/measure-known-list.js` (no DB, no gateway). |
-> | The invented product | Root cause was **image preparation**, not the model. Telegram delivers 720×1280 (~34 px/line); a 2×/3× upscale, **no rotation**, removes the invention and keeps all 37 lines. `transcribe/prepareImage.js`, mutation-tested. |
-> | The merged line | The prompt was **instructing** the merge ("mark the later one possible_duplicate"). Removed; the two Heinz products stay two. |
-> | Conditioner→shampoo | Category guard in `resolveByCatalogue.js`; regular 105's alias `"tresemme blue label"` no longer wins over regular 17. |
-> | Favourites-first | `basket-executor/method.cjs` reads the pinned `BROWSER_METHOD`; `favourites.cjs` + `resolve.cjs` walk the settled ladder. **Live-unverified against the real grid DOM.** |
-> | Nothing claimed a build request | `basket-executor/consume-request.cjs`, called by the runtime pass. This was why every shop parked at `wait:browser_runner` forever. |
-> | Trolley read-back | Trolley-derived, one count, per-run artefacts. Unreadable quantity is now a blocker. |
-> | Dead model default | `ROLE_ALIAS.vision` was `fusion.vision`, which the gateway does not register; the guard pinned the broken literal and `loadModels()` never cleared `FUSION_MODEL_*`. All three fixed; mutation-proven. |
-> | CI | `basket-executor` added — it operates the live trolley and nothing ran its 56 tests. |
+> | **The model does not decide** | `planWithDecisions` is now planBasket → demote → applyRulebook → **decideBasket** → Warwick. The deterministic layer cannot bind identity; `regularCandidates` has no production consumer. Corpus forbid-hits **7 → 0**. |
+> | **Cross-question mis-binding** | CORRELATION POLICY = A (Warwick's ruling). Shorthand preserved, cross-question binds refused. Interruptions on the real corpus **2, not 4**. |
+> | **A wrong answer was permanent** | Correction as a new round; the original survives because nothing can reach it. Planner re-plans from the corrected answer — proven on its own output, not on the row. |
+> | **The immortal browser request** | `browser_build_request` id 1 was re-claiming and failing **every pass since 28 July** — 291 occurrences. Now terminal `failed`; `browser_build_failed` events **291 → 0**. It self-terminated; no live write. |
+> | **The lane never executed** | `consume-request.cjs:152` passed a manifest **object**; `run-basket.cjs:332` read it as a **path**. All 291 failures were that one line. |
+> | **Browser lane unconfigured** | `ASDAIR_CHROME_PATH`, `ASDAIR_CHROME_PROFILE_DIR`, `ASDAIR_CDP_PORT` placed by Larry. `resolveConfig({})` returns them where it threw `LauncherConfigError`. |
+> | **The runtime narrated states it was not in** | `stepReplan` announced *"every question is answered"* with seven open. Both surfaces fixed — including the **card on Warwick's phone**, which now says *"2 question(s) above are still open — none of them is holding the shop up."* |
+> | **The Cockpit could not correct an answer** | `correctAnswer` on the shared surface, routed end to end against a real Postgres row. Live: `command_names` **11 → 12**. |
+> | **A button that silently lied** | `app.js:3104` "Change this answer" called `answerQuestion`, which no-ops on a settled row while returning `ok:true` — the UI flashed *"Saved"* for a write that never happened. Replaced; `asdairOpenReanswer` **deleted**, not renamed. |
+> | **The guard watched a corpse** | `cockpitUi.test.js` tested a **dead Directus extension**; the live Cockpit serves `services/cockpit/public/app.js` off disk. Re-pointed and mutation-tested. |
+> | **The grant check made a claim it could not support** | `GRANT_MATRIX` was a hand-maintained literal that never folded in `012`, so *"no committed migration grants it"* was **false**. Now declares its sources and asserts them against disk. |
 >
-> ### OPEN — these are the completion gate
+> ### ⛔ OPEN — and these are the completion gate
 >
-> 1. **The PHOTO door has never completed a real shop.** Attempt 3 (`SHOP-2026-08-19`) succeeded on the
->    **TEXT** door. Mis-binding, Terra invention and first-answer-wins were **not re-exercised** on the
->    path that broke. See `Deliverables/2026-08-17-b15-5-real-run-defects.md`.
-> 2. **Autonomous wake is unproven end to end** — Telegram → durable command → runtime picks it up with
->    no shell, no request id, no Larry.
-> 3. **Runtime credentials** still arrive from an invoking shell in practice; the runtime-inherits path
->    is built but unexercised.
-> 4. **Crash/restart re-invocation** — resumable is built; automatic re-invocation is unproven.
-> 5. **Question → Telegram → durable answer → automatic resume** is unproven live.
-> 6. **The audited correction command is NOT built.** ⚑ **UNPARKED BY WARWICK, 2026-08-18 — it is now
->    REQUIRED WORK, BEFORE VERITAS.** It was deferred deliberately (a new name in a closed allowlist
->    days before a real shop); that reason has expired and he has replaced it. **His words:** *"The
->    already-open audited correction capability / answer-correction path still needs to be completed
->    before Veritas so a wrongly accepted answer is not immutable forever."* Its trigger is the residual
->    he explicitly refused to waive when ruling CORRELATION POLICY = A: *"an answer that matches nothing
->    at all is still accepted and cannot be changed afterwards. That permanence is not acceptable as the
->    completed North Star."* Starting evidence is WO-2026-08-18-03's AC4 report — four executed probes
->    naming exactly what remains reachable.
-> 7. **Favourites bulk tick-and-add is written against a DOM never seen.**
+> 1. **The joined route has never run end to end from a fresh photograph.** The decision point fired on a
+>    **re-plan**, not on a new Telegram photo. **Veritas's discharge condition is one real photograph.**
+> 2. **No browser has ever launched.** A real Chrome becomes necessary at `run-basket.cjs`'s
+>    `ensureChrome`. AC2 (real Chrome, scratch profile, local fixture) is in flight.
+> 3. **Kill-and-revive unproven** — AC4, in flight against a real disposable Postgres.
+> 4. **Terminal-condition notification sweep** — AC5, in flight.
+> 5. **`shop_line_provenance` is empty across the whole database.** No writer exists anywhere; migration
+>    020 says *"NO BACKFILL … DELIBERATELY"*. **Reconciling to the source photograph remains a human act.**
+>    Separate Work Order; needs a Silas conversation about `source_region_id`.
+> 6. **The Cockpit's SCREEN correction control is merged but ungated** — with Vera now.
+> 7. **⛔ THE ESTATE CANNOT BE REBUILT FROM GIT.** Reproduced independently in **two separate clusters**:
+>    applying `001`→`021` then `012` aborts — `relation "asdair.command_request" does not exist`.
+>    `command_request` comes from a **control-plane** migration (an undeclared cross-service dependency);
+>    `previously_ordered` and `skill_steps` are created by **no committed SQL anywhere**. Now visible
+>    rather than silent: the matrix carries those six tables, so a from-git rebuild **fails BLOCKING**
+>    where it previously reported green across 139 assertions. **Repatriating the three objects is a
+>    schema decision and is parked for the reconcile.**
+> 8. **The live `REVOKE` of `022` is Larry's, held until after the shop** (Route C). Until then the
+>    over-grant warning fires **and is TRUE** — the live database holds a privilege the committed
+>    migrations no longer grant. **The identical sentence was FALSE twelve hours earlier.**
 >
-> ### Test state at `2329a98`
-> interpret 48/0 · transcribe 43/0 · intake 43/0 · pipeline **525/0** · pipeline-runtime 132/0 ·
-> browser-runner 92/0 · handoff 135/0 · basket-executor 56/0. `skill` carries 7 pre-existing
-> environment failures (`ASDAIR_DB_URL` unset, `pg` absent) — unchanged baseline, not a regression.
+> ### Assurance state
+>
+> **Veritas Gate 2 · FAIL at `a0a71f5`** (receipt `d30201d`) → corrective work → **HOLD at `4bc0894`**
+> (receipt `3925ac0`), requirement 8 FAIL, the other eight HOLD. Its reason for HOLD over FAIL:
+> *"The route is now correct… What is absent is production execution."*
+>
+> **⚠️ Both Veritas receipts declare a `receipt_sha256` that does NOT match their own committed bytes**
+> (checked under LF and CRLF). Two consecutive. The integrity field on assurance receipts is decorative,
+> which is worse than absent. Recorded, not edited — a reviewer's receipt is not Larry's to alter.
 >
 > ### Standing constraints a fresh Larry must not relearn
-> **Larry is NOT in the weekly runtime.** Never checkout/pay/slot/credentials/substitute. The ASDA
-> **product NAME is identity**; a missing `asda_product_id` must never block a line. Rules must reach the
-> **decision point** — a rule in Git or Supabase that the runtime does not consume is FAIL.
-> Report repeat failures as: REPEAT FAILURE / PREVIOUS PREVENTION / WHY PREVENTION FAILED / CAUSAL FIX /
-> PROOF / RECURRENCE BARRIER. **Do not tell Warwick he is right — show the mechanism was removed.**
 >
+> **Larry is NOT in the weekly runtime.** Never checkout/pay/slot/credentials/substitute — permanently
+> out of scope, goal contract **S-3**, unaffected by every other supersession of 2026-08-17. The ASDA
+> **product NAME is identity**; a missing `asda_product_id` must never block a line. **Rules must reach
+> the decision point** — a rule the runtime does not consume is FAIL. **A confidence value without an
+> identity binding is not a successful match** (Warwick, 2026-08-18). **Do not tell Warwick he is right —
+> show the mechanism was removed.**
+>
+> **And the one this session cost the most to learn: an authority supplied in a dispatch message does not
+> exist.** It lives on the field of a generated Work Order or it is not a grant. Larry made that error
+> twice with the same worker in one evening, and the second time it had already taught him the clause.
+
+
 > ### Route to done — **expanded 2026-08-18 on Warwick's sequencing correction. The order was already
 > right here; what was missing is the ITERATION, and that omission let a chat summary put Veritas first.**
 >
