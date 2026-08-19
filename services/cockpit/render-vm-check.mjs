@@ -982,6 +982,53 @@ const ASDAIR_PLAN = [
           () => /[Nn]othing was superseded/.test(bindings.asdairCorrectionOutcome(
             { answered_open_round: true, corrected: false, opened: false, duplicate: false },
             { text: 'x', tipWhen: null }).message)],
+        // ⛔ V-10, THE LOST RACE. commands.js:571-578 sets `duplicate` INSIDE the open-round
+        // branch, so both flags arrive together whenever the tip was open and the write changed
+        // nothing -- Warwick answering the same clarification on Telegram seconds earlier, then
+        // submitting here. Testing answered_open_round first told him his answer went through.
+        // The two named control surfaces racing is not an edge case; it is what two surfaces do.
+        ['⛔ an open round that was ALREADY answered is NOT reported as a successful write',
+          () => {
+            const o = bindings.asdairCorrectionOutcome(
+              { ok: true, command: 'correctAnswer', question_key: 'milk#1',
+                answered_open_round: true, corrected: false, opened: false, duplicate: true },
+              { text: 'whole milk', tipWhen: null });
+            return o.ok === false && o.done === null && o.kind === 'open_round_already_answered';
+          }],
+        ['and it does NOT tell him his answer went to that question, because it did not',
+          () => !/your answer went to that open question/.test(bindings.asdairCorrectionOutcome(
+            { answered_open_round: true, corrected: false, duplicate: true },
+            { text: 'x', tipWhen: null }).message)],
+        ['it names Telegram as the likely other surface, so the state is explicable',
+          () => /Telegram/.test(bindings.asdairCorrectionOutcome(
+            { answered_open_round: true, corrected: false, duplicate: true },
+            { text: 'x', tipWhen: null }).message)],
+        // The SAME flag with duplicate FALSE is still the honest success, so the fix cannot have
+        // been a blanket refusal of every open-round receipt.
+        ['⛔ the un-raced open round is STILL a successful write — the fix is not a blanket refusal',
+          () => bindings.asdairCorrectionOutcome(
+            { answered_open_round: true, corrected: false, opened: false, duplicate: false },
+            { text: 'x', tipWhen: null }).ok === true],
+        // ⚠ NEITHER DUPLICATE SENTENCE MAY CLAIM WHO ANSWERED OR WHAT IS RECORDED.
+        // The old one said "You already made this change - AsdAIr has it as X" and both halves
+        // can be false: the answer that won may have come from Telegram, and first-answer-wins
+        // means the stored value is whatever landed first, which need not be X.
+        ['⛔ a duplicate never claims Warwick made the change',
+          () => ['open_round_already_answered', 'duplicate'].every((k) => {
+            const r = k === 'duplicate' ? { corrected: false, duplicate: true }
+              : { answered_open_round: true, corrected: false, duplicate: true };
+            return !/[Yy]ou already made this change/.test(bindings.asdairCorrectionOutcome(r, { text: 'x', tipWhen: null }).message);
+          })],
+        ['⛔ and never asserts that the recorded answer IS what he just typed',
+          () => !/AsdAIr has it as/.test(bindings.asdairCorrectionOutcome(
+            { corrected: false, duplicate: true }, { text: 'x', tipWhen: null }).message)],
+        // A receipt that is internally contradictory must FAIL CLOSED. corrected and duplicate
+        // are mutually exclusive by construction, so both true is a bug upstream -- and the safe
+        // direction is never to claim a supersede that may not have happened.
+        ['⛔ a contradictory corrected+duplicate receipt fails CLOSED, never to success',
+          () => bindings.asdairCorrectionOutcome(
+            { corrected: true, duplicate: true, superseded_answer_text: 'a' },
+            { text: 'b', tipWhen: null }).ok === false],
         // commands.js ~593-600, the same-words branch.
         ['unchanged is a refusal, and the only receipt allowed to claim nothing was written',
           () => {

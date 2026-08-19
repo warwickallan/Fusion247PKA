@@ -1742,7 +1742,8 @@ createApp({
      *
      * The four exits of commands.js correctAnswer, enumerated from source rather than assumed:
      *   unchanged:true            the same words — no audit row, nothing written at all
-     *   answered_open_round:true  the newest round was OPEN, so it was answered; nothing superseded
+     *   answered_open_round:true  the newest round was OPEN. It was answered IF duplicate is false;
+     *                             with duplicate true the race was lost and nothing of his landed
      *   corrected:true            the supersede: a successor round opened and answered
      *   corrected:false+duplicate the successor was already answered with this — a redelivery
      *
@@ -1764,10 +1765,41 @@ createApp({
         return { kind: 'unchanged', ok: false, done: null,
           message: 'That is already what AsdAIr has recorded for this line. Nothing was written just now.' };
       }
-      // The newest round of this line was still OPEN — typically a clarification AsdAIr raised
-      // because it could not read the previous answer. The answer landed on THAT question. It is a
-      // real and successful write, so it must not be reported as a failure; it is not a supersede,
-      // so it must not claim one either.
+
+      // ⛔ `duplicate` IS TESTED BEFORE `answered_open_round`, AND THE ORDER IS THE WHOLE FIX.
+      // Vera V-10. commands.js:571-578 sets `duplicate: answeredOpen.changed === false` INSIDE the
+      // open-round branch, so both flags arrive together whenever the tip was open and the write
+      // changed nothing. Testing answered_open_round first told Warwick his answer went through
+      // when it had not.
+      //
+      // It is the two named control surfaces racing, not an edge case: he answers the same
+      // clarification on Telegram seconds earlier, then submits here. First-answer-wins does its
+      // ordinary job and this write lands on nothing. Self-correcting once the board reloads --
+      // and for those seconds the screen was stating a falsehood about a write, which is the exact
+      // class this Work Order exists to remove.
+      //
+      // `corrected` and `duplicate` are mutually exclusive by construction in the supersede branch
+      // (`corrected: answered.changed === true` / `duplicate: answered.changed === false`), so
+      // testing duplicate first cannot swallow a real success. A CONTRADICTORY receipt carrying
+      // both would fail closed here, which is the safe direction: never claim a supersede that may
+      // not have happened.
+      if (r.duplicate === true) {
+        // Same signal, two different truths behind it -- so two different sentences.
+        if (r.answered_open_round === true) {
+          return { kind: 'open_round_already_answered', ok: false, done: null,
+            message: 'AsdAIr had already asked about this line again, and that question had been answered before this arrived — so “' + text + '” is not what is recorded. It may have been answered on Telegram. Reload to see what AsdAIr has.' };
+        }
+        // ⚠ IT DOES NOT SAY WHO, AND IT DOES NOT SAY WHAT IS RECORDED. This read "You already made
+        // this change — AsdAIr has it as X", and both halves can be false: the answer that won may
+        // have come from Telegram rather than from him, and first-answer-wins means the stored value
+        // is whatever landed first, which need not be X at all.
+        return { kind: 'duplicate', ok: false, done: null,
+          message: 'AsdAIr already has an answer recorded for this line, so “' + text + '” was not taken. It may have been answered on Telegram. Reload to see what AsdAIr has.' };
+      }
+
+      // The newest round was OPEN and this answer LANDED on it -- typically a clarification AsdAIr
+      // raised because it could not read the previous answer. A real and successful write, so it
+      // must not be reported as a failure; not a supersede, so it must not claim one either.
       if (r.answered_open_round === true) {
         return { kind: 'answered_open_round', ok: true, done: null,
           message: 'AsdAIr had already asked about this line again, and your answer went to that open question. Nothing was superseded — there was no settled answer to replace.' };
@@ -1789,10 +1821,6 @@ createApp({
             now: text,
             round: r.question_round === undefined ? null : r.question_round,
           } };
-      }
-      if (r.duplicate === true) {
-        return { kind: 'duplicate', ok: false, done: null,
-          message: 'You already made this change — AsdAIr has it as “' + text + '”.' };
       }
       // A receipt that is none of the above. Reported as unknown, never guessed at.
       return { kind: 'unknown', ok: false, done: null,
