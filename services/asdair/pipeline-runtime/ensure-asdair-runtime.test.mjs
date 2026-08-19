@@ -36,7 +36,8 @@ const {
   preflight, BLOCKING, ADVISORY,
   GRANT_MATRIX, MATRIX_PRIVILEGES, COLUMN_DENIALS,
   grantExpectations, evaluateGrants, evaluateColumnDenials,
-  MATRIX_SOURCE_MIGRATIONS, MIGRATIONS_DIR, compareMatrixProvenance, readMigrationFilenames,
+  MATRIX_SOURCE_MIGRATIONS, MATRIX_LOCAL_UNTRACKED, MIGRATIONS_DIR,
+  compareMatrixProvenance, readMigrationFilenames,
   extractModelIds, evaluateVisionModel, VISION_MODEL_DEFAULT,
   launcherPathFromTaskArguments, evaluateScheduledTask, SCHEDULED_TASK_NAME,
   looksLikeTelegramToken, PG_CONSUMERS, CHROME_DEFAULT_PROFILE_DIR, samePath,
@@ -322,14 +323,22 @@ test('AC3 never puts a connection string into its output', async () => {
 
 test('the matrix is derived from the migrations, not invented: both roles, and the documented negatives', () => {
   assert.deepEqual(Object.keys(GRANT_MATRIX), ['asdair_ro', 'asdair_rw']);
-  // -- RE-CUT 2026-08-19 (WO-2026-08-19-01). THIS TEST PINNED THE BUG. ------
-  // It used to assert both of these were `{}`, citing 010. 012:96-101 grants
-  // asdair_rw SELECT on both, so the assertion was enshrining a stale literal
-  // and the preflight emitted a false warning on every start because of it.
-  // Changed to match THE REQUIREMENT - the matrix must state what the committed
-  // migrations actually grant - never to match the code.
-  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], { table: ['SELECT'] });
-  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], { table: ['SELECT'] });
+  // -- RE-CUT TWICE ON 2026-08-19 (WO-2026-08-19-01). READ BOTH HALVES. -----
+  // These two assert `{}`, which is what they asserted before this Work Order
+  // began - but NOT for the reason they did then, and restoring the old comment
+  // would make the test right by accident.
+  //
+  //   THEN: `{}` citing 010's prose. That was already stale: 012:96-101 grants
+  //         asdair_rw SELECT on both, and the test was enshrining the stale
+  //         literal that made the live preflight emit a false warning on every
+  //         start. It was corrected to { table: ['SELECT'] } earlier today.
+  //   NOW:  `{}` because 022_revoke_rw_budget_and_alternatives.sql revokes both,
+  //         forward-only, superseding 012. The committed END STATE is no grant.
+  //
+  // Changed both times to match THE REQUIREMENT - the matrix must state what the
+  // committed migrations actually leave in place - never to match the code.
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], {});
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], {});
   // 005 grants insert/update on regulars per COLUMN, never per table.
   assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.regulars'].column, ['INSERT', 'UPDATE']);
   // No migration grants DELETE to asdair_rw on anything.
@@ -870,11 +879,11 @@ test('the declared migration sources match what is actually on disk RIGHT NOW', 
   assert.ok(prov.ok);
 });
 
-test('an UNFOLDED migration is caught by name - the 022 case, before it happens', () => {
-  const onDisk = [...MATRIX_SOURCE_MIGRATIONS, '022_revoke_unnecessary_rw_reads.sql'];
+test('an UNFOLDED migration is caught BY NAME - proven for real on 022, then generalised', () => {
+  const onDisk = [...MATRIX_SOURCE_MIGRATIONS, '023_a_migration_nobody_has_written_yet.sql'];
   const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, onDisk);
   assert.equal(prov.ok, false, 'a migration nobody folded in was reported as fine');
-  assert.deepEqual(prov.unaccounted, ['022_revoke_unnecessary_rw_reads.sql']);
+  assert.deepEqual(prov.unaccounted, ['023_a_migration_nobody_has_written_yet.sql']);
   assert.deepEqual(prov.vanished, []);
 });
 
@@ -898,6 +907,58 @@ test('012 is DECLARED, and the two privileges it grants are in the matrix', () =
   // The specific regression, pinned so it cannot silently revert.
   assert.ok(MATRIX_SOURCE_MIGRATIONS.includes('012_complete_grant_matrix.sql'),
     '012 is the migration whose absence caused the false warning');
-  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], { table: ['SELECT'] });
-  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], { table: ['SELECT'] });
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], {});
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], {});
+});
+
+// =====================================================================
+// WO-2026-08-19-01 - THE 011 CASE, WHICH THIS CHECK FOUND ON ITSELF.
+//
+// On its first live start the provenance check flagged
+// 011_decisions_log_rule_notes_seed.sql as an unfolded migration. Larry had
+// relayed it to me as ABSENT FROM THE REPOSITORY; it is neither absent nor
+// committed. Its own header line 5 reads:
+//
+//     !! THIS FILE CARRIES ROWS, NOT STRUCTURE. IT IS DELIBERATELY GITIGNORED. !!
+//
+// It holds household preference data that must never enter a public repo, so it
+// is in the live working copy and in no clone. Declaring it as a matrix SOURCE
+// would have been wrong in both directions - it grants nothing, and every clean
+// checkout would then report it `vanished`. Same noise, inverted.
+// =====================================================================
+
+test('a known local-only file is accounted for when PRESENT - the live working copy', () => {
+  const live = [...MATRIX_SOURCE_MIGRATIONS, ...MATRIX_LOCAL_UNTRACKED];
+  const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, live);
+  assert.ok(prov.ok, `the live shape was reported as unreconciled: ${JSON.stringify(prov)}`);
+  assert.deepEqual(prov.unaccounted, []);
+  assert.deepEqual(prov.localPresent, [...MATRIX_LOCAL_UNTRACKED].sort());
+});
+
+test('a known local-only file is accounted for when ABSENT - every clean clone', () => {
+  const clone = [...MATRIX_SOURCE_MIGRATIONS];
+  const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, clone);
+  assert.ok(prov.ok, 'a clean clone was reported as unreconciled');
+  assert.deepEqual(prov.vanished, [], 'a gitignored file was demanded of a clone that cannot have it');
+  assert.deepEqual(prov.localPresent, []);
+});
+
+test('the allowance is a NAMED list, not a blanket - an unknown extra file is still caught', () => {
+  const dirty = [...MATRIX_SOURCE_MIGRATIONS, ...MATRIX_LOCAL_UNTRACKED, '099_someone_dropped_this_here.sql'];
+  const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, dirty);
+  assert.equal(prov.ok, false, 'the allowance had become a blanket - any file would pass');
+  assert.deepEqual(prov.unaccounted, ['099_someone_dropped_this_here.sql']);
+});
+
+test('011 is declared LOCAL-ONLY and is NOT claimed as a committed matrix source', () => {
+  assert.ok(MATRIX_LOCAL_UNTRACKED.includes('011_decisions_log_rule_notes_seed.sql'));
+  assert.ok(!MATRIX_SOURCE_MIGRATIONS.includes('011_decisions_log_rule_notes_seed.sql'),
+    '011 is gitignored household data - declaring it a committed source is a false provenance claim');
+});
+
+test('022 IS folded in, and the two privileges it revokes are absent from the matrix', () => {
+  assert.ok(MATRIX_SOURCE_MIGRATIONS.includes('022_revoke_rw_budget_and_alternatives.sql'),
+    '022 revokes two asdair_rw privileges; a matrix that has not read it is stale');
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], {});
+  assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], {});
 });

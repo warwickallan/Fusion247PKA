@@ -197,8 +197,22 @@ export const GRANT_MATRIX = Object.freeze({
     // `{}` here would have flipped the same staleness from a false ADVISORY
     // over-grant into a false BLOCKING missing-grant, in the week of a real
     // shop. MATRIX_SOURCE_MIGRATIONS below exists so that cannot happen again.
-    'asdair.budget_settings': { table: ['SELECT'] },
-    'asdair.product_alternatives': { table: ['SELECT'] },
+    // -- AND SUPERSEDED AGAIN 2026-08-19 by 022_revoke_rw_budget_and_alternatives.sql.
+    // The full history, because two people have now read half of it and drawn
+    // the wrong conclusion from the half they read:
+    //   010  granted nothing here, and said so in prose  -> {}
+    //   012  granted asdair_rw SELECT on both (:96-101)  -> { table: ['SELECT'] }
+    //   022  REVOKES both, forward-only, superseding 012 -> {} again
+    // So `{}` is correct once more, for a DIFFERENT reason than it was in 010.
+    // Reverting this to 010's rationale would be right by accident, and would
+    // go stale the moment 022 is itself superseded.
+    //
+    // ⚠ UNTIL THE LIVE REVOKE IS RUN the preflight reports these two as an
+    // over-grant. THAT WARNING IS NOW TRUE: the live database holds a privilege
+    // the committed migrations no longer grant. It is real drift, not the false
+    // negative this constant used to emit, and it must NOT be silenced.
+    'asdair.budget_settings': {},
+    'asdair.product_alternatives': {},
   }),
 });
 
@@ -208,7 +222,8 @@ export const GRANT_MATRIX = Object.freeze({
  * GRANT_MATRIX is a HAND-MAINTAINED literal. That is a deliberate choice and it
  * is the right one: the migrations build their grants by string concatenation
  * inside `do $ ... end if $` blocks, several numbers are absent from the
- * repository altogether (002, 003, 011, 013, 014, 015), and a REVOKE has to be
+ * repository altogether (002, 003, 013, 014, 015 - and 011 is a DIFFERENT case,
+ * see MATRIX_LOCAL_UNTRACKED below), and a REVOKE has to be
  * ordered against the GRANTs that precede it. A runtime parser over that would
  * be a claim of derivation resting on an incomplete set - the identical defect
  * with more authority behind it.
@@ -239,6 +254,35 @@ export const MATRIX_SOURCE_MIGRATIONS = Object.freeze([
   '019_shopping_list_shop_identity.sql',
   '020_shop_line_provenance_and_human_state.sql',
   '021_regulars_display_name.sql',
+  '022_revoke_rw_budget_and_alternatives.sql',
+]);
+
+/**
+ * ── FILES THAT LIVE ONLY IN SOME WORKING COPIES ────────────────────────────
+ *
+ * Added 2026-08-19 after this very check fired on its first live start and
+ * flagged `011_decisions_log_rule_notes_seed.sql`, which Larry had relayed to
+ * me as ABSENT FROM THE REPOSITORY. It is not absent - and it is not committed
+ * either. Its own header, line 5:
+ *
+ *     !! THIS FILE CARRIES ROWS, NOT STRUCTURE. IT IS DELIBERATELY GITIGNORED. !!
+ *
+ * It back-fills household preference DATA that must never enter this public
+ * repository, so it exists in the live working copy and in no clone.
+ *
+ * FOLDING IT INTO MATRIX_SOURCE_MIGRATIONS WOULD BE WRONG in both directions:
+ * it is not a source of the committed matrix, and on any clean checkout it
+ * would then be reported `vanished` forever - the same noise, inverted.
+ *
+ * So it is declared HERE instead, where presence and absence are BOTH fine.
+ *
+ * ⛔ THE ENTRY BAR IS THE SAME AS THE OTHER LIST: adding a name here is a claim
+ * that you OPENED THE FILE and found it carries no `grant` and no `revoke`. For
+ * 011 that was checked by execution - a case-insensitive search returns only
+ * two prose mentions in comments, and no statement.
+ */
+export const MATRIX_LOCAL_UNTRACKED = Object.freeze([
+  '011_decisions_log_rule_notes_seed.sql',
 ]);
 
 /** Where those migrations live, relative to this file. */
@@ -248,12 +292,16 @@ export const MIGRATIONS_DIR = new URL('../db/', import.meta.url);
  * PURE. Compare the declared source list against what is actually on disk.
  * `unaccounted` is the one that matters: a migration nobody folded in.
  */
-export function compareMatrixProvenance(declared, onDisk) {
+export function compareMatrixProvenance(declared, onDisk, localOnly = MATRIX_LOCAL_UNTRACKED) {
   const d = new Set(declared);
+  const local = new Set(localOnly);
   const k = new Set(onDisk);
-  const unaccounted = onDisk.filter((n) => !d.has(n)).sort();
+  // A local-only file is accounted for whether it is here or not: it is present
+  // in the live working copy and absent from every clone, and both are correct.
+  const unaccounted = onDisk.filter((n) => !d.has(n) && !local.has(n)).sort();
   const vanished = declared.filter((n) => !k.has(n)).sort();
-  return { ok: unaccounted.length === 0 && vanished.length === 0, unaccounted, vanished };
+  const localPresent = onDisk.filter((n) => local.has(n)).sort();
+  return { ok: unaccounted.length === 0 && vanished.length === 0, unaccounted, vanished, localPresent };
 }
 
 /**
@@ -831,13 +879,18 @@ async function checkGrantMatrix(conn, add) {
   // noise.
   try {
     const prov = compareMatrixProvenance(MATRIX_SOURCE_MIGRATIONS, readMigrationFilenames());
-    add('AC4', 'the grant matrix accounts for every committed migration', prov.ok, ADVISORY,
+    // NOTE THE CLAIM THIS MAKES, AND THE ONE IT DOES NOT. It reads a DIRECTORY.
+    // It cannot see git, so it must not say 'committed' - saying so is how 011
+    // (deliberately gitignored, present in the live working copy, in no clone)
+    // got reported as an unfolded committed migration on the first live start.
+    add('AC4', 'the grant matrix accounts for every migration file present', prov.ok, ADVISORY,
       prov.ok
-        ? `the matrix declares all ${MATRIX_SOURCE_MIGRATIONS.length} migration file(s) on disk`
+        ? `the matrix declares all ${MATRIX_SOURCE_MIGRATIONS.length} committed migration file(s) present`
+          + (prov.localPresent.length ? `, plus ${prov.localPresent.length} known local-only file(s) that carry no grants` : '')
         : [
           `the grant matrix was read from ${MATRIX_SOURCE_MIGRATIONS.length} migration file(s);`,
-          `${prov.unaccounted.length + prov.vanished.length} do not reconcile with what is on disk.`,
-          prov.unaccounted.length ? `NOT FOLDED IN: ${prov.unaccounted.join(', ')} - every grant claim below may be wrong in EITHER direction until someone reads them.` : '',
+          `${prov.unaccounted.length + prov.vanished.length} do not reconcile with the files in services/asdair/db.`,
+          prov.unaccounted.length ? `NOT ACCOUNTED FOR: ${prov.unaccounted.join(', ')} - every grant claim below may be wrong in EITHER direction until someone OPENS them. Fold real grants into GRANT_MATRIX; if a file is a deliberately-gitignored local data seed, add it to MATRIX_LOCAL_UNTRACKED once you have confirmed it carries no grant or revoke.` : '',
           prov.vanished.length ? `DECLARED BUT ABSENT: ${prov.vanished.join(', ')}.` : '',
         ].filter(Boolean).join(' '));
   } catch (err) {
