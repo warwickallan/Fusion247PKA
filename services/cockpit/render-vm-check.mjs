@@ -694,6 +694,24 @@ const WS_SKIP_CMD = ws({ human_state: 'NEEDS_WARWICK' },
 // If assembleWorkspace.js ships them under different names, the second scenario goes red — which is
 // the correct outcome. The screen would then be showing nothing rather than something wrong, and a
 // silently absent correction chain is exactly what a fixture exists to catch.
+// The reply the API actually publishes on a resolved item (assembleWorkspace.js). The UI reads THIS
+// in preference to any name of its own.
+const CORRECT_REPLY = [{ key: 'correct', label: 'Change this answer', command: 'correctAnswer' }];
+// ⛔ THE POISONED PAYLOAD. A resolved item whose 'correct' reply names `answerQuestion` — the
+// compare-and-set command that silently writes nothing against a settled row. The API now has a
+// test forbidding it; this is the SAME rule asserted from the CLIENT end, because a UI that obeys
+// whatever it is handed would resurrect the defect the moment a payload regressed.
+const WS_POISONED = ws({ human_state: 'NEEDS_WARWICK' }, {
+  // ⚠️ `answerQuestion` IS ON THE SURFACE HERE, DELIBERATELY. Without it the row would be
+  // refused merely because the command is unpublished, and the scenario would pass without
+  // ever exercising the guard — which is exactly what it did until mutation testing showed the
+  // assertion surviving the guard's removal. Both names present means the ONLY thing that can
+  // refuse this payload is the explicit answerQuestion check.
+  command_names: [...(WS.command_names || []), 'correctAnswer', 'answerQuestion'],
+  questions: { ...WS.questions,
+    resolved: WS.questions.resolved.map((q) => ({ ...q,
+      allowed_replies: [{ key: 'correct', label: 'Change this answer', command: 'answerQuestion' }] })) },
+});
 const WS_CORRECT_CMD = ws({ human_state: 'NEEDS_WARWICK' },
   { command_names: [...(WS.command_names || []), 'correctAnswer'] });
 // The SAME shop after one correction: round 1 superseded, round 2 answered. BOTH rows are present
@@ -703,9 +721,9 @@ const WS_CORRECTED = ws({ human_state: 'NEEDS_WARWICK' }, {
   command_names: [...(WS.command_names || []), 'correctAnswer'],
   questions: { ...WS.questions, resolved_count_display: '2',
     resolved: [
-      { ...R1, question_round: 1, supersedes_question_key: null,
+      { ...R1, allowed_replies: CORRECT_REPLY, question_round: 1, supersedes_question_key: null,
         superseded_by_question_key: 'q_placeholder_2#2' },
-      { ...R1, id: 77, question_key: 'q_placeholder_2#2', question_round: 2,
+      { ...R1, allowed_replies: CORRECT_REPLY, id: 77, question_key: 'q_placeholder_2#2', question_round: 2,
         answer_text_display: 'Placeholder Butcher Sausages 600g',
         answered_at_display: '2 Jan, 18:02',
         resolution_display: 'Resolved to Placeholder Butcher Sausages 600g.',
@@ -949,6 +967,16 @@ const ASDAIR_PLAN = [
           (p) => !hasText(p, 'does not yet publish a command for correcting a settled answer')],
         ['the control is still offered',
           (p) => hasText(p, 'Change this answer')],
+      ]],
+    // ⛔ THE SAME RULE AS THE API's, ASSERTED FROM THE CLIENT END. assembleWorkspace.js now carries a
+    // test that no `allowed_replies` entry may name answerQuestion on a settled question. This is
+    // the other half: even when HANDED that payload, the UI must refuse it. A client that obeys
+    // whatever it is given would resurrect "Saved for a write that never happened" the moment the
+    // payload regressed — and a regressed payload is not the only way this defect can come back.
+    ['QUESTIONS · a payload naming answerQuestion on a settled row is REFUSED, not obeyed', 'questions',
+      { asdairWs: WS_POISONED, asdairWsErr: null }, {}, [
+        ['the control is greyed even though correctAnswer IS on the surface',
+          (p) => hasText(p, 'does not yet publish a command for correcting a settled answer')],
       ]],
     ['QUESTIONS · after a correction, BOTH rounds are on record and neither is a deletion', 'questions',
       { asdairWs: WS_CORRECTED, asdairWsErr: null }, {}, [

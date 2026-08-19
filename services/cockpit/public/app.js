@@ -1434,10 +1434,45 @@ createApp({
     // disabled with an honest explanation rather than pretending to work.
     const ASDAIR_SKIP_COMMANDS = Object.freeze(['skipThisWeek', 'skipItem', 'markNotThisWeek', 'skipLine']);
     const asdairSkipCommand = computed(() => ASDAIR_SKIP_COMMANDS.find((n) => asdairCommands.value.has(n)) || null);
-    // Correcting a settled answer. Published as `correctAnswer` on the shared surface; until the API
-    // lists it in command_names the control renders DISABLED and says why, exactly as the skip
-    // control above does. No probe list here — unlike skip, this command's name is not a guess.
+    // Correcting a settled answer. Until the API publishes the capability the control renders
+    // DISABLED and says why, exactly as the skip control above does.
+    //
+    // TWO GATES, AND THEY ANSWER DIFFERENT QUESTIONS — which is why both are kept.
+    //   asdairCorrectCommandFor(q)  "what may this PARTICULAR settled question offer?" — read from
+    //                               the row's own `allowed_replies`, the payload's own mechanism for
+    //                               naming an action so the client cannot invent one. This is the
+    //                               authority, and it is per-row: a question the API decides is not
+    //                               correctable simply carries no such reply.
+    //   asdairCanCorrect            "does the surface carry the capability at all?" — the whole-
+    //                               workspace answer, used for the explanatory note and as the
+    //                               fallback when a payload predates allowed_replies on resolved
+    //                               items. A name is hardcoded here and NOWHERE else.
     const asdairCanCorrect = computed(() => asdairHasCommand('correctAnswer'));
+    /**
+     * The command this settled question says may change it, or null.
+     * ⛔ NEVER `answerQuestion`, whatever a payload claims. That command is a compare-and-set on
+     * status='open': aimed at a settled row it writes nothing and reports success, which is the
+     * exact defect this whole change removes. Honouring it here would reintroduce it from the other
+     * end — so a reply naming it is refused rather than trusted.
+     */
+    function asdairCorrectCommandFor(q) {
+      const replies = q && Array.isArray(q.allowed_replies) ? q.allowed_replies : null;
+      // ⛔ WHEN THE ROW CARRIES allowed_replies, THE API IS AUTHORITATIVE FOR THAT ROW AND THERE IS
+      // NO FALL-BACK. This first fell through to the workspace-level answer whenever it failed to
+      // find a usable reply, which meant a payload naming `answerQuestion` was filtered out and then
+      // silently re-enabled by the fallback — the refusal defeated by the safety net beneath it.
+      // Caught by the poisoned-payload scenario in render-vm-check, which is why that scenario
+      // exists. Absent replies mean the API has said nothing; a present-but-unusable reply means it
+      // has said no.
+      if (replies) {
+        const r = replies.find((x) => x && x.key === 'correct');
+        if (!r || !r.command) return null;                 // no correction offered for this row
+        if (r.command === 'answerQuestion') return null;    // first-answer-wins: it cannot do this
+        return asdairHasCommand(r.command) ? r.command : null; // named but unpublished — disabled
+      }
+      // No allowed_replies on this row (a payload predating them). Workspace-level answer only.
+      return asdairCanCorrect.value ? 'correctAnswer' : null;
+    }
 
     // ---- THE CORRECTION CHAIN, WHEN THE API PUBLISHES IT ---------------------------------------
     // A correction is a NEW ROUND whose parent is the row it superseded, so after one correction the
@@ -1656,9 +1691,13 @@ createApp({
       if (!text) { asdairSheetErr.value = 'Type what you meant instead.'; return; }
       if (!asdairCorrectConfirm.value) { asdairSheetErr.value = 'Tick “replace what I said” first — this supersedes a settled answer.'; return; }
       if (!asdairCorrectReady.value) { asdairSheetErr.value = 'That is the same answer you already gave. Change the wording, or go back.'; return; }
+      // The row's OWN named command. Resolved here rather than hardcoded, so a question the
+      // API says is not correctable cannot be corrected from this sheet by accident.
+      const cmd = asdairCorrectCommandFor(q);
+      if (!cmd) { asdairSheetErr.value = 'AsdAIr does not publish a way to change this answer.'; return; }
       asdairSheetBusy.value = true; asdairSheetErr.value = null; asdairFlash.value = null; asdairRemember.value = null;
       try {
-        const r = await asdairCommand('correctAnswer', {
+        const r = await asdairCommand(cmd, {
           questionKey: q.question_key,
           answerText: text,
           answerSource: 'typed',
@@ -2142,7 +2181,7 @@ createApp({
       // Answer correction (supersede, never overwrite). `asdairOpenReanswer` is GONE, not renamed:
       // it called answerQuestion on a settled row and reported success for a write that never
       // happened. Anything still referencing it must be found now, by failing, not by looking right.
-      asdairCanCorrect, asdairOpenCorrect, asdairSubmitCorrection, asdairCorrectReady,
+      asdairCanCorrect, asdairCorrectCommandFor, asdairOpenCorrect, asdairSubmitCorrection, asdairCorrectReady,
       asdairCorrectText, asdairCorrectConfirm, asdairCorrectDone,
       asdairSupersededBy, asdairSupersedes, asdairIsSuperseded,
       // WP-B15-42 — one exception board, the brand-grouped final list, corroboration vocabulary,
@@ -3262,11 +3301,11 @@ createApp({
                              uses for skip: a control whose command is absent is DISABLED and says
                              why, never rendered as if it worked. It lights up by itself the moment
                              "correctAnswer" appears in command_names. -->
-                        <button class="act" :disabled="e.question._busy || !asdairCanCorrect"
-                          :title="asdairCanCorrect ? 'Supersede this answer — the original is kept' : 'AsdAIr does not publish a correction command yet'"
+                        <button class="act" :disabled="e.question._busy || !asdairCorrectCommandFor(e.question)"
+                          :title="asdairCorrectCommandFor(e.question) ? 'Supersede this answer — the original is kept' : 'AsdAIr does not publish a correction command yet'"
                           @click="asdairOpenCorrect(e.question)">Change this answer</button>
                       </div>
-                      <p class="as-note" v-if="!asdairCanCorrect">“Change this answer” is greyed out because AsdAIr does not yet publish a command for correcting a settled answer. It becomes live the moment one exists — nothing here pretends to work in the meantime.</p>
+                      <p class="as-note" v-if="!asdairCorrectCommandFor(e.question)">“Change this answer” is greyed out because AsdAIr does not yet publish a command for correcting a settled answer. It becomes live the moment one exists — nothing here pretends to work in the meantime.</p>
                       <p class="err" v-if="e.question._error">{{ e.question._error }}</p>
                     </div>
                   </details>
