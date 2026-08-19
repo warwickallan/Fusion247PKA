@@ -263,3 +263,103 @@ test('AC4 RECOVERY: a release that names no class does not erase the class an ea
     'a plain release overwrites the failure class with null - the recovery rule would then never find it');
   assert.equal(seen[0].params[5], null);
 });
+
+
+// =====================================================================
+// WO-2026-08-19-01 AC5 - THE ERROR PATH IS NOT SILENT EITHER.
+//
+// Every other terminal condition on this lane announces. The generic catch
+// path did not - it released the lease and rethrew. That is the one release
+// that CONSUMES AN ATTEMPT, so at the ceiling it marks the request `failed`
+// permanently; and because it names no failureClass,
+// requeueEnvironmentFailures can never resurrect it. A shop could reach a dead
+// end that nothing announced and nothing could recover.
+//
+// The announcement must not swallow the throw. The throw is how the caller
+// learns the pass failed; the announcement is how a human does. Both, or
+// neither is right.
+// =====================================================================
+
+test('AC5: a run that THROWS announces before it rethrows', async () => {
+  const query = fakePool({ claimed: claimedRow({}), releaseStatus: 'queued', attempts: 1 });
+  const deps = io(query, { result: null });
+  deps.runBasket = async () => { throw new Error('CDP websocket closed'); };
+
+  let thrown = null;
+  try {
+    await consumeOneBrowserBuildRequest(deps, { log: () => {} });
+  } catch (e) { thrown = e; }
+
+  assert.ok(thrown, 'the error was swallowed - the caller cannot know the pass failed');
+  assert.match(thrown.message, /CDP websocket closed/, 'a different error surfaced');
+
+  const errors = deps.announced.filter((a) => a.kind === 'basket_run_error');
+  assert.equal(errors.length, 1, 'the error path announced nothing - it is still silent');
+  assert.match(errors[0].detail, /CDP websocket closed/, 'the announcement does not say what failed');
+  assert.equal(String(errors[0].shop_id), '26');
+  assert.equal(errors[0].household_id, 1, 'no household id - the outbox is keyed per household and would drop it');
+  assert.equal(errors[0].shop_ref, 'SHOP-2026-08-18', 'the announcement cannot name the shop that failed');
+  assert.equal(errors[0].terminal, false);
+});
+
+test('AC5: at the CEILING the error announcement says it has stopped', async () => {
+  const query = fakePool({ claimed: claimedRow({}), releaseStatus: 'failed', attempts: 5 });
+  const deps = io(query, { result: null });
+  deps.runBasket = async () => { throw new Error('the browser never answered'); };
+
+  await assert.rejects(() => consumeOneBrowserBuildRequest(deps, { log: () => {} }));
+
+  const errors = deps.announced.filter((a) => a.kind === 'basket_run_error');
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].terminal, true,
+    'the request is permanently failed and the announcement did not say so');
+  assert.equal(errors[0].attempts, 5);
+  assert.equal(errors[0].max_attempts, 5);
+});
+
+test('AC5: an error BEFORE the manifest is built still names the shop', async () => {
+  // loadShop throwing is the earliest realistic failure. The announcement is
+  // built from the CLAIMED ROW rather than the manifest, so it survives it.
+  const query = fakePool({ claimed: claimedRow({}), releaseStatus: 'queued', attempts: 1 });
+  const deps = io(query, { result: null });
+  deps.loadShop = async () => { throw new Error('browser build request names shop 99, which does not exist'); };
+
+  await assert.rejects(() => consumeOneBrowserBuildRequest(deps, { log: () => {} }));
+
+  const errors = deps.announced.filter((a) => a.kind === 'basket_run_error');
+  assert.equal(errors.length, 1, 'a failure before the manifest existed was silent');
+  assert.equal(String(errors[0].shop_id), '26', 'the card cannot say which shop this was');
+  assert.match(errors[0].detail, /does not exist/);
+});
+
+test('AC5: an announce that itself throws does NOT mask the real error', async () => {
+  const query = fakePool({ claimed: claimedRow({}), releaseStatus: 'queued', attempts: 1 });
+  const deps = io(query, { result: null });
+  deps.runBasket = async () => { throw new Error('the REAL failure'); };
+  deps.announce = async () => { throw new Error('the outbox is down'); };
+
+  let thrown = null;
+  try {
+    await consumeOneBrowserBuildRequest(deps, { log: () => {} });
+  } catch (e) { thrown = e; }
+
+  assert.match(thrown.message, /the REAL failure/,
+    'a broken announcer replaced the real error - the diagnosis would be lost');
+});
+
+test('AC5: the SUCCESS and NOT-READY announcements carry the shop identity the outbox needs', async () => {
+  // announceBasketOutcome returns null without shop_id, so a payload missing it
+  // could never have produced a row however well the announcer behaved.
+  for (const [label, result, expected] of [
+    ['not ready', RUN_CLASS_RESULT, 'basket_not_ready'],
+    ['ready', { exitCode: 0, basketReady: true, reconciliation: { ready: { ready: true } }, blockers: [] }, 'basket_ready'],
+  ]) {
+    const query = fakePool({ claimed: claimedRow({}), releaseStatus: 'queued', attempts: 0 });
+    const deps = io(query, { result });
+    await consumeOneBrowserBuildRequest(deps, { log: () => {} });
+    const hit = deps.announced.find((a) => a.kind === expected);
+    assert.ok(hit, `${label}: no ${expected} announcement`);
+    assert.equal(String(hit.shop_id), '26', `${label}: no shop_id - the announcer would drop it`);
+    assert.equal(hit.household_id, 1, `${label}: no household_id - the outbox is keyed per household`);
+  }
+});

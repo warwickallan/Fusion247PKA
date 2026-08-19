@@ -10,7 +10,24 @@ async function openAndEval(url, expression, waitMs = 10000) {
   c.close();
   return { value: ev.result?.result?.value, targetId };
 }
-const TROLLEY_SNAPSHOT = `JSON.stringify((()=>{
+// ── STRING.RAW IS LOAD-BEARING (WO-2026-08-19-01). ─────────────────────────
+// This was an ordinary template literal, and every backslash in the regexes
+// below was consumed when Node built the string. The expression that reached
+// the page read:
+//
+//     /Order totals*£(d+.d{2})/        instead of  /Order total\s*£(\d+\.\d{2})/
+//     .filter(x=>x.name && //product//.test(x.href));
+//
+// The last one is not merely a wrong regex - `//` opens a LINE COMMENT, so the
+// whole expression was a SyntaxError and Runtime.evaluate returned undefined.
+// This module could never have read a trolley. It has no production caller
+// today (run-basket goes through browser.cjs, whose copy escapes correctly),
+// which is the only reason it never showed up as a live failure - and exactly
+// why it would have been believed the first time something did call it.
+//
+// String.raw keeps the backslashes. There are no intentional escapes in this
+// template - the newlines are real newlines - so nothing else changes.
+const TROLLEY_SNAPSHOT = String.raw`JSON.stringify((()=>{
   const txt = document.body.innerText;
   const total = (txt.match(/Order total\s*£(\d+\.\d{2})/)||[null,null])[1];
   const items = (txt.match(/(\d+)\s+items? subtotal/)||[null,null])[1];

@@ -2783,6 +2783,61 @@ export function makeVerificationFor(deps, { log = () => {} } = {}) {
 export const BASKET_BLOCKED_ON_ENVIRONMENT = 'basket_blocked_on_environment';
 
 /**
+ * EVERY TERMINAL CONDITION ON THE BROWSER LANE, AND WHAT EACH ONE EMITS.
+ * (WO-2026-08-19-01 AC5.)
+ *
+ * -- WHY A TABLE AND NOT THREE IF-STATEMENTS -------------------------------
+ * AC5 is an "every" claim, and an "every" claim needs an inventory it can be
+ * checked against. This is that inventory: the terminal conditions the
+ * consumer can reach, enumerated, each mapped to the outbox kind it writes.
+ * A test walks it, so a condition added later without a row here is caught.
+ *
+ * -- WHAT WAS SILENT BEFORE, AND IT WAS TWO THINGS -------------------------
+ *  1. `basket_not_ready` reached this function and was DROPPED - the guard
+ *     below returned null for every kind except the environment one. A run
+ *     that finished `failed` over an untruthful reconciliation wrote a log
+ *     line and nothing else.
+ *  2. `basket_run_error` did not exist. The consumer's catch path released the
+ *     lease and rethrew without announcing at all, and at the attempt ceiling
+ *     that release marks the request `failed` permanently while naming no
+ *     `_failure_class` - so `requeueEnvironmentFailures` could never bring it
+ *     back either. Silent AND unrecoverable.
+ *
+ * -- NO NEW OUTBOX KIND, DELIBERATELY --------------------------------------
+ * Both map onto the EXISTING `failure` kind, whose renderer has been in
+ * bot/renderMessages.js since the bot was built and offers Retry / View
+ * status. A new kind would need a new renderer, and a kind with no renderer is
+ * abandoned by drainOutbox - discarded, nobody told - which is the exact
+ * failure AC5 exists to remove. Reuse is not laziness here; it is the only
+ * option that cannot reintroduce the defect.
+ *
+ * `basket_ready` is listed with `outboxKind: null` ON PURPOSE. Success already
+ * has a route - advanceAll -> queueShopCards -> drainOutbox - and a second
+ * card would be a second truth about one event. Writing it down as a decision
+ * is what stops a later reader "fixing" the omission.
+ */
+export const LANE_TERMINAL_CONDITIONS = Object.freeze({
+  [BASKET_BLOCKED_ON_ENVIRONMENT]: Object.freeze({
+    outboxKind: BASKET_BLOCKED_ON_ENVIRONMENT,
+    why: 'the machine is not ready - retried, then terminal at the ceiling',
+  }),
+  basket_not_ready: Object.freeze({
+    outboxKind: 'failure',
+    stage: 'browser basket',
+    why: 'the run finished but the reconciliation was not truthful',
+  }),
+  basket_run_error: Object.freeze({
+    outboxKind: 'failure',
+    stage: 'browser basket',
+    why: 'the run threw - the lease is released and an attempt is consumed',
+  }),
+  basket_ready: Object.freeze({
+    outboxKind: null,
+    why: 'success already announces through advanceAll -> queueShopCards -> drainOutbox',
+  }),
+});
+
+/**
  * THE BROWSER LANE'S OUTCOME, TOLD DURABLY WHEN IT IS A FAILURE.
  *
  * Extracted from `realWiring` so the production function is the function under
@@ -2814,8 +2869,45 @@ export async function announceBasketOutcome(deps, payload, { log = () => {} } = 
     request_id: p.request_id,
     blockers: (p.blockers || []).map((b) => b && b.kind),
   });
-  if (p.kind !== BASKET_BLOCKED_ON_ENVIRONMENT) return null;
+  const condition = LANE_TERMINAL_CONDITIONS[p.kind];
+  // An UNKNOWN kind is not silently dropped: it is logged as such, so a
+  // condition someone adds without a row in the table above shows up in the
+  // journal instead of vanishing the way basket_not_ready used to.
+  if (!condition) { log('basket_outcome_unmapped', { kind: p.kind, shop_ref: p.shop_ref }); return null; }
+  if (!condition.outboxKind) return null;
   if (p.shop_id === null || p.shop_id === undefined) return null;
+
+  // ── THE FAILURE-CLASS CONDITIONS (AC5) ───────────────────────────────────
+  // Mapped onto the EXISTING `failure` kind and its existing renderer. Deduped
+  // per shop and per phase on the same ledger family the environment card uses,
+  // so a failing pass produces one card and not one per pass.
+  if (condition.outboxKind === 'failure') {
+    const failPhase = p.terminal === true ? 'terminal' : 'retrying';
+    const failKey = outboxKeyFor(p.shop_ref, `${p.kind}.${failPhase}`);
+    const failFamily = ledgerFamilyKey({
+      kind: LEDGER_KINDS.OUTBOX,
+      householdId: p.household_id ?? null,
+      name: 'failure',
+      key: failKey,
+    });
+    if ((await store.spentLedgerGenerations(deps, failFamily)) !== 0) return null;
+    return store.enqueueMessage(deps, {
+      householdId: p.household_id ?? null,
+      shopId: p.shop_id,
+      kind: 'failure',
+      key: failKey,
+      payload: {
+        shopRef: p.shop_ref,
+        stage: condition.stage,
+        // Blocker KINDS, or the error's own sentence. Never a launcher detail:
+        // those name environment variables and a card is not a config
+        // reference - pipeline-runtime/RUNBOOK.md is.
+        detail: p.detail
+          ? String(p.detail).slice(0, 200)
+          : ((p.blockers || []).map((b) => b && b.kind).filter(Boolean).join('; ') || 'no reconciliation was produced'),
+      },
+    });
+  }
 
   const phase = p.terminal === true ? 'terminal' : 'retrying';
   const key = outboxKeyFor(p.shop_ref, `${BASKET_BLOCKED_ON_ENVIRONMENT}.${phase}`);

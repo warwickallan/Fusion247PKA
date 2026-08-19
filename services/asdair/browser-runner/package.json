@@ -8,7 +8,11 @@
   "main": "runner.js",
   "scripts": {
     "test": "node --test",
-    "status": "node runnerctl.cjs status"
+    "status": "node runnerctl.cjs status",
+    "prove:ac4": "node proof/ac4-kill-and-revive.cjs",
+    "prove:ac4:mutate": "node proof/ac4-kill-and-revive.cjs --mutate",
+    "prove:ac2": "node proof/ac2-lane-launches.cjs",
+    "prove:ac2:mutate": "node proof/ac2-lane-launches.cjs --mutate"
   },
   "dependencies": {
     "pg": "^8.11.0"
