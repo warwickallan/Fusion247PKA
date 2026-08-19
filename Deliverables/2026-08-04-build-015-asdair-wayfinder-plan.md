@@ -6005,11 +6005,30 @@ exists.**
 > **ROTATION 2026-08-19.** Closing head named in the commit that adds this line. Branch `main`, clean,
 > `main == origin/main`, every branch merged with containment asserted.
 >
-> **Session report:** `Deliverables/2026-08-19-session-report-b15-agentic.md` — **OUTSTANDING ON
-> ARRIVAL.** Commissioned from Pax at this rotation and may return AFTER the `/clear`. Inputs handed to
-> him: `Deliverables/2026-08-19-subagent-token-ledger-b15-agentic.md` (committed) and
-> `~/.mypka/governor/capae-opening.json`. **When it lands: write it to `Deliverables/`, commit, run
-> `populate.mjs --file` then `capae-sync.mjs` POSITIONALLY on its payload, and re-cut this line.**
+> **Session report: LANDED AND DISCHARGED** — `Deliverables/2026-08-19-session-report-b15-agentic.md`,
+> committed at `6fecc29` with its payload. `populate.mjs` wrote rotation `061869b2` (verified);
+> `capae-sync.mjs` synced 4 families, 0 unknown, 0 rejected.
+>
+> **Its headline, because it answers whether the envelope route earns its cost: THE GENERATED ENVELOPE
+> STOPPED A LIVE GROCERY WRITE.** WO-2026-08-19-01 AC2 demanded *"a real browser session and a built
+> trolley"* on the lane whose production target is Warwick's signed-in ASDA account, while the envelope's
+> `live_authority` read `none`. **The worker refused.** 11 of 11 orders generated this session, after
+> 0 of 3 last session — *the control skipped last session is the one that saved this one.*
+>
+> ⛔ **AND IT FALSIFIED A CAUSAL STORY LARRY HAD ALREADY BANKED.** Larry reported merging the commit a
+> worker's return named rather than the branch tip. **He did not.** `4bc0894^2` is `b9aac0d`, which WAS
+> the tip at 22:22:17; `c8e7320` was committed at 22:24:05 — **108 seconds after the merge.** The ref was
+> merged correctly and the branch advanced behind it. **A `COMPLETED` return is where a worker had got
+> to, not where it stopped**, and a single containment check at merge time passes and then goes stale.
+> **Assert containment at every point of USE** — before a restart, before an assurance dispatch.
+>
+> ⚠️ **AND THE CAPAE BRIEF WAS WRONG ON THREE OF ITS FOUR ROWS**, every error but one flattering the
+> estate: Larry was told he held three clean exposures and held **one**, against a different family.
+> Cause, third consecutive occurrence: the previous rotation's `capae-sync` ran **16 m 20 s after**
+> SessionStart froze the snapshot. **The existing staleness warning structurally cannot catch it** —
+> `STALE_AFTER_DAYS = 14` against a brief **0.954 days** old. **The defect is ORDINAL, not temporal**, and
+> no day-counter at any threshold detects *one sync behind*. The fix Pax names builds nothing new:
+> compare the brief's `written_at` against the newest `ts` in `session-report-populate.jsonl`.
 >
 > **⛔ THE EXACT NEXT ACTION.** Nothing further is owed from engineering. **On 20 AUGUST OR LATER —
 > NOT the 19th** (a photo sent on the 19th computes ref `SHOP-2026-08-19`, which is id 35,
