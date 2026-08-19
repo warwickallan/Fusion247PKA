@@ -962,3 +962,60 @@ test('022 IS folded in, and the two privileges it revokes are absent from the ma
   assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.budget_settings'], {});
   assert.deepEqual(GRANT_MATRIX.asdair_rw['asdair.product_alternatives'], {});
 });
+
+// =====================================================================
+// WO-2026-08-19-01 - A FROM-GIT REBUILD ON WHICH 012 ABORTED IS NOT GREEN.
+//
+// The db/** worker established that applying 001->021 then 012 aborts with
+// `relation "asdair.command_request" does not exist`, and that the AC4 check
+// reported FULLY GREEN on that broken rebuild. The reason was structural:
+// nothing in GRANT_MATRIX was unique to 012. 005-010 already supplied every
+// pair the matrix asserted, so a rebuild that never ran 012 satisfied it.
+//
+// Provenance could never catch this - it enumerates FILES, and a migration that
+// aborts leaves its file sitting on disk. The fix is to make the matrix carry
+// something only 012 supplies.
+// =====================================================================
+
+test('the matrix carries the six tables ONLY 012 grants, for both roles', () => {
+  const only012 = ['asdair.command_request', 'asdair.credentials_ref', 'asdair.previously_ordered',
+    'asdair.process_suggestions', 'asdair.products', 'asdair.skill_steps'];
+  for (const tbl of only012) {
+    assert.deepEqual(GRANT_MATRIX.asdair_ro[tbl], { table: ['SELECT'] }, `asdair_ro is missing ${tbl}`);
+    assert.deepEqual(GRANT_MATRIX.asdair_rw[tbl], { table: ['SELECT'] }, `asdair_rw is missing ${tbl}`);
+  }
+});
+
+test('a rebuild WITHOUT command_request is caught - the failed-012 case, no longer green', () => {
+  const exp = grantExpectations();
+  // A database on which 012 aborted: the table does not exist, so the privilege
+  // SQL returns no row for it at all (it filters on to_regclass IS NOT NULL).
+  const rows = correctPrivilegeRows().filter((r) => r.tbl !== 'asdair.command_request');
+  const v = evaluateGrants(exp, new Map(rows.map((r) => [`${r.role}|${r.tbl}|${r.priv}`, r])));
+  assert.ok(v.unobserved.length > 0,
+    'a rebuild missing command_request was reported as fully observed - the failed-012 case is green again');
+  const tables = new Set(v.unobserved.map((k) => k.split('|')[1]));
+  assert.ok(tables.has('asdair.command_request'),
+    'the absent table was not named in the unobserved set');
+  // unobserved drives the BLOCKING 'every table in the matrix exists' row, so
+  // this is a refusal to start, not an advisory.
+  assert.equal(v.missing.length, 0, 'an absent TABLE must not be reported as a missing GRANT - different defect, different fix');
+});
+
+test('MUTATION: drop the six from the matrix and the broken rebuild goes green again', () => {
+  // The proof above must be about the SIX, not about some incidental pair. This
+  // rebuilds the expectations from a matrix with them removed and shows the
+  // failed-012 rebuild becomes indistinguishable from a good one.
+  const only012 = new Set(['asdair.command_request', 'asdair.credentials_ref', 'asdair.previously_ordered',
+    'asdair.process_suggestions', 'asdair.products', 'asdair.skill_steps']);
+  const stripped = Object.fromEntries(Object.entries(GRANT_MATRIX).map(([role, tables]) => [
+    role, Object.fromEntries(Object.entries(tables).filter(([tbl]) => !only012.has(tbl))),
+  ]));
+  const exp = grantExpectations(stripped);
+  const observed = new Map(correctPrivilegeRows()
+    .filter((r) => r.tbl !== 'asdair.command_request')
+    .map((r) => [`${r.role}|${r.tbl}|${r.priv}`, r]));
+  const v = evaluateGrants(exp, observed);
+  assert.deepEqual(v.unobserved, [],
+    'the six are not what makes the broken rebuild visible - this proof is measuring something else');
+});

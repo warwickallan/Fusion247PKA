@@ -149,6 +149,31 @@ export const GRANT_MATRIX = Object.freeze({
     'asdair.shopping_lists': { table: ['SELECT'] },
     'asdair.shopping_list_items': { table: ['SELECT'] },
     'asdair.product_alternatives': { table: ['SELECT'] },
+    // ── THE SIX 012-ONLY TABLES (WO-2026-08-19-01). ────────────────────────
+    // Added so a from-git rebuild on which 012 ABORTED stops reporting green.
+    // Nothing in this matrix was previously unique to 012: 005-010 already
+    // supplied every pair it asserted, so a rebuild missing 012 entirely was
+    // green by the matrix's own semantics. These six are granted by 012 and by
+    // nothing else, and three of them (command_request, previously_ordered,
+    // skill_steps) are created by no committed SQL in services/asdair/db - so
+    // on such a rebuild the BLOCKING 'every table in the matrix exists' row
+    // fails, which is the whole point.
+    //
+    // Table existence on the LIVE database was verified out-of-band before
+    // these were added (all six PRESENT). The PRIVILEGES are asserted from
+    // 012's own text and are NOT separately verified live - if a grant here is
+    // not in place, the BLOCKING 'every committed grant is genuinely in place'
+    // row fires. That is the check working, not a false positive: a committed
+    // grant that is not live is real drift.
+    //
+    // credentials_ref is a TABLE NAME. This records that a role may SELECT it;
+    // nothing here reads, holds or names any value inside it.
+    'asdair.command_request': { table: ['SELECT'] },
+    'asdair.credentials_ref': { table: ['SELECT'] },
+    'asdair.previously_ordered': { table: ['SELECT'] },
+    'asdair.process_suggestions': { table: ['SELECT'] },
+    'asdair.products': { table: ['SELECT'] },
+    'asdair.skill_steps': { table: ['SELECT'] },
   }),
   // The narrow write role (ASDAIR_WRITE_DB_URL). No DELETE anywhere, by design:
   // 006 states the runtime "may never delete" a shop, and no migration grants
@@ -166,6 +191,31 @@ export const GRANT_MATRIX = Object.freeze({
     // No UPDATE: a rule is immutable to this role (D-2026-08-03-16).
     'asdair.rules': { table: ['SELECT', 'INSERT'] },
     'asdair.source_documents': { table: ['SELECT'] },
+    // ── THE SIX 012-ONLY TABLES (WO-2026-08-19-01). ────────────────────────
+    // Added so a from-git rebuild on which 012 ABORTED stops reporting green.
+    // Nothing in this matrix was previously unique to 012: 005-010 already
+    // supplied every pair it asserted, so a rebuild missing 012 entirely was
+    // green by the matrix's own semantics. These six are granted by 012 and by
+    // nothing else, and three of them (command_request, previously_ordered,
+    // skill_steps) are created by no committed SQL in services/asdair/db - so
+    // on such a rebuild the BLOCKING 'every table in the matrix exists' row
+    // fails, which is the whole point.
+    //
+    // Table existence on the LIVE database was verified out-of-band before
+    // these were added (all six PRESENT). The PRIVILEGES are asserted from
+    // 012's own text and are NOT separately verified live - if a grant here is
+    // not in place, the BLOCKING 'every committed grant is genuinely in place'
+    // row fires. That is the check working, not a false positive: a committed
+    // grant that is not live is real drift.
+    //
+    // credentials_ref is a TABLE NAME. This records that a role may SELECT it;
+    // nothing here reads, holds or names any value inside it.
+    'asdair.command_request': { table: ['SELECT'] },
+    'asdair.credentials_ref': { table: ['SELECT'] },
+    'asdair.previously_ordered': { table: ['SELECT'] },
+    'asdair.process_suggestions': { table: ['SELECT'] },
+    'asdair.products': { table: ['SELECT'] },
+    'asdair.skill_steps': { table: ['SELECT'] },
     // 006_shop_control_surface.sql
     'asdair.shop': { table: ['SELECT', 'INSERT', 'UPDATE'] },
     'asdair.shop_event': { table: ['SELECT', 'INSERT'] },   // append-only ledger
