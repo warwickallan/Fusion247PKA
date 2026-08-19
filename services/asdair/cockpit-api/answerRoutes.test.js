@@ -86,11 +86,18 @@ test('AC3: the surface grew by three ROUTES and by zero COMMANDS', () => {
   // one lives in httpApi.test.js and the declared surface only ever named that
   // one. ADDING A ROUTE MOVES BOTH. B15-51's Work Order declared both files, so
   // this edit needed no exception - which is the fix working.
+  //
+  // WO-2026-08-19-03: the TWELFTH command is `correctAnswer`, and it adds NO
+  // ROUTE - it dispatches through the existing generic POST /asdair/command.
+  // That is this pin running in the opposite direction for the first time:
+  // every previous note here recorded a ROUTE moving while the COMMAND count
+  // held. The two numbers are independent, which is why both are pinned.
   assert.equal(ROUTES.length, 13);
   assert.deepEqual(Object.keys(ANSWER_ROUTES).sort(),
     ['/asdair/answer', '/asdair/answer/choose', '/asdair/answer/skip']);
-  // THE POINT OF AC3. All three land on one existing command.
-  assert.equal(commandSurface.COMMAND_NAMES.length, 11);
+  // THE POINT OF AC3, UNCHANGED. All three ANSWER routes still land on one
+  // existing command and still add none of their own.
+  assert.equal(commandSurface.COMMAND_NAMES.length, 12);
   assert.ok(commandSurface.COMMAND_NAMES.includes('answerQuestion'));
   assert.ok(!commandSurface.COMMAND_NAMES.includes('chooseCandidate'));
   assert.ok(!commandSurface.COMMAND_NAMES.includes('skipThisWeek'));

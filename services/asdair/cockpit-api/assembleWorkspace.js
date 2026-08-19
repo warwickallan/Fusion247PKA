@@ -492,9 +492,65 @@ function buildQuestions(input, cat, facts) {
     if (k !== null && !decisionsByQuestion.has(k)) decisionsByQuestion.set(k, d);
   });
 
+  // ── WO-2026-08-19-03 AC2. THE ROUND CHAIN, READ ONCE ─────────────────────
+  //
+  // `parent_question_id` is the ONLY thing that makes a supersession legible,
+  // and it is deliberately the thing consulted rather than the shape of a
+  // question_key: parsing the round out of a key would be this view inventing
+  // the meaning of a correction, which is precisely what "a second view, not a
+  // second brain" forbids. A database without migration 017 supplies neither
+  // column, and every field below then reads null - never a fabricated round 1.
+  const byId = new Map();
+  all.forEach(function (q) {
+    const k = idKey(q.id);
+    if (k !== null) byId.set(k, q);
+  });
+  // parent question_key -> the key of the round that REPLACED it.
+  const replacedBy = new Map();
+  all.forEach(function (q) {
+    const parentKey = idKey(q.parent_question_id);
+    if (parentKey === null) return;
+    const parent = byId.get(parentKey);
+    if (parent && parent.question_key !== undefined && parent.question_key !== null) {
+      replacedBy.set(String(parent.question_key), q.question_key);
+    }
+  });
+  function supersedesKeyOf(q) {
+    const parentKey = idKey(q.parent_question_id);
+    if (parentKey === null) return null;
+    const parent = byId.get(parentKey);
+    return parent && parent.question_key !== undefined ? parent.question_key : null;
+  }
+  function supersededByKeyOf(q) {
+    const k = q.question_key === undefined || q.question_key === null ? null : String(q.question_key);
+    return k === null ? null : (replacedBy.get(k) || null);
+  }
+
+  // AC2. A superseded round is HISTORY and must not be listed as outstanding -
+  // the Telegram board has retired it, and a card sitting here beside its own
+  // successor is the same condemned artefact the board stopped showing.
+  //
+  // Projected from the ONE arithmetic object on the production path. Derived
+  // locally only when a direct unit test calls this function without facts, and
+  // then from the SAME parent-link data, so the definition is single-source
+  // either way - exactly the discipline classifyQuestion already follows above.
+  const supersededKeys = new Set(facts && Array.isArray(facts.superseded_question_keys)
+    ? facts.superseded_question_keys
+    : open.filter(function (q) { return supersededByKeyOf(q) !== null; })
+      .map(function (q) { return q.question_key; }));
+  const openLive = open.filter(function (q) { return !supersededKeys.has(q.question_key); });
+
   return {
     // AC6. Projected from the one arithmetic object on the production path.
-    open_count_display: P.count(facts ? facts.questions_open : open.length),
+    //
+    // WO-2026-08-19-03 AC2: `questions_open_live`, NOT `questions_open`. The
+    // raw bucket keeps the four-bucket totality invariant intact; this is the
+    // number a human reads as "still open", and a superseded round is not.
+    open_count_display: P.count(facts ? facts.questions_open_live : openLive.length),
+    // Said rather than silently deducted - a non-zero value is AsdAIr having
+    // re-asked something, which Warwick is entitled to see.
+    superseded_count_display: P.count(facts ? facts.superseded_questions_suppressed
+      : open.length - openLive.length),
     resolved_count_display: P.count(facts
       ? facts.questions_answered + facts.questions_skipped
       : resolved.length),
@@ -517,7 +573,7 @@ function buildQuestions(input, cat, facts) {
           + 'needing you nor as settled, and it is listed here so it is not lost.'
       };
     }),
-    items: open.map(function (q) {
+    items: openLive.map(function (q) {
       return {
         id: q.id === undefined ? null : q.id,
         // ── THE JOIN KEY (WP-B15-41 AC2) ─────────────────────────────────
@@ -540,6 +596,12 @@ function buildQuestions(input, cat, facts) {
           };
         }),
         answer_becomes_durable: durableLearningFor(q),
+        // AC2. Which round this is, and what it replaced. An open question that
+        // supersedes an earlier one is AsdAIr ASKING AGAIN, and saying so is the
+        // difference between a confusing repeat and a legible correction.
+        question_round: q.question_round === undefined ? null : q.question_round,
+        supersedes_question_key: supersedesKeyOf(q),
+        superseded_by_question_key: supersededByKeyOf(q),
         // Named so the UI cannot invent an action that has no command behind it.
         allowed_replies: [
           { key: 'choose', label: 'Choose this one', command: 'answerQuestion' },
@@ -572,7 +634,39 @@ function buildQuestions(input, cat, facts) {
         // decision is on record — the UI shows the raw answer on its own
         // rather than a sentence this module has no grounds for.
         resolution_display: resolutionSentence(q.status, decision),
-        decision: decision
+        decision: decision,
+
+        // ── WO-2026-08-19-03. THE CORRECTION CHAIN, READABLE AFTER A RELOAD ──
+        //
+        // THE DEFECT THIS CLOSES IS NOT AC2's. AC2 stops a superseded question
+        // being counted as OPEN. This is the other half: once a correction has
+        // landed, BOTH rounds are resolved, so the payload carried them as two
+        // independent settled entries about the same line, with contradicting
+        // answers and no stated relationship between them. Warwick reloads and
+        // sees himself apparently having said two different things.
+        //
+        // The link is published as DATA, from `parent_question_id`, so the view
+        // never has to pair rounds by parsing a question_key - inventing the
+        // meaning of a correction in the client is the same "second brain"
+        // failure from the other end.
+        //
+        // null everywhere when migration 017 is not applied: unknown, not
+        // fabricated.
+        question_round: q.question_round === undefined ? null : q.question_round,
+        supersedes_question_key: supersedesKeyOf(q),
+        superseded_by_question_key: supersededByKeyOf(q),
+
+        // THE HONEST MECHANISM, not a client-invented action - the same shape
+        // the open items above use, so one rule covers both lists.
+        //
+        // ⚠️ THE COMMAND IS `correctAnswer`, AND THAT IS THE WHOLE POINT.
+        // `answerQuestion` is a compare-and-set on status='open' and is
+        // first-answer-wins: aimed at a SETTLED row it silently changes nothing
+        // while the surface reports success. A control offering to change a
+        // settled answer must name the command that can actually do it.
+        allowed_replies: [
+          { key: 'correct', label: 'Change this answer', command: 'correctAnswer' }
+        ]
       };
     })
   };

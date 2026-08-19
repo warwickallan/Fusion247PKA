@@ -405,3 +405,170 @@ test.after(async () => {
   if (writePool) await writePool.end();
   if (readPool) await readPool.end();
 });
+
+// =====================================================================
+// WO-2026-08-19-03 - AGAINST A REAL POSTGRES, NOT A FIXTURE.
+//
+// The read-back for this Work Order said the AC1/AC2 proofs would be offline,
+// because no disposable target was available. One was; these are the row-level
+// proofs that replaces. Same limits as everything else in this file: a
+// throwaway cluster, builder evidence, and no claim whatsoever about live data.
+// =====================================================================
+
+test('AC1 DB: correctAnswer dispatches through the Cockpit HTTP layer against a real row',
+  { skip: !ENABLED && skipMessage() }, async () => {
+  const { handleRequest } = require('./httpApi');
+  const { getCommandDeps } = require('./commandDeps');
+  const seed = await seedShop({ suffix: 'correct' });
+
+  // ⚠️ THE KEY IS DERIVED BY THE PIPELINE'S OWN FUNCTION, NOT TYPED.
+  //
+  // correctAnswer REFUSES to open a successor whose key it cannot re-derive
+  // from a name the question actually carries - "a successor derived from a
+  // different name would be invisible to the planner: recorded, and inert". A
+  // hand-written key is therefore not a valid fixture, and the first draft of
+  // this test earned exactly that refusal. The refusal is the product working;
+  // the fixture was wrong. `item_name` reaches the question by the
+  // shop_question.list_item_id -> shopping_list_items.item_name join.
+  const { questionKeyFor } = require('../pipeline/keys.js');
+  const itemName = 'cat food ' + RUN;
+  const key = questionKeyFor(itemName, 1);
+  const item = await w(
+    'INSERT INTO asdair.shopping_list_items (list_id, item_name, status) VALUES ($1,$2,$3) RETURNING id',
+    [seed.listId, itemName, 'held']
+  );
+  await w(
+    'INSERT INTO asdair.shop_question (shop_id, list_item_id, question_key, question_text, status) '
+    + 'VALUES ($1,$2,$3,$4,$5)',
+    [seed.shopId, item.rows[0].id, key, 'which cat food did you mean?', 'open']
+  );
+
+  // 1. He answers, and it binds.
+  const answered = await handleRequest({
+    method: 'POST', path: '/asdair/answer',
+    body: { shop: seed.shopRef, question_key: key, answer_text: 'Dreamies cheese' }
+  }, { commandDeps: getCommandDeps() });
+  assert.equal(answered.status, 200, JSON.stringify(answered.body));
+  assert.equal(answered.body.changed, true);
+
+  // 2. THE CAPABILITY THIS WORK ORDER EXISTS FOR. Before it, this call was a
+  //    400 unknown_command: the Cockpit could not express the correction at
+  //    all, while Telegram could.
+  const corrected = await handleRequest({
+    method: 'POST', path: '/asdair/command',
+    body: {
+      command: 'correctAnswer',
+      // ⚠️ `actor` TRAVELS INSIDE args, AND THAT IS THE REAL CLIENT'S SHAPE,
+      // not a fixture convenience. httpApi.js maps body.actor -> requested_by
+      // only, while commands.js requireActor() reads spec.actor directly - so
+      // every write through the generic route depends on the caller also
+      // putting it in args. services/cockpit/public/app.js already does exactly
+      // this, and says so in a comment at its one write function. REPORTED as a
+      // seam wart rather than quietly changed here: altering the route would
+      // change the contract for all twelve commands, which is wider than this
+      // Work Order.
+      args: { shopRef: seed.shopRef, questionKey: key, actor: 'cockpit:warwick',
+        answerText: 'Felix As Good As It Looks', answerSource: 'typed' },
+    }
+  }, { commandDeps: getCommandDeps() });
+
+  assert.notEqual(corrected.status, 400,
+    'a 400 here means the Cockpit still cannot name the correction capability: ' + JSON.stringify(corrected.body));
+  assert.equal(corrected.status, 200, JSON.stringify(corrected.body));
+  assert.equal(corrected.body.command, 'correctAnswer');
+
+  // 3. THE PROOF THAT MATTERS - the DURABLE ROWS moved, read back through the
+  //    SELECT-only role so this is not the writer confirming its own work.
+  const rows = await r(
+    'SELECT id, question_key, status, answer_text, question_round, parent_question_id '
+    + 'FROM asdair.shop_question WHERE shop_id = $1 ORDER BY id ASC',
+    [seed.shopId]
+  );
+  assert.equal(rows.rows.length, 2,
+    'a correction opens a SUCCESSOR round - it never edits the original, which is the record of '
+    + 'what he was actually asked and what he actually said');
+
+  const first = rows.rows[0];
+  const second = rows.rows[1];
+  assert.equal(first.question_key, key);
+  assert.equal(first.answer_text, 'Dreamies cheese', 'his original words survive verbatim');
+  assert.equal(String(second.parent_question_id), String(first.id),
+    'the successor must point at the round it replaced - that link is the whole supersession');
+  assert.equal(second.question_round, 2);
+});
+
+test('AC2 DB: a SUPERSEDED round is not counted as open by the cockpit arithmetic',
+  { skip: !ENABLED && skipMessage() }, async () => {
+  const A = require('./shopArithmetic');
+  const seed = await seedShop({ suffix: 'superseded' });
+
+  // Round 1, open and never answered. Round 2 replaces it. A third, unrelated
+  // question stays genuinely open - so a rule that suppressed everything would
+  // fail here rather than look correct.
+  const k1 = 'q-' + RUN + '-sup-r1';
+  const k2 = 'q-' + RUN + '-sup-r2';
+  const k3 = 'q-' + RUN + '-other';
+  const parent = await w(
+    'INSERT INTO asdair.shop_question (shop_id, question_key, question_text, status) '
+    + 'VALUES ($1,$2,$3,$4) RETURNING id',
+    [seed.shopId, k1, 'which cat food?', 'open']
+  );
+  const parentId = parent.rows[0].id;
+  await w(
+    'INSERT INTO asdair.shop_question (shop_id, question_key, question_text, status, question_round, parent_question_id) '
+    + 'VALUES ($1,$2,$3,$4,$5,$6)',
+    [seed.shopId, k2, 'which cat food, exactly?', 'open', 2, parentId]
+  );
+  await w(
+    'INSERT INTO asdair.shop_question (shop_id, question_key, question_text, status) VALUES ($1,$2,$3,$4)',
+    [seed.shopId, k3, 'which ham?', 'open']
+  );
+
+  // Read the rows the way the workspace read does, INCLUDING the 017 columns -
+  // the point being that they are actually present on a real database and
+  // actually arrive.
+  const read = await r(
+    'SELECT id, list_item_id, question_key, question_text, candidates, status, answer_text, '
+    + 'answer_source, asked_at, answered_at, question_round, parent_question_id '
+    + 'FROM asdair.shop_question WHERE shop_id = $1 ORDER BY id ASC',
+    [seed.shopId]
+  );
+  assert.equal(read.rows.length, 3);
+  assert.ok(read.rows.some((q) => q.parent_question_id !== null),
+    'parent_question_id must be readable, or the cockpit cannot see a supersession at all');
+
+  const facts = A.countShop({
+    stage: 'PROCESSING', human_state: 'ASDAIR_WORKING',
+    questions: read.rows, lines: [], items: [],
+  });
+
+  // THREE rows say status='open'. TWO are questions Warwick still has.
+  assert.equal(facts.questions_open, 3, 'the raw status bucket is unchanged, and still sums');
+  assert.equal(facts.questions_open_live, 2, 'the replaced round must not read as still open');
+  assert.equal(facts.superseded_questions_suppressed, 1);
+  assert.deepEqual([...facts.superseded_question_keys], [k1]);
+  assert.equal(facts.decisions_needing_warwick, 2);
+});
+
+test('AC2 DB: the SELECT the workspace actually builds carries the 017 columns on a real database',
+  { skip: !ENABLED && skipMessage() }, async () => {
+  const RW = require('./readWorkspace');
+  // Ask the catalogue what this database has, exactly as the read path does,
+  // rather than trusting that a migration file exists in the repository.
+  const cols = await r(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema='asdair' "
+    + "AND table_name='shop_question'"
+  );
+  const present = cols.rows.map((c) => c.column_name);
+  assert.ok(present.includes('parent_question_id'), 'migration 017 is not applied to this target');
+
+  const sql = RW._internal.buildQuestionSelect(present);
+  assert.ok(sql.includes('parent_question_id'));
+  assert.ok(sql.includes('question_round'));
+
+  // And it RUNS. A statement that assembles and then fails against the real
+  // catalogue would be a green about nothing.
+  const seed = await seedShop({ suffix: 'select' });
+  const out = await r(sql, [seed.shopId]);
+  assert.ok(Array.isArray(out.rows));
+});

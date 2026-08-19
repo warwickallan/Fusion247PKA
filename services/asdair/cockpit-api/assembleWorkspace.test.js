@@ -695,3 +695,135 @@ test('AC7: the exception-first buckets the UI filters on are all present per lin
   assert.ok(Object.prototype.hasOwnProperty.call(l, 'status'));
   assert.ok(Object.prototype.hasOwnProperty.call(l, 'provenance'));
 });
+
+// =====================================================================
+// WO-2026-08-19-03 AC2 - THE PAYLOAD AGREES WITH THE TELEGRAM BOARD.
+// =====================================================================
+
+// Round 1 was replaced by round 2 on the same line. Round 1's row is still
+// 'open' in the database - it was never answered, it was SUPERSEDED.
+const SUPERSEDED_QUESTIONS = [
+  { id: 10, question_key: 'shop:7:line:3:r1', question_text: 'Which product is "cat food"?',
+    status: 'open', question_round: 1, parent_question_id: null, list_item_id: 300, candidates: [] },
+  { id: 11, question_key: 'shop:7:line:3:r2', question_text: 'Which cat food, exactly?',
+    status: 'open', question_round: 2, parent_question_id: 10, list_item_id: 300, candidates: [] },
+  { id: 12, question_key: 'shop:7:line:7:r1', question_text: 'Which product is "ham"?',
+    status: 'open', question_round: 1, parent_question_id: null, list_item_id: 700, candidates: [] },
+];
+
+test('AC2: a superseded round is not listed as outstanding, and not counted as open', () => {
+  const p = assembleWorkspace(input({ questions: SUPERSEDED_QUESTIONS }));
+  const keys = p.questions.items.map((q) => q.question_key);
+
+  assert.deepEqual(keys, ['shop:7:line:3:r2', 'shop:7:line:7:r1'],
+    'the condemned round must leave the board - showing it beside its own successor is the '
+    + 'artefact Telegram already stopped displaying');
+  assert.equal(p.questions.open_count_display, '2');
+  // Excluded, therefore said.
+  assert.equal(p.questions.superseded_count_display, '1');
+});
+
+test('AC2: the successor says what it replaced - the chain is DATA, not a parsed key', () => {
+  const p = assembleWorkspace(input({ questions: SUPERSEDED_QUESTIONS }));
+  const successor = p.questions.items.find((q) => q.question_key === 'shop:7:line:3:r2');
+  assert.equal(successor.question_round, 2);
+  assert.equal(successor.supersedes_question_key, 'shop:7:line:3:r1');
+  assert.equal(successor.superseded_by_question_key, null);
+
+  const untouched = p.questions.items.find((q) => q.question_key === 'shop:7:line:7:r1');
+  assert.equal(untouched.question_round, 1);
+  assert.equal(untouched.supersedes_question_key, null);
+  assert.equal(untouched.superseded_by_question_key, null);
+});
+
+test('AC2: with no 017 columns the payload still assembles, and invents no round', () => {
+  const p = assembleWorkspace(input({
+    questions: [
+      { id: 1, question_key: 'a', question_text: 'q', status: 'open', candidates: [] },
+      { id: 2, question_key: 'b', question_text: 'q', status: 'answered', answer_text: 'the blue one' },
+    ],
+  }));
+  assert.equal(p.questions.open_count_display, '1');
+  assert.equal(p.questions.superseded_count_display, '0');
+  // null, never a fabricated round 1.
+  assert.equal(p.questions.items[0].question_round, null);
+  assert.equal(p.questions.items[0].supersedes_question_key, null);
+  assert.equal(p.questions.resolved[0].question_round, null);
+});
+
+// =====================================================================
+// WO-2026-08-19-03 (addition A) - A CORRECTION CHAIN IS READABLE AFTER A
+// RELOAD, AND THE OFFERED ACTION CAN ACTUALLY PERFORM IT.
+//
+// NOT the AC2 case. Once a correction has landed BOTH rounds are RESOLVED, so
+// the payload carried two independent settled entries about the same line with
+// contradicting answers and nothing stating the relationship. Warwick reloads
+// and sees himself apparently having said two different things.
+// =====================================================================
+
+const CORRECTED_QUESTIONS = [
+  { id: 20, question_key: 'shop:7:line:3:r1', question_text: 'Which product is "cat food"?',
+    status: 'answered', answer_text: 'Dreamies cheese', answer_source: 'button',
+    question_round: 1, parent_question_id: null, list_item_id: 300, candidates: [] },
+  { id: 21, question_key: 'shop:7:line:3:r2', question_text: 'Which cat food, exactly?',
+    status: 'answered', answer_text: 'Felix As Good As It Looks', answer_source: 'typed',
+    question_round: 2, parent_question_id: 20, list_item_id: 300, candidates: [] },
+];
+
+test('addition A: both rounds are resolved, and the payload STATES which replaced which', () => {
+  const p = assembleWorkspace(input({ questions: CORRECTED_QUESTIONS }));
+  const byKey = new Map(p.questions.resolved.map((q) => [q.question_key, q]));
+  assert.equal(p.questions.resolved.length, 2, 'both rounds are settled and both are published');
+
+  const first = byKey.get('shop:7:line:3:r1');
+  const second = byKey.get('shop:7:line:3:r2');
+
+  assert.equal(first.question_round, 1);
+  assert.equal(first.supersedes_question_key, null);
+  assert.equal(first.superseded_by_question_key, 'shop:7:line:3:r2',
+    'without this, two contradicting answers about one line have no stated relationship');
+
+  assert.equal(second.question_round, 2);
+  assert.equal(second.supersedes_question_key, 'shop:7:line:3:r1');
+  assert.equal(second.superseded_by_question_key, null);
+
+  // Both answers survive verbatim. A correction supersedes an answer; it never
+  // edits what he actually said.
+  assert.equal(first.answer_text_display, 'Dreamies cheese');
+  assert.equal(second.answer_text_display, 'Felix As Good As It Looks');
+});
+
+test('addition A: a resolved question offers correctAnswer - the command that can actually change it', () => {
+  const p = assembleWorkspace(input({ questions: CORRECTED_QUESTIONS }));
+  p.questions.resolved.forEach((q) => {
+    assert.ok(Array.isArray(q.allowed_replies) && q.allowed_replies.length > 0,
+      'a settled question must name the action available on it, or the UI invents one');
+    q.allowed_replies.forEach((r) => {
+      // THE WHOLE POINT. `answerQuestion` is a compare-and-set on status='open':
+      // aimed at a settled row it changes nothing while the surface reports
+      // success. That is the live defect this field exists to stop the UI
+      // reproducing.
+      assert.notEqual(r.command, 'answerQuestion',
+        'offering answerQuestion on a SETTLED question is a silent no-op dressed as a save');
+      assert.equal(r.command, 'correctAnswer');
+      assert.ok(typeof r.key === 'string' && r.key.length > 0);
+      assert.ok(typeof r.label === 'string' && r.label.length > 0);
+    });
+  });
+});
+
+test('addition A: every command named in allowed_replies is a real command on the shared surface', () => {
+  const { COMMAND_NAMES } = require('./commandSurface');
+  const p = assembleWorkspace(input({ questions: CORRECTED_QUESTIONS.concat(SUPERSEDED_QUESTIONS) }));
+  const named = new Set();
+  p.questions.items.forEach((q) => (q.allowed_replies || []).forEach((r) => named.add(r.command)));
+  p.questions.resolved.forEach((q) => (q.allowed_replies || []).forEach((r) => named.add(r.command)));
+  assert.ok(named.size > 0);
+  named.forEach((c) => {
+    assert.ok(COMMAND_NAMES.includes(c),
+      'the payload offers "' + c + '", which the cockpit cannot dispatch - a button with no command '
+      + 'behind it is the defect this whole Work Order is about');
+  });
+  // And the correction capability really is among them now.
+  assert.ok(named.has('correctAnswer'));
+});
