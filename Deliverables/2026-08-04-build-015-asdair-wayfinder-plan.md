@@ -6057,14 +6057,47 @@ exists.**
 >
 > 1. **The joined route has never run end to end from a fresh photograph.** The decision point fired on a
 >    **re-plan**, not on a new Telegram photo. **Veritas's discharge condition is one real photograph.**
-> 2. **No browser has ever launched.** A real Chrome becomes necessary at `run-basket.cjs`'s
->    `ensureChrome`. AC2 (real Chrome, scratch profile, local fixture) is in flight.
-> 3. **Kill-and-revive unproven** — AC4, in flight against a real disposable Postgres.
-> 4. **Terminal-condition notification sweep** — AC5, in flight.
+> 2. **The browser lane now launches — against a FIXTURE.** ✅ **AC2 closed 2026-08-19.** Real
+>    Chrome 151 launched by the shipping launcher on a **scratch** profile; all five boundaries refused
+>    **on the live code path with a browser attached**, including `Input.dispatchKeyEvent` — *a process
+>    that cannot synthesise a keystroke cannot type a password or a card number* — while the trolley page
+>    itself stayed permitted, because a boundary is not a wall. First real trolley read in this build's
+>    history: `order_total 24.53`, `item_count 7`, both product lines with ids, through the **real**
+>    `reconcile()`; gate opens, and **shuts** with `unexplained-absence` when a line is removed.
+>    ⛔ **STILL OPEN: nothing has touched the real ASDA site, account or trolley.** No request left the
+>    machine — the fixture is written into the harness's own tab rather than fetched, so the allowlist was
+>    neither used nor weakened.
+> 3. ~~Kill-and-revive unproven~~ ✅ **CLOSED — AC4, 2026-08-19.** **SIGKILL** against
+>    real PostgreSQL 17.4, 11/11. The proof that makes it a proof: **a second runner is REFUSED while the
+>    dead runner's lease is still live**, and the row still shows the dead runner holding it — *a corpse,
+>    not a clean slate*. Work completed before the kill survived; the new runner **resumed** rather than
+>    restarting; total work only grew, 3 → 6. The real schema earned its place in two minutes by failing
+>    the harness on a `NOT NULL`, a `CHECK` and a `FOREIGN KEY` a string-matching fake cannot have.
+> 4. ~~Terminal-condition notification sweep~~ ✅ **CLOSED — AC5, 2026-08-19, and it was TWO silent
+>    conditions, not one.** `basket_not_ready` reached the announcer and was **dropped by a guard testing
+>    the wrong kind** — the announcement was being made and thrown away. `basket_run_error` **did not
+>    exist**: the catch path released the lease and rethrew, and that is the one release that *consumes an
+>    attempt*, so at the ceiling it marked the request permanently `failed` while naming no failure class —
+>    meaning the re-queue rule could never resurrect it. **A shop could reach a dead end that nothing
+>    announced and nothing could recover.** A third would have made a fix look like a fix: `basket_not_ready`
+>    carried no `shop_id`, and the announcer returns `null` without one. **No new outbox kind** — a kind
+>    absent from the renderer map is *abandoned* by `drainOutbox`, so a new kind is how a
+>    failure-must-never-be-silent fix becomes silent.
 > 5. **`shop_line_provenance` is empty across the whole database.** No writer exists anywhere; migration
 >    020 says *"NO BACKFILL … DELIBERATELY"*. **Reconciling to the source photograph remains a human act.**
 >    Separate Work Order; needs a Silas conversation about `source_region_id`.
-> 6. **The Cockpit's SCREEN correction control is merged but ungated** — with Vera now.
+> 6. ~~The Cockpit's SCREEN correction control is merged but ungated~~ ✅ **CLOSED — Vera PASS at
+>    `dbdf041`, 2026-08-19**, after **FAIL → fixes → PASS → one MEDIUM → PASS**. Receipt:
+>    `Deliverables/2026-08-19-vera-cockpit-correction-control-gate.md`, 684 lines, three gates recorded.
+>    **The control it replaced had been lying for weeks** — `app.js:3104` called `answerQuestion`, which
+>    no-ops on a settled row while returning `ok:true`, so the screen flashed *"Saved"* for a write that
+>    never happened. **And the first replacement reproduced the class**: it read *not-duplicate* as a
+>    result where the old had read *ok* as a result. Success is now gated on `corrected === true`, in a
+>    **pure function separated from the write so a test can reach it** — which is also what let the
+>    reviewer execute it standalone across twelve receipt shapes without a browser.
+>    ⛔ **STILL OPEN, and stated in the receipt's own banner: no real end-to-end correction against a live
+>    shop.** `questions.resolved` is `[]`, so the control is absent from the live DOM — a fact about the
+>    shop, not the code, and it stays true until a shop has a settled answer.
 > 7. **⛔ THE ESTATE CANNOT BE REBUILT FROM GIT.** Reproduced independently in **two separate clusters**:
 >    applying `001`→`021` then `012` aborts — `relation "asdair.command_request" does not exist`.
 >    `command_request` comes from a **control-plane** migration (an undeclared cross-service dependency);
