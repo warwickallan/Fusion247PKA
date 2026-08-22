@@ -2059,20 +2059,102 @@ function mumScenarios(shopRender) {
   });
 }
 
+// ── STABLE-STEM MUTATION ANCHORS (WO-2026-08-15-03, external reviewer finding Codex F-3) ────────
+//
+// ⛔ THE DEFECT THIS REPAIRS, recorded because of what it cost. Every mutation below injects markup
+// immediately after an opening tag, and each one used to pin itself to that tag's FULL text —
+// `'<div class="page page-pad">'`. On 2026-08-13 (51b9a3b, "Mum's SEND becomes real") that div
+// legitimately gained `:data-send-state="sendState"`, the literal stopped matching, and the anchor
+// guard did exactly what it should: it aborted loudly rather than run seven mutations that would
+// silently no-op. The template was RIGHT; the tool's expectation had gone stale.
+//
+// The damage was not the red badge. This file's CI step is `--self-test` and then the REAL gate,
+// under `bash -e` — so the abort took the real gate with it, and SEVEN further steps in the
+// `cockpit-private-apps` job were skipped on every push. The only CI check that inspects the
+// household shopping template never ran once between that surface shipping and this repair.
+//
+// The lesson is the one DRAWER_STEM already recorded above: match the STABLE STEM, not the full
+// string. What a mutation depends on is the element's IDENTITY — its class — never its attribute
+// list, which grows.
+//
+// ⛔ AND THE TRAP, because the obvious repair is worse than the defect. The anchor is not only a
+// detector, it is the `String.replace` TARGET. Shorten it to `'<div class="page page-pad"'` and
+// `t.replace(stem, stem + '<p>…</p>')` splices the injection INSIDE the opening tag —
+// `<div class="page page-pad"<p>…`. That is a green stem with a broken mutation, and it fails
+// SILENTLY, which is strictly worse than the honest refusal it replaced. So the stem LOCATES the
+// element and the injection lands after that tag's real `>`, found by scanning past quoted
+// attribute values.
+//
+// The guard ends up stronger than the one it replaces, which is the point: the old one proved a
+// STRING EXISTED; this proves each mutation actually CHANGED the template. Ambiguity and no-ops
+// are hard stops, never "take the first match and hope".
+function injectAfterOpenTag(template, stem, html) {
+  const first = template.indexOf(stem);
+  if (first < 0) {
+    console.error('SELF-TEST FAIL — the mutation anchor stem is missing: ' + stem);
+    console.error('  The element this mutation depends on has been renamed or removed. Re-derive the');
+    console.error('  stem from the shipped template. Do NOT delete the case, and do NOT relax the stem');
+    console.error('  to something that still matches by accident.');
+    process.exit(1);
+  }
+  if (template.indexOf(stem, first + 1) >= 0) {
+    // A second match is a hard stop, not a first-wins. The mutation would inject into whichever
+    // copy came first and the scenario would quietly stop testing the element it names.
+    console.error('SELF-TEST FAIL — the mutation anchor stem matches MORE THAN ONCE: ' + stem);
+    console.error('  Narrow the stem until it identifies exactly one element.');
+    process.exit(1);
+  }
+  let i = first + stem.length, quote = null;
+  while (i < template.length) {
+    const c = template[i];
+    if (quote) { if (c === quote) quote = null; }
+    else if (c === '"' || c === "'") quote = c;
+    else if (c === '>') break;
+    i++;
+  }
+  if (i >= template.length) {
+    console.error('SELF-TEST FAIL — the anchor stem never closes its opening tag: ' + stem);
+    process.exit(1);
+  }
+  const out = template.slice(0, i + 1) + html + template.slice(i + 1);
+  if (out === template) {
+    // Belt to the caller's braces. A mutation that produces an identical template reports "caught"
+    // for whatever the UNMUTATED render happens to do, which is a vacuous pass wearing a green hat.
+    console.error('SELF-TEST FAIL — the mutation produced an IDENTICAL template: ' + stem);
+    process.exit(1);
+  }
+  return out;
+}
+
+// The differs-from-source assertion the callers run, so the proof appears in the RUN OUTPUT rather
+// than only in this function's failure path. `injectAfterOpenTag` already refuses a no-op; this
+// counts the ones that were checked, because "the guard would have fired" is not evidence and a
+// count a reader can see is.
+function assertMutated(label, source, mutated) {
+  if (mutated === source || mutated.length <= source.length) {
+    console.error('SELF-TEST FAIL — mutation did not change the template: ' + label);
+    process.exit(1);
+  }
+  return mutated;
+}
+
 // ---------------------------------------------------------------------------
 // MUTATION TEST — the `has` trap is the mechanism; prove it still catches.
 // A harness whose detector has silently stopped detecting looks exactly like a clean run.
 // ---------------------------------------------------------------------------
 if (SELF_TEST) {
-  const anchor = '<div class="app-view">';
-  if (!opts.template.includes(anchor)) { console.error('SELF-TEST FAIL — anchor missing; rewrite the mutations.'); process.exit(1); }
+  // STEM, not the full tag — see injectAfterOpenTag above. Probed eagerly so a stale stem is
+  // reported before any scenario output rather than halfway through a run.
+  const APP_VIEW_STEM = '<div class="app-view"';
+  injectAfterOpenTag(opts.template, APP_VIEW_STEM, '<!-- anchor probe -->');
+  let mutationsProven = 0;
   const cases = {
     'missing binding (undeclared identifier)':
-      (t) => t.replace(anchor, anchor + '<p>{{ noSuchBindingAnywhere }}</p>'),
+      (t) => injectAfterOpenTag(t, APP_VIEW_STEM, '<p>{{ noSuchBindingAnywhere }}</p>'),
     'missing binding (undeclared helper call)':
-      (t) => t.replace(anchor, anchor + '<p>{{ noSuchHelper(1) }}</p>'),
+      (t) => injectAfterOpenTag(t, APP_VIEW_STEM, '<p>{{ noSuchHelper(1) }}</p>'),
     'expression throws on real data':
-      (t) => t.replace(anchor, anchor + '<p>{{ currentApp.nope.deeper }}</p>'),
+      (t) => injectAfterOpenTag(t, APP_VIEW_STEM, '<p>{{ currentApp.nope.deeper }}</p>'),
   };
   let caught = 0, total = Object.keys(cases).length + 1; // +1 = the stray-JSON mutation below
   const missed = [];
@@ -2084,7 +2166,9 @@ if (SELF_TEST) {
     // 'label')" on untouched HEAD. Every one was VACUOUS: the has-trap detector this block exists to
     // prove was never exercised. A mutation test that passes for the wrong reason is worse than
     // none, because it gets quoted as evidence.
-    const r = scenario('mutant', 'shop', Vue.compile(mutate(opts.template)));
+    mutationsProven++;
+    const r = scenario('mutant', 'shop', Vue.compile(
+      assertMutated(name, opts.template, mutate(opts.template))));
     const hit = r.err || r.missing.length;
     if (hit) { caught++; console.log('  caught  ' + name.padEnd(42) + ' -> ' + (r.err ? 'threw: ' + r.err.message.slice(0, 60) : 'missing: ' + r.missing.join(', '))); }
     else { missed.push(name); console.log('  MISSED  ' + name); }
@@ -2094,7 +2178,9 @@ if (SELF_TEST) {
   // discriminator added above could quietly stop discriminating and every run would look clean.
   {
     setRefs({ asdairWs: WS, asdairWsErr: null });
-    const mutated = opts.template.replace(anchor, anchor + '<p>{{ JSON.stringify(asdairWs) }}</p>');
+    mutationsProven++;
+    const mutated = assertMutated('stray raw JSON outside a drawer', opts.template,
+      injectAfterOpenTag(opts.template, APP_VIEW_STEM, '<p>{{ JSON.stringify(asdairWs) }}</p>'));
     // 'shop' for the same reason as above: on HEAD this scenario THREW, `strays` was forced to [],
     // and the mutation was reported MISSED every run. Fixing the key is what makes it a real test.
     const r = scenario('mutant', 'shop', Vue.compile(mutated));
@@ -2110,21 +2196,23 @@ if (SELF_TEST) {
   {
     const vocabCases = {
       'vocabulary: a screen calls corroboration VERIFIED':
-        (t) => t.replace(anchor, anchor + '<p>Every line was verified against the photograph.</p>'),
+        (t) => injectAfterOpenTag(t, APP_VIEW_STEM, '<p>Every line was verified against the photograph.</p>'),
       'vocabulary: the API word "unknown" reaches a value slot':
-        (t) => t.replace(anchor, anchor + '<p>{{ "unknown" }}</p>'),
+        (t) => injectAfterOpenTag(t, APP_VIEW_STEM, '<p>{{ "unknown" }}</p>'),
       'vocabulary: the ZZ brand sort sentinel is rendered as a brand':
-        (t) => t.replace(anchor, anchor + '<p>ZZ (no brand recorded)</p>'),
+        (t) => injectAfterOpenTag(t, APP_VIEW_STEM, '<p>ZZ (no brand recorded)</p>'),
       // VERA V-4. Mutated through a REAL undefined property, and CONCATENATED — which is how the
       // live leak actually rendered ("undefined/undefined"). A bare `{{ undefined }}` is useless as
       // a mutation: Vue renders it as an empty string, so it proves nothing. Found by running it.
       'vocabulary: a raw JavaScript undefined reaches the screen':
-        (t) => t.replace(anchor, anchor + '<p>WO first pass {{ currentApp.noSuchField + "/" + currentApp.noSuchField }}</p>'),
+        (t) => injectAfterOpenTag(t, APP_VIEW_STEM, '<p>WO first pass {{ currentApp.noSuchField + "/" + currentApp.noSuchField }}</p>'),
     };
     total += Object.keys(vocabCases).length;
     for (const [name, mutate] of Object.entries(vocabCases)) {
       setRefs({ asdairWs: WS, asdairWsErr: null });
-      const r = scenario('mutant', 'shop', Vue.compile(mutate(opts.template)));
+      mutationsProven++;
+      const r = scenario('mutant', 'shop', Vue.compile(
+        assertMutated(name, opts.template, mutate(opts.template))));
       const hits = r.err ? [] : bannedVocabulary(r.name, text(r.vnode));
       if (hits.length) { caught++; console.log('  caught  ' + name.padEnd(48) + ' -> ' + hits[0].slice(0, 60)); }
       else { missed.push(name); console.log('  MISSED  ' + name); }
@@ -2133,7 +2221,8 @@ if (SELF_TEST) {
     // detector fires on the feature and gets switched off — the same trade the drawer control makes.
     setRefs({ asdairWs: WS, asdairWsErr: null });
     const clean = scenario('control', 'shop', Vue.compile(
-      opts.template.replace(anchor, anchor + '<p>No brand recorded</p><p>Corroborated</p>')));
+      assertMutated('SHOP control', opts.template,
+        injectAfterOpenTag(opts.template, APP_VIEW_STEM, '<p>No brand recorded</p><p>Corroborated</p>'))));
     const falsePos = clean.err ? [] : bannedVocabulary('SHOP control', text(clean.vnode));
     console.log(falsePos.length
       ? '  CONTROL FAILED — the sanctioned unbranded heading is being flagged: ' + falsePos[0]
@@ -2167,6 +2256,13 @@ if (SELF_TEST) {
   // "0". Nothing throws, no binding goes missing, no blob appears — under the pre-existing detectors
   // alone this mutation was INVISIBLE. If it ever stops turning assertions red, the verdict layer
   // has stopped verdicting.
+  // ⚠️ KNOWN TICKING ANCHOR — deliberately NOT converted to a stable stem (WO-2026-08-15-03 AC5,
+  // reported to Larry and accepted). It is not an opening-tag anchor like the two above: it is a
+  // WHOLE ROW used as the replace TARGET, and its three mutations rewrite that entire row. Making
+  // it stem-based means matching the enclosing element structurally, which is a materially larger
+  // change carrying real risk of weakening the one guard that proves the verdict layer still
+  // verdicts. The brittleness is the better trade and is recorded here rather than left to be
+  // rediscovered: if this row's markup changes, this abort fires and the message below says so.
   const RR_ANCHOR = '<div><dt>Elapsed</dt><dd><span v-if="rrHas(r.elapsedMinutes)" class="rr-num">{{ rrMins(r.elapsedMinutes) }}</span><span v-else class="rr-unk">not established</span></dd></div>';
   if (!opts.template.includes(RR_ANCHOR)) {
     // Loud abort, deliberately: a mutation that silently stops mutating produces a green that means
@@ -2218,30 +2314,33 @@ if (SELF_TEST) {
   //
   // Every mutation is IN MEMORY. public/shopping.js is never written, not even temporarily.
   {
-    const mumAnchor = '<div class="page page-pad">';
-    if (!shopOpts.template.includes(mumAnchor)) {
-      console.error('SELF-TEST FAIL — the household template anchor is missing; rewrite the mutations.');
-      process.exit(1);
-    }
+    // ⛔ THIS IS THE ANCHOR THAT BROKE (Codex F-3). It read `'<div class="page page-pad">'` — the
+    // FULL opening tag — and stopped matching the moment that div gained `:data-send-state`. The
+    // stem is the class, which is what these mutations actually depend on; the attribute list is
+    // not. See injectAfterOpenTag above for the trap in the naive version of this repair.
+    const MUM_STEM = '<div class="page page-pad"';
+    injectAfterOpenTag(shopOpts.template, MUM_STEM, '<!-- anchor probe -->');
     const mumCases = {
       'household: the word COCKPIT reaches her screen':
-        (t) => t.replace(mumAnchor, mumAnchor + '<p>Back to the Cockpit</p>'),
+        (t) => injectAfterOpenTag(t, MUM_STEM, '<p>Back to the Cockpit</p>'),
       'household: the system names itself to her':
-        (t) => t.replace(mumAnchor, mumAnchor + '<p>AsdAIr is getting your shopping ready</p>'),
+        (t) => injectAfterOpenTag(t, MUM_STEM, '<p>AsdAIr is getting your shopping ready</p>'),
       'household: catalogue identity vocabulary leaks':
-        (t) => t.replace(mumAnchor, mumAnchor + '<p>Choose a regular from the catalogue</p>'),
+        (t) => injectAfterOpenTag(t, MUM_STEM, '<p>Choose a regular from the catalogue</p>'),
       'household: retail-operator vocabulary leaks':
-        (t) => t.replace(mumAnchor, mumAnchor + '<p>Added to your basket</p>'),
+        (t) => injectAfterOpenTag(t, MUM_STEM, '<p>Added to your basket</p>'),
       'household: machine vocabulary leaks':
-        (t) => t.replace(mumAnchor, mumAnchor + '<p>The API endpoint did not answer</p>'),
+        (t) => injectAfterOpenTag(t, MUM_STEM, '<p>The API endpoint did not answer</p>'),
       'household: a status enum leaks':
-        (t) => t.replace(mumAnchor, mumAnchor + '<p>needs_decision</p>'),
+        (t) => injectAfterOpenTag(t, MUM_STEM, '<p>needs_decision</p>'),
       'household: a SHA or bare identifier leaks':
-        (t) => t.replace(mumAnchor, mumAnchor + '<p>Build 3b2a574f</p>'),
+        (t) => injectAfterOpenTag(t, MUM_STEM, '<p>Build 3b2a574f</p>'),
     };
     total += Object.keys(mumCases).length;
     for (const [name, mutate] of Object.entries(mumCases)) {
-      const r = mumScenario('mutant', M({}), Vue.compile(mutate(shopOpts.template)));
+      mutationsProven++;
+      const r = mumScenario('mutant', M({}), Vue.compile(
+        assertMutated(name, shopOpts.template, mutate(shopOpts.template))));
       const hits = r.err ? [] : mumVocabulary(text(r.vnode));
       if (hits.length) { caught++; console.log('  caught  ' + name.padEnd(48) + ' -> ' + hits[0].slice(0, 60)); }
       else { missed.push(name); console.log('  MISSED  ' + name); }
@@ -2250,8 +2349,9 @@ if (SELF_TEST) {
     // "They've run out of the usual eggs", which is why /\brun\b/ is deliberately absent from
     // MUM_VOCABULARY. If someone adds it back, this control goes red BEFORE the gate does, and the
     // message says which sentence it broke rather than leaving the next reader to find out.
-    const cleanMum = mumScenario('control', M({}), Vue.compile(shopOpts.template.replace(
-      mumAnchor, mumAnchor + '<p>They have run out of the usual eggs, so I have left them out.</p>')));
+    const cleanMum = mumScenario('control', M({}), Vue.compile(
+      assertMutated('household control', shopOpts.template, injectAfterOpenTag(shopOpts.template,
+        MUM_STEM, '<p>They have run out of the usual eggs, so I have left them out.</p>'))));
     const mumFalsePos = cleanMum.err ? [] : mumVocabulary(text(cleanMum.vnode));
     console.log(mumFalsePos.length
       ? '  CONTROL FAILED — sanctioned household copy is being flagged: ' + mumFalsePos[0]
@@ -2284,6 +2384,15 @@ if (SELF_TEST) {
     ? '  CONTROL FAILED — ' + cRed + ' of ' + cRan + ' assertions red on the UNMUTATED template'
     : '  control  ' + cRan + ' assertions executed on the unmutated template, all green');
   if (cRan === 0) { console.error('  CONTROL FAILED — zero assertions executed; the verdict layer is vacuous.'); }
+  // AC2 of WO-2026-08-15-03, reported rather than merely enforced. `assertMutated` exits on a no-op,
+  // so reaching this line means every counted mutation demonstrably CHANGED the template. The count
+  // is printed because a guard that would have fired is not evidence a reader can check, and a zero
+  // here would mean the stem-anchored mutations stopped running altogether.
+  if (mutationsProven === 0) {
+    console.error('  CONTROL FAILED — zero stem-anchored mutations were proven to change the template.');
+    process.exit(1);
+  }
+  console.log('  proof   ' + mutationsProven + ' stem-anchored mutations each changed the template (no silent no-op)');
   if (missed.length || dirty.length || cRed || cRan === 0) { console.error('SELF-TEST FAIL'); process.exit(1); }
   console.log('SELF-TEST PASS — ' + caught + '/' + total + ' mutations caught, control clean.');
   process.exit(0);
