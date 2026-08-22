@@ -23,10 +23,14 @@
 #   CANONICAL        the repository working folder itself.
 #   PRIVATE-RUNTIME  C:\.fusion247\** — the approved private/runtime home (GL-012). Out of repo
 #                    scope by design; reported, never silently ignored.
-#   DERIVED-CURRENT  an installed copy whose tracked source files are byte-identical to canonical
-#                    main. PROVEN by comparison, not by a marker file or a plausible name.
-#   DERIVED-STALE    an installed copy that differs from canonical main. FAILS. This is the case
-#                    that escaped the old check.
+#   DERIVED-CURRENT  an installed copy whose tracked source files are identical IN CONTENT to
+#                    canonical main. PROVEN by comparison, not by a marker file or a plausible name.
+#                    Line endings are normalised before comparing: the documented install route is
+#                    `git cat-file blob`, which yields LF where the working tree holds CRLF, so a
+#                    raw byte comparison manufactured drift that did not exist. See
+#                    Test-ContentIdentical for the measurement that established it.
+#   DERIVED-STALE    an installed copy whose CONTENT differs from canonical main. FAILS. This is the
+#                    case that escaped the old check.
 #   EXTERNAL-ESTATE  a legitimate SEPARATE repo/product estate. NOT Fusion247PKA state, NOT audited.
 #                    Only one question is asked of it: does Fusion247PKA launch from or depend on it?
 #   IMPROPER-DEPENDENCY  Fusion247PKA code references an external estate's path. FAILS.
@@ -79,8 +83,40 @@ function Get-RuntimeRoot([string]$entry) {
     return (Split-Path -Parent $entry)
 }
 
+function Test-ContentIdentical([string]$a, [string]$b) {
+    # CONTENT, not REPRESENTATION.
+    #
+    # WHY THIS EXISTS (WO-2026-08-15-06, 2026-08-15). This estate runs core.autocrlf=true with no
+    # root .gitattributes, so the git blob holds LF while the working tree holds CRLF. The documented
+    # install route for every runtime here is `git cat-file blob <head>:<path>` — see the
+    # INSTALLED-FROM.txt files, which record installing from the blob PRECISELY because a copy taken
+    # from the working tree "differs by exactly the line count and fails byte-identity". So a
+    # correctly installed, genuinely current file is routinely CR-different from its canonical
+    # counterpart, and a raw hash calls that DRIFT. It is not drift. It is one content, written two
+    # ways, and reporting it as stale sends an operator hunting a difference that does not exist.
+    #
+    # Measured before this was written: against the working tree 7 of 10 governor modules falsely
+    # differed; against the git blob 2 of 10 falsely differed. Raw hashes lie in BOTH directions.
+    #
+    # CR bytes are stripped from BOTH sides and nothing else is touched. ISO-8859-1 is a lossless
+    # byte<->char map — all 256 values round-trip — so this is a byte comparison written as a string
+    # comparison: no encoding is assumed about the file, and a one-character content change still
+    # differs. (Windows PowerShell 5.1 has no [Text.Encoding]::Latin1, hence GetEncoding by name.)
+    #
+    # FAILS CLOSED. An unreadable file returns $false and is reported as drift. A checker that goes
+    # quiet when it cannot read the ground is worse than one that never ran at all.
+    try {
+        $enc = [System.Text.Encoding]::GetEncoding('iso-8859-1')
+        $ta = $enc.GetString([System.IO.File]::ReadAllBytes($a)).Replace("`r", '')
+        $tb = $enc.GetString([System.IO.File]::ReadAllBytes($b)).Replace("`r", '')
+        return ($ta -ceq $tb)
+    } catch {
+        return $false
+    }
+}
+
 function Test-DerivedFromMain([string]$root) {
-    # PROVE derivation: every tracked source file present in the install must be byte-identical
+    # PROVE derivation: every tracked source file present in the install must be identical IN CONTENT
     # to canonical main. node_modules and .git are excluded (dependency/VCS state, not source).
     $mismatch = @()
     $checked = 0
@@ -95,9 +131,15 @@ function Test-DerivedFromMain([string]$root) {
             $canonFile = Join-Path $CANON $rel
             if (Test-Path -LiteralPath $canonFile -PathType Leaf) {
                 $checked++
+                # TWO STAGES, deliberately. The raw hash is the fast path and settles the common
+                # case outright: equal bytes are equal content, and no further question is worth
+                # asking. Only when the bytes differ is the CONTENT question asked, so the cost of
+                # the second read is paid solely by the handful of files that actually differ —
+                # and a file whose sole difference is line endings stops being reported as drift.
+                # A real change of even one character fails both stages and is still reported.
                 $a = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
                 $b = (Get-FileHash -LiteralPath $canonFile -Algorithm SHA256).Hash
-                if ($a -ne $b) { $mismatch += $rel }
+                if ($a -ne $b -and -not (Test-ContentIdentical $_.FullName $canonFile)) { $mismatch += $rel }
             }
         }
     return @{ ok = ($mismatch.Count -eq 0 -and $checked -gt 0); checked = $checked; mismatch = $mismatch }
@@ -145,13 +187,13 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ForEach-Object {
             }
         } else {
             $d = Test-DerivedFromMain $root
-            if ($d.ok) { $cls = 'DERIVED-CURRENT'; $detail = "$($d.checked) source files byte-identical to canonical main" }
+            if ($d.ok) { $cls = 'DERIVED-CURRENT'; $detail = "$($d.checked) source files content-identical to canonical main (line endings normalised)" }
             else { $cls = 'DERIVED-STALE'; $detail = "$($d.mismatch.Count) file(s) differ: " + (($d.mismatch | Select-Object -First 3) -join ', ') }
         }
     }
     else {
         $d = Test-DerivedFromMain $root
-        if ($d.ok) { $cls = 'DERIVED-CURRENT'; $detail = "$($d.checked) source files byte-identical to canonical main" }
+        if ($d.ok) { $cls = 'DERIVED-CURRENT'; $detail = "$($d.checked) source files content-identical to canonical main (line endings normalised)" }
         else { $cls = 'DERIVED-STALE'; $detail = "$($d.mismatch.Count) file(s) differ from canonical main: " + (($d.mismatch | Select-Object -First 4) -join ', ') }
     }
     $rows += [pscustomobject]@{ PID=$p.ProcessId; Root=$root; Class=$cls; Detail=$detail }
