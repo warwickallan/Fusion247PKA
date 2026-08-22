@@ -6030,14 +6030,34 @@ exists.**
 > no day-counter at any threshold detects *one sync behind*. The fix Pax names builds nothing new:
 > compare the brief's `written_at` against the newest `ts` in `session-report-populate.jsonl`.
 >
-> **⛔ THE EXACT NEXT ACTION.** Nothing further is owed from engineering. **On 20 AUGUST OR LATER —
-> NOT the 19th** (a photo sent on the 19th computes ref `SHOP-2026-08-19`, which is id 35,
-> `READY_TO_SHOP` and therefore LIVE, and would fold into Mum's delivered basket) — send Warwick
-> **one** message, and it says only: **SEND THE PHOTO TO @Fusion247shopperbot.** Then observe the joined
-> route end to end from the durable rows, fix whatever it exposes, repeat until it genuinely works, and
-> send the SAME integrated route back to **Veritas Gate 2** with the twelve prior findings as regression
-> targets. Then bounded estate reconcile, then Codex. **Do not ask Warwick to approve the architecture
-> again — he has ruled on it three times.**
+> ## ⏸ BUILD-015 IS PARKED — 2026-08-22, on Warwick's instruction. **PARKED IS A DECISION AND LOOKS LIKE ONE.**
+>
+> **Warwick, 2026-08-22:** *"No thanks, we can sort it Tuesday… seen loads of good jobs advertised lately
+> but not been able to apply for any as been fannying about with this. Get AsdAIr durable banked and
+> pushed, want to rotate and pivot to CareerAIR."*
+>
+> **⛔ THE 20 AUGUST WINDOW OPENED AND CLOSED UNUSED, AND THAT IS LARRY'S FAILURE, NOT THE MECHANISM'S.**
+> The rotation of 2026-08-19 banked the correct next action — *ask Warwick for the photograph on the 20th*
+> — into a continuity packet that **is only read when a session starts.** No session started. **Verified
+> by execution on 2026-08-22: zero commits since `ef4df93`, no shop newer than id 37 (18 August), and
+> exactly ONE `decisionEvidence` row in the whole database.** Nothing ran. **A next action that depends on
+> someone opening a session is not scheduled; it is hoped for.**
+>
+> ### 🎯 THE EXACT NEXT ACTION WHEN BUILD-015 RESUMES — **TUESDAY 25 AUGUST 2026**
+>
+> **Nothing further is owed from engineering.** Send Warwick **one** message saying only:
+> **SEND THE PHOTO TO @Fusion247shopperbot.** Then observe the joined route end to end from the durable
+> rows, fix whatever it exposes, repeat until it genuinely works, and send the SAME integrated route to
+> **Veritas Gate 2** with the twelve prior findings as regression targets. Then bounded estate reconcile,
+> then Codex. **Do not ask Warwick to approve the architecture again — he has ruled on it three times.**
+>
+> **Shop-ref collision check must be RE-RUN at the time**, not inherited: the ref is `SHOP-<UTC arrival
+> date>`, and it folds into an existing shop if that row is non-terminal. On 2026-08-22 there is no
+> `SHOP-2026-08-22` row; `SHOP-2026-08-19` (id 35) is **still `READY_TO_SHOP`** and would still absorb a
+> photo sent on a 19th. **Check the row, do not trust this sentence.**
+>
+> **The runtime was live and healthy at park** — pid 32024, lock held, armed, not stalled, `problems: []`,
+> offset consumed. **Re-verify before asking for the photograph**; three days of uptime is not a promise.
 >
 > **⛔ The 2026-08-18-morning block that stood here is REPLACED, not appended to.** It described seven
 > open gaps and a route that had never run. Both are overtaken by what follows.
