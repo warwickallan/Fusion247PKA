@@ -30,6 +30,47 @@ async function resolveHousehold(client, household) {
   return null; // 0 or >1 with no selector -> caller fails closed
 }
 
+// CODEX F-1 (2026-08-15) -- A SHOP-OWNED WRITE MUST PROVE THE SHOP BELONGS TO THE HOUSEHOLD.
+//
+// `execute` validated shop_id only as a positive integer and resolved household_id separately, so the
+// two facts were never compared against each other. findOrCreateDraftList's first statement then
+// selects `shopping_lists where shop_id=$1` with NO household predicate, and reclaimUnownedList's
+// UPDATE stamps the supplied shop onto a list it found BY HOUSEHOLD. Neither proves ownership, which
+// left two distinct defects behind one missing check:
+//
+//   READ LEAK  -- a shop_id belonging to ANOTHER household, whose shop already owns a list, returns
+//                 THAT list, and the item is written onto a list this household never owned.
+//   CORRUPTION -- a shop_id belonging to another household whose shop owns NO list falls through to
+//                 the reclaim, which adopts THIS household's unowned list and sets its owner to a
+//                 FOREIGN shop. The list still carries this household's items, it is now owned by a
+//                 shop that will never read it, and this household's unowned lane is gone. This is
+//                 the worse of the two: it corrupts rather than merely leaks.
+//
+// Cross-HOUSEHOLD is latent today (asdair.households holds one row). The same check is also what
+// turns a STALE or DELETED shop_id from an opaque FK 23503 thrown mid-write into a clean refusal
+// that writes nothing -- and that case IS reachable today.
+//
+// WHAT THIS CHECK CANNOT DO, said plainly so nobody reads more into it: where two shops of the SAME
+// household are open, both are genuinely owned by that household and both pass. Choosing which of
+// them a caller meant is not knowable here -- the supplied shop_id IS the only shop identity this
+// command has. Same-household isolation is a property of the per-shop list (migration 019), proven
+// by add-list-item.dbtest.mjs, not of this guard.
+//
+// STATEMENT SHAPE IS LOAD-BEARING -- `from asdair.shop where id = $1`, WITH SPACES AROUND THE `=`.
+// This handler is run against the offline double at services/asdair/pipeline/test/fakePg.js, which
+// raises on any statement it does not model; the handler that answers this one is its UNANCHORED
+// /FROM asdair\.shop WHERE id = \$1/i. Since WP-B15-21 EVERY add_list_item intent in the pipeline
+// suite carries a shop_id, so every one of them reaches this query. Written `id=$1` -- this file's
+// own style everywhere else -- the double replies "no handler" and 262 offline tests die. That break
+// would be CI-INVISIBLE from here: .github/workflows/asdair-tests.yml is path-filtered to
+// services/asdair/**, so a PR touching only services/control-plane/** never runs the suite it
+// breaks. Verified by execution BOTH ways on 2026-08-15 (spaced: answered; unspaced: no handler).
+// Do not "tidy" the spacing.
+async function shopHouseholdId(client, shopId) {
+  const r = await client.query('select id, household_id from asdair.shop where id = $1', [shopId]);
+  return r.rowCount ? r.rows[0].household_id : null;
+}
+
 // WP-B15-16: THE SHOP OWNS THE LIST, NOT THE DATE.
 //
 // When `shopId` is given the list is resolved by OWNER (asdair.shopping_lists.shop_id, added by
@@ -233,6 +274,20 @@ export async function execute(client, command, args) {
     }
     const householdId = await resolveHousehold(client, args?.household);
     if (!householdId) return { ok: false, command, error: 'household could not be resolved (missing selector or ambiguous)', worker: 'cp_worker', executed_at: at };
+    // CODEX F-1: prove the shop belongs to THIS household before anything is read, reclaimed or
+    // created. This is the single choke point -- findOrCreateDraftList has exactly two callers and
+    // this is the only one that ever passes a shopId -- and it sits ahead of EVERY write, so "a
+    // mismatch writes nothing" is structural rather than a matter of ordering three checks
+    // correctly. It fails closed on absence as well as on mismatch, and it refuses in the same
+    // { ok:false, error } shape every other refusal in this branch uses, never a throw.
+    // findOrCreateDraftList and reclaimUnownedList are deliberately left BYTE-UNCHANGED: Codex
+    // confirmed the reclaim-before-create repair correct in the matching-household path, and the
+    // safest way to keep a confirmed-correct behaviour is not to touch it.
+    if (shopId !== null) {
+      const owningHousehold = await shopHouseholdId(client, shopId);
+      if (owningHousehold === null) return { ok: false, command, error: `shop ${shopId} not found`, worker: 'cp_worker', executed_at: at };
+      if (String(owningHousehold) !== String(householdId)) return { ok: false, command, error: `shop ${shopId} belongs to household ${owningHousehold}, not household ${householdId}`, worker: 'cp_worker', executed_at: at };
+    }
     await client.query('select pg_advisory_xact_lock($1)', [householdId]);
     const listId = await findOrCreateDraftList(client, householdId, listDate, shopId);
 
