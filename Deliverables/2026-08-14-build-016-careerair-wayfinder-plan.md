@@ -4,6 +4,37 @@
 **No CareerAIR development has begun.** This map exists so the first CareerAIR session starts from
 established truth rather than archaeology.
 
+> ## 🔴 THIS MAP IS THE ACTIVE FRONTIER — 2026-08-22, on Warwick's instruction.
+>
+> **His words:** *"Seen loads of good jobs advertised lately but not been able to apply for any as been
+> fannying about with this. Get AsdAIr durable banked and pushed, want to rotate and pivot to CareerAIR."*
+>
+> **⚠️ THAT SENTENCE IS THE GOAL, NOT THE PREAMBLE.** The outcome this build owes is **applications going
+> out for jobs Warwick has actually seen** — not a wired runtime, not a passing gate. Every decision here
+> is measured against whether an application reached an employer. **Four days of BUILD-015 cost him a
+> window of live vacancies; that is the price of this build being slow, and it is not recoverable.**
+>
+> **BUILD-015 AsdAIr is PARKED, not abandoned** — engineering COMPLETE, one human action outstanding on
+> **Tuesday 25 August** (send the photograph). See
+> `Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md` §12. **Do not resume it before Tuesday and
+> do not let it displace this map.**
+>
+> ### ⛔ THE LESSON BUILD-015 PAID FOR, AND IT APPLIES TO THIS MAP'S FRONTIER EXACTLY
+>
+> BUILD-015 lost four days to one defect: **the approved contract never became load-bearing runtime
+> behaviour.** Code existed, was tested, was committed — and **nothing in production invoked it.**
+>
+> **This map's own frontier is the same defect, in its own words:** *"The product works. NOTHING IN
+> PRODUCTION CALLS IT."* `runJourney` has exactly two callers and **both are scripts a human types.**
+>
+> **So do not re-derive it, do not re-audit it, and do not open with a census.** The diagnosis is already
+> made and it is already correct. **Wire one real production event and prove it fired.**
+>
+> **A second lesson, from the rotation that failed on 2026-08-19:** *a next action that depends on someone
+> opening a session is not scheduled, it is hoped for.* BUILD-015's send window opened and closed unused
+> because the packet carrying it is only read when a session starts. **If this build's outcome depends on
+> a recurring human moment, that dependency is a defect to design out, not a note to leave in a map.**
+
 ## START / RESUME HERE — ordered by Warwick
 
 - This Git Wayfinder is the sole route and source of truth.
