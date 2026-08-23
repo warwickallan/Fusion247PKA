@@ -239,6 +239,28 @@ expressed as the ABSENCE of a row, so `cockpit.careerair_status` starts empty an
 one row per opportunity Warwick has actually touched. A count of zero there means he has not started,
 never that the feature is broken. Nothing backfills it and nothing prunes it.
 
+**The NEW lozenge stores nothing, and there is nothing to operate.** A row wears an amber `NEW`
+marker when **`firstSeen` is within 7 days AND its status is still `todo`** — both facts are already
+in the list payload, so no table, column, job or backfill exists for this and none can go stale. A
+row stops being new the moment Warwick sets any status on it (that is the "or until they are
+interacted with" half of the ask) or when the 7 days elapse, whichever comes first. `New only` is a
+seventh option on the existing **Status** filter, so it inherits the same hidden-row count and
+one-tap restore as every other mode and can never hide rows silently.
+
+**⚠️ The 7 days are measured against the BROWSER's clock, not the server's.** `Date.now()` is read
+on Warwick's phone or laptop, fresh at each repaint. Two consequences worth knowing before anyone
+debugs a "wrong" lozenge: a device whose clock is wrong will draw the wrong markers, and a page left
+open overnight keeps yesterday's boundary until something repaints it. This is deliberate — the
+marker is a visual hint on a triage list and is never a stored fact, and every other filter on this
+page is already computed client-side. The rule itself lives beside this note in
+`public/careerair.js` (`isNewOpportunity`), and `careerair-check.mjs` executes it under a frozen
+clock rather than matching its source.
+
+**Expect nearly every row to be NEW while the collector is down.** There is no automatic sweep at
+present, so a large block of opportunities shares a single `firstSeen`. That is the rule behaving
+correctly on the data it has, not a defect, and it resolves itself as soon as arrivals are spread
+over real days again.
+
 **One environment variable, and Mack owns its value:**
 
 | Variable | Required? | Effect when absent |

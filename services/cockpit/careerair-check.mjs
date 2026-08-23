@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { Script, createContext } from 'node:vm';
 import {
   parseScores, tierOf, shapeRow, firstPresent, stripHtmlComments,
   isLoopbackBind, resolveCvRoot, resolveCvPath, cvIdsOnDisk,
@@ -45,6 +46,9 @@ let failed = 0;
 const skipped = [];
 let liveExecuted = 0;
 let phase = 'offline';
+/** Mutation testing. A defence nobody broke on purpose is a defence nobody has measured. */
+let mutantsRun = 0;
+let mutantsKilled = 0;
 
 function ok(label, cond, detail) {
   executed += 1;
@@ -584,6 +588,287 @@ try {
   }
 
   /* -----------------------------------------------------------------------------------------------
+     7c. "NEW" - the lozenge that expires by itself.
+
+     NEW = firstSeen within 7 days AND status still 'todo'. Nothing is stored and nothing remembers:
+     both facts are already in the list payload, and "interacted with" is exactly "moved off todo".
+
+     THE RULE IS EXECUTED HERE, NOT MATCHED. The page's own bytes are run in a node:vm and the
+     published predicate is CALLED under a FROZEN clock. That is not a stylistic preference: this
+     very file already recorded a mutant that survived a source-regex assertion - commenting out
+     `sel.value = prev` left every one of those assertions green, because a regex cannot tell live
+     code from a note about it. A rule with eight boundary cases is the last thing to assert by text.
+     ----------------------------------------------------------------------------------------------- */
+  section('NEW - the qualifying rule, executed under a frozen clock');
+  {
+    const CLIENT_SRC = fs.readFileSync(path.join(PUBLIC, 'careerair.js'), 'utf8');
+
+    /**
+     * Run the page's classic script in a fresh VM and hand back what it published. The DOM stub is
+     * deliberately small: at load time the page only calls document.addEventListener, and the node
+     * factory below is what `el()` and `rowCard()` need to build a card without a browser.
+     */
+    const runClient = (src) => {
+      const node = (tag) => ({
+        tagName: tag, className: '', textContent: '', id: '', type: '', value: '', selected: false,
+        href: '', target: '', rel: '', disabled: false, style: {}, children: [], attrs: {},
+        appendChild(c) { this.children.push(c); return c; },
+        removeChild(c) { this.children = this.children.filter((x) => x !== c); return c; },
+        setAttribute(k, v) { this.attrs[k] = v; },
+        addEventListener() {}, remove() {}, querySelector() { return null; },
+      });
+      const win = { location: { origin: 'http://localhost' } };
+      const doc = {
+        addEventListener() {},
+        createElement: (t) => node(t),
+        createDocumentFragment: () => node('#fragment'),
+        createTextNode: (t) => ({ tagName: '#text', textContent: String(t), children: [] }),
+        getElementById: () => null,
+      };
+      const ctx = createContext({ window: win, document: doc });
+      new Script(src, { filename: 'careerair.js' }).runInContext(ctx);
+      return win.CAREERAIR_RULES;
+    };
+
+    /** Every element in a built card, flattened, so a marker can be found wherever it was put. */
+    const walk = (el2, out) => {
+      (el2.children || []).forEach((c) => { out.push(c); walk(c, out); });
+      return out;
+    };
+    const hasClass = (el2, cls) => String(el2.className || '').split(/\s+/).indexOf(cls) !== -1;
+
+    const R = runClient(CLIENT_SRC);
+    ok('the page publishes its rules for the gate to CALL, not to read',
+      Boolean(R) && typeof R.isNew === 'function' && typeof R.passesStatus === 'function'
+      && typeof R.buildCard === 'function');
+
+    const DAY = 24 * 60 * 60 * 1000;
+    // A FROZEN clock, never Date.now(). A gate whose answer depends on the minute it runs is a gate
+    // that will fail on a Tuesday and nobody will know why.
+    const NOW = Date.parse('2026-08-23T12:00:00.000Z');
+    ok('the frozen clock parsed - a NaN "now" would make every comparison below vacuously false',
+      Number.isFinite(NOW));
+    eq('the window is seven days, expressed in milliseconds', R.NEW_WINDOW_MS, 7 * DAY);
+
+    const ago = (ms) => new Date(NOW - ms).toISOString();
+    const row = (firstSeen, status) => ({ id: '1', tier: 'thin', scores: {},
+      status: status === undefined ? 'todo' : status, firstSeen });
+
+    // -- inside the window, untouched -----------------------------------------------------------
+    ok('an opportunity seen a minute ago, still to do, is NEW', R.isNew(row(ago(60 * 1000)), NOW) === true);
+    ok('...and one seen six days ago is still NEW', R.isNew(row(ago(6 * DAY)), NOW) === true);
+    // The boundary, both sides of it. "keep this lozenge for 7 days" includes the seventh day.
+    ok('EXACTLY seven days old is still NEW - the boundary is inclusive', R.isNew(row(ago(7 * DAY)), NOW) === true);
+    ok('seven days and one millisecond is NOT new', R.isNew(row(ago(7 * DAY + 1)), NOW) === false);
+    ok('seven days and one second is NOT new', R.isNew(row(ago(7 * DAY + 1000)), NOW) === false);
+    ok('eight days old is NOT new', R.isNew(row(ago(8 * DAY)), NOW) === false);
+    // Clock skew the other way. The age is negative, which is inside the window - and a row the
+    // database says arrived in the future is certainly not one Warwick has already dealt with.
+    ok('a FUTURE firstSeen is new rather than an error', R.isNew(row(ago(-1 * DAY)), NOW) === true);
+
+    // -- touched: the "or until they are interacted with" half ------------------------------------
+    ok('a fresh row Warwick has REVIEWED is not new', R.isNew(row(ago(60 * 1000), 'reviewed'), NOW) === false);
+    ok('a fresh row he has APPLIED to is not new', R.isNew(row(ago(60 * 1000), 'applied'), NOW) === false);
+    ok('a fresh row he has CLOSED is not new', R.isNew(row(ago(60 * 1000), 'closed'), NOW) === false);
+    ok('an unrecognised status is not new either - only the literal todo qualifies',
+      R.isNew(row(ago(60 * 1000), 'nonsense'), NOW) === false);
+
+    // -- the input the payload might not carry ----------------------------------------------------
+    // `new Date(null)` is 1 JANUARY 1970, not Invalid Date, and `Date.parse(0)` is the year 2000.
+    // Neither may become a timestamp that merely looks plausible, and none of these may THROW: a
+    // predicate that throws inside rowCard takes the whole grid down, which is far worse than a
+    // missing lozenge.
+    const notADate = [null, undefined, '', '   ', '\t\n', 'not-a-date', 'tomorrow', 'NaN',
+      0, 1, NOW, true, false, {}, [], new Date(NOW)];
+    let threw = null;
+    let wronglyNew = [];
+    for (const v of notADate) {
+      try { if (R.isNew(row(v), NOW) !== false) wronglyNew.push(String(v)); }
+      catch (e) { threw = String(v) + ': ' + e.message; }
+    }
+    ok('a firstSeen that is not a usable date string never qualifies (16 shapes, incl. null and 0)',
+      wronglyNew.length === 0, wronglyNew.join(', '));
+    ok('...and none of them THROWS - a throw here would blank the whole grid, not one lozenge',
+      threw === null, threw || '');
+    ok('a missing row object is not new, and does not throw', R.isNew(null, NOW) === false);
+    ok('a row with no status field at all is not new', R.isNew({ firstSeen: ago(60 * 1000) }, NOW) === false);
+
+    // -- the filter mode ---------------------------------------------------------------------------
+    ok('"New only" keeps a qualifying row', R.passesStatus(row(ago(60 * 1000)), 'new', NOW) === true);
+    ok('...drops a fresh row that has been reviewed', R.passesStatus(row(ago(60 * 1000), 'reviewed'), 'new', NOW) === false);
+    ok('...drops an untouched row that has aged out', R.passesStatus(row(ago(30 * DAY)), 'new', NOW) === false);
+    // NEW is a STRICT subset of "To do only", and this is the assertion that says so: the same row
+    // that "New only" drops is one "To do only" keeps.
+    ok('an aged-out to-do row is dropped by "New only" but KEPT by "To do only"',
+      R.passesStatus(row(ago(30 * DAY)), 'new', NOW) === false
+      && R.passesStatus(row(ago(30 * DAY)), 'todo', NOW) === true);
+    // The four modes that existed before must be untouched by the new one.
+    ok('"All statuses" still keeps everything, new or not', R.passesStatus(row(ago(30 * DAY), 'closed'), 'all', NOW) === true);
+    ok('the DEFAULT mode still hides the dead rows', R.passesStatus(row(ago(60 * 1000), 'closed'), 'open', NOW) === false);
+    ok('...and still keeps a live one', R.passesStatus(row(ago(30 * DAY), 'applied'), 'open', NOW) === true);
+    ok('"Applied only" is unaffected by the new mode', R.passesStatus(row(ago(60 * 1000), 'applied'), 'applied', NOW) === true);
+
+    // -- the RENDER wiring, executed: the marker is BUILT, and built in the right place ------------
+    // AC5's structural half. Asserted by building a real card rather than by matching source: the
+    // question "does the lozenge overlap the status control" is a question about the tree.
+    const newCard = R.buildCard(row(ago(60 * 1000)), NOW);
+    const oldCard = R.buildCard(row(ago(30 * DAY)), NOW);
+    const newNodes = walk(newCard, []);
+    const oldNodes = walk(oldCard, []);
+    const marks = newNodes.filter((e2) => hasClass(e2, 'ca-r-marks'));
+    const lozenges = newNodes.filter((e2) => hasClass(e2, 'ca-new'));
+    eq('a qualifying card is built with exactly one NEW lozenge', lozenges.length, 1);
+    eq('...reading NEW', lozenges[0] && lozenges[0].textContent, 'NEW');
+    eq('a card that does NOT qualify is built with none', oldNodes.filter((e2) => hasClass(e2, 'ca-new')).length, 0);
+    eq('...and still carries its evidence tier badge, so nothing was lost',
+      oldNodes.filter((e2) => hasClass(e2, 'ca-tier')).length, 1);
+    eq('the lozenge sits in the marker column', marks.length, 1);
+    ok('...and the marker column is what holds it, beside the tier badge - not the title box',
+      walk(marks[0], []).some((e2) => hasClass(e2, 'ca-new'))
+      && walk(marks[0], []).some((e2) => hasClass(e2, 'ca-tier')));
+    // AC5, the half that matters on a phone: the lozenge is NOT inside the status control's wrapper,
+    // so it can neither overlap it nor be swallowed by it.
+    const statusWrap = newNodes.filter((e2) => hasClass(e2, 'ca-status-wrap'));
+    eq('the card still builds its status control', statusWrap.length, 1);
+    ok('...and the NEW lozenge is NOT inside it - the two controls cannot overlap',
+      !walk(statusWrap[0], []).some((e2) => hasClass(e2, 'ca-new')));
+
+    /* -- MUTATION TESTING ------------------------------------------------------------------------
+       Every new defence is broken ON A COPY OF THE SOURCE HELD IN MEMORY and re-run in a fresh VM.
+       The file on disk is NEVER touched, and that is load-bearing twice over: `public/*` is served
+       straight off disk by the running cockpit, so mutating this file in place would DEPLOY a broken
+       page to Warwick for the length of the run - and there is nothing to restore in a `finally`,
+       which removes the "an interrupted mutation run leaves the source mutated" failure mode
+       outright rather than defending against it.
+
+       Four ways a mutation runner can lie, all closed here:
+         * the mutation is asserted to have CHANGED the source - a stale anchor is a FAILURE, never
+           a skip, because an unapplied mutant means the defence is simply not being measured;
+         * the probe is asserted to hold against REAL code first - a probe that is already false
+           would "kill" every mutant while measuring nothing at all;
+         * the mutant is asserted to have RUN - it must still publish its rules;
+         * a probe that THROWS counts as a kill rather than crashing the gate.
+       -------------------------------------------------------------------------------------------- */
+    const mutate = (label, find, replace, probe) => {
+      executed += 1;
+      if (CLIENT_SRC.indexOf(find) === -1) {
+        failed += 1;
+        console.log('  FAIL mutant NOT APPLIED - the anchor is stale, so this defence is UNMEASURED: ' + label);
+        return;
+      }
+      const mutated = CLIENT_SRC.replace(find, replace);
+      if (mutated === CLIENT_SRC) {
+        failed += 1;
+        console.log('  FAIL mutant changed nothing: ' + label);
+        return;
+      }
+      let baseline = false;
+      try { baseline = probe(R) === true; } catch (ignore) { baseline = false; }
+      if (!baseline) {
+        failed += 1;
+        console.log('  FAIL the probe does not hold against REAL code, so it measures nothing: ' + label);
+        return;
+      }
+      mutantsRun += 1;
+      let survived = true;
+      try {
+        const mr = runClient(mutated);
+        if (!mr || typeof mr.isNew !== 'function') {
+          failed += 1;
+          console.log('  FAIL the mutant did not RUN, so nothing was measured: ' + label);
+          return;
+        }
+        survived = probe(mr) === true;
+      } catch (ignore) { survived = false; }
+      if (survived) {
+        failed += 1;
+        console.log('  FAIL mutant SURVIVED - this check cannot see that defect: ' + label);
+      } else {
+        mutantsKilled += 1;
+        console.log('  ok   mutant killed - ' + label);
+      }
+    };
+
+    mutate('the 7-day boundary is INCLUSIVE (<= became <)',
+      'return (nowMs - t) <= NEW_WINDOW_MS;',
+      'return (nowMs - t) < NEW_WINDOW_MS;',
+      (r) => r.isNew(row(ago(7 * DAY)), NOW) === true);
+
+    mutate('the window is SEVEN days (7 became 70)',
+      'var NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;',
+      'var NEW_WINDOW_MS = 70 * 24 * 60 * 60 * 1000;',
+      (r) => r.isNew(row(ago(30 * DAY)), NOW) === false);
+
+    mutate('a touched row is not new (the status conjunct removed)',
+      "if (!row || row.status !== 'todo') return false;",
+      'if (!row) return false;',
+      (r) => r.isNew(row(ago(60 * 1000), 'reviewed'), NOW) === false);
+
+    // THE new Date(null) TRAP, made to bite. The naive implementation below is the one a reader
+    // would write without knowing that `new Date(<a Date>)` round-trips and `new Date(null)` is 1970.
+    mutate('only a real date STRING qualifies (guard replaced by naive new Date())',
+      "    if (typeof raw !== 'string' || raw.trim() === '') return false;\n"
+      + '    var t = Date.parse(raw);\n'
+      + '    if (!isFinite(t)) return false;',
+      '    var t = new Date(raw).getTime();',
+      (r) => r.isNew(row(new Date(NOW)), NOW) === false);
+
+    mutate('the "New only" filter mode is wired to the rule (branch removed)',
+      "    if (mode === 'new') return isNewOpportunity(r, nowMs);\n",
+      '',
+      (r) => r.passesStatus(row(ago(60 * 1000)), 'new', NOW) === true);
+
+    mutate('the lozenge is actually BUILT onto a qualifying card (call site removed)',
+      "    if (isNewOpportunity(row, nowMs)) marks.appendChild(el('span', 'ca-new', 'NEW'));\n",
+      '',
+      (r) => walk(r.buildCard(row(ago(60 * 1000)), NOW), []).filter((e2) => hasClass(e2, 'ca-new')).length === 1);
+
+    /* -- THE COLOUR, against the MEASURED pairing rather than an asserted one ---------------------
+       A yellow chip is the classic accessibility trap and this estate has already measured its way
+       out of it once: /styles.css section D-13 records --ink2 on --warn-w at 6.40 light / 6.16 dark
+       (PASS both, 4.5 floor) and the --warn ring at 3.63 / 6.25 (PASS both, non-text 3.0 floor) -
+       figures contrast-check.mjs reproduces and refuses to print if they drift. The two arms that
+       FAIL are #fff on --warn (4.23 / 2.17) and --warn as TEXT on --warn-w (3.63 in light). So the
+       assertion is not "some colour is set": it is that the words are --ink2 and only the RING is
+       --warn, which is what makes the measured figures the ones that apply. */
+    const cssSrc = fs.readFileSync(path.join(PUBLIC, 'careerair.css'), 'utf8');
+    const newRule = (/\.ca-new\s*\{([^}]*)\}/.exec(cssSrc.replace(/\/\*[\s\S]*?\*\//g, '')) || [, ''])[1];
+    ok('the .ca-new rule exists in the stylesheet', newRule.trim().length > 0);
+    ok('...its TEXT is --ink2, the token measured at 6.40 light / 6.16 dark on this tint',
+      /color\s*:\s*var\(--ink2\)/.test(newRule));
+    ok('...its fill is the shared warning tint --warn-w, not a colour of its own',
+      /background\s*:\s*var\(--warn-w\)/.test(newRule));
+    ok('...and --warn is used only for the RING, which is non-text and clears the 3:1 floor',
+      /border\s*:\s*1px solid var\(--warn\)/.test(newRule));
+    ok('...the lozenge NEVER puts --warn on --warn-w as text - that pairing is 3.63 in light and fails AA',
+      !/color\s*:\s*var\(--warn\)/.test(newRule));
+    ok('...and declares no colour of its own: every value in it is a shared token',
+      !/#[0-9a-fA-F]{3,8}\b/.test(newRule) && !/\b(rgb|hsl)a?\(/.test(newRule));
+    // AC5: the marker column must not take width from the role title, which is the one field
+    // Warwick is scanning. `flex:none` on the column is the declaration that guarantees it.
+    const marksRule = (/\.ca-r-marks\s*\{([^}]*)\}/.exec(cssSrc.replace(/\/\*[\s\S]*?\*\//g, '')) || [, ''])[1];
+    ok('the marker column exists and is flex:none, so 247 lozenges never squeeze the role title',
+      /flex\s*:\s*none/.test(marksRule));
+
+    // The page offers the filter, and the DEFAULT is still the status filter - adding "New only"
+    // must not have made it the landing view, or the grid would open showing 247 of 259 rows and
+    // silently hiding the rest on first load.
+    const htmlSrc = fs.readFileSync(path.join(PUBLIC, 'careerair.html'), 'utf8');
+    ok('the page offers a "New only" option', /<option value="new">/.test(htmlSrc));
+    ok('...and it is NOT the default - the default is still the hide-dead-rows filter',
+      /<option value="open" selected>/.test(htmlSrc) && !/<option value="new" selected>/.test(htmlSrc));
+
+    // AC6: the browser-clock limitation is written where a future reader finds it - at the code and
+    // at the door. Asserted in both places because either one alone rots quietly.
+    const clientForDocs = CLIENT_SRC;
+    ok('the browser-clock limitation is recorded beside the rule',
+      /BROWSER'S CLOCK/.test(clientForDocs));
+    const readmeSrc = fs.readFileSync(path.join(DIR, 'README.md'), 'utf8');
+    ok('...and in the README, so it is findable without opening the page source',
+      /browser/i.test(readmeSrc) && /clock/i.test(readmeSrc) && /7 days/.test(readmeSrc));
+  }
+
+  /* -----------------------------------------------------------------------------------------------
      8. LIVE — the acceptance property. Requires the database; NEVER passes without it.
      ----------------------------------------------------------------------------------------------- */
   section('Live — every opportunity reaches the page');
@@ -592,6 +877,8 @@ try {
     console.log('\nNOT RUN — the database could not be reached, so the acceptance property was NOT checked.');
     console.log('  reason: ' + e.message);
     console.log('\nExecuted ' + executed + ' assertion(s) offline, ' + failed + ' failed. LIVE assertions executed: 0.');
+    console.log('Mutants: ' + mutantsKilled + ' killed of ' + mutantsRun + ' applied.');
+    if (mutantsRun === 0) console.log('ZERO mutants applied - the new defences are UNMEASURED. That is a FAILURE, not a pass.');
     console.log('A check that cannot read its ground does not pass. Exiting non-zero.');
     process.exit(3);
   }
@@ -678,8 +965,11 @@ try {
 /* ================================================================================================= */
 console.log('\n' + '-'.repeat(78));
 console.log('Executed ' + executed + ' assertion(s); ' + liveExecuted + ' of them against the live database.');
+console.log('Mutants: ' + mutantsKilled + ' killed of ' + mutantsRun + ' applied.');
 for (const s of skipped) console.log('NOT EXERCISED (not a pass): ' + s);
 if (executed === 0) { console.log('ZERO assertions executed. That is a FAILURE, not a pass.'); process.exit(2); }
+// A mutation suite that applied nothing has measured nothing, however green the assertions above look.
+if (mutantsRun === 0) { console.log('ZERO mutants applied. The defences are UNMEASURED - that is a FAILURE, not a pass.'); process.exit(2); }
 if (liveExecuted === 0) { console.log('ZERO LIVE assertions executed — the acceptance property was not checked.'); process.exit(3); }
 if (failed > 0) { console.log(failed + ' assertion(s) FAILED.'); process.exit(1); }
 console.log('All assertions passed.');

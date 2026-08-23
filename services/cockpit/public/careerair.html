@@ -85,6 +85,12 @@
     <select id="ca-status" name="status">
       <option value="open" selected>Hide "no longer accepting"</option>
       <option value="all">All statuses</option>
+      <!-- The seventh option, not a seventh control. "New only" is routed through the same
+           passesStatus() dispatch as every other mode, so it inherits the hidden-count sentence,
+           the one-tap "Show them" restore and the empty state's accounting rather than getting a
+           second, divergent implementation of the never-hide-silently rule. It sits beside "To do
+           only" because it is a strict subset of it: new = to-do AND arrived in the last 7 days. -->
+      <option value="new">New only (last 7 days)</option>
       <option value="todo">To do only</option>
       <option value="reviewed">Reviewed only</option>
       <option value="applied">Applied only</option>

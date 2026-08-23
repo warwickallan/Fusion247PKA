@@ -44,6 +44,49 @@
     closed: 'No longer accepting',
   };
 
+  /* ===============================================================================================
+     "NEW" - arrived in the last 7 days AND not yet touched.
+
+     Warwick's ask: "a little lozenge in yellow that says new to any new opportunities that come
+     through from tomorrow's sweep, they should keep this lozenge for 7 days or until they are
+     interacted with."
+
+     NOTHING IS STORED AND NOTHING IS REMEMBERED. Both halves are already in the list payload:
+     `firstSeen` (careerair.opportunity.first_seen_at, shaped in careerair.mjs) and `status` (which
+     defaults to 'todo' by the ABSENCE of a row). "Interacted with" is exactly "moved off todo",
+     which is the signal the status control already produces - so a row stops being new either
+     because it aged out or because Warwick set a status on it, and no schema, column, job or
+     bookkeeping exists to go stale.
+
+     THE 7-DAY BOUNDARY IS MEASURED AGAINST THE BROWSER'S CLOCK, AND THAT IS A REAL LIMITATION.
+     `nowMs` is `Date.now()` on the phone or laptop, taken fresh at each paint - not a server time
+     and not a value the payload carries. A device whose clock is wrong will draw the wrong
+     lozenges, and a page left open overnight keeps yesterday's boundary until something repaints.
+     Neither is worth a server round trip: this is a visual hint on a triage list, it is never a
+     stored fact, and every other filter on this page is already computed client-side for the same
+     reason. Recorded in services/cockpit/README.md too, so it is findable from outside this file.
+
+     AND `new Date(null)` IS 1 JANUARY 1970, NOT `Invalid Date`. That is the trap this guard is
+     shaped around. The predicate trusts ONE input type - the non-empty string the API actually
+     emits - and refuses everything else before any date maths happens, rather than letting a null,
+     a number, a Date or an object coerce into a timestamp that merely looks plausible. A future
+     timestamp (clock skew the other way) IS new: the age is negative, which is inside the window.
+     =============================================================================================== */
+  var NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+  /**
+   * Is this row NEW, as at `nowMs`? Pure: no clock read, no DOM, no fetch - the caller supplies the
+   * time, which is what makes it testable under a frozen clock instead of only observable.
+   */
+  function isNewOpportunity(row, nowMs) {
+    if (!row || row.status !== 'todo') return false;
+    var raw = row.firstSeen;
+    if (typeof raw !== 'string' || raw.trim() === '') return false;
+    var t = Date.parse(raw);
+    if (!isFinite(t)) return false;
+    return (nowMs - t) <= NEW_WINDOW_MS;
+  }
+
   var el = function (tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -305,10 +348,27 @@
      repaint would collapse every expanded detail panel and throw away Warwick's scroll position for
      a one-row change. If the row no longer passes the status filter it is removed, and focus moves
      to the count line, which is the element that explains where it went. */
+  /* The lozenge is the "or until they are interacted with" half of the rule, so it has to come off
+     the card the moment a write is CONFIRMED - not when the control moves. `setStatus` is
+     optimistic and reconciles against the response; if the write fails, `row.status` goes back and
+     this was never called, so the marker and the stored truth cannot disagree. Re-evaluated rather
+     than merely removed, because Warwick can put a row BACK to "To do" and it should light up again
+     if it is still inside the window. */
+  function refreshNewMark(row, card, nowMs) {
+    if (!card) return;
+    var marks = card.querySelector('.ca-r-marks');
+    if (!marks) return;
+    var existing = marks.querySelector('.ca-new');
+    var should = isNewOpportunity(row, nowMs);
+    if (should && !existing) marks.appendChild(el('span', 'ca-new', 'NEW'));
+    if (!should && existing) existing.parentNode.removeChild(existing);
+  }
+
   function afterStatusWrite(row, card) {
     var f = currentFilters();
     var removed = false;
-    if (card && card.parentNode && !passesStatus(row, f.status)) { card.parentNode.removeChild(card); removed = true; }
+    refreshNewMark(row, card, f.now);
+    if (card && card.parentNode && !passesStatus(row, f.status, f.now)) { card.parentNode.removeChild(card); removed = true; }
     state.hiddenByStatus = hiddenByStatusCount(f);
     paintCount(document.getElementById('ca-list').querySelectorAll('.ca-row').length);
     if (removed) {
@@ -317,7 +377,7 @@
     }
   }
 
-  function rowCard(row) {
+  function rowCard(row, nowMs) {
     var card = el('article', 'ca-row t-' + row.tier);
     card.setAttribute('data-opp', row.id);
     card.setAttribute('data-tier', row.tier);
@@ -334,7 +394,12 @@
     titleBox.appendChild(titles);
     titleBox.appendChild(emp);
     head.appendChild(titleBox);
-    head.appendChild(el('span', 'ca-tier ca-tier-' + row.tier, TIER_LABEL[row.tier]));
+    // The tier badge and the NEW lozenge share ONE `flex:none` column so neither takes width from
+    // the role title. See .ca-r-marks in careerair.css for why that is not a cosmetic choice.
+    var marks = el('div', 'ca-r-marks');
+    marks.appendChild(el('span', 'ca-tier ca-tier-' + row.tier, TIER_LABEL[row.tier]));
+    if (isNewOpportunity(row, nowMs)) marks.appendChild(el('span', 'ca-new', 'NEW'));
+    head.appendChild(marks);
     card.appendChild(head);
 
     card.appendChild(metaLine(row));
@@ -413,6 +478,10 @@
       evidence: document.getElementById('ca-evidence').value,
       cvOnly: document.getElementById('ca-cv').checked,
       status: document.getElementById('ca-status').value,
+      /* ONE clock read per paint, carried through every predicate that needs it. Reading Date.now()
+         separately inside each helper would let two rows in the same repaint be judged against two
+         different "now"s - a boundary row could then be new in the list and not new in the count. */
+      now: Date.now(),
     };
   }
 
@@ -420,9 +489,15 @@
      hidden" count can be attributed to THIS filter specifically. A row dropped by the search box is
      not hidden by the status filter, and telling Warwick otherwise would be the same class of lie
      the count line exists to prevent. */
-  function passesStatus(r, mode) {
+  function passesStatus(r, mode, nowMs) {
     if (mode === 'all') return true;
     if (mode === 'open') return r.status !== 'closed';
+    /* "New only" is a seventh option on THIS control rather than a control of its own, and that is
+       deliberate. Routing it through here means it inherits the honest-count machinery already
+       built for the default filter - hiddenByStatusCount, the "Show them" one-tap restore, and the
+       empty state's accounting - instead of re-implementing the never-hide-silently guarantee a
+       second time and getting one of the three copies wrong. */
+    if (mode === 'new') return isNewOpportunity(r, nowMs);
     return r.status === mode;
   }
 
@@ -452,14 +527,14 @@
     state.rows.forEach(function (r) {
       if (!passesOtherFilters(r, f)) return;
       eligible += 1;
-      if (passesStatus(r, f.status)) kept += 1;
+      if (passesStatus(r, f.status, f.now)) kept += 1;
     });
     return eligible - kept;
   }
 
   function visibleRows(f) {
     var out = state.rows.filter(function (r) {
-      return passesStatus(r, f.status) && passesOtherFilters(r, f);
+      return passesStatus(r, f.status, f.now) && passesOtherFilters(r, f);
     });
     var by = {
       score: function (a, b) {
@@ -497,7 +572,7 @@
     stateLine.textContent = '';
     stateLine.className = 'ca-state';
     var frag = document.createDocumentFragment();
-    rows.forEach(function (r) { frag.appendChild(rowCard(r)); });
+    rows.forEach(function (r) { frag.appendChild(rowCard(r, f.now)); });
     list.appendChild(frag);
     paintCount(rows.length);
   }
@@ -603,4 +678,21 @@
     });
     load();
   });
+
+  /* PUBLISHED FOR THE GATE, AND THE REASON IS A MUTANT THAT ALREADY SURVIVED IN THIS FILE.
+     careerair-check.mjs used to assert this page's defences by matching its source text, and
+     commenting out `sel.value = prev` left every one of those assertions GREEN - a regex cannot
+     tell live code from a note about it. So the qualifying rule is EXECUTED by the gate, not read:
+     the check runs these exact bytes in a node:vm under a FROZEN clock and calls these functions.
+
+     A single namespaced property on `window` is the same convention apps.js already uses for
+     `window.FUSION_APPS`, and it is what keeps the "classic script, no top-level exports" rule in
+     this file's header intact - there is still no second top-level `const` for another classic
+     script to collide with. */
+  window.CAREERAIR_RULES = {
+    isNew: isNewOpportunity,
+    passesStatus: passesStatus,
+    NEW_WINDOW_MS: NEW_WINDOW_MS,
+    buildCard: rowCard,
+  };
 }(window, document));

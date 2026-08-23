@@ -99,6 +99,34 @@ main:focus { outline:none; }
 .ca-tier-partial { background:var(--warn-w); color:var(--warn); }
 .ca-tier-thin { background:var(--stop-w); color:var(--stop); }
 
+/* ---- The card's marker column ----
+   The tier badge and the NEW lozenge STACK here rather than sitting inline beside the title.
+   `flex:none` is the load-bearing declaration, not tidiness: .ca-r-title is `flex:1; min-width:0`,
+   so an extra inline chip would take its width away and squeeze the one field Warwick is actually
+   scanning. Stacking costs the card ~20px of height and costs the title nothing. With 247 rows
+   qualifying at once — which is what happens while the sweep is down — that difference is the
+   difference between a readable list and a column of broken titles. */
+.ca-r-marks { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex:none; }
+
+/* ---- "NEW" — arrived in the last 7 days and not yet touched ----
+   ⛔ THE COLOUR IS THE MEASURED D-13 PAIRING, NOT A NEW TOKEN, AND NOT THE OBVIOUS YELLOW.
+   A yellow chip is the classic contrast trap and this estate has already measured its way out of
+   it once — the figures live in /styles.css § D-13 and are reproduced by contrast-check.mjs, which
+   refuses to print anything if they drift:
+
+     --ink2 on --warn-w    6.40 light / 6.16 dark   PASS both   (text, 4.5 floor)  <- used here
+     --warn ring on --warn-w  3.63 / 6.25           PASS both   (non-text, 3 floor) <- used here
+     #fff  on --warn       4.23 light / 2.17 dark   FAILS BOTH                      <- NOT used
+     --warn on --warn-w    3.63 light               below 4.5 for TEXT              <- NOT used
+
+   So the words are --ink2 and only the RING is --warn. `.chip.warn` in /styles.css already ships
+   exactly this construction; this is that chip, at the grid's badge metrics.
+   The 1px border is absorbed out of the padding so the lozenge is the same box as .ca-tier
+   beside it, and the marker column does not change height when one appears. */
+.ca-new { font-size:11px; font-weight:800; border-radius:6px; padding:2px 6px; white-space:nowrap;
+  text-transform:uppercase; letter-spacing:.03em;
+  background:var(--warn-w); color:var(--ink2); border:1px solid var(--warn); }
+
 /* ---- Warwick's status: the one control on a card that writes ----
    Phone first. 44px is the platform touch-target floor and this control is meant to be hit with a
    thumb on a moving train, so it is the full width of the card rather than a neat inline chip.
