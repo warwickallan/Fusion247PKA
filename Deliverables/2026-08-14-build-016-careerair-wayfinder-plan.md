@@ -475,3 +475,24 @@ reconstructing the method from conversation.
 - **No application has been sent, and no ledger row exists for any of them.** Four separate workers
   flagged that independently rather than improvising a write into an unverified path. **If a document
   goes out, the record is opened BEFORE the irreversible act.**
+
+## SESSION REPORT POINTER — and what is OUTSTANDING ON ARRIVAL
+
+**Report path (commissioned, may arrive AFTER the `/clear`):**
+`Deliverables/2026-08-23-session-report-careerair-collaborative.md`
+**Payload:** `Deliverables/2026-08-23-session-report-payload.json`
+**Ledger, already committed and handed to Pax as an input:**
+`Deliverables/2026-08-23-subagent-token-ledger-careerair-collaborative.md`
+
+**Closing head at rotation:** `38f3b6dc` on `wo/2026-08-23-cockpit-grid`, **deliberately unpushed.**
+
+**⚑ OUTSTANDING ON ARRIVAL — named, not silent.** Pax was commissioned for the session report and is
+**NOT on the blocking path**; his return may legitimately outlive the `/clear`. **When it lands —
+this session or the next — write it to `Deliverables/`, commit it, and run `populate.mjs` then
+`capae-sync.mjs` from the same payload.** A commissioned worker whose return is never read is
+unbanked work.
+
+**Steps 7b and 7c are DEFERRED WITH THE REPORT, not skipped.** They consume the payload Pax produces,
+so they cannot run before it exists. That is a sequencing fact, not a failure — but it means **this
+rotation ends with Supabase NOT populated and the CAPAE record NOT updated for it.** Recorded here so
+the next session finishes the transaction rather than discovering the gap.
