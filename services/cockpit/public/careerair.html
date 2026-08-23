@@ -33,7 +33,11 @@
        this page actually built, and a separate SQL count(*) — and it says both. It is not decoration:
        if they ever disagree, this line is where that becomes visible instead of a grid that quietly
        shows fewer rows than exist. -->
-  <p class="ca-count" id="ca-count" role="status" aria-live="polite">Loading…</p>
+  <!-- `tabindex="-1"` so focus can be MOVED here. When Warwick sets a row to "no longer accepting"
+       and the default filter takes it off screen, the card under his thumb disappears; focus would
+       otherwise fall back to the document and a screen reader would say nothing. Focus lands here
+       instead, and this is the element that says what just happened. -->
+  <p class="ca-count" id="ca-count" role="status" aria-live="polite" tabindex="-1">Loading…</p>
 </header>
 
 <!-- CONTROLS. Sortable by score and by recency, filterable to a score threshold, plus a plain text
@@ -70,6 +74,21 @@
       <option value="all">All rows</option>
       <option value="full">Full advert only</option>
       <option value="thin">Thin rows only</option>
+    </select>
+  </div>
+  <!-- THE STATUS FILTER. It DEFAULTS to hiding "no longer accepting", because that is the whole
+       point of the feature: 103 of these rows are dead and every one of them costs Warwick a look.
+       A filter that is on before he touches anything must never hide silently, so the count line
+       above says how many are hidden and carries a button that brings them back in one tap. -->
+  <div class="ca-field">
+    <label for="ca-status">Status</label>
+    <select id="ca-status" name="status">
+      <option value="open" selected>Hide "no longer accepting"</option>
+      <option value="all">All statuses</option>
+      <option value="todo">To do only</option>
+      <option value="reviewed">Reviewed only</option>
+      <option value="applied">Applied only</option>
+      <option value="closed">No longer accepting only</option>
     </select>
   </div>
   <div class="ca-field ca-field-check">

@@ -30,6 +30,19 @@
   var LIST_URL = '/api/careerair/opportunities';
   var DETAIL_URL = '/api/careerair/opportunity?id=';
   var CV_URL = '/api/careerair/cv?id=';
+  var STATUS_URL = '/api/careerair/status';
+
+  /* The four states. The ORDER is the order they appear in the control, and it is the order Warwick
+     moves through them — not alphabetical. The labels are the only status text on the page; the
+     stored value ('closed') is never shown to him. Kept in step with STATUS_VALUES/STATUS_LABELS in
+     careerair.mjs, which the server and the database both hold. */
+  var STATUS_ORDER = ['todo', 'reviewed', 'applied', 'closed'];
+  var STATUS_LABEL = {
+    todo: 'To do',
+    reviewed: 'Reviewed',
+    applied: 'Applied',
+    closed: 'No longer accepting',
+  };
 
   var el = function (tag, cls, text) {
     var n = document.createElement(tag);
@@ -46,7 +59,11 @@
     return true;
   };
 
-  var state = { rows: [], dbCount: -1, countsAgree: false, tiers: null, cvSource: 'unknown', open: {} };
+  var state = { rows: [], dbCount: -1, countsAgree: false, tiers: null, cvSource: 'unknown', open: {},
+    /* How many rows the STATUS filter removed on the last paint. Counted from what was actually
+       filtered, not predicted from statusCounts — the number in the sentence and the number of rows
+       missing from the list are then the same measurement, and cannot drift apart. */
+    hiddenByStatus: 0 };
 
   /* ---------------------------------------------------------------------------------------------
      THE MARKDOWN READING VIEW. A deliberately NARROW subset — headings, bullet lists, rules, bold
@@ -190,10 +207,121 @@
     return acts;
   }
 
+  /* ---------------------------------------------------------------------------------------------
+     WARWICK'S STATUS — the one control on this page that WRITES.
+
+     A native <select>. Not a segmented control, not a row of buttons, not a custom widget: on a phone
+     the platform picker gives a full-height touch target, the platform's own keyboard and screen
+     reader semantics, and a value that is legible at a glance without opening anything. Four states
+     that are mutually exclusive is exactly what a <select> is.
+
+     ⛔ A FAILED WRITE MUST BE VISIBLE, because he will act on what this says. The update is optimistic
+     — the control moves at once, which is the right feel on a phone — but it is RECONCILED AGAINST
+     THE RESPONSE, never against what was sent. If the write fails the control goes back to where it
+     was and the card says so out loud. A status that looks saved and is not is worse than no feature.
+     --------------------------------------------------------------------------------------------- */
+  function statusControl(row, card) {
+    var wrap = el('div', 'ca-status-wrap');
+
+    var sel = document.createElement('select');
+    sel.className = 'ca-status-sel st-' + row.status;
+    sel.id = 'ca-status-' + row.id;
+    // No visible label per card — there is no room for 354 of them, and the value itself reads as
+    // the label. The accessible name carries the opportunity so a screen reader user moving through
+    // a long list always knows WHICH job the control belongs to.
+    sel.setAttribute('aria-label', 'Status for opportunity ' + row.id);
+    STATUS_ORDER.forEach(function (s) {
+      var o = document.createElement('option');
+      o.value = s;
+      o.textContent = STATUS_LABEL[s];
+      if (s === row.status) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function () { setStatus(row, sel.value, sel, card); });
+    wrap.appendChild(sel);
+
+    // role=alert so a failure is ANNOUNCED, not just drawn. Empty until something goes wrong.
+    var err = el('span', 'ca-status-err');
+    err.id = 'ca-status-err-' + row.id;
+    err.setAttribute('role', 'alert');
+    wrap.appendChild(err);
+    return wrap;
+  }
+
+  function setStatus(row, next, sel, card) {
+    var prev = row.status;
+    if (next === prev) return;
+    var err = document.getElementById('ca-status-err-' + row.id);
+    if (err) err.textContent = '';
+
+    row.status = next;                                    // optimistic
+    sel.disabled = true;                                  // no second write in flight for this row
+    sel.className = 'ca-status-sel st-' + next + ' is-saving';
+
+    fetch(STATUS_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ id: row.id, status: next }),
+    })
+      .then(function (r) {
+        // A 4xx/5xx does NOT reject a fetch. Carry the HTTP result forward explicitly, or a refusal
+        // reads as a success and the whole reconciliation below never runs.
+        return r.json().catch(function () { return null; }).then(function (d) { return { httpOk: r.ok, body: d }; });
+      })
+      .then(function (res) {
+        if (!res.httpOk || !res.body || res.body.ok !== true) {
+          throw new Error((res.body && res.body.error) || 'no_response');
+        }
+        // RECONCILE AGAINST THE RESPONSE. The server is what decides what was stored; if it ever
+        // answered with a different status than was sent, this page follows the server.
+        row.status = STATUS_LABEL[res.body.status] ? res.body.status : prev;
+        row.statusAt = res.body.at || null;
+        sel.disabled = false;
+        sel.value = row.status;
+        sel.className = 'ca-status-sel st-' + row.status;
+        afterStatusWrite(row, card);
+      })
+      .catch(function (e) {
+        row.status = prev;                                // the model goes back
+        sel.disabled = false;
+        sel.value = prev;                                 // and so does the CONTROL
+        sel.className = 'ca-status-sel st-' + prev;
+        if (err) {
+          err.textContent = 'NOT SAVED — still "' + STATUS_LABEL[prev] + '". ' + writeFailureReason(e && e.message);
+        }
+      });
+  }
+
+  /* Say what went wrong in Warwick's terms. The server answers with codes precisely so that no path,
+     host or role name can reach a response body; this turns the code back into a sentence. */
+  function writeFailureReason(code) {
+    if (code === 'unknown_opportunity') return 'This opportunity is no longer in the live list — reload the page.';
+    if (code === 'bad_status' || code === 'bad_opportunity_id' || code === 'bad_json') return 'The page sent something the server refused. Reload and try again.';
+    if (code === 'status_write_failed' || code === 'status_check_failed') return 'The database refused the write. Try again in a moment.';
+    return 'The write did not reach the server. Check the connection and try again.';
+  }
+
+  /* After a CONFIRMED write. The card is updated IN PLACE rather than repainting all 354 — a full
+     repaint would collapse every expanded detail panel and throw away Warwick's scroll position for
+     a one-row change. If the row no longer passes the status filter it is removed, and focus moves
+     to the count line, which is the element that explains where it went. */
+  function afterStatusWrite(row, card) {
+    var f = currentFilters();
+    var removed = false;
+    if (card && card.parentNode && !passesStatus(row, f.status)) { card.parentNode.removeChild(card); removed = true; }
+    state.hiddenByStatus = hiddenByStatusCount(f);
+    paintCount(document.getElementById('ca-list').querySelectorAll('.ca-row').length);
+    if (removed) {
+      var count = document.getElementById('ca-count');
+      if (count) count.focus();
+    }
+  }
+
   function rowCard(row) {
     var card = el('article', 'ca-row t-' + row.tier);
     card.setAttribute('data-opp', row.id);
     card.setAttribute('data-tier', row.tier);
+    card.setAttribute('data-status', row.status);
 
     var head = el('div', 'ca-r-head');
     var titles = el('div', 'ca-r-title');
@@ -212,6 +340,7 @@
     card.appendChild(metaLine(row));
     card.appendChild(scoreChips(row));
     if (row.summary) card.appendChild(el('p', 'ca-r-sum', row.summary));
+    card.appendChild(statusControl(row, card));
     card.appendChild(actions(row, card));
     return card;
   }
@@ -283,23 +412,54 @@
       min: Number(document.getElementById('ca-min').value || 0),
       evidence: document.getElementById('ca-evidence').value,
       cvOnly: document.getElementById('ca-cv').checked,
+      status: document.getElementById('ca-status').value,
     };
+  }
+
+  /* Does the STATUS filter alone keep this row? Separate from visibleRows so the "how many are
+     hidden" count can be attributed to THIS filter specifically. A row dropped by the search box is
+     not hidden by the status filter, and telling Warwick otherwise would be the same class of lie
+     the count line exists to prevent. */
+  function passesStatus(r, mode) {
+    if (mode === 'all') return true;
+    if (mode === 'open') return r.status !== 'closed';
+    return r.status === mode;
+  }
+
+  /* Every filter EXCEPT status. Split out so "how many is the status filter hiding" can be answered
+     as a differential — see hiddenByStatusCount. */
+  function passesOtherFilters(r, f) {
+    if (f.cvOnly && !r.hasCv) return false;
+    if (f.evidence === 'full' && r.tier !== 'full') return false;
+    if (f.evidence === 'thin' && r.tier === 'full') return false;
+    if (f.min > 0) {
+      var p = r.scores && r.scores.primary;
+      if (p === null || p === undefined || p < f.min) return false;
+    }
+    if (f.q) {
+      var hay = [r.title, r.employer, r.location, r.salary, r.summary, r.id].filter(Boolean).join(' ').toLowerCase();
+      if (hay.indexOf(f.q) === -1) return false;
+    }
+    return true;
+  }
+
+  /* How many MORE rows Warwick would see if he turned the status filter off, every other filter left
+     exactly as it is. That is the honest number, and it is not the same as "how many are closed": a
+     dead row that his search box already excluded is not a row this filter is hiding from him, and
+     counting it would overstate what the button will do. */
+  function hiddenByStatusCount(f) {
+    var eligible = 0, kept = 0;
+    state.rows.forEach(function (r) {
+      if (!passesOtherFilters(r, f)) return;
+      eligible += 1;
+      if (passesStatus(r, f.status)) kept += 1;
+    });
+    return eligible - kept;
   }
 
   function visibleRows(f) {
     var out = state.rows.filter(function (r) {
-      if (f.cvOnly && !r.hasCv) return false;
-      if (f.evidence === 'full' && r.tier !== 'full') return false;
-      if (f.evidence === 'thin' && r.tier === 'full') return false;
-      if (f.min > 0) {
-        var p = r.scores && r.scores.primary;
-        if (p === null || p === undefined || p < f.min) return false;
-      }
-      if (f.q) {
-        var hay = [r.title, r.employer, r.location, r.salary, r.summary, r.id].filter(Boolean).join(' ').toLowerCase();
-        if (hay.indexOf(f.q) === -1) return false;
-      }
-      return true;
+      return passesStatus(r, f.status) && passesOtherFilters(r, f);
     });
     var by = {
       score: function (a, b) {
@@ -321,10 +481,17 @@
     var rows = visibleRows(f);
     var list = document.getElementById('ca-list');
     var stateLine = document.getElementById('ca-state');
+
+    state.hiddenByStatus = hiddenByStatusCount(f);
+
     list.textContent = '';
     if (!rows.length) {
-      stateLine.textContent = 'No opportunity matches those filters. ' + state.rows.length + ' are loaded.';
+      // Even the empty state has to account for the rows the DEFAULT filter removed — otherwise the
+      // one screen where a hidden row matters most is the one screen that does not mention them.
+      stateLine.textContent = 'No opportunity matches those filters. ' + state.rows.length + ' are loaded'
+        + (state.hiddenByStatus > 0 ? ', and ' + state.hiddenByStatus + ' of them are hidden by the status filter' : '') + '.';
       stateLine.className = 'ca-state';
+      paintCount(0);
       return;
     }
     stateLine.textContent = '';
@@ -342,6 +509,7 @@
   function paintCount(showing) {
     var n = document.getElementById('ca-count');
     n.className = 'ca-count';
+    n.textContent = '';
     if (!state.countsAgree) {
       n.className = 'ca-count ca-mismatch';
       n.textContent = 'MISMATCH — ' + state.rows.length + ' rows built, but the database holds ' + state.dbCount
@@ -349,9 +517,32 @@
       return;
     }
     var t = state.tiers || { full: 0, partial: 0, thin: 0 };
-    n.textContent = 'Showing ' + showing + ' of ' + state.rows.length + ' live opportunities (database agrees: '
+    n.appendChild(document.createTextNode(
+      'Showing ' + showing + ' of ' + state.rows.length + ' live opportunities (database agrees: '
       + state.dbCount + '). ' + t.full + ' full adverts · ' + t.partial + ' partial · ' + t.thin + ' thin · '
-      + state.cvCount + ' with a tailored document.';
+      + state.cvCount + ' with a tailored document.'));
+
+    /* ⛔ THE FILTER NEVER HIDES SILENTLY. It is ON before Warwick touches anything, so the page owes
+       him two things on every paint: the number it is holding back, and a way to see them that costs
+       one tap. Without this the grid quietly shows 251 of 354 and looks complete — which is the exact
+       failure the mismatch line above was built to prevent, arriving through a different door. */
+    if (state.hiddenByStatus > 0) {
+      n.appendChild(document.createTextNode(' '));
+      var hidden = el('span', 'ca-hidden', state.hiddenByStatus + ' hidden by the status filter.');
+      n.appendChild(hidden);
+      n.appendChild(document.createTextNode(' '));
+      var show = el('button', 'ca-show-hidden', 'Show them');
+      show.type = 'button';
+      show.addEventListener('click', function () {
+        var sel = document.getElementById('ca-status');
+        sel.value = 'all';
+        paint();
+        // The button has just been repainted out of existence. Move focus somewhere real and
+        // meaningful rather than letting it fall to the document body.
+        sel.focus();
+      });
+      n.appendChild(show);
+    }
   }
 
   function paintLegendHint() {
@@ -371,10 +562,20 @@
             + '. Nothing is being guessed at — this is not an empty list, it is an unread one.';
           return;
         }
-        state.rows = d.rows || [];
+        /* ⛔ NORMALISE THE STATUS ON ARRIVAL, exactly as the server does on the way out.
+           Found by RENDERING, not by reasoning: `public/*` is live on save while `careerair.mjs`
+           needs a restart, so between a deploy and a restart this page runs against an API that has
+           no `status` field at all. `'st-' + undefined` is a class nobody styled, no <option>
+           matches, and a failed write would then try to restore the control to `undefined`. One line
+           makes the page correct in that window and in any other where a row arrives incomplete. */
+        state.rows = (d.rows || []).map(function (r) {
+          r.status = STATUS_LABEL[r.status] ? r.status : 'todo';
+          return r;
+        });
         state.dbCount = d.dbCount;
         state.countsAgree = d.countsAgree;
         state.tiers = d.tiers;
+        state.statusCounts = d.statusCounts || null;
         state.cvCount = d.cvCount;
         state.cvSource = d.cvSource;
         paint();

@@ -99,6 +99,34 @@ main:focus { outline:none; }
 .ca-tier-partial { background:var(--warn-w); color:var(--warn); }
 .ca-tier-thin { background:var(--stop-w); color:var(--stop); }
 
+/* ---- Warwick's status: the one control on a card that writes ----
+   Phone first. 44px is the platform touch-target floor and this control is meant to be hit with a
+   thumb on a moving train, so it is the full width of the card rather than a neat inline chip.
+   NO COLOUR TOKEN IS DECLARED HERE — every value below comes from /styles.css, which is why this
+   page cannot drift into a second look. */
+.ca-status-wrap { display:flex; flex-direction:column; gap:4px; margin-top:2px; }
+.ca-status-sel { font-family:inherit; font-size:14px; font-weight:750; min-height:44px; width:100%;
+  border-radius:10px; padding:8px 12px; border:1px solid var(--hair); background:var(--panel2);
+  color:var(--ink); }
+.ca-status-sel:disabled { opacity:.6; cursor:progress; }
+/* The current state is legible WITHOUT opening anything — colour reinforces the words, never
+   replaces them, so this reads the same to someone who cannot distinguish them. */
+.ca-status-sel.st-todo { background:var(--panel2); color:var(--ink2); }
+.ca-status-sel.st-reviewed { background:var(--accent-w); border-color:var(--accent); color:var(--accent-ink); }
+.ca-status-sel.st-applied { background:var(--ok-w); border-color:var(--ok); color:var(--ok); }
+.ca-status-sel.st-closed { background:var(--stop-w); border-color:var(--stop); color:var(--stop); }
+.ca-status-sel.is-saving { opacity:.7; }
+/* A failed write is LOUD. It is empty until something goes wrong, so it costs nothing when it does not. */
+.ca-status-err:empty { display:none; }
+.ca-status-err { color:var(--stop); font-weight:800; font-size:12.5px; line-height:1.4; }
+
+/* The hidden-row disclosure in the count line. The filter is on by default, so this pair is how the
+   page stays honest about what it is holding back. */
+.ca-hidden { color:var(--warn); font-weight:800; }
+.ca-show-hidden { font-family:inherit; font-size:12px; font-weight:800; min-height:32px;
+  border-radius:8px; padding:4px 10px; cursor:pointer; margin-left:2px;
+  border:1px solid var(--accent); background:var(--accent-w); color:var(--accent-ink); }
+
 /* ---- Actions ---- */
 .ca-r-acts { display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
 .ca-act { font-size:13px; font-weight:700; border-radius:10px; padding:9px 13px; min-height:40px;

@@ -32,6 +32,8 @@ import {
   isLoopbackBind, resolveCvRoot, resolveCvPath, cvIdsOnDisk,
   careerairCvResponse, careerairListResponse, careerairDetailResponse,
   CV_ROOT_ENV,
+  STATUS_VALUES, STATUS_LABELS, DEFAULT_STATUS, normaliseOpportunityId, isStatus,
+  careerairStatusWrite, SQL_FOR_ASSERTION,
 } from './careerair.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -359,6 +361,227 @@ try {
   // are genuinely different readings of the same configuration.
   ok('the CV route is handed the BOUND socket address, not the requested string',
     /server\.address\(\)/.test(serverSrc) && /bind: \(bound && bound\.address\) \|\| BIND/.test(serverSrc));
+
+  /* -----------------------------------------------------------------------------------------------
+     7b. WARWICK'S STATUS — the only write on this surface.
+
+     Every assertion here runs with NO CREDENTIALS PRESENT: `careerairStatusWrite` takes its pools as
+     a parameter and returns `{status, body}` without touching the response, so the refusals, the
+     containment of error detail, and the "never reaches the write pool" property are all executable
+     offline against stubs. The stubs RECORD their calls, because "an unknown status is a 400" is only
+     half the requirement — the half that matters is that nothing was written.
+     ----------------------------------------------------------------------------------------------- */
+  section('Status — the four states, and the writes that must never happen');
+  {
+    /** A pair of stub pools that records every call. `exists:false` makes the opportunity unknown. */
+    const stubPools = (opts) => {
+      const o = opts || {};
+      const calls = { q: [], w: [] };
+      const boom = (spec) => { const e = new Error(spec.message); e.code = spec.code; throw e; };
+      return {
+        calls,
+        q: async (sql, params) => { calls.q.push({ sql, params }); if (o.qThrows) boom(o.qThrows); return { rows: o.exists === false ? [] : [{ ok: 1 }] }; },
+        w: async (sql, params) => { calls.w.push({ sql, params }); if (o.wThrows) boom(o.wThrows); return { rowCount: 1 }; },
+      };
+    };
+
+    // ── The frozen four ──────────────────────────────────────────────────────────────────────────
+    eq('there are exactly four states', STATUS_VALUES.length, 4);
+    ok('...and they are the four the database constrains', STATUS_VALUES.join(',') === 'todo,reviewed,applied,closed');
+    ok('...and the list is frozen, so no caller can widen it at runtime', Object.isFrozen(STATUS_VALUES));
+    eq('the default is the absence of a row, expressed as todo', DEFAULT_STATUS, 'todo');
+    ok('every state has a label Warwick reads', STATUS_VALUES.every((s) => typeof STATUS_LABELS[s] === 'string' && STATUS_LABELS[s].length > 0));
+    ok('the stored value is never the shown value for the dead state', STATUS_LABELS.closed === 'No longer accepting');
+
+    // ── The id, in ONE canonical form ────────────────────────────────────────────────────────────
+    eq('a plain id normalises to itself', normaliseOpportunityId('1131'), '1131');
+    eq('...and a numeric id is accepted', normaliseOpportunityId(1131), '1131');
+    eq('...and surrounding whitespace is trimmed (it cannot change WHICH job is meant)', normaliseOpportunityId('  1131  '), '1131');
+    eq('a LEADING ZERO is refused — it would be a second key for one job', normaliseOpportunityId('01131'), null);
+    eq('a non-numeric id is refused', normaliseOpportunityId('abc'), null);
+    eq('an empty id is refused', normaliseOpportunityId(''), null);
+    eq('a zero id is refused', normaliseOpportunityId('0'), null);
+    eq('a negative id is refused', normaliseOpportunityId('-1'), null);
+    eq('a decimal is refused rather than silently truncated', normaliseOpportunityId('1131.0'), null);
+    eq('a float is refused before String() makes it look valid', normaliseOpportunityId(1131.5), null);
+    eq('an unsafe integer is refused', normaliseOpportunityId(1e21), null);
+    eq('a 19-digit id is refused — the existence check casts to bigint and must not overflow', normaliseOpportunityId('9999999999999999999'), null);
+    eq('null is refused', normaliseOpportunityId(null), null);
+    eq('undefined is refused', normaliseOpportunityId(undefined), null);
+    eq('an object is refused', normaliseOpportunityId({}), null);
+
+    // ── The status value, strictly ───────────────────────────────────────────────────────────────
+    ok('each of the four is a status', STATUS_VALUES.every((s) => isStatus(s)));
+    ok('an unknown value is not', !isStatus('archived'));
+    ok('case is NOT folded — the database would refuse it, so this must too', !isStatus('TODO'));
+    ok('whitespace is NOT trimmed for a status', !isStatus(' todo'));
+    ok('a non-string is not a status', !isStatus(1) && !isStatus(null) && !isStatus({}));
+
+    // ── THE REFUSALS, AND THE WRITE THAT MUST NOT HAPPEN ─────────────────────────────────────────
+    const badStatus = stubPools();
+    const rBadStatus = await careerairStatusWrite(badStatus, { id: '1131', status: 'archived' });
+    eq('an unknown status is a 400', rBadStatus.status, 400);
+    eq('...naming the reason', rBadStatus.body.error, 'bad_status');
+    eq('...AND THE WRITE POOL WAS NEVER CALLED', badStatus.calls.w.length, 0);
+    eq('...and the read pool was not called either — it is refused before any query', badStatus.calls.q.length, 0);
+
+    const badId = stubPools();
+    const rBadId = await careerairStatusWrite(badId, { id: '01131', status: 'applied' });
+    eq('a non-canonical id is a 400', rBadId.status, 400);
+    eq('...naming the reason', rBadId.body.error, 'bad_opportunity_id');
+    eq('...and nothing was written', badId.calls.w.length, 0);
+
+    const missingBody = stubPools();
+    const rMissing = await careerairStatusWrite(missingBody, {});
+    eq('an empty body is a 400, not a crash', rMissing.status, 400);
+    eq('...and nothing was written', missingBody.calls.w.length, 0);
+    const nullBody = stubPools();
+    eq('a null body is a 400, not a crash', (await careerairStatusWrite(nullBody, null)).status, 400);
+    eq('...and nothing was written', nullBody.calls.w.length, 0);
+
+    const unknownOpp = stubPools({ exists: false });
+    const rUnknown = await careerairStatusWrite(unknownOpp, { id: '999999', status: 'applied' });
+    eq('a status for an opportunity that does not exist is a 404', rUnknown.status, 404);
+    eq('...naming the reason', rUnknown.body.error, 'unknown_opportunity');
+    eq('...and NOTHING WAS WRITTEN — no orphan row is created', unknownOpp.calls.w.length, 0);
+    eq('...though the opportunity set WAS consulted', unknownOpp.calls.q.length, 1);
+
+    // ── THE HAPPY PATH, AND THE TWO POOLS ────────────────────────────────────────────────────────
+    for (const s of STATUS_VALUES) {
+      const p = stubPools();
+      const r = await careerairStatusWrite(p, { id: '1131', status: s });
+      eq('"' + s + '" is accepted', r.status, 200);
+      eq('...and the response echoes what was stored, which the page reconciles against', r.body.status, s);
+      eq('...and it was written exactly once', p.calls.w.length, 1);
+    }
+    const pools = stubPools();
+    await careerairStatusWrite(pools, { id: '  1131 ', status: 'applied' });
+    eq('the id written is the CANONICAL form, never the raw input', pools.calls.w[0].params[0], '1131');
+    ok('the existence check runs on the READ pool against careerair.opportunity',
+      /careerair\.opportunity/.test(pools.calls.q[0].sql));
+    ok('...restricted to the same set the grid renders', /intake_status\s*=\s*'captured'/.test(pools.calls.q[0].sql));
+    ok('the write runs on the WRITE pool against the cockpit\u2019s own table',
+      /cockpit\.careerair_status/.test(pools.calls.w[0].sql));
+    ok('...as an upsert, so one opportunity can never accumulate two status rows',
+      /on conflict \(opportunity_id\) do update/.test(pools.calls.w[0].sql));
+    ok('the write pool is NEVER pointed at the careerair schema — 290\u2019s boundary holds in code too',
+      !/careerair\./.test(pools.calls.w[0].sql));
+
+    // ── CONTAINMENT: a failure names a CODE, never a message ─────────────────────────────────────
+    // The fixture message is synthetic and deliberately carries every shape that must not escape: a
+    // role name, a host, a port and a Windows path. This is the defect that was found in the CV
+    // route's 500 branch and fixed in 724f19f; it is asserted here so it cannot arrive one route on.
+    const leaky = { code: '28P01', message: 'password authentication failed for user "cp_worker" at 10.0.0.1:5432 (C:\\secrets\\live.env.json)' };
+    const qFail = stubPools({ qThrows: leaky });
+    const rq = await careerairStatusWrite(qFail, { id: '1131', status: 'applied' });
+    eq('a failed existence check is a 500', rq.status, 500);
+    eq('...carrying the error CODE', rq.body.detail, '28P01');
+    const rqJson = JSON.stringify(rq.body);
+    ok('...and NOT the role name', rqJson.indexOf('cp_worker') === -1);
+    ok('...and NOT the host or port', rqJson.indexOf('10.0.0.1') === -1 && rqJson.indexOf('5432') === -1);
+    ok('...and NOT a filesystem path', !/\b[A-Za-z]:[\\/]/.test(rqJson));
+    ok('...and not the message in any form', rqJson.indexOf('password authentication') === -1);
+    eq('...and a failed check never proceeds to write', qFail.calls.w.length, 0);
+
+    const wFail = stubPools({ wThrows: leaky });
+    const rw = await careerairStatusWrite(wFail, { id: '1131', status: 'applied' });
+    eq('a failed write is a 500', rw.status, 500);
+    eq('...carrying the error CODE', rw.body.detail, '28P01');
+    const rwJson = JSON.stringify(rw.body);
+    ok('...and no role name, host, port or path', rwJson.indexOf('cp_worker') === -1 && rwJson.indexOf('10.0.0.1') === -1 && !/\b[A-Za-z]:[\\/]/.test(rwJson));
+    ok('...and the response says ok:false, so the page puts the control back', rw.body.ok === false);
+    // An error with NO code must still not fall back to the message.
+    const noCode = stubPools({ wThrows: { code: undefined, message: leaky.message } });
+    const rNoCode = await careerairStatusWrite(noCode, { id: '1131', status: 'applied' });
+    eq('an error with no code reports "unknown", never the message', rNoCode.body.detail, 'unknown');
+    ok('...and still leaks nothing', JSON.stringify(rNoCode.body).indexOf('cp_worker') === -1);
+
+    // ── THE DEFAULT IS THE ABSENCE OF A ROW ──────────────────────────────────────────────────────
+    eq('a row with no status row reads as todo', shapeRow({ opportunity_id: 1, status: null }).status, 'todo');
+    eq('...and so does a row where the column is simply absent', shapeRow({ opportunity_id: 1 }).status, 'todo');
+    eq('a stored status is carried through', shapeRow({ opportunity_id: 1, status: 'applied' }).status, 'applied');
+    eq('an unrecognised stored value degrades to todo rather than reaching the page',
+      shapeRow({ opportunity_id: 1, status: 'nonsense' }).status, 'todo');
+    eq('statusAt is null when there is no row', shapeRow({ opportunity_id: 1 }).statusAt, null);
+
+    // ── THE SQL ITSELF — the two mistakes that would break countsAgree SILENTLY ───────────────────
+    // A payload-level assertion cannot see either of these: a fixture where every opportunity has a
+    // status row would pass an inner join, and a COUNT_SQL that filtered the same way as LIST_SQL
+    // would agree with it perfectly. So these are asserted against the statements.
+    ok('the status join is a LEFT join — an inner one would drop every untouched opportunity',
+      /left join cockpit\.careerair_status/i.test(SQL_FOR_ASSERTION.list));
+    ok('...joined on the canonical text form of the id',
+      /on s\.opportunity_id = o\.opportunity_id::text/i.test(SQL_FOR_ASSERTION.list));
+    // ANCHORED ON THE OUTER WHERE, not on "does s.status appear after any where". The first form
+    // written here was VACUOUS: the CTE contains `count(*) filter (where field_name = ...)`, so a
+    // `where` precedes the select list and the regex matched `s.status` where it is SUPPOSED to be —
+    // in the SELECT. It went red against correct code. This form pins the outer clause to its ONE
+    // predicate, so adding `and s.status <> 'closed'` breaks it and nothing else does.
+    ok('the LIST statement outer WHERE is intake_status ALONE - status filtering belongs to the client',
+      /\bwhere o\.intake_status = 'captured'\s*\r?\norder by o\.opportunity_id/i.test(SQL_FOR_ASSERTION.list));
+    ok('the COUNT statement never mentions the status table — the two measurements stay independent',
+      SQL_FOR_ASSERTION.count.indexOf('careerair_status') === -1);
+    ok('...and carries no status predicate of its own',
+      !/\bs\.status\b/i.test(SQL_FOR_ASSERTION.count));
+    ok('the two statements are genuinely different statements',
+      SQL_FOR_ASSERTION.list !== SQL_FOR_ASSERTION.count);
+
+    // ── countsAgree SURVIVES THE STATUS FEATURE ──────────────────────────────────────────────────
+    // Synthetic rows: three opportunities, one of them dead, one never touched.
+    const fakeRows = [
+      { opportunity_id: 11, role_title: 'Synthetic Role A', status: 'applied' },
+      { opportunity_id: 12, role_title: 'Synthetic Role B', status: 'closed' },
+      { opportunity_id: 13, role_title: 'Synthetic Role C', status: null },
+    ];
+    // ⚠️ DISCRIMINATE ON `count(*)::int as n`, NOT on `count(*)`. LIST_SQL's CTE contains
+    // `count(*) filter (where ...)`, so the looser marker routed the LIST query into the COUNT
+    // branch and this fixture silently built ONE row instead of three. The fixture was wrong, not
+    // the code — but it is exactly the shape of fixture bug that makes a real defect invisible.
+    const fakeQ = async (sql) => (sql.indexOf('count(*)::int as n') !== -1 ? { rows: [{ n: fakeRows.length }] } : { rows: fakeRows });
+    const payload = await careerairListResponse(fakeQ, {});
+    eq('the list still builds every row when statuses are present', payload.rows.length, 3);
+    ok('...and countsAgree is still true', payload.countsAgree === true);
+    eq('...the untouched opportunity defaults to todo', payload.rows[2].status, 'todo');
+    eq('...the dead one keeps its status and is STILL IN THE PAYLOAD', payload.rows[1].status, 'closed');
+    eq('the status counts add up to the row count', payload.statusCounts.todo + payload.statusCounts.reviewed
+      + payload.statusCounts.applied + payload.statusCounts.closed, payload.rows.length);
+    eq('...counting the dead row', payload.statusCounts.closed, 1);
+    // The response the page reads on a database failure must still carry the shape it destructures.
+    const brokenQ = async () => { throw new Error('synthetic failure'); };
+    const failed = await careerairListResponse(brokenQ, {});
+    ok('a failed list still returns a statusCounts object rather than undefined', failed.statusCounts
+      && typeof failed.statusCounts.closed === 'number');
+
+    // ── THE PAGE: the filter is CLIENT-SIDE, and it never hides silently ─────────────────────────
+    // ⚠️ LINE COMMENTS ARE STRIPPED BEFORE ANY SOURCE ASSERTION BELOW, AND THAT IS NOT TIDINESS.
+    // Proven by mutation: commenting out `sel.value = prev` left every assertion here GREEN, because
+    // a regex cannot tell live code from a note about it. A defence asserted by source text must be
+    // asserted against the code that RUNS. Block comments are deliberately NOT stripped — a naive
+    // block-comment regex eats regex literals in this file, and the line-comment form is what the
+    // surviving mutant actually used.
+    const clientSrc = fs.readFileSync(path.join(PUBLIC, 'careerair.js'), 'utf8').replace(/^\s*\/\/.*$/gm, ' ');
+    ok('the page posts the status to its own route', clientSrc.indexOf("'/api/careerair/status'") !== -1);
+    ok('...and reconciles against the RESPONSE rather than what it sent',
+      /res\.body\.status/.test(clientSrc));
+    ok('...and puts the control back when the write fails — asserted against LIVE code, not a comment',
+      /sel\.value = prev;/.test(clientSrc));
+    ok('...and says so on the card', /NOT SAVED/.test(clientSrc));
+    ok('the status filter defaults to hiding the dead rows',
+      /<option value="open" selected>/.test(fs.readFileSync(path.join(PUBLIC, 'careerair.html'), 'utf8')));
+    // ⚠️ THE EXACT EXPRESSION, not the phrase. The phrase "hidden by the status filter" appears TWICE
+    // in the page — once in the count line and once in the empty state — so a loose match stayed
+    // green when the count line's copy was removed. Each occurrence now has its own assertion.
+    ok('...and the COUNT LINE reports what it is holding back',
+      clientSrc.indexOf("state.hiddenByStatus + ' hidden by the status filter.'") !== -1);
+    ok('...and the EMPTY STATE accounts for them too — the one screen where a hidden row matters most',
+      clientSrc.indexOf("' of them are hidden by the status filter'") !== -1);
+    ok('...and offers them back in one tap', /ca-show-hidden/.test(clientSrc));
+    // Found by RENDERING the page against a server that had not been restarted: with no `status`
+    // field in the payload the cards rendered class "st-undefined" and no <option> matched. The page
+    // normalises on arrival now, and this asserts it stays that way.
+    ok('...and the page normalises an absent status on arrival, so an un-restarted API cannot render st-undefined',
+      clientSrc.indexOf("r.status = STATUS_LABEL[r.status] ? r.status : 'todo';") !== -1);
+  }
 
   /* -----------------------------------------------------------------------------------------------
      8. LIVE — the acceptance property. Requires the database; NEVER passes without it.

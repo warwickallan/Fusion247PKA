@@ -274,6 +274,141 @@ export function firstPresent(...vals) {
   return null;
 }
 
+/* =================================================================================================
+   WARWICK'S OWN STATUS — the cockpit's lifecycle over a dataset it may only read.
+
+   ⛔ THE DEFAULT IS THE ABSENCE OF A ROW. `todo` is what an opportunity is until he says otherwise,
+   and it is expressed by `cockpit.careerair_status` having no row for it. 354 opportunities create
+   ZERO rows on day one, and the read path supplies `todo` through a LEFT JOIN. Nothing is backfilled,
+   so this table stays proportional to his decisions rather than to the collector's output.
+
+   ⚠️ TWO ROLES, TWO POOLS, AND NO SHARED TRANSACTION — a DECLARED design decision, not a discovery.
+   Migration 290 granted `cp_worker` NOTHING in the `careerair` schema, deliberately and in writing,
+   so the write role cannot see the opportunity set it is validating against. Validation therefore
+   runs on `q` (`cp_directus`, SELECT) and the write on `w` (`cp_worker`), which cannot be one
+   transaction. The race that opens is: an opportunity is deleted between the check and the write, and
+   a status row is left with nothing to attach to. That is a stale row costing three columns — never
+   corruption, and never a status on the WRONG job. The alternative, granting `cp_worker` reach into
+   `careerair`, reverses a boundary 290 argued for at length; this is the cheaper side of that trade.
+   ================================================================================================= */
+
+/** The four states. FROZEN — the DB carries the same list as a check constraint. */
+export const STATUS_VALUES = Object.freeze(['todo', 'reviewed', 'applied', 'closed']);
+
+/** What Warwick reads. The stored value is never shown to him raw. */
+export const STATUS_LABELS = Object.freeze({
+  todo: 'To do',
+  reviewed: 'Reviewed',
+  applied: 'Applied',
+  closed: 'No longer accepting',
+});
+
+/** The state an opportunity is in when no row exists for it. */
+export const DEFAULT_STATUS = 'todo';
+
+/**
+ * The canonical form of an opportunity id, or null.
+ *
+ * ONE CANONICAL FORM, matching migration 291's check constraint character for character. '1131',
+ * '01131' and '1131 ' would otherwise be three different text keys for one job, and a `text primary
+ * key` would not notice. Whitespace is trimmed because it cannot change WHICH opportunity is meant;
+ * a leading zero is REFUSED because accepting it would create a second key for the same job.
+ *
+ * Bounded at 18 digits so `$1::bigint` in the existence check can never overflow — that would be a
+ * 500 from a caller-supplied value, which is a defect even when it is not a vulnerability.
+ * @param {unknown} id
+ * @returns {string|null}
+ */
+export function normaliseOpportunityId(id) {
+  if (id === null || id === undefined) return null;
+  // A float or an unsafe integer never round-trips to a canonical id; refuse before String() makes
+  // something plausible-looking out of it (`1e21` becomes '1e+21', `1131.0` becomes '1131').
+  if (typeof id === 'number' && !Number.isSafeInteger(id)) return null;
+  const s = String(id).trim();
+  return /^[1-9][0-9]{0,17}$/.test(s) ? s : null;
+}
+
+/**
+ * Is this exactly one of the four? Strict: no case folding and no trimming, so 'TODO' and ' todo'
+ * are refused rather than quietly coerced. The DB constraint is equally strict, and two controls
+ * that disagree about what is valid are one control plus a surprise.
+ * @param {unknown} v
+ */
+export function isStatus(v) { return typeof v === 'string' && STATUS_VALUES.indexOf(v) !== -1; }
+
+/**
+ * The status of a row as read from the database. An absent row — and anything unrecognised — is
+ * `todo`. The unrecognised branch is unreachable while the check constraint holds; it exists so that
+ * a future migration widening the constraint cannot make the page render a raw enum value at Warwick.
+ * @param {unknown} v
+ */
+export function normaliseStatus(v) { return isStatus(v) ? v : DEFAULT_STATUS; }
+
+/** Does this opportunity exist in the set the GRID renders? Same predicate as LIST_SQL, deliberately. */
+const STATUS_EXISTS_SQL = `
+select 1 from careerair.opportunity
+where opportunity_id = $1::bigint and intake_status = 'captured'
+limit 1`;
+
+/** Record the decision. One row per opportunity Warwick has actually touched. */
+const STATUS_UPSERT_SQL = `
+insert into cockpit.careerair_status (opportunity_id, status, updated_at)
+values ($1, $2, now())
+on conflict (opportunity_id) do update set status = excluded.status, updated_at = now()`;
+
+/**
+ * Record Warwick's status for one opportunity.
+ *
+ * Returns `{ status, body }` for the caller to write — no I/O on the response, so
+ * `careerair-check.mjs` executes this function directly with stub pools and NO CREDENTIALS PRESENT.
+ * That is the same shape `careerairCvResponse` uses and for the same reason.
+ *
+ * The refusals, in order, and every one fails CLOSED — none of them reaches `w`:
+ *   400 bad_opportunity_id   — not the canonical form of an id.
+ *   400 bad_status           — not one of the frozen four. An unknown value is NEVER written.
+ *   404 unknown_opportunity  — no such opportunity in the set the grid renders.
+ *   500 status_check_failed  — the read failed.
+ *   500 status_write_failed  — the write failed.
+ *
+ * ⛔ NO BRANCH RETURNS `e.message`. Node and `pg` both embed context in error messages — a path, a
+ * host, a role name (`password authentication failed for user "..."`). `e.code` tells an operator
+ * everything the message would and names nothing. This is the same defect that was found in the CV
+ * route's 500 branch and fixed in `724f19f`; it is not being reintroduced one route along.
+ *
+ * @param {{q: (sql: string, params?: any[]) => Promise<{rows: any[]}>, w: (sql: string, params?: any[]) => Promise<any>}} pools
+ * @param {unknown} body
+ */
+export async function careerairStatusWrite(pools, body) {
+  const q = pools && pools.q;
+  const w = pools && pools.w;
+  const src = body && typeof body === 'object' ? body : {};
+
+  const id = normaliseOpportunityId(src.id);
+  if (id === null) return { status: 400, body: { ok: false, error: 'bad_opportunity_id' } };
+  if (!isStatus(src.status)) {
+    return { status: 400, body: { ok: false, error: 'bad_status', allowed: STATUS_VALUES.slice() } };
+  }
+
+  // Validate against the REAL opportunity set before writing anything. A status for an id that does
+  // not exist is a row nothing will ever render and nothing will ever clean up.
+  let found = false;
+  try {
+    const r = await q(STATUS_EXISTS_SQL, [id]);
+    found = Boolean(r && r.rows && r.rows.length);
+  } catch (e) {
+    return { status: 500, body: { ok: false, error: 'status_check_failed', detail: (e && e.code) || 'unknown' } };
+  }
+  if (!found) return { status: 404, body: { ok: false, error: 'unknown_opportunity', id } };
+
+  try {
+    await w(STATUS_UPSERT_SQL, [id, src.status]);
+  } catch (e) {
+    return { status: 500, body: { ok: false, error: 'status_write_failed', detail: (e && e.code) || 'unknown' } };
+  }
+  // The page reconciles against THIS body, not against what it sent. See careerair.js.
+  return { status: 200, body: { ok: true, id, status: src.status, at: new Date().toISOString() } };
+}
+
 /**
  * Turn one database row into the shape the page renders.
  *
@@ -310,6 +445,10 @@ export function shapeRow(r) {
     // trip on a panel most visits never expand.
     scores: { larry: scores.larry, rubric: scores.rubric, disagree: scores.disagree, primary: scores.primary },
     tier: tierOf({ hasRequirements, fieldRows }),
+    // Warwick's own status. `r.status` is NULL for every opportunity he has never touched — the LEFT
+    // JOIN in LIST_SQL guarantees the row is still here, and `todo` is supplied on the way past.
+    status: normaliseStatus(r.status),
+    statusAt: r.status_at ? new Date(r.status_at).toISOString() : null,
     firstSeen: r.first_seen_at ? new Date(r.first_seen_at).toISOString() : null,
     lastSeen: r.last_seen_at ? new Date(r.last_seen_at).toISOString() : null,
     submissions: Number(r.submission_count || 0),
@@ -317,6 +456,23 @@ export function shapeRow(r) {
   };
 }
 
+/*
+ * ⛔ THIS STATEMENT NEVER FILTERS BY STATUS, AND THAT IS WHAT KEEPS `countsAgree` HONEST.
+ *
+ * `countsAgree` compares the rows this payload built against COUNT_SQL, an INDEPENDENT `count(*)`.
+ * Hiding "no longer accepting" rows HERE would drop `rows.length` while COUNT_SQL stayed at the full
+ * number, so the page would paint its red MISMATCH banner — correctly, because rows really would be
+ * missing from the payload. The tempting repair is to add the same predicate to COUNT_SQL, and that
+ * is the one that must never happen: two measurements that filter identically can no longer falsify
+ * each other, and the guarantee becomes a field that always says true.
+ *
+ * So the payload always carries EVERY live opportunity, and hiding `closed` is done in the client,
+ * where five other filters already live (`visibleRows` in public/careerair.js). The page then reports
+ * what it is hiding and offers it back in one tap. `careerair-check.mjs` asserts both halves of this.
+ *
+ * The JOIN IS `LEFT`, and that is load-bearing rather than stylistic: an inner join would silently
+ * drop every opportunity Warwick has never touched — on day one, all 354 of them.
+ */
 const LIST_SQL = `
 with f as (
   select opportunity_id,
@@ -336,14 +492,32 @@ with f as (
 select o.opportunity_id, o.role_title, o.employer_name, o.salary_text, o.source_url, o.note,
        o.first_seen_at, o.last_seen_at, o.submission_count,
        f.f_title, f.f_org, f.f_location, f.f_value, f.f_employment, f.f_closing, f.f_summary,
-       coalesce(f.has_req, 0) as has_req, coalesce(f.field_rows, 0) as field_rows
+       coalesce(f.has_req, 0) as has_req, coalesce(f.field_rows, 0) as field_rows,
+       s.status, s.updated_at as status_at
 from careerair.opportunity o
 left join f on f.opportunity_id = o.opportunity_id
+left join cockpit.careerair_status s on s.opportunity_id = o.opportunity_id::text
 where o.intake_status = 'captured'
 order by o.opportunity_id`;
 
-/** The independent count. Deliberately a SEPARATE statement from the list — see below. */
+/**
+ * The independent count. Deliberately a SEPARATE statement from the list — see below.
+ *
+ * ⛔ IT MUST NEVER LEARN ABOUT STATUS. It does not join `cockpit.careerair_status` and it carries no
+ * status predicate. The moment it filters the way LIST_SQL filters, the two measurements stop being
+ * independent and `countsAgree` becomes a field that cannot say no. Asserted by careerair-check.mjs.
+ */
 const COUNT_SQL = 'select count(*)::int as n from careerair.opportunity where intake_status = \'captured\'';
+
+/**
+ * The two statements, exported for the gate ONLY.
+ *
+ * `careerair-check.mjs` asserts properties OF THE SQL ITSELF — that the status join is LEFT and that
+ * COUNT_SQL never mentions status. Those are exactly the two mistakes that would break `countsAgree`
+ * silently, and neither is visible from the payload when the fixture happens to have a status row for
+ * every opportunity. A check that can only see outputs cannot catch them; this is how it sees inputs.
+ */
+export const SQL_FOR_ASSERTION = Object.freeze({ list: LIST_SQL, count: COUNT_SQL });
 
 const DETAIL_SQL = `
 select field_name, field_value, confidence, is_long_form
@@ -385,10 +559,17 @@ export async function careerairListResponse(q, env) {
     const dbCount = Number(count.rows[0] ? count.rows[0].n : -1);
     const tiers = { full: 0, partial: 0, thin: 0 };
     for (const r of rows) tiers[r.tier] += 1;
+    // ⚠️ DERIVED FROM `rows`, exactly like `tiers` and `cvCount` — it is a convenience for the page,
+    // NOT a second independent measurement. `dbCount` is the only independent one on this payload and
+    // it is the only one `countsAgree` is built from. Saying so here because a count that sits beside
+    // an independent count starts to look like one.
+    const statusCounts = { todo: 0, reviewed: 0, applied: 0, closed: 0 };
+    for (const r of rows) statusCounts[r.status] += 1;
     return {
       ok: true,
       rows,
       dbCount,
+      statusCounts,
       // The page renders this. A mismatch is shown to Warwick rather than hidden, because a grid
       // that quietly drops rows is the exact failure this field exists to make impossible.
       countsAgree: dbCount === rows.length,
@@ -400,7 +581,7 @@ export async function careerairListResponse(q, env) {
       at: new Date().toISOString(),
     };
   } catch (e) {
-    return { ok: false, error: e.message, rows: [], dbCount: -1, countsAgree: false, tiers: { full: 0, partial: 0, thin: 0 }, cvCount: 0, cvSource: 'unknown', at: new Date().toISOString() };
+    return { ok: false, error: e.message, rows: [], dbCount: -1, statusCounts: { todo: 0, reviewed: 0, applied: 0, closed: 0 }, countsAgree: false, tiers: { full: 0, partial: 0, thin: 0 }, cvCount: 0, cvSource: 'unknown', at: new Date().toISOString() };
   }
 }
 
