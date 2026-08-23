@@ -16,9 +16,23 @@
 -- empty grid for the one role that actually serves it. The lesson is the general one: verify a grant
 -- as the ROLE THAT WILL USE IT, never as the role that happens to be connected.
 --
---   cp_directus  — RENDER ONLY: usage on the schema, SELECT on exactly three tables. Nothing else.
+--   cp_directus  — RENDER ONLY: usage on the schema, SELECT on exactly three OBJECTS. Nothing else.
 --   cp_worker    — DELIBERATELY NOT GRANTED ANYTHING HERE. The cockpit's write role has no business
 --                  in this schema; the grid is a read surface and there is no intent queue behind it.
+--
+-- ⚠️ ONE OF THE THREE IS A VIEW, AND THAT IS A PRIVILEGE-INDIRECTION OBJECT. Say it plainly, because
+-- "three tables" understated it. `careerair.opportunity_field_current` is a VIEW, and its
+-- `security_invoker` is UNSET — so it executes with the privileges of its OWNER (`postgres`), not of
+-- the caller. Granting SELECT on it is therefore how `cp_directus` reads `opportunity_field`,
+-- `opportunity_field_name` and `opportunity_classification` WITHOUT holding any grant on those
+-- tables, and `\dp` against them will show none.
+--
+-- That is intended and it is bounded — the reach is exactly the view's own text and nothing wider,
+-- and the view exposes current field values, which is precisely what the grid renders. But a future
+-- maintainer reading "SELECT on three tables" would conclude the role's reach is three tables, and
+-- it is not. TWO CONSEQUENCES WORTH CARRYING: redefining this view silently widens what the cockpit
+-- role can read, with no grant change to review; and setting `security_invoker = on` would break the
+-- grid unless the underlying tables were granted at the same time. Neither is changed here.
 --
 -- ⛔ `careerair.email_message` IS DELIBERATELY OMITTED, AND ITS OMISSION IS THE POINT.
 -- That table carries the content of Warwick's mail. The grid does not need it, so the role that

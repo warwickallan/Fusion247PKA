@@ -39,6 +39,8 @@ const PUBLIC = path.join(DIR, 'public');
 
 let executed = 0;
 let failed = 0;
+/** Assertions that could not be exercised. NEVER counted as passes; printed loudly in the summary. */
+const skipped = [];
 let liveExecuted = 0;
 let phase = 'offline';
 
@@ -161,6 +163,83 @@ try {
   eq('a numeric PREFIX of a real id does not match it', resolveCvPath(fixtureRoot, '42'), null);
   eq('the on-disk document set is discovered by listing', cvIdsOnDisk(fixtureRoot).size, 1);
 
+  /* ── LINKS OUT OF THE ROOT ────────────────────────────────────────────────────────────────────
+     A directory JUNCTION is refused for free (`isDirectory()` is false for one). The two vectors
+     that are NOT free are a hard link and a file symlink named cv.md sitting inside an otherwise
+     legitimate <digits>-<slug>/ directory. Both were reachable before the containment and nlink
+     checks were added, and each needs a DIFFERENT defence — realpath resolves a symlink and does
+     NOT resolve a hard link. A canary is planted outside the root; reading it back is the failure. */
+  const outsideDir = path.join(fixtureRoot, '..', path.basename(fixtureRoot) + '-outside');
+  fs.mkdirSync(outsideDir, { recursive: true });
+  // ⚠️ ONE CANARY PER VECTOR, AND THE REASON IS A DEFECT THIS FIXTURE ALREADY HAD.
+  // A single shared canary couples the two tests: creating the hard link raises the TARGET's link
+  // count to 2, and `statSync` follows a symlink — so the symlink case was being caught by the
+  // nlink check rather than by the containment check, and removing containment altogether still
+  // passed. Mutation testing found it; reading the file would not have. Separate files keep each
+  // assertion pinned to the single defence it is supposed to be measuring.
+  const canaryFile = path.join(outsideDir, 'canary-hard.md');
+  fs.writeFileSync(canaryFile, 'CANARY-OUTSIDE-THE-ROOT', 'utf8');
+  const canarySym = path.join(outsideDir, 'canary-sym.md');
+  fs.writeFileSync(canarySym, 'CANARY-OUTSIDE-THE-ROOT', 'utf8');
+  let linkVectorsExercised = 0;
+
+  fs.mkdirSync(path.join(appsDir, '9002-hard-link'), { recursive: true });
+  let hardLinked = false;
+  try { fs.linkSync(canaryFile, path.join(appsDir, '9002-hard-link', 'cv.md')); hardLinked = true; } catch (ignore) { hardLinked = false; }
+  if (hardLinked) {
+    linkVectorsExercised += 1;
+    ok('a HARD LINK to a file outside the root does not resolve', resolveCvPath(fixtureRoot, '9002') === null);
+    const r = careerairCvResponse(env, '9002', LOOPBACK);
+    eq('...and the route answers 404 rather than serving it', r.status, 404);
+    ok('...and the canary never reaches the response', JSON.stringify(r.body).indexOf('CANARY-OUTSIDE-THE-ROOT') === -1);
+    ok('...while the hard link genuinely IS readable on disk (the fixture is real, not inert)',
+      fs.readFileSync(path.join(appsDir, '9002-hard-link', 'cv.md'), 'utf8').indexOf('CANARY') === 0);
+  } else {
+    skipped.push('hard-link containment — the OS refused to create the fixture');
+  }
+
+  fs.mkdirSync(path.join(appsDir, '9003-symlink'), { recursive: true });
+  let symLinked = false;
+  try { fs.symlinkSync(canarySym, path.join(appsDir, '9003-symlink', 'cv.md'), 'file'); symLinked = fs.statSync(path.join(appsDir, '9003-symlink', 'cv.md')).isFile(); } catch (ignore) { symLinked = false; }
+  if (symLinked) {
+    linkVectorsExercised += 1;
+    // The target of this one is NOT hard-linked, so its nlink is 1 and only the containment check
+    // can refuse it. That is what makes this assertion a test of containment specifically.
+    eq('the symlink fixture target has nlink 1, so ONLY containment can refuse it',
+      fs.statSync(path.join(appsDir, '9003-symlink', 'cv.md')).nlink, 1);
+    ok('a SYMLINK to a file outside the root does not resolve', resolveCvPath(fixtureRoot, '9003') === null);
+    eq('...and the route answers 404 rather than serving it', careerairCvResponse(env, '9003', LOOPBACK).status, 404);
+    ok('...and the canary never reaches the response',
+      JSON.stringify(careerairCvResponse(env, '9003', LOOPBACK).body).indexOf('CANARY-OUTSIDE-THE-ROOT') === -1);
+  } else {
+    // ⛔ NOT COUNTED AS A PASS. Creating a file symlink on Windows needs elevation or Developer
+    // Mode, and this run did not have it. A skipped assertion that reports itself as green is the
+    // exact defect this estate keeps rediscovering, so it is recorded and printed loudly instead.
+    skipped.push('symlink containment — the OS refused to create the fixture (needs elevation on Windows)');
+  }
+  ok('at least one link vector was actually exercised', linkVectorsExercised > 0);
+
+  // A legitimate document must still resolve after all of the above — a containment rule that
+  // refuses everything would pass every assertion above and break the entire feature.
+  eq('a legitimate document still resolves with the link defences in place',
+    path.basename(resolveCvPath(fixtureRoot, '4242') || ''), 'cv.md');
+
+  /* ── THE 500 BRANCH MUST NOT CARRY THE PATH ───────────────────────────────────────────────────
+     Node embeds the absolute path in an fs error message, so returning `e.message` published the
+     private store's location in an error body and the page then printed it. */
+  fs.mkdirSync(path.join(appsDir, '9005-unreadable'), { recursive: true });
+  fs.writeFileSync(path.join(appsDir, '9005-unreadable', 'cv.md'), 'x', 'utf8');
+  const realRead = fs.readFileSync;
+  let failBody = null;
+  try {
+    fs.readFileSync = () => { const e = new Error("ENOENT: no such file or directory, open '" + path.join(appsDir, '9005-unreadable', 'cv.md') + "'"); e.code = 'ENOENT'; throw e; };
+    failBody = careerairCvResponse(env, '9005', LOOPBACK);
+  } finally { fs.readFileSync = realRead; }
+  eq('an unreadable document answers 500', failBody.status, 500);
+  ok('...and the 500 body carries NO absolute path', !/[A-Za-z]:[\/]/.test(JSON.stringify(failBody.body)));
+  ok('...and carries no fragment of the private root', JSON.stringify(failBody.body).indexOf(fixtureRoot) === -1);
+  eq('...and reports the error CODE, which names nothing', failBody.body.detail, 'ENOENT');
+
   const served = careerairCvResponse(env, '4242', LOOPBACK);
   eq('a configured, loopback-bound request serves the document', served.status, 200);
   ok('...and the HTML comment header is stripped from the reading view', !/<!--/.test(served.body.markdown));
@@ -275,7 +354,11 @@ try {
   // The CV route's loopback guard must be wired to what this process is ACTUALLY bound to. A guard
   // fed a literal would be a guard that cannot fail.
   const serverSrc = fs.readFileSync(path.join(DIR, 'server.mjs'), 'utf8');
-  ok('the CV route is handed the real bind address, not a constant', /careerairCvResponse\(process\.env, id, \{ bind: BIND \}\)/.test(serverSrc));
+  // Measure through the ENFORCING mechanism: the guard must be fed the address the socket actually
+  // has, not the one that was requested. Node normalises `0:0:0:0:0:0:0:1` to `::1`, so those two
+  // are genuinely different readings of the same configuration.
+  ok('the CV route is handed the BOUND socket address, not the requested string',
+    /server\.address\(\)/.test(serverSrc) && /bind: \(bound && bound\.address\) \|\| BIND/.test(serverSrc));
 
   /* -----------------------------------------------------------------------------------------------
      8. LIVE — the acceptance property. Requires the database; NEVER passes without it.
@@ -372,6 +455,7 @@ try {
 /* ================================================================================================= */
 console.log('\n' + '-'.repeat(78));
 console.log('Executed ' + executed + ' assertion(s); ' + liveExecuted + ' of them against the live database.');
+for (const s of skipped) console.log('NOT EXERCISED (not a pass): ' + s);
 if (executed === 0) { console.log('ZERO assertions executed. That is a FAILURE, not a pass.'); process.exit(2); }
 if (liveExecuted === 0) { console.log('ZERO LIVE assertions executed — the acceptance property was not checked.'); process.exit(3); }
 if (failed > 0) { console.log(failed + ' assertion(s) FAILED.'); process.exit(1); }

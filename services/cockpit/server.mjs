@@ -524,7 +524,13 @@ const server = http.createServer(async (req, res) => {
     // ACTUALLY bound to, never a constant this file believes about itself.
     if (req.url.startsWith('/api/careerair/cv')) {
       const id = new URL(req.url, 'http://x').searchParams.get('id');
-      const out = careerairCvResponse(process.env, id, { bind: BIND });
+      // ⚠️ THE BOUND ADDRESS, NOT THE REQUESTED ONE. `BIND` is what this process ASKED for;
+      // `server.address().address` is what the socket actually IS, which is the thing the guard is
+      // about. They differ: Node normalises `0:0:0:0:0:0:0:1` to `::1`, so the requested string
+      // could be denied while the socket was genuinely loopback. Falls back to `BIND` only if the
+      // server is somehow not listening, which cannot happen inside a request handler.
+      const bound = server.address();
+      const out = careerairCvResponse(process.env, id, { bind: (bound && bound.address) || BIND });
       const body = JSON.stringify(out.body);
       res.writeHead(out.status, { ...CAREERAIR_JSON_HEADERS, 'content-length': Buffer.byteLength(body) });
       return res.end(body);

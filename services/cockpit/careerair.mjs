@@ -26,9 +26,26 @@
 //      would put a machine path in a public repo AND bind the cockpit to one machine — the defect
 //      `clone-portability-check.mjs` exists to record. Keel owns the variable's SHAPE and its
 //      validation; MACK OWNS ITS VALUE (`credential_scope: none`, and the Keel/Mack config split).
-//   2. LOOPBACK ONLY. The route refuses unless the server is bound to a loopback address. The
-//      cockpit binds 127.0.0.1 and is fronted by `tailscale serve` tailnet-only; if that ever
-//      changes, this route stops serving rather than quietly following the new binding out.
+//   2. LOOPBACK ONLY. The route refuses unless the server is bound to a loopback address, measured
+//      from `server.address()` — the socket as it actually is, not the value that was requested.
+//      The cockpit binds 127.0.0.1 and is fronted by `tailscale serve`; if that ever changes, this
+//      route stops serving rather than quietly following the new binding out.
+//
+//      ⚠️ TWO LIMITS ON THAT SENTENCE, BOTH DELIBERATE, NEITHER A DEFECT — recorded because the
+//      paragraph above reads stronger than it is.
+//
+//      (a) IT GUARDS THIS ROUTE ONLY. `/api/careerair/opportunities` and the detail route carry no
+//          bind check, exactly like every other route on this server. If the cockpit were ever bound
+//          to 0.0.0.0 the CVs would fail closed and the GRID WOULD STILL SERVE. That is consistent
+//          with the rest of the cockpit rather than a regression, and the grid carries no
+//          career-identifiable document text — but it is not "the page is protected".
+//
+//      (b) LOOPBACK IS NOT "THIS MACHINE". `tailscale serve` terminates on the tailnet and proxies
+//          INTO 127.0.0.1, so the request arrives at this process from loopback however far away the
+//          device is. Every device on Warwick's tailnet can therefore read the CVs. That is the
+//          intended design — it is how he opens this on his phone — and the control this property
+//          actually delivers is "not reachable from the PUBLIC Funnel", not "not reachable off this
+//          machine".
 //   3. THE OPPORTUNITY ID IS THE ONLY INPUT, AND IT IS DIGITS. The request never names a file. A
 //      directory is SELECTED from a listing by its `<id>-` prefix; nothing the caller sends is ever
 //      joined onto a path. That is why traversal is not a case to be filtered — there is no
@@ -62,6 +79,18 @@ const realpath = (p) => (fs.realpathSync.native ? fs.realpathSync.native(p) : fs
 function real(p) {
   try { return realpath(p); } catch { /* may not exist */ }
   try { return path.join(realpath(path.dirname(p)), path.basename(p)); } catch { return p; }
+}
+
+/**
+ * Is `child` inside `root`? Compared AFTER both have been resolved, with a separator boundary so a
+ * sibling directory whose name merely starts with the root's name is not mistaken for a descendant.
+ * Case-folded on win32 only, because that is where the filesystem itself folds case — the same
+ * decision `private-apps.mjs` makes, and for the same reason.
+ * @param {string} child @param {string} root
+ */
+function containedBy(child, root) {
+  const fold = (p) => (process.platform === 'win32' ? String(p).toLowerCase() : String(p));
+  return fold(child).startsWith(fold(root) + path.sep);
 }
 
 /**
@@ -141,6 +170,7 @@ export function cvIdsOnDisk(root) {
 export function resolveCvPath(root, id) {
   const key = String(id);
   if (!/^\d+$/.test(key)) return null;
+  const rootReal = real(path.resolve(root));
   let entries = [];
   try { entries = fs.readdirSync(applicationsDir(root), { withFileTypes: true }); } catch { return null; }
   for (const e of entries) {
@@ -148,7 +178,19 @@ export function resolveCvPath(root, id) {
     const m = /^(\d+)-/.exec(e.name);
     if (!m || m[1] !== key) continue;
     const fp = path.join(applicationsDir(root), e.name, CV_FILENAME);
-    try { if (fs.statSync(fp).isFile()) return fp; } catch { /* keep looking */ }
+    let st = null;
+    try { st = fs.statSync(fp); } catch { continue; }
+    if (!st.isFile()) continue;
+    if (!containedBy(real(fp), rootReal)) continue;
+    // ⛔ TWO LINK VECTORS, AND THEY NEED TWO DIFFERENT CHECKS. The containment test above resolves
+    // symlinks and junctions, so a link POINTING out of the root is refused. It does NOT reach a
+    // HARD LINK: a hard link is a second directory entry for the same file, so `realpath` returns
+    // the path you handed it and the containment test passes clean. Established by execution, not
+    // reasoned about — a planted hard link reported `nlink=2` with `realpath` equal to its own path,
+    // while every genuine CV in the store reported `nlink=1`. `nlink > 1` is therefore the only
+    // signal that distinguishes them, and it is the whole of the hard-link defence.
+    if (st.nlink > 1) continue;
+    return fp;
   }
   return null;
 }
@@ -422,11 +464,18 @@ export function careerairCvResponse(env, id, opts) {
   const fp = resolveCvPath(rootInfo.root, key);
   if (!fp) return { status: 404, body: { ok: false, error: 'no_cv', id: key } };
   let markdown = '';
-  try { markdown = fs.readFileSync(fp, 'utf8'); } catch (e) { return { status: 500, body: { ok: false, error: 'cv_unreadable', detail: e.message } }; }
+  // ⛔ `e.code`, NEVER `e.message`. Node embeds the ABSOLUTE PATH in an fs error message, so
+  // returning `e.message` here published the private store's location in a 500 body — and the page
+  // then printed it on screen. That directly contradicted the note below, which was written about
+  // the 200 response and was silently untrue of this branch. A code (`ENOENT`, `EACCES`, `EBUSY`)
+  // tells an operator everything the message would, and names nothing.
+  try { markdown = fs.readFileSync(fp, 'utf8'); } catch (e) { return { status: 500, body: { ok: false, error: 'cv_unreadable', detail: e.code || 'unknown' } }; }
   return {
     status: 200,
-    // `markdown` is the ONLY CV-derived field. The absolute path is never returned, never logged
-    // and never rendered: where the private store lives is not something this surface says.
+    // `markdown` is the ONLY CV-derived field. NO RESPONSE FROM THIS FUNCTION — success or failure —
+    // carries the absolute path, and none of them is logged: where the private store lives is not
+    // something this surface says. (That guarantee once held for this 200 body alone; the 500 branch
+    // above leaked it until Vex found the contradiction.)
     body: { ok: true, id: key, markdown: stripHtmlComments(markdown), bytes: Buffer.byteLength(markdown, 'utf8'), at: new Date().toISOString() },
   };
 }
