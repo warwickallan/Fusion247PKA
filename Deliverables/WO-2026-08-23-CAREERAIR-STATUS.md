@@ -100,3 +100,82 @@ another to `closed`, reloads, and both are still right — and the closed one is
 by executing that journey, not by describing it.
 
 Commit on the branch. Do not push, do not open a PR, do not merge.
+
+---
+
+# AMENDMENT 1 — Larry, 2026-08-23, after Keel's read-back REFUSE
+
+**The refusal was correct and is accepted in full.** The order handed a worker three things no Work
+Order can reach — a migration against the live database, operating a live service, and writes to live
+data. Those are mine, on Warwick's authority. They are removed from Keel's scope below, not
+re-authorised in different words.
+
+## The id-stability question — SETTLED by live read, and the answer removes the risk
+
+Keel was right to refuse to assume it. Established directly against the live database:
+
+- **`careerair.opportunity.opportunity_id` is `bigint default nextval(...)`** — a plain surrogate
+  sequence. Not derived from any external id, so it cannot collide with a re-used source id.
+- **The collector updates in place; it does not delete and reinsert.** 688 rows, **688 distinct
+  non-null `source_fingerprint`s**, `203` rows with `submission_count > 1` and one at **143**. A
+  delete-and-reinsert cycle would have reset those counters to 1. It did not.
+
+**Therefore an `opportunity_id` belongs to one advert for that advert's life, and the dangerous case —
+a status silently attaching to a different job — cannot arise.**
+
+**`schema_decision`: NO binding fingerprint column.** Option (b) from the read-back is declined
+*because the risk it defends against has been measured away*, not because it was a bad idea. It was
+the right thing to propose while the question was open.
+
+**`schema_decision`: store `todo` EXPLICITLY.** Keel's recommendation is adopted, and his reasoning
+carries it: no DELETE grant is needed, migration 290's minimal-grant discipline is preserved, and
+`updated_at` then records when Warwick moved a row *back*, which the delete route would throw away.
+Absence of a row still means `todo` for every row he never touches.
+
+**F4 — the split-pool validation is ADOPTED AS A DECLARED DESIGN DECISION, not discovered.** Validate
+the id on `q` (`cp_directus`), write on `w` (`cp_worker`), no shared transaction. The worst outcome of
+the race is a stale status row, never corruption. **Do not grant `cp_worker` anything in the
+`careerair` schema** — 290 argued that boundary in writing and it stands.
+
+## `file_surface` — declared
+
+`services/control-plane/db/mypka/291_careerair_status.sql` (new) ·
+`services/cockpit/careerair.mjs` · `services/cockpit/server.mjs` ·
+`services/cockpit/careerair-check.mjs` · `services/cockpit/public/careerair.{js,css,html}` ·
+`services/cockpit/README.md`. **Not** `provenance.mjs` — keep the status code inside `careerair.mjs`,
+per the read-back's own reasoning.
+
+## F8 — public/** stays with Keel, and the basis is named
+
+Critical rule 10, subject to `render-check.mjs`. Not split to Felix: the control is inseparable from
+the route and the failed-write reconciliation behind it, and a handoff would put the two halves of one
+interaction in two heads. **Vera's visual gate is unaffected and still applies to the rendered page.**
+
+## Acceptance — replaced, because the original could not go green for the worker
+
+Keel proves, on **disposable and offline targets only**:
+
+1. **291 on `test/run-migration-test.sh`'s throwaway cluster** — applies, re-applies idempotently, and
+   the grants are exactly right **on both halves** (`cp_directus` SELECT only; `cp_worker`
+   SELECT/INSERT/UPDATE only; neither reaching further).
+2. **The route as a pure function in `careerair.mjs`** returning `{status, body}`, so the check
+   executes it with no credentials present. Thin wiring in `server.mjs`. Unknown status → 400, never a
+   write. **Errors return a code, never `e.message`** — no path, DSN or role name in any branch.
+3. The list join · the card control · the default-hide-`closed` filter with its visible count and
+   one-tap restore · failed-write reconciliation · `render-check.mjs`.
+4. **`careerair-check.mjs` offline assertions, each mutation-tested** — break every new defence on
+   purpose, show the check goes red, assert a non-zero executed count.
+5. Surface-scoped secret scan. Commit on the branch. No push, no PR, no merge.
+
+**Larry then executes, on Warwick's authority:** apply 291 to live · restart via the scheduled task ·
+run the live half of the check · put the journey in front of Warwick on his phone.
+
+## Out-of-scope findings from the read-back — Warwick's to schedule, not work
+
+- `/api/opportunity-decide` and `careerairListResponse` still return `e.message`, which can carry a
+  role name. Same class as the leak fixed in `724f19f`, which only covered the CV route. **Recorded,
+  not fixed here.** The new route must not repeat it.
+- `cockpit.opportunity` already exists (migration 271, Mason's, unrelated dataset, and it already has a
+  four-state human `disposition`). **`cockpit.careerair_status` is the right name;
+  `cockpit.opportunity_status` would be a landmine.** Good catch — it stands.
+- `sw.js` needs no change and adding one would be wrong. Checked and correctly left alone.
