@@ -484,7 +484,16 @@ reconstructing the method from conversation.
 **Ledger, already committed and handed to Pax as an input:**
 `Deliverables/2026-08-23-subagent-token-ledger-careerair-collaborative.md`
 
-**Closing head at rotation:** `38f3b6dc` on `wo/2026-08-23-cockpit-grid`, **deliberately unpushed.**
+**Closing head at rotation:** the **tip of `wo/2026-08-23-cockpit-grid`**, deliberately unpushed.
+
+> **Why this is named as a tip rather than a literal SHA, and it is not evasion.** A map that writes
+> its own closing SHA is self-referential: committing the line moves the head it just claimed. That is
+> exactly what happened at this rotation - the map said `38f3b6dc`, the commit carrying it produced
+> `2bd2d06`, and the read-back check caught the mismatch. **The commit that carries THIS correction is
+> the closing head**, and the continuity packet - which is written after the commit and can therefore
+> name it truthfully - carries the literal SHA. **The packet is the place for a literal head; a map is
+> not.** Ancestry for anyone reconstructing: `18634098` (grid) then `724f19fa` (security fixes) then
+> `38f3b6d` (amendment 2 + ledger) then `2bd2d06` (report pointer) then this one.
 
 **⚑ OUTSTANDING ON ARRIVAL — named, not silent.** Pax was commissioned for the session report and is
 **NOT on the blocking path**; his return may legitimately outlive the `/clear`. **When it lands —
