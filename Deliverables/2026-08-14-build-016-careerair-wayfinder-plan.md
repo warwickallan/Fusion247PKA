@@ -98,7 +98,10 @@ ever reached a fit assessment · the below-7 override is unreachable · duplicat
 converge (`opportunity_link` = **0 rows**, ~196 rows for ~3 vacancies) · the privacy scan is red · one
 vacancy has ever reached `ready_to_send` · AC-13 regressed from a genuine PASS.
 
-## 🔴 THE NEW FRONTIER — derived from that evidence
+## ⛔ SUPERSEDED 2026-08-22 — THE FRONTIER BELOW IS NO LONGER THE ROUTE.
+**Read AMENDMENT 1 at the foot of this map first. Warwick has split this build in two: the scanning half is automated, the CV/application half is deliberately NOT. The gap named below is real and its intake half was closed on 2026-08-22 — but wiring one production event to runJourney is NO LONGER the next action, because runJourney drives the half he has ruled collaborative.**
+
+## 🔴 THE FORMER FRONTIER — retained as record, superseded above
 
 > **The product works. NOTHING IN PRODUCTION CALLS IT.**
 >
@@ -339,3 +342,136 @@ parked deliberately, not drifted.
 (`2026-08-14-careerair-state-recovery-RAW.md`) · `BACKLOG.md` C-10 · the seven public CareerAIR evidence
 documents · the Proofline map's CareerAIR rows · the private tree's contracts, build record, `HELD-ITEMS`
 and live runtime state.
+
+---
+
+# ⚑ AMENDMENT 1 — Warwick, 2026-08-22. **A PRODUCT DECISION THAT RESHAPES THIS BUILD.**
+
+> **His words, quoted:**
+>
+> *"the issue has been trying to build detministic apps with no human in the loop - simple fact, ai is
+> not there yet as 6 weeks of Asdair shows"*
+>
+> *"the brief in the other app is we work together and do the plumbing as we go, we don't set out to
+> build an auto app."*
+>
+> *"for Careerair, the bit I want to be automated is the opportunity scanning but the CV creation and
+> application we can absolutely do together on desktop in side panel."*
+
+**This splits BUILD-016 in two, and the split is now the primary structure of the build.**
+
+| Half | Disposition |
+|---|---|
+| **Opportunity scanning** — collection, extraction, dedupe, storage, surfacing | **AUTOMATED.** Runs without him and without a session. This is where unattended engineering effort belongs. |
+| **CV creation and application** — fit discussion, tailoring, drafting, the package | **COLLABORATIVE, BY DECISION.** Done together, on desktop, in side panel. **NOT a pipeline, and not to be rebuilt as one.** |
+
+## What this SUPERSEDES on this map — Larry's reading, labelled as such
+
+**The 2026-08-14 frontier is retired.** It read *"The product works. NOTHING IN PRODUCTION CALLS IT"*
+and named the next action as wiring one production event to `runJourney`. **That diagnosis was correct
+and is now moot for the half it pointed at:** `runJourney` drives fit → draft → document, which is
+precisely the half Warwick has ruled collaborative. **Wiring it to fire unattended is now the wrong
+work.** The intake half of the same gap WAS closed on 2026-08-22 — see below.
+
+**A problem recorded earlier today largely dissolves.** Larry flagged that the CareerAIR specialist
+writes files while the pipeline's ledger, gates and QA chain never see them — *"two parallel truths"* —
+and called it the thing blocking CareerAIR from being one system. **Under this ruling that matters far
+less:** a ledger-backed, gate-enforced, QA-chained CV pipeline is machinery for an unattended path he
+has just declined. The ledger still earns its place for **opportunity** state; it does not need to
+govern a drafting conversation.
+
+**`FR-23` needs re-reading, not deleting.** *"Larry is not the normal runtime operator"* still binds
+the scanning half absolutely. It does **not** bind the CV half, where Warwick has now said the human is
+the point.
+
+**AC-01's *"without a manual session"* clause applies to SCANNING ONLY.** Applying it to drafting would
+grade this build against a design its owner has rejected.
+
+## What was delivered on 2026-08-22, against the half that stays automated
+
+- **Gmail collector** — `src/email/gmail-collect.mjs`, `scripts/careerair-gmail-collect.mjs`. Reads
+  forwarded job mail over IMAP with an app password. No Entra, no Zapier, no Microsoft admin surface,
+  no session. Proven end to end on a real vacancy: collected, idempotent on re-run, drained by the
+  existing processor.
+- **The three dead routes, established by execution and recorded so they are not retried:** local
+  Outlook COM (0-for-4, hangs), Microsoft Entra app registration (work tenant hijacks the personal
+  account, `AADSTS90072`), paid Zapier (declined).
+- **Intake precision defect found and dispatched** — one digest produced 22 opportunities of which 6
+  were vacancies. Allow-list filter in flight.
+
+## The cost note, recorded because Warwick raised it
+
+> *"I've had great success with you last few days building apps away from mypka and all it's excessive
+> governance and productivity prevention department."*
+
+**Recorded as his assessment, not adjudicated here.** The measurable fact from this session: a
+two-file link-filter change consumed **two full Work Order generation-and-CLARIFY cycles** before a
+line was written. Both refusals caught something real — one would have shipped a silent regression
+across five job boards. **Both things are true at once, and the map records both rather than picking
+the flattering one.**
+
+**The collaborative half does not carry Work Order ceremony.** Working together in session is the
+route Warwick has chosen for it, and imposing dispatch machinery on a conversation would be the
+"productivity prevention" he is naming.
+
+---
+
+# AMENDMENT 2 — session of 2026-08-23. **THE COLLABORATIVE HALF WAS BUILT AND IS WORKING.**
+
+**Written at rotation. Branch `wo/2026-08-23-cockpit-grid`, closing head `724f19fa`, DELIBERATELY
+UNPUSHED — see the privacy hold below.**
+
+> **PRIVACY BOUNDARY ON THIS MAP.** This file is tracked in the PUBLIC repository and currently names
+> **zero** employers, roles or opportunities. **Keep it that way.** Everything specific to the job
+> search lives in the private store and is pointed at, never restated here. Authority:
+> `CAREERAIR-PRIVACY-REALIGN-002`.
+
+## ⚑ WORK CLASSIFICATION
+
+| Class | Item |
+|---|---|
+| **FRONTIER** (exactly one) | **ACCEPT** — Warwick reads the tailored documents and decides which go out. The machinery is built, live and proven; the remaining act is his judgement, which is the design. |
+| **NEXT** | **ADMIN — the public-repo privacy decision (C-P2).** Blocks pushing anything, so it gates the Git half of everything below. Options and recommendation are in the private findings file. |
+| **NEXT** | **BUILD — render the tailored documents to .docx.** None has been opened the way a recipient receives it, so the page-fill rule is unmeasured on all of them. This is the last step before anything is sent. |
+| **SIDECAR / NON-BLOCKING** | Two parallel implementations now serve this dataset to a cockpit and only one is canon — a reconciliation question, not a defect. · A dormant second proxy exists that would now be refused by the new boundary. · The canonical private runbook still carries the reasoning that caused the leak. |
+| **PARKED — deliberate, not forgotten** | The acquisition receipt reports `content_verified: true` on **400 of 400** rows while **96** have zero extracted requirements. Recorded with measurements in the private baseline. **A control that passes 400 of 400 is not a control** — but it is a data-quality defect, not a safety one, and it is Warwick's to schedule. |
+| **PARKED** | Model-API credits remain exhausted, so the fit gate cannot score. All scoring this session was hand-judged or rubric-applied and is labelled as such — **never as a gate verdict**. |
+| **PARKED** | The collector is still not scheduled; the registration commands are recorded in the private baseline. |
+
+## What was delivered, against BOTH halves
+
+**The collaborative half — built, and it is the point of the session.** Four cluster base CVs and nine
+tailored forks, produced by forking rather than rewriting. The discipline held and was measured: one
+fork's entire content was **verbatim from its base with zero novel lines**, another changed four lines
+and dropped two bullets. That is what makes volume honest rather than generative.
+
+**The scanning half — a readable surface over it.** A single cockpit page, tailnet-only, showing every
+live opportunity with score, source link and its tailored document where one exists. **Live and proven
+through Warwick's own URL**, restarted via the scheduled task rather than a shell, so the configuration
+arrives from the production start path and not from a session.
+
+**A durable route file** now records how a fork is made, so the next session can produce more without
+reconstructing the method from conversation.
+
+## Assurance carried out this session
+
+- **Internal, external to the builder:** a security review of the new route returned **GREEN**. It
+  verified rather than accepted the builder's claims — mutation-testing the traversal control by
+  *removing* it, and executing the renderer against a recording DOM rather than reading it.
+- **The builder then falsified part of that review.** The suggested containment fix does not reach a
+  hard link, because `realpath` does not resolve one. Established by execution, and a second defence
+  shipped alongside the first.
+- **A live privacy leak was found, escalated, fixed and proven closed** — before and after on one
+  record, a full route sweep, and the product path verified unbroken. Detail is in the private
+  findings file; **the specifics deliberately do not appear on this public map.**
+
+## ⛔ Honest limits at this boundary
+
+- **No Veritas gate has been taken on any of this.** The work is builder-evidenced and
+  security-reviewed; it is **not** internally assured, and nothing here may be reported as PASS,
+  complete or accepted. The recommended next assurance target, if one is wanted, is the live boundary
+  plus its executable gate — which re-runs independently rather than being read back.
+- **Nothing is pushed.** Two commits sit on a local branch by decision, not by accident.
+- **No application has been sent, and no ledger row exists for any of them.** Four separate workers
+  flagged that independently rather than improvising a write into an unverified path. **If a document
+  goes out, the record is opened BEFORE the irreversible act.**
