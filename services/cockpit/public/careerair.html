@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<!-- PHONE FIRST. This page is opened on a phone before it is opened on anything else, so the layout
+     starts as a stack of cards and only becomes a table when there is room. `viewport-fit=cover` plus
+     the safe-area padding in careerair.css keeps the sticky controls clear of the home indicator. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<title>Opportunities — Fusion247</title>
+<!-- ⛔ THE SHARED TOKENS COME FIRST AND ARE NOT COPIED.
+     `/styles.css` is the cockpit's design language — colours, dark mode, type scale, focus rings. This
+     page LOADS it rather than restating any of it, so it cannot drift into a second look. Everything in
+     careerair.css below is grid- and card-specific and declares NO colour token of its own. That is the
+     same arrangement names.html uses, and the reason is written up there: a copied :root goes stale
+     silently the first time the shared one changes. -->
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/careerair.css">
+<link rel="icon" href="/icon.svg">
+</head>
+<body>
+<!-- Skip link first in the DOM: the controls below are sticky and numerous, and on a phone with a
+     screen reader the row list is what you actually came for. -->
+<a class="ca-skip" href="#ca-results">Skip to the list</a>
+
+<header class="ca-top">
+  <div class="ca-top-row">
+    <a class="ca-back" href="/">← Cockpit</a>
+    <h1>Opportunities</h1>
+  </div>
+  <!-- THE HONEST COUNT LINE. It is rendered from two independent measurements — the number of rows
+       this page actually built, and a separate SQL count(*) — and it says both. It is not decoration:
+       if they ever disagree, this line is where that becomes visible instead of a grid that quietly
+       shows fewer rows than exist. -->
+  <p class="ca-count" id="ca-count" role="status" aria-live="polite">Loading…</p>
+</header>
+
+<!-- CONTROLS. Sortable by score and by recency, filterable to a score threshold, plus a plain text
+     search, because on a 354-row list the fastest route to one row is usually typing part of it. All
+     four are plain form controls: no custom widget, so they get the platform's own touch targets,
+     keyboard behaviour and screen-reader semantics for free. -->
+<form class="ca-controls" id="ca-controls" role="search" aria-label="Filter and sort opportunities" autocomplete="off">
+  <div class="ca-field ca-field-wide">
+    <label for="ca-q">Search</label>
+    <input type="search" id="ca-q" name="q" placeholder="role, employer, location…" enterkeyhint="search">
+  </div>
+  <div class="ca-field">
+    <label for="ca-sort">Sort</label>
+    <select id="ca-sort" name="sort">
+      <option value="score">Best score first</option>
+      <option value="recent">Most recent first</option>
+      <option value="id">Opportunity number</option>
+    </select>
+  </div>
+  <div class="ca-field">
+    <label for="ca-min">Score at least</label>
+    <select id="ca-min" name="min">
+      <option value="0">Any</option>
+      <option value="5">5+</option>
+      <option value="6">6+</option>
+      <option value="7">7+</option>
+      <option value="8">8+</option>
+      <option value="9">9+</option>
+    </select>
+  </div>
+  <div class="ca-field">
+    <label for="ca-evidence">Advert detail</label>
+    <select id="ca-evidence" name="evidence">
+      <option value="all">All rows</option>
+      <option value="full">Full advert only</option>
+      <option value="thin">Thin rows only</option>
+    </select>
+  </div>
+  <div class="ca-field ca-field-check">
+    <input type="checkbox" id="ca-cv" name="cv">
+    <label for="ca-cv">Has a tailored document</label>
+  </div>
+</form>
+
+<!-- THE EVIDENCE LEGEND, ON THE PAGE AND NOT IN A TOOLTIP.
+     AC6: a uniform grid would make this page lie by omission. Some rows were built from a full advert
+     and some from little more than a title, and a score means materially less on the second kind. The
+     counts are filled in from the live payload — never hardcoded — so the legend cannot drift away
+     from what is actually on screen. -->
+<details class="ca-legend" id="ca-legend">
+  <summary>What the markers mean<span class="ca-legend-hint" id="ca-legend-hint"></span></summary>
+  <dl>
+    <dt><span class="ca-tier ca-tier-full">Full advert</span></dt>
+    <dd>The advert text was captured and its requirements were extracted. A score here is judged against real requirements.</dd>
+    <dt><span class="ca-tier ca-tier-partial">Partial</span></dt>
+    <dd>Some fields were extracted, but the requirements came back <strong>empty</strong>. The row looks complete and is not.</dd>
+    <dt><span class="ca-tier ca-tier-thin">Thin</span></dt>
+    <dd>No advert detail at all — little more than a title and an employer. <strong>A score on a thin row means much less.</strong></dd>
+    <dt><span class="ca-chip ca-chip-larry">Judged 8</span></dt>
+    <dd>Read and scored by hand.</dd>
+    <dt><span class="ca-chip ca-chip-rubric">Rubric 6</span></dt>
+    <dd>A rubric applied without individual judgement. <strong>Where both appear they can disagree, and both are shown.</strong> Neither is a fit-gate verdict.</dd>
+  </dl>
+</details>
+
+<main id="ca-results" tabindex="-1">
+  <p class="ca-state" id="ca-state">Loading opportunities…</p>
+  <!-- Rows are built by careerair.js. No template engine and no build step: this page is served
+       straight off disk like the rest of public/, so what is on disk is what runs. -->
+  <div class="ca-list" id="ca-list"></div>
+</main>
+
+<!-- THE READING VIEW for a tailored document. A native <dialog>, so focus trapping, Escape and the
+     top layer are the platform's job rather than hand-rolled. Its content is built by careerair.js
+     from ESCAPED text only — see the renderer's header comment; no HTML from the document is ever
+     passed through. -->
+<dialog class="ca-doc" id="ca-doc" aria-labelledby="ca-doc-h">
+  <div class="ca-doc-bar">
+    <h2 id="ca-doc-h">Tailored document</h2>
+    <button type="button" class="ca-doc-x" id="ca-doc-x" aria-label="Close">Close</button>
+  </div>
+  <div class="ca-doc-body" id="ca-doc-body" tabindex="0"></div>
+</dialog>
+
+<script src="/careerair.js"></script>
+</body>
+</html>

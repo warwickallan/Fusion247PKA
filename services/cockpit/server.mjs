@@ -49,6 +49,15 @@ import {
   ASDAIR_DISPLAY_NAME_ROUTE, proxyAsdairDisplayName,
   ASDAIR_COMMAND_ROUTE, proxyAsdairCommand,
 } from './asdair-list.mjs';
+// The opportunity grid, its detail route, and the private-store reading route. Its own module for
+// exactly the reason given five imports above — a handler that lives in THIS file cannot be executed
+// by any gate, because importing this file opens live pools. careerair.mjs imports node builtins
+// only and takes the READ pool as a parameter, so careerair-check.mjs runs every one of its
+// decisions with no credentials present at all.
+import {
+  careerairListResponse, careerairDetailResponse, careerairCvResponse,
+  careerairStartupLine, JSON_HEADERS as CAREERAIR_JSON_HEADERS,
+} from './careerair.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -501,6 +510,25 @@ const server = http.createServer(async (req, res) => {
     // CAPAE. Same READ pool `q`, same never-throws contract: a database failure is HTTP 200
     // { ok:false, error } and takes no other route down with it.
     if (req.url.startsWith('/api/capae')) return j(res, 200, await capaeResponse(q));
+    // The opportunity grid. Same READ pool `q` and the same never-throws contract as the two routes
+    // above: a database failure is HTTP 200 { ok:false, error } and takes nothing else down.
+    if (req.url.startsWith('/api/careerair/opportunities')) return j(res, 200, await careerairListResponse(q, process.env));
+    if (req.url.startsWith('/api/careerair/opportunity')) {
+      const id = new URL(req.url, 'http://x').searchParams.get('id');
+      return j(res, 200, await careerairDetailResponse(q, id));
+    }
+    // The private reading route. It is the ONLY route on this server that reads the private store, and
+    // it is the only one that answers with a real HTTP status rather than 200-with-an-error-field:
+    // a refusal here is a boundary decision, and a boundary that reports itself as 200 is a boundary
+    // nobody can see holding. `BIND` is passed in so the loopback guard tests what this process is
+    // ACTUALLY bound to, never a constant this file believes about itself.
+    if (req.url.startsWith('/api/careerair/cv')) {
+      const id = new URL(req.url, 'http://x').searchParams.get('id');
+      const out = careerairCvResponse(process.env, id, { bind: BIND });
+      const body = JSON.stringify(out.body);
+      res.writeHead(out.status, { ...CAREERAIR_JSON_HEADERS, 'content-length': Buffer.byteLength(body) });
+      return res.end(body);
+    }
     // The four provenance fields are the object provenance.mjs builds and the gate executes — the
     // endpoint does not assemble its own version of the answer.
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD, ...PROVENANCE });
@@ -525,4 +553,9 @@ server.listen(PORT, BIND, () => {
   // A boundary whose configuration was silently discarded is a boundary nobody can tell is set
   // wrongly. Said once, out loud, at startup — never silently dropped.
   for (const warning of PRIVATE_API.configWarnings) console.warn(warning);
+  // Same reasoning as the overlay line above, applied to the private reading store: an unset root
+  // and a misconfigured one both serve exactly nothing, so without this line a typo is
+  // indistinguishable from switching the feature off. The VERDICT is printed; the path never is.
+  const ca = careerairStartupLine(process.env);
+  console[ca.level](ca.message);
 });

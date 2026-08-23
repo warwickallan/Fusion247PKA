@@ -74,6 +74,9 @@
  * @property {string}  [offline]        What to tell Warwick when the service does not answer.
  * @property {string}  [moduleLabel]    How this key prints as a ROW source. Defaults to `label`.
  * @property {Lane}    [lane]           Which Home lane its rows sit in. Defaults to 'build'.
+ * @property {string}  [href]           A SAME-ORIGIN absolute path this tile opens instead of an
+ *                                      in-shell workspace, e.g. '/careerair.html'. Anything that is
+ *                                      not a rooted ordinary path is dropped — see normaliseApp.
  *
  * @typedef {'life'|'build'} Lane
  *
@@ -146,6 +149,33 @@ const APPS = [
     offline: 'AsdAIr’s read service is not answering, so there is nothing to show. That is not the same as an empty shop — no shop data has been read, and none is being guessed at.',
   },
 
+  {
+    key: 'careerair',
+    label: 'Opportunities',
+    icon: '🎯',
+    desc: 'every live opportunity, scored, in one readable list',
+    tone: 'blue',
+    lane: 'life',
+    moduleLabel: 'Opportunities',
+    // ITS OWN PAGE, not an in-shell workspace. `/careerair.html` loads /styles.css so it wears the
+    // same design language, but it needs a dense sortable list and a document reading view, neither
+    // of which the app shell's view/tab shape fits. `href` is what makes the tile open it — without
+    // it this entry would render a place that goes nowhere.
+    href: '/careerair.html',
+    // No `probe`: there is no separate backing service to report on. The page reads the cockpit's own
+    // API on this same server, so a tile pill claiming "running" would be measuring nothing.
+    views: [{ key: 'grid', label: 'Opportunities' }],
+    about: [
+      'One page listing every live opportunity the system currently holds, newest or best-scored first.',
+      'Two kinds of score are shown and never merged: one read and judged by hand, one produced by a rubric with no individual judgement. Where a row carries both and they disagree, it says so.',
+      'Neither score is a fit-gate verdict. The gate is a separate assessment that covers only a handful of rows, and a note is displayed as a note.',
+      'Rows built from a full advert, from a partial one, and from little more than a title are marked differently — a score means materially less on a thin row, and hiding that would make the page flatter the data.',
+      'A missing field prints as "unknown". Nothing is dropped for being incomplete and nothing is filled in with a guess.',
+      'Tailored documents are read from a private store at the moment you open one. They are never copied into this repository or cached on the device.',
+    ],
+    offline: 'The opportunity list could not be read. That is not an empty list — nothing has been read, and nothing is being guessed at.',
+  },
+
   // ── ADDING THE NEXT APP ────────────────────────────────────────────────────────────────────
   // One entry above is the whole job. The minimum is genuinely one line:
   //
@@ -200,6 +230,18 @@ function normaliseApp(a) {
     icon: a.icon ? String(a.icon) : '🧩',
     tone: TONES.includes(a.tone) ? a.tone : 'grey',
     probe: a.probe === true,
+    // A SAME-ORIGIN PAGE THIS TILE OPENS INSTEAD OF AN IN-SHELL WORKSPACE. Empty for every app that
+    // is a place inside the cockpit; set only for the ones that are their own page.
+    //
+    // ⛔ SAME-ORIGIN ABSOLUTE PATHS ONLY, AND THE ALLOWLIST IS THE POINT. This registry can be
+    // EXTENDED BY THE LOCAL OVERLAY, which is a file outside this repository — so a free-text href
+    // would be a way for a local file to put an off-site link on Warwick's cockpit. A value that is
+    // not a rooted path of ordinary path characters is DROPPED, not sanitised: `//evil.example`,
+    // `https://…`, `javascript:…` and a protocol-relative URL all fail this test and leave the tile
+    // behaving exactly as it did before, which is the safe direction. The neighbouring rule in this
+    // file — "the browser may only ever name an app KEY, never a URL" — governs which SERVICE the
+    // server will talk to and is untouched by this: nothing here reaches APP_SERVICES.
+    href: (typeof a.href === 'string' && /^\/[A-Za-z0-9._~\-/]*$/.test(a.href)) ? a.href : '',
     views: Object.freeze(views),
     about: Object.freeze(Array.isArray(a.about) ? a.about.map(String) : []),
     offline: String(a.offline || 'This app’s service is not answering, so there is nothing to show yet. Nothing has been read, and nothing is being guessed at.'),

@@ -1,0 +1,151 @@
+/* Fusion247 Cockpit — the opportunity grid.
+   ⛔ NO COLOUR TOKENS ARE DECLARED HERE, DELIBERATELY. careerair.html loads /styles.css first, which
+   owns :root and the dark-mode block. Everything below spends those variables and declares none, so
+   this page follows the cockpit's palette — including every future change to it — instead of pinning
+   a copy that goes stale silently. names.css makes the same choice for the same reason; if you find
+   yourself about to write a hex value in this file, spend a token instead.
+
+   ⛔ AND IT IS A CARD LIST FIRST, A TABLE SECOND. Warwick opens this on a phone. A grid of columns is
+   the WRONG default there: it either overflows sideways or squeezes the role title — the one field he
+   is actually scanning — down to three words. So the base layout is one readable card per opportunity,
+   and the table only appears at >=900px where the columns genuinely fit. "Make sure display is easily
+   readbale and not just a database view!" is the acceptance bar this file is written against. */
+
+/* ---- Skip link ---- */
+.ca-skip { position:absolute; left:-9999px; top:0; z-index:20; background:var(--panel); color:var(--ink);
+  border:1px solid var(--accent); border-radius:0 0 10px 0; padding:10px 14px; font-weight:700; }
+.ca-skip:focus { left:0; }
+
+/* ---- Header ---- */
+.ca-top { position:sticky; top:0; z-index:6; background:var(--panel); border-bottom:1px solid var(--hair);
+  padding:calc(12px + env(safe-area-inset-top)) 16px 10px; }
+.ca-top-row { display:flex; align-items:baseline; gap:12px; }
+.ca-top h1 { font-size:19px; font-weight:800; letter-spacing:-.02em; }
+.ca-back { color:var(--accent-ink); font-size:13.5px; font-weight:700; text-decoration:none;
+  /* 44px touch target without moving the baseline of the heading beside it. */
+  padding:11px 8px 11px 0; margin:-11px 0; }
+.ca-count { font-size:12.5px; font-weight:600; color:var(--ink2); margin-top:4px; }
+.ca-count.ca-mismatch { color:var(--stop); font-weight:800; }
+
+/* ---- Controls ----
+   Wrapping flex rather than a fixed grid: on a 360px phone these become two per row and on a desktop
+   they sit on one line, with no breakpoint doing the arithmetic. */
+.ca-controls { display:flex; flex-wrap:wrap; gap:10px 12px; padding:12px 16px;
+  background:var(--panel2); border-bottom:1px solid var(--hair); position:sticky; top:0; z-index:5; }
+.ca-field { display:flex; flex-direction:column; gap:3px; flex:1 1 130px; min-width:0; }
+.ca-field-wide { flex:2 1 210px; }
+.ca-field label { font-size:11px; font-weight:700; color:var(--ink3); text-transform:uppercase; letter-spacing:.04em; }
+.ca-field input[type=search], .ca-field select {
+  font-family:inherit; font-size:16px; /* 16px stops iOS zooming the whole page on focus. */
+  color:var(--ink); background:var(--panel); border:1px solid var(--hair); border-radius:10px;
+  padding:9px 10px; min-height:42px; width:100%; box-sizing:border-box; }
+.ca-field-check { flex-direction:row; align-items:center; gap:8px; flex:1 1 100%; }
+.ca-field-check input { width:20px; height:20px; }
+.ca-field-check label { text-transform:none; font-size:13.5px; color:var(--ink2); letter-spacing:0; }
+:where(.ca-controls, .ca-list, .ca-doc) :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* ---- Evidence legend ---- */
+.ca-legend { margin:12px 16px 0; background:var(--panel); border:1px solid var(--hair); border-radius:12px; padding:10px 14px; }
+.ca-legend summary { font-size:13px; font-weight:700; color:var(--ink2); cursor:pointer; min-height:24px; }
+.ca-legend-hint { font-weight:600; color:var(--ink3); }
+.ca-legend dl { margin:10px 0 2px; display:grid; grid-template-columns:auto 1fr; gap:8px 12px; align-items:start; }
+.ca-legend dt { margin:0; } .ca-legend dd { margin:0; font-size:13px; color:var(--ink2); line-height:1.45; }
+
+/* ---- The list ---- */
+main { display:block; width:100%; max-width:1520px; margin:0 auto;
+  padding:12px 16px calc(28px + env(safe-area-inset-bottom)); }
+main:focus { outline:none; }
+.ca-state { font-size:14px; color:var(--ink2); padding:18px 2px; font-weight:600; }
+.ca-state.ca-err { color:var(--stop); font-weight:700; }
+.ca-list { display:flex; flex-direction:column; gap:10px; }
+
+/* One opportunity. `border-left` carries the evidence tier, so the thin rows are visibly different
+   down the whole list rather than only where the eye happens to land on a badge. */
+.ca-row { background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--park);
+  border-radius:14px; padding:13px 15px; display:grid; gap:7px; }
+.ca-row.t-full { border-left-color:var(--ok); }
+.ca-row.t-partial { border-left-color:var(--warn); }
+.ca-row.t-thin { border-left-color:var(--ink3); }
+
+.ca-r-head { display:flex; align-items:flex-start; gap:10px; }
+.ca-r-title { font-size:16px; font-weight:750; line-height:1.3; letter-spacing:-.01em; flex:1; min-width:0;
+  /* Wrap, never truncate. A truncated role title is the single most useless thing this page could do. */
+  overflow-wrap:anywhere; }
+.ca-r-emp { font-size:13.5px; font-weight:650; color:var(--ink2); }
+.ca-r-meta { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:13px; color:var(--ink2); }
+.ca-r-meta b { font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+.ca-r-sum { font-size:13px; color:var(--ink2); line-height:1.5; }
+
+/* A value the system does not have. Printed, never blank, and never guessed at. */
+.ca-unknown { color:var(--ink3); font-style:italic; font-weight:600; }
+
+/* ---- Score chips ----
+   The two kinds are told apart by SHAPE AND WORD as well as colour: the hand-judged one is a solid
+   accent pill reading "Judged", the rubric one is an outlined pill reading "Rubric". Colour alone
+   would fail anyone who cannot separate them, and would vanish entirely in a screenshot. */
+.ca-scores { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex:none; }
+.ca-chip { font-size:12px; font-weight:800; border-radius:999px; padding:4px 10px; white-space:nowrap;
+  font-variant-numeric:tabular-nums; border:1.5px solid transparent; }
+.ca-chip-larry { background:var(--accent); color:var(--panel); border-color:var(--accent); }
+.ca-chip-rubric { background:transparent; color:var(--accent-ink); border-color:var(--accent-ink);
+  border-style:dashed; }
+/* Both present and different. Said in words, because a colour cannot say "these disagree". */
+.ca-disagree { font-size:11px; font-weight:800; color:var(--warn); text-transform:uppercase; letter-spacing:.03em; }
+
+/* ---- Evidence tier badge ---- */
+.ca-tier { font-size:11px; font-weight:800; border-radius:6px; padding:3px 7px; white-space:nowrap;
+  text-transform:uppercase; letter-spacing:.03em; }
+.ca-tier-full { background:var(--ok-w); color:var(--ok); }
+.ca-tier-partial { background:var(--warn-w); color:var(--warn); }
+.ca-tier-thin { background:var(--stop-w); color:var(--stop); }
+
+/* ---- Actions ---- */
+.ca-r-acts { display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
+.ca-act { font-size:13px; font-weight:700; border-radius:10px; padding:9px 13px; min-height:40px;
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer; text-decoration:none;
+  border:1px solid var(--hair); background:var(--panel2); color:var(--accent-ink); font-family:inherit; }
+.ca-act:hover { border-color:var(--accent); }
+.ca-act-cv { background:var(--accent-w); border-color:var(--accent); }
+/* Not a dead link and not an empty cell — a stated absence. */
+.ca-act-none { color:var(--ink3); background:transparent; border-style:dashed; cursor:default; font-weight:600; }
+
+.ca-detail { font-size:13px; color:var(--ink2); line-height:1.55; border-top:1px solid var(--hair);
+  margin-top:4px; padding-top:9px; display:grid; gap:8px; }
+.ca-detail h3 { font-size:11.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ink3); }
+.ca-detail p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.ca-blank { color:var(--warn); font-weight:700; font-size:12.5px; }
+
+/* ---- The reading view ---- */
+.ca-doc { border:none; border-radius:16px; padding:0; background:var(--panel); color:var(--ink);
+  width:min(760px, 94vw); max-height:88vh; }
+.ca-doc::backdrop { background:rgba(0,0,0,.55); }
+.ca-doc-bar { display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--hair);
+  position:sticky; top:0; background:var(--panel); border-radius:16px 16px 0 0; }
+.ca-doc-bar h2 { font-size:15px; font-weight:800; flex:1; min-width:0; }
+.ca-doc-x { font-size:13px; font-weight:700; border:1px solid var(--hair); background:var(--panel2);
+  color:var(--ink2); border-radius:10px; padding:9px 13px; min-height:40px; cursor:pointer; }
+.ca-doc-body { padding:16px 18px calc(20px + env(safe-area-inset-bottom)); overflow-y:auto; max-height:calc(88vh - 62px);
+  /* A CV is a document, so it gets document measure and leading, not table metrics. */
+  font-size:15px; line-height:1.6; }
+.ca-doc-body h1 { font-size:20px; font-weight:800; margin:18px 0 6px; letter-spacing:-.01em; }
+.ca-doc-body h2 { font-size:16px; font-weight:800; margin:16px 0 5px; color:var(--accent-ink); }
+.ca-doc-body h3 { font-size:14px; font-weight:800; margin:14px 0 4px; color:var(--ink2); }
+.ca-doc-body h1:first-child, .ca-doc-body h2:first-child { margin-top:0; }
+.ca-doc-body p { margin:0 0 10px; overflow-wrap:anywhere; }
+.ca-doc-body ul { margin:0 0 12px; padding-left:22px; }
+.ca-doc-body li { margin:0 0 5px; }
+.ca-doc-body a { color:var(--accent-ink); }
+.ca-doc-body hr { border:none; border-top:1px solid var(--hair); margin:14px 0; }
+
+/* ---- >=900px: the table appears ----
+   Only here. Below this width the card list above is what renders, and it is the primary form. */
+@media (min-width:900px) {
+  .ca-row { grid-template-columns:minmax(0,3fr) minmax(0,1.6fr) auto auto; align-items:start; gap:8px 16px; padding:14px 18px; }
+  .ca-r-head { grid-column:1; }
+  .ca-r-meta { grid-column:2; flex-direction:column; gap:3px; }
+  .ca-scores { grid-column:3; align-items:center; flex-direction:row; gap:6px; }
+  .ca-r-acts { grid-column:4; margin-top:0; justify-content:flex-end; }
+  .ca-r-sum, .ca-detail { grid-column:1 / -1; }
+}
+
+@media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }

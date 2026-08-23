@@ -190,6 +190,84 @@ curl -s -X POST -H 'content-type: application/json' \
     answers `ok:false` saying the read role has not been granted access; it does not crash and it
     takes no other route down.
 
+## The opportunity grid — operating it
+
+**One page, `/careerair.html`, reachable from the Apps tile labelled "Opportunities".** It lists every
+live opportunity the database holds, scored, with a link out to the original advert and — where one
+exists — a reading view of the tailored document. It is a page Warwick opens; nothing about it is
+automatic, nothing is scheduled, and it writes nothing anywhere.
+
+**Routes** (all read-only; `q`, the `cp_directus` SELECT-only pool, is the only database access):
+
+- `GET /api/careerair/opportunities` — the grid payload. **Failure is HTTP 200 `{ok:false, error}`**,
+  the same never-throws contract as `/api/capae` and `/api/rotation-reports`.
+- `GET /api/careerair/opportunity?id=<n>` — long-form detail for one row, fetched only on expand.
+- `GET /api/careerair/cv?id=<n>` — the tailored document, read from the private store **at request
+  time**. This is the one route that answers with a real HTTP status rather than 200-with-an-error,
+  because a refusal here is a boundary decision and a boundary that reports itself as `200` is one
+  nobody can see holding.
+
+### What Mack needs to know
+
+**Start / stop / restart: unchanged.** This adds no process, no scheduled task and no supervisor
+entry. It is served by the same `server.mjs` on 8090 as everything else, so the existing start, stop
+and restart instructions under **Run** above are the whole story.
+
+**`public/*` is live on save; `server.mjs`, `careerair.mjs` and the other loaded modules need a
+restart.** A change to the page (`careerair.html`, `careerair.js`, `careerair.css`, `apps.js`,
+`app.js`) is live on the next reload. A change to `careerair.mjs` or to the route wiring in
+`server.mjs` is **not live until the cockpit is restarted** — the same rule this README already
+states for `capae.mjs` and `rotation-report.mjs`.
+
+**One environment variable, and Mack owns its value:**
+
+| Variable | Required? | Effect when absent |
+|---|---|---|
+| `COCKPIT_CAREERAIR_ROOT` | Optional | The grid still renders in full. Every row reports "no tailored document". |
+
+It must be an **absolute path** to the private store root; a relative path is refused. The service
+says which state it is in **once, at startup**, and never prints the path:
+
+```
+CareerAIR: CV store configured — 9 tailored CV(s) readable. (Path not printed.)
+CareerAIR: no CV store — COCKPIT_CAREERAIR_ROOT is not set, so no CV is served. …
+```
+
+**Read that line on every restart.** An unset root and a mistyped one both serve exactly nothing, so
+without it a typo is indistinguishable from the feature being switched off.
+
+### Reading the page's health without opening it
+
+- `curl -s http://127.0.0.1:8090/api/careerair/opportunities | head -c 300` — expect `"ok":true`. The
+  payload carries **`countsAgree`**, which compares the rows it built against an independent
+  `count(*)`. **If that is ever `false`, rows are missing from the page** and it says so on screen in
+  red. That is the one field worth watching.
+- `cvSource` in the same payload is `configured` · `unconfigured` · `not-absolute` · `missing`.
+- `node services/cockpit/careerair-check.mjs` — the gate. It prints the number of assertions it
+  executed and **exits non-zero if it could not reach the database**, so it can never go green by
+  doing nothing.
+
+### Two failure modes and what they mean
+
+- **The page says "the list could not be read".** The database read failed. This is *not* an empty
+  list and the page deliberately does not present it as one. Check the read role still has its grants
+  (`services/control-plane/db/mypka/290_careerair_cockpit_read_grants.sql`, safe to re-run).
+- **Every row says "no tailored document" when it should not.** `COCKPIT_CAREERAIR_ROOT` is unset or
+  wrong. Read the startup line. Nothing else in the page is affected.
+
+### The boundary, stated so it is not eroded by accident
+
+The tailored documents are **read at request time and never copied** — not into `public/`, not into
+this repository, not into a cache and not into a log line. Three properties hold that, and
+`careerair-check.mjs` asserts all three: the private root arrives **by environment variable** so no
+machine path exists in this repo; the route **refuses unless the server is bound to loopback**; and
+the opportunity id is digits that **select** a directory from a listing rather than being joined onto
+a path. The response carries `cache-control: no-store`.
+
+**If the cockpit is ever rebound to a non-loopback address, the document route stops serving.** That
+is deliberate. It is not a fault to work around, and the fix is to leave the cockpit on loopback
+behind `tailscale serve`, exactly as the **Expose** section above describes.
+
 ## Not yet (see Deliverables/BACKLOG.md)
 Autostart-on-boot (held until accepted over Directus); inline TubeAIR-packet render in Outputs;
 shopping-Accept household write; projector-level output dedup; Builds/System live projections.

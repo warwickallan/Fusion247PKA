@@ -155,7 +155,14 @@ createApp({
       try {
         const qp = new URLSearchParams(window.location.search);
         const wantApp = qp.get('app');
-        if (wantApp && APPS.some((a) => a.key === wantApp)) {
+        const target = wantApp ? APPS.find((a) => a.key === wantApp) : null;
+        if (target && target.href) {
+          // An app that IS its own page cannot be "opened" inside this shell — there is no workspace
+          // to route to. A deep link to one navigates, so a card carrying ?app=<key> lands Warwick on
+          // the page rather than silently doing nothing. `href` is already validated to a
+          // same-origin rooted path by the registry, so this cannot be pointed off-site.
+          window.location.assign(target.href);
+        } else if (target) {
           go('apps');
           openApp(wantApp);
           const wantView = qp.get('view');
@@ -2479,7 +2486,21 @@ createApp({
           <p class="app-blurb">The things Fusion runs for you. Each one opens into its own workspace.</p>
           <div v-if="!APPS.length" class="empty big">No apps registered yet.</div>
           <div v-else class="tiles">
-            <button v-for="a in APPS" :key="a.key" class="tile" :class="appTone(a)" :data-app-tile="a.key" @click="openApp(a.key)">
+            <!-- An app carrying an href is its OWN PAGE rather than a workspace inside this shell,
+                 so its tile is a real anchor: middle-click, long-press and "open in new tab" all
+                 work, which they would not on a button that navigated in script. Every other app
+                 renders exactly the button it always did. The registry validates the value to a
+                 same-origin rooted path before it ever reaches here (see normaliseApp in apps.js).
+                 NOTE FOR THE NEXT EDITOR: this whole template is a JS template literal, so a
+                 BACKTICK anywhere in this comment silently terminates the string and blanks the
+                 cockpit. node --check catches it; that is how this note came to be here. -->
+            <a v-for="a in APPS.filter(x => x.href)" :key="a.key" class="tile" :class="appTone(a)" :data-app-tile="a.key" :href="a.href">
+              <span class="t-num" aria-hidden="true">{{ a.icon }}</span>
+              <span class="t-lbl">{{ a.label }}</span>
+              <span class="t-desc">{{ a.desc }}</span>
+              <span class="app-pill">open</span>
+            </a>
+            <button v-for="a in APPS.filter(x => !x.href)" :key="a.key" class="tile" :class="appTone(a)" :data-app-tile="a.key" @click="openApp(a.key)">
               <span class="t-num" aria-hidden="true">{{ a.icon }}</span>
               <span class="t-lbl">{{ a.label }}</span>
               <span class="t-desc">{{ a.desc }}</span>

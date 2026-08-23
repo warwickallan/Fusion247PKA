@@ -63,6 +63,9 @@ export const SOURCE_MODULES = [
   'asdair-checklist.mjs',
   'asdair-list.mjs',
   'capae.mjs',
+  // Added in the same commit as its `server.mjs` import, per the rule stated above. It reads the
+  // private store at request time, so a digest blind to it would be a digest blind to a boundary.
+  'careerair.mjs',
   'db.mjs',
   'down-reason.mjs',
   'private-api.mjs',
