@@ -505,3 +505,81 @@ unbanked work.
 so they cannot run before it exists. That is a sequencing fact, not a failure — but it means **this
 rotation ends with Supabase NOT populated and the CAPAE record NOT updated for it.** Recorded here so
 the next session finishes the transaction rather than discovering the gap.
+
+---
+
+# AMENDMENT 3 — session of 2026-08-23 into 2026-08-24. **THE GRID IS GRADED AND 38 DOCUMENTS ARE SENDABLE.**
+
+> **PRIVACY BOUNDARY UNCHANGED, AND NOW EXPLICITLY RULED ON.** Warwick, 2026-08-24: *"so long as
+> there is nothing identifiable in the public repo, I don't give a shit. the fact that careerair
+> exists is neither here nor there."* Recorded against the contract it supersedes in
+> `contracts/PRIVACY-DATA-MAP.md`. **The service name may appear here. No employer, role, recruiter,
+> vacancy, salary or opportunity URL may.** This amendment names none.
+
+## ⚑ WORK CLASSIFICATION
+
+| Class | Item |
+|---|---|
+| **FRONTIER** (exactly one) | **ACCEPT — Warwick reads and sends.** 26 documents are SEND_AS_IS today. The machinery is finished; the remaining act is his. |
+| **NEXT** | **12 documents held on ONE named question each.** Listed below. Each is a product decision, not a defect. |
+| **NEXT** | **The collector runs at 16:50 daily but the ops health record cannot go green** — the thing that used to write it is disabled and the live route does not write it. A health record that can never report healthy is not a health record. |
+| **SIDECAR / NON-BLOCKING** | The runtime projection of the master source is owed — nine dated 2026-08-23/24 entries read `projected_to: NOT PROJECTED`. Anything reading the DB projection instead of the file will not see Warwick's rulings. |
+| **PARKED** | Model-API credits remain exhausted, so the runtime fit gate still cannot score. Everything in this pass was judged by dispatched specialists grounded on the master, and is labelled as such. |
+
+## What is true now, established by execution
+
+- **140 open opportunities, 119 closed, 76 discarded** with a stated reason each. Every closure came
+  from the advert's own words, never from age.
+- **140 of 140 are tier `full`** — real advert text behind every score. It was 116 at session start.
+- **38 tailored documents, every one rendered to `.docx` AND `.pdf`, every one opened and measured**,
+  all within Warwick's three-page rule. It was 9 documents at session start, **of which only 1 was
+  actually renderable.**
+- **All four cluster bases are corrected at source** — the repeated figure and the contract wording —
+  so future forks inherit the fixes rather than reproducing them.
+
+## The root cause worth carrying forward
+
+`thin` was never a scoring problem. **A database trigger forbids requirement text on an opportunity
+that has never been classified, and the intake pipeline had classified only 190 of 688.** 102 live rows
+were structurally incapable of holding the evidence the tier reads. No amount of careful reading could
+have fixed it. Classifying them was the fix.
+
+## ⚑ THE TWELVE OPEN QUESTIONS — each blocks exactly one document
+
+1. **Full driving licence** — stated requirement on one role, absent from the evidence base. Nobody
+   will write it without him, correctly.
+2. **One advert's closing date has passed.** Document ready. Send anyway or discard.
+3. **One advert says DO NOT send a CV** — it wants a LinkedIn profile plus a self-made artefact. Route
+   decision.
+4. **One is a people-leadership role and the headline still says Consultant.** Re-cutting a headline is
+   re-drafting, so it was recommended and not done.
+5. **One requires six-month rotations across two continents.** He ruled "potentially, don't rule it
+   out", so it stays live — but he should see the shape before sending.
+6. **⛔ TWO DOCUMENTS USE THE PERSONAL AGENTIC-AI EVIDENCE, AND THE RECORD SAYS HE NEVER SAID "I
+   APPROVE" TO THAT BLOCK.** The master entry was written on Larry's reading of "do it" and says so.
+   **This is a claims-provenance question on documents about to reach real employers, and it is the one
+   on this list that should be settled first.**
+7. **`121 staff` appears twice in every document** — the same repeated-figure pattern he had cut for
+   another figure. He named only that one, so the rule was not extended for him.
+8. **10 of 38 word the contract figure differently from the other 28.** Neither breaches his ruling;
+   they are simply not identical across documents going to one market.
+9. **Two roles carry an Associate seniority signal.** On one it is only a metadata dropdown and the
+   body asks for no years at all; on the other the body itself says "looking to further their career".
+   Different weights, same decision shape.
+10. **One document was forked from a base another agent judged wrong for it.** Defensible either way.
+11. **One opportunity now has two candidate documents** — an older one the grid could not see, with a
+    substantial assessment behind it that may hold judgement worth keeping.
+12. **One base's fork guidance cannot be executed as written** without minting a connective the base
+    does not supply. A base defect to fix once, not per document.
+
+## Honest limits at this boundary
+
+- **No Veritas gate on any of it.** Builder-evidenced and cross-checked between agents; **not**
+  internally assured. Nothing here may be reported as PASS, complete or accepted.
+- **No application has been sent, no employer contacted, and the application ledger still holds ZERO
+  rows.** Warwick's own rule is that the record opens BEFORE the irreversible act. It has not.
+- **Four separate agents independently refused instructions from their own dispatch** when those
+  instructions contradicted a banked Warwick ruling. In one case Larry had written the wrong
+  instruction into a shared spec that five agents read; it would have put a forbidden phrasing into up
+  to 31 documents. **The refusals are why it reached nothing.** Recorded in the master as Larry's
+  error, dated, and explicitly not attributed to Warwick.
