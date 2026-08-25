@@ -55,6 +55,7 @@
 // `server.mjs`'s use of `private-api.mjs` is the sibling control. Neither is re-implemented here.
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 /** The environment variable carrying the private CareerAIR root. Mack owns the value. */
 export const CV_ROOT_ENV = 'COCKPIT_CAREERAIR_ROOT';
@@ -659,6 +660,179 @@ export function careerairCvResponse(env, id, opts) {
     // above leaked it until Vex found the contradiction.)
     body: { ok: true, id: key, markdown: stripHtmlComments(markdown), bytes: Buffer.byteLength(markdown, 'utf8'), at: new Date().toISOString() },
   };
+}
+
+/* =================================================================================================
+   THE PRE-SEND RECORD — the row that must exist before a document leaves.
+
+   ⛔ THIS SURFACE RECORDS. IT DOES NOT SEND. There is no email, upload, employer contact or LinkedIn
+   automation anywhere in this file or downstream of it. "Pre-send" names the MOMENT, not an action.
+
+   ── WHY THIS ROUTE FORWARDS INSTEAD OF WRITING ──────────────────────────────────────────────────
+   This cockpit CANNOT write `careerair.application`, and cannot read it either. Migration 290 granted
+   `cp_directus` SELECT on exactly three `careerair` objects — `opportunity`,
+   `opportunity_field_current`, `fit_assessment` — and granted `cp_worker` NOTHING in that schema at
+   all, deliberately and in writing. So neither pool on this server can reach the ledger.
+
+   The alternative was to widen that grant. It was considered and REJECTED: a widened grant outlives
+   the reason for it, 290 argued its boundary at length, and the schema decision is not this file's to
+   make. Instead the control lives where Warwick actually clicks (here, on the grid) and the WRITE
+   lives in the private CareerAIR service, which already owns that schema, reached over LOOPBACK.
+
+   ── WHAT THIS FILE CONTRIBUTES, AND WHY IT MATTERS ──────────────────────────────────────────────
+   The DIGEST. Only this server can see the tailored document, so only this server can say which exact
+   bytes Warwick was committing to. It computes a sha-256 over the artefact and sends the digest —
+   never the document, never a path, never a directory name.
+   ================================================================================================= */
+
+/** Where the pre-send write is performed. Loopback only; overridable for a non-default port. */
+export const PRESEND_URL_ENV = 'COCKPIT_CAREERAIR_PRESEND_URL';
+const PRESEND_DEFAULT_URL = 'http://127.0.0.1:8791/careerair/api/application/presend';
+
+/**
+ * Resolve the upstream, and refuse anything that is not loopback.
+ *
+ * ⛔ THE LOOPBACK TEST IS A CONTROL, NOT A DEFAULT. Without it an environment variable could redirect
+ * every pre-send record — which carries an opportunity id and a document digest — to an arbitrary
+ * host. `network: none` is the standing authority for this estate; this route's ONLY permitted
+ * outbound hop is to another process on this machine.
+ * @param {NodeJS.ProcessEnv} env
+ */
+export function resolvePresendUrl(env) {
+  const raw = String((env || {})[PRESEND_URL_ENV] || '').trim() || PRESEND_DEFAULT_URL;
+  let u;
+  try { u = new URL(raw); } catch { return { ok: false, url: null, detail: PRESEND_URL_ENV + ' is not a valid URL.' }; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    return { ok: false, url: null, detail: 'the pre-send upstream must be http(s).' };
+  }
+  if (!isLoopbackBind(u.hostname)) {
+    return { ok: false, url: null, detail: 'the pre-send upstream must be a loopback address.' };
+  }
+  return { ok: true, url: u.toString(), detail: 'resolved.' };
+}
+
+/**
+ * The sha-256 of the tailored document for one opportunity.
+ *
+ * ⛔ IT DIGESTS THE RAW FILE, NOT THE STRIPPED READING VIEW that `careerairCvResponse` returns.
+ * `stripHtmlComments` is a PRESENTATION step: editing it would change the digest of a document nobody
+ * had touched, which would make the durable pointer unstable for reasons that have nothing to do with
+ * the document. The artefact of record is the file.
+ *
+ * It reuses `resolveCvRoot`/`resolveCvPath` rather than resolving a path of its own, so the identical
+ * containment, symlink, hard-link and digits-only controls apply. There is deliberately no second path
+ * resolver in this file.
+ * @param {NodeJS.ProcessEnv} env @param {string|number} id
+ */
+export function cvContentDigest(env, id) {
+  const key = String(id == null ? '' : id).trim();
+  if (!/^\d+$/.test(key)) return { ok: false, error: 'bad_opportunity_id' };
+  const rootInfo = resolveCvRoot(env || {});
+  if (!rootInfo.ok) return { ok: false, error: 'no_cv_root', detail: rootInfo.detail };
+  const fp = resolveCvPath(rootInfo.root, key);
+  if (!fp) return { ok: false, error: 'no_cv', id: key };
+  try {
+    // `e.code`, never `e.message`: an fs message carries the ABSOLUTE PATH, and a path in that store
+    // is `<id>-<employer-slug>`, so the message would name an employer.
+    const buf = fs.readFileSync(fp);
+    return { ok: true, digest: crypto.createHash('sha256').update(buf).digest('hex'), bytes: buf.length };
+  } catch (e) { return { ok: false, error: 'cv_unreadable', detail: e.code || 'unknown' }; }
+}
+
+/**
+ * Record that Warwick is committing to the tailored document for this opportunity.
+ *
+ * Returns `{ status, body }` and performs no I/O on the response, exactly like every other function
+ * here — which is what lets `careerair-check.mjs` execute every branch with a stub poster, NO
+ * CREDENTIALS and NO NETWORK.
+ *
+ * `post` is INJECTED rather than imported so that this module keeps its no-network property: nothing
+ * in this file can reach off-box by itself.
+ *
+ * Refusals, all fail-closed and none of them reaches the upstream:
+ *   403 not_loopback        — this server is not bound to loopback (same guard as the CV route).
+ *   400 bad_opportunity_id  — not digits.
+ *   503 no_cv_root          — the private store is not configured.
+ *   404 no_cv               — there is no tailored document to commit to. Nothing is recorded.
+ *   503 presend_unreachable — the recording service did not answer. NOTHING WAS RECORDED, and the
+ *                             page must say so rather than implying the click was saved.
+ *   502 presend_bad_reply   — it answered with something this route will not vouch for.
+ * Upstream 4xx/409 answers are passed through unchanged so the page can tell "already recorded" from
+ * "failed".
+ *
+ * @param {NodeJS.ProcessEnv} env
+ * @param {unknown} body
+ * @param {{bind: string, post: (url: string, payload: object) => Promise<{status: number, body: any}>}} opts
+ */
+export async function careerairPresendResponse(env, body, opts) {
+  const o = opts || {};
+  if (!isLoopbackBind(o.bind)) {
+    return { status: 403, body: { ok: false, error: 'not_loopback' } };
+  }
+  const src = body && typeof body === 'object' ? body : {};
+  const id = normaliseOpportunityId(src.id);
+  if (id === null) return { status: 400, body: { ok: false, error: 'bad_opportunity_id' } };
+
+  const dig = cvContentDigest(env, id);
+  if (!dig.ok) {
+    const status = dig.error === 'no_cv' ? 404 : dig.error === 'no_cv_root' ? 503 : dig.error === 'cv_unreadable' ? 500 : 400;
+    return { status, body: { ok: false, error: dig.error, detail: dig.detail } };
+  }
+
+  const up = resolvePresendUrl(env);
+  if (!up.ok) return { status: 503, body: { ok: false, error: 'presend_not_configured', detail: up.detail } };
+
+  let reply;
+  try {
+    reply = await o.post(up.url, {
+      opportunity_id: id,
+      content_digest: dig.digest,
+      new_attempt: src.new_attempt === true,
+    });
+  } catch (e) {
+    // NOTHING WAS RECORDED. Said plainly, because the page puts the control back on this answer.
+    return { status: 503, body: { ok: false, error: 'presend_unreachable', detail: (e && e.code) || 'unknown' } };
+  }
+  if (!reply || typeof reply.status !== 'number' || !reply.body || typeof reply.body !== 'object') {
+    return { status: 502, body: { ok: false, error: 'presend_bad_reply' } };
+  }
+  return { status: reply.status, body: reply.body };
+}
+
+/* =================================================================================================
+   AC2 — THE HANDOVER GATE. HELD: Warwick's decision, not this file's.
+
+   The route that puts a tailored document in Warwick's hands is `/api/careerair/cv`, and today it
+   gates on FILE EXISTENCE ALONE — it consults no ledger of any kind, and per migration 290 it could
+   not consult `careerair.application` even if it wanted to. So a document can be read with no
+   pre-send record in existence.
+
+   Whether to CLOSE that door is a product decision: enforcing it changes what Warwick can open
+   tonight, across 38 documents. It is with him and is NOT implemented in either direction.
+
+   What is built is the DECISION, as a pure function, so switching it on later is one call site and no
+   redesign. The CV route is deliberately left untouched: adding a no-op call to the route Warwick is
+   using right now would buy nothing and risk something.
+
+   TO ENFORCE, when he rules: set `CV_HANDOVER_MODE` to 'enforce' and call `cvHandoverDecision` in
+   `careerairCvResponse` immediately after `resolveCvPath` succeeds, passing a record fetched from the
+   private service (this cockpit cannot read the ledger itself — see the pre-send block above).
+   ================================================================================================= */
+
+/** `report` = observe only, the current and only shipped behaviour. `enforce` = refuse without a record. */
+export const CV_HANDOVER_MODE = 'report';
+
+/**
+ * May this document be handed over?
+ *
+ * @param {{exists: boolean}|null} record what the ledger says, or null if it was not consulted
+ * @param {'report'|'enforce'} mode
+ */
+export function cvHandoverDecision(record, mode) {
+  const hasRecord = Boolean(record && record.exists);
+  if (mode !== 'enforce') return { allow: true, mode: 'report', hasRecord };
+  if (hasRecord) return { allow: true, mode: 'enforce', hasRecord: true };
+  return { allow: false, mode: 'enforce', hasRecord: false, error: 'no_presend_record' };
 }
 
 /** One honest line at startup, so a misconfigured root is never indistinguishable from an absent one. */

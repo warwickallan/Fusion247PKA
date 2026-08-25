@@ -56,7 +56,8 @@ import {
 // decisions with no credentials present at all.
 import {
   careerairListResponse, careerairDetailResponse, careerairCvResponse,
-  careerairStatusWrite, careerairStartupLine, JSON_HEADERS as CAREERAIR_JSON_HEADERS,
+  careerairStatusWrite, careerairStartupLine, careerairPresendResponse,
+  JSON_HEADERS as CAREERAIR_JSON_HEADERS,
 } from './careerair.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -551,6 +552,45 @@ const server = http.createServer(async (req, res) => {
     // a refusal here is a boundary decision, and a boundary that reports itself as 200 is a boundary
     // nobody can see holding. `BIND` is passed in so the loopback guard tests what this process is
     // ACTUALLY bound to, never a constant this file believes about itself.
+    // Warwick is committing to a tailored document. THE RECORD OPENS BEFORE THE ACT — and this route
+    // records only: it sends nothing, contacts no employer and automates nothing.
+    //
+    // The write itself happens in the private CareerAIR service over LOOPBACK, because migration 290
+    // gave neither pool on this server any reach into the `careerair` schema — see the pre-send block
+    // in careerair.mjs. `post` is injected so that careerair.mjs keeps its no-network property and the
+    // gate can execute every branch of this with no network at all.
+    if (req.url.startsWith('/api/careerair/presend') && req.method === 'POST') {
+      let raw = '';
+      req.on('data', (d) => { raw += d; if (raw.length > 4096) req.destroy(); });
+      req.on('end', async () => {
+        let body = null;
+        try { body = JSON.parse(raw || '{}'); } catch { return j(res, 400, { ok: false, error: 'bad_json' }); }
+        const bound = server.address();
+        const out = await careerairPresendResponse(process.env, body, {
+          bind: (bound && bound.address) || BIND,
+          post: async (url, payload) => {
+            // A short timeout, because the page is waiting and an unanswered click must resolve to a
+            // visible "not recorded" rather than a spinner. `resolvePresendUrl` has already refused
+            // any non-loopback target, so this hop cannot leave the machine.
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(), 5000);
+            try {
+              const r = await fetch(url, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: ac.signal,
+              });
+              let parsed = null;
+              try { parsed = await r.json(); } catch { parsed = null; }
+              return { status: r.status, body: parsed };
+            } finally { clearTimeout(timer); }
+          },
+        });
+        return j(res, out.status, out.body);
+      });
+      return;
+    }
     if (req.url.startsWith('/api/careerair/cv')) {
       const id = new URL(req.url, 'http://x').searchParams.get('id');
       // ⚠️ THE BOUND ADDRESS, NOT THE REQUESTED ONE. `BIND` is what this process ASKED for;

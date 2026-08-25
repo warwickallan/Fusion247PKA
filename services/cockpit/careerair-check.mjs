@@ -35,6 +35,8 @@ import {
   CV_ROOT_ENV,
   STATUS_VALUES, STATUS_LABELS, DEFAULT_STATUS, normaliseOpportunityId, isStatus,
   careerairStatusWrite, SQL_FOR_ASSERTION,
+  resolvePresendUrl, cvContentDigest, careerairPresendResponse,
+  PRESEND_URL_ENV, CV_HANDOVER_MODE, cvHandoverDecision,
 } from './careerair.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -866,6 +868,127 @@ try {
     const readmeSrc = fs.readFileSync(path.join(DIR, 'README.md'), 'utf8');
     ok('...and in the README, so it is findable without opening the page source',
       /browser/i.test(readmeSrc) && /clock/i.test(readmeSrc) && /7 days/.test(readmeSrc));
+  }
+
+  /* -----------------------------------------------------------------------------------------------
+     7b. THE PRE-SEND RECORD — the row that must exist before a document leaves.
+
+     Every assertion here runs with NO NETWORK and NO CREDENTIALS: the upstream poster is injected,
+     which is why `careerairPresendResponse` takes it as a parameter rather than importing one.
+     The fixture root above is reused deliberately — a second CV fixture would be a second path
+     resolver's worth of assumptions.
+     ----------------------------------------------------------------------------------------------- */
+  section('Pre-send record — it records, and it cannot send');
+  {
+    const env = { [CV_ROOT_ENV]: fixtureRoot };
+    /** Records what was posted upstream so the assertions can inspect it. */
+    const stubPost = (reply) => {
+      const calls = [];
+      const fn = async (url, payload) => { calls.push({ url, payload }); if (reply instanceof Error) throw reply; return reply; };
+      fn.calls = calls;
+      return fn;
+    };
+    const okReply = { status: 200, body: { ok: true, application_id: '1', attempt_no: 1, state: 'submitted' } };
+
+    // ── the upstream is loopback-only, and that is a control ────────────────────────────────────
+    ok('the default pre-send upstream is loopback', resolvePresendUrl({}).ok);
+    eq('a NON-loopback upstream is refused',
+      resolvePresendUrl({ [PRESEND_URL_ENV]: 'http://10.0.0.5:8791/x' }).ok, false);
+    eq('...and a public hostname is refused too',
+      resolvePresendUrl({ [PRESEND_URL_ENV]: 'https://example.invalid/x' }).ok, false);
+    eq('a non-http scheme is refused', resolvePresendUrl({ [PRESEND_URL_ENV]: 'file:///c:/x' }).ok, false);
+    eq('an unparseable upstream is refused', resolvePresendUrl({ [PRESEND_URL_ENV]: 'not a url' }).ok, false);
+
+    // ── the digest ───────────────────────────────────────────────────────────────────────────────
+    const dig = cvContentDigest(env, '4242');
+    ok('a tailored document produces a sha-256 digest', dig.ok && /^[0-9a-f]{64}$/.test(dig.digest));
+    eq('the digest is STABLE across calls', cvContentDigest(env, '4242').digest, dig.digest);
+    eq('an opportunity with no document yields no digest', cvContentDigest(env, '4243').error, 'no_cv');
+    eq('a non-numeric id is refused before the filesystem is touched',
+      cvContentDigest(env, '../etc').error, 'bad_opportunity_id');
+    eq('an unconfigured store yields no digest', cvContentDigest({}, '4242').error, 'no_cv_root');
+
+    // ── what actually goes over the wire ─────────────────────────────────────────────────────────
+    {
+      const post = stubPost(okReply);
+      const r = await careerairPresendResponse(env, { id: '4242' }, { bind: '127.0.0.1', post });
+      eq('a good pre-send returns the upstream status', r.status, 200);
+      eq('exactly one upstream call is made', post.calls.length, 1);
+      const sent = JSON.stringify(post.calls[0].payload);
+      ok('the payload carries the opportunity id and the digest',
+        post.calls[0].payload.opportunity_id === '4242' && /^[0-9a-f]{64}$/.test(post.calls[0].payload.content_digest));
+      // ⛔ THE PRIVACY ASSERTIONS. The artefact directories are named <id>-<employer-slug>, so a path
+      // in this payload would carry an employer to the durable record.
+      ok('the payload carries NO filesystem path', !/[\\]/.test(sent) && !/(^|[^A-Za-z])[A-Za-z]:[\/]/.test(sent));
+      ok('the payload carries NO directory name from the store', sent.indexOf('synthetic-role') === -1);
+      ok('the payload carries NO document text', sent.indexOf(SYNTHETIC_CV.slice(0, 24)) === -1);
+      ok('the payload carries no employer, salary or URL key',
+        !/employer|salary|role_title|https?:\/\//i.test(sent));
+    }
+
+    // ── every refusal fails closed and reaches NO upstream ───────────────────────────────────────
+    {
+      const post = stubPost(okReply);
+      const r = await careerairPresendResponse(env, { id: '4242' }, { bind: '0.0.0.0', post });
+      eq('a non-loopback SERVER refuses to record', r.status, 403);
+      eq('...and reaches no upstream', post.calls.length, 0);
+    }
+    {
+      const post = stubPost(okReply);
+      const r = await careerairPresendResponse(env, { id: 'nope' }, { bind: '127.0.0.1', post });
+      eq('a bad opportunity id is a 400', r.status, 400);
+      eq('...and reaches no upstream', post.calls.length, 0);
+    }
+    {
+      const post = stubPost(okReply);
+      const r = await careerairPresendResponse(env, { id: '4243' }, { bind: '127.0.0.1', post });
+      eq('recording is refused when there is NO document to commit to', r.status, 404);
+      eq('...and reaches no upstream', post.calls.length, 0);
+    }
+
+    // ── an unreachable recorder must never look like a success ───────────────────────────────────
+    {
+      const boom = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8791'), { code: 'ECONNREFUSED' });
+      const r = await careerairPresendResponse(env, { id: '4242' }, { bind: '127.0.0.1', post: stubPost(boom) });
+      eq('an unreachable recorder is a 503, not a 200', r.status, 503);
+      eq('...named so the page can say nothing was recorded', r.body.error, 'presend_unreachable');
+      eq('...carrying a CODE, never the message', r.body.detail, 'ECONNREFUSED');
+      ok('...and the message never escapes', JSON.stringify(r.body).indexOf('ECONNREFUSED 127.0.0.1') === -1);
+    }
+    {
+      const r = await careerairPresendResponse(env, { id: '4242' }, { bind: '127.0.0.1', post: stubPost(null) });
+      eq('a malformed upstream reply is a 502, never vouched for', r.status, 502);
+    }
+    {
+      const conflict = { status: 409, body: { ok: false, error: 'already_submitted', attempt_no: 1 } };
+      const r = await careerairPresendResponse(env, { id: '4242' }, { bind: '127.0.0.1', post: stubPost(conflict) });
+      eq('an already-recorded submission is passed through as 409', r.status, 409);
+      eq('...so the page can tell it from a failure', r.body.error, 'already_submitted');
+    }
+
+    // ── AC6: this surface cannot send ────────────────────────────────────────────────────────────
+    {
+      const src = fs.readFileSync(path.join(DIR, 'careerair.mjs'), 'utf8');
+      const code = src.split(/\r?\n/).filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+      ok('careerair.mjs contains no mail, smtp or upload capability',
+        !/nodemailer|sendMail|smtp\.|multipart\/form-data/i.test(code));
+      ok('careerair.mjs makes no outbound call of its own — the poster is injected',
+        !/\bfetch\s*\(/.test(code) && !/https?\.request/.test(code));
+    }
+
+    // ── AC2: the handover gate is BUILT and deliberately NOT switched on ──────────────────────────
+    eq('the CV handover gate ships in REPORT mode — Warwick has not ruled', CV_HANDOVER_MODE, 'report');
+    ok('report mode allows handover whether or not a record exists',
+      cvHandoverDecision(null, 'report').allow && cvHandoverDecision({ exists: true }, 'report').allow);
+    ok('...and still REPORTS which it was', cvHandoverDecision({ exists: true }, 'report').hasRecord === true
+      && cvHandoverDecision(null, 'report').hasRecord === false);
+    eq('enforce mode refuses a handover with no pre-send record', cvHandoverDecision(null, 'enforce').allow, false);
+    eq('...naming why', cvHandoverDecision(null, 'enforce').error, 'no_presend_record');
+    eq('enforce mode allows a handover that HAS a record', cvHandoverDecision({ exists: true }, 'enforce').allow, true);
+    // The switch must be one call site, not a redesign: the CV route is untouched today.
+    ok('the CV route is NOT yet wired to the gate — the decision is Warwick\u2019s',
+      !/cvHandoverDecision/.test(fs.readFileSync(path.join(DIR, 'careerair.mjs'), 'utf8')
+        .split('export function careerairCvResponse')[1].split('export ')[0]));
   }
 
   /* -----------------------------------------------------------------------------------------------
