@@ -702,3 +702,77 @@ first edit and after the last command.
 
 **No Veritas gate on any of this.** Builder self-test evidence only, and labelled as such by the builder.
 
+
+---
+
+# ⚑ AMENDMENT 5 — session of 2026-08-25 into 2026-08-26. **FOURTEEN SENT, AND THE FRONT DOOR DIAGNOSED.**
+
+> **Privacy boundary unchanged.** The service name may appear here; no employer, role, recruiter,
+> vacancy, salary or opportunity URL may. This amendment names none.
+
+## ⚑ WORK CLASSIFICATION
+
+| Class | Item |
+|---|---|
+| **FRONTIER** (exactly one) | **ACCEPT — read the ops rows after the next scheduled email run.** The intake wiring is BUILT-NOT-VERIFIED and stays on the frontier until a real run produces acquisition rows. |
+| **NEXT** | **PRODUCT-DECISION — the CV-Library link class.** Destinations are opaque ciphertext; only a network request resolves them. Needs Warwick's authority to reverse a deliberate no-network policy. |
+| **NEXT** | **PRODUCT-DECISION — `content_verified` persistence.** 336 rows across 156 opportunities assert it falsely. Data-model decision; Silas's to design, Warwick's to authorise. |
+| **NEXT** | **ADMIN — convergence.** The branch is still unmerged and PR #116 is still correctly a draft. |
+| **SIDECAR / NON-BLOCKING** | 29 unsent documents still carry the third-person profile. No rejected headline survives anywhere. |
+| **PARKED** | Model-API credits; the runtime fit gate still cannot score. |
+
+## What happened, established by execution
+
+**FOURTEEN applications submitted** in one collaborative session, every one verified by reading the
+employer's confirmation off the page rather than on assumption, and every one recorded with what actually
+went out. **TEN adverts were found dead before effort was wasted on them. THREE were abandoned on stated
+requirements Warwick does not meet** — one of which he spotted before the form did.
+
+Full record, including all six of Warwick's rulings quoted as his:
+`C:/.fusion247/private/careerair/runtime/applications/APPLICATION-LOG-2026-08-25.md` — **private tree, and
+it must stay there.** It names employers, roles, salaries and opportunity URLs.
+
+## ⛔ THE FRONT DOOR — two causes, neither what anyone assumed
+
+**Neither was an extraction bug**, which is what Larry would have guessed and deliberately did not write
+into the Work Order.
+
+- **A 19-role email produced ZERO rows because the destination is not in the link.** Every candidate sits
+  behind a click-tracker whose path segment is **encrypted** — 0 of 68 decoded to printable ASCII, 185
+  distinct byte values in 304 bytes. Only a network request can resolve it, and the extractor is
+  deliberately no-network. **This recurs on every send from that source until a resolver exists.**
+- **Three empty rows because THE EMAIL PATH NEVER ACQUIRED.** Link extraction worked perfectly. There
+  were **zero acquisition rows anywhere in the whole window** — the runner is called from three other
+  paths and never from email. **The second half of the front door had never been wired.**
+- **A third defect nobody was looking for:** the acquirer fetched adverts, verified them, recorded
+  `content_verified: true`, extracted fields **and discarded the text**. The flag means "read once inside
+  a process", not "durably held".
+
+**Fixed and mutation-proven:** a silent drop where the link accounting was built and then thrown away one
+call later, producing an arithmetically impossible durable record indistinguishable from an empty email.
+
+**Wired and construct-proven, NOT run:** acquisition into the email path.
+
+## ⛔ ACCEPTANCE TESTS OWED — named so they cannot decay into habits
+
+1. **After the next scheduled 16:50 collector run:** read the ops record and confirm `collectors.gmail`
+   was written BY THAT RUN. Until observed, the liveness fix is capability, not automation.
+2. **After the next scheduled email run:** query `opportunity_acquisition` for opportunities that run
+   created. Non-null rows with stored content = fixed. **Nothing there = still broken.**
+
+**Neither may be marked done on the strength of a green test or a successful construction.**
+
+## CI
+
+`cockpit-private-apps` had failed on every commit for four days. Cause: an attribute added to a template
+div broke a full-literal anchor. **A third of that gate had been DARK, not merely red** — seven mutations,
+a false-positive control, a dirty check and a clean-control run had not executed since. Re-derived,
+mutation-proven three ways, **and CI is now green on the pushed head.**
+
+## Honest limits at this boundary
+
+- **No Veritas gate on ANY of this session's work.** Builder-evidenced throughout, and labelled so by the
+  builders themselves. Nothing here may be reported as PASS, complete or accepted.
+- **Larry passed on an unverified negative twice** — a substring grep read as an anchor match, and a
+  claim that no raw email payload existed when the bodies were in the database all along. Both were
+  caught by workers who checked rather than inherited.
