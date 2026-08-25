@@ -44,22 +44,24 @@
 > in response to it.** The regrowth cap (root `CLAUDE.md`) applies at full force. **The ruling removes
 > architecture; it does not commission machinery.**
 
-> ## 🟡 OUTSTANDING ON ARRIVAL — 2026-08-25 rotation. Not a blocker; named so it is never silently absent.
+> ## ✅ ROTATION 2026-08-25 CLOSED — session-performance report landed and is folded in.
 >
-> **Pax's closing session-performance report for the 2026-08-24/25 manual-shop session was commissioned
-> but had not returned as of this rotation.** Per `/rotate` step 6, this does not hold the door shut —
-> durable state (this map, the shop record, the subagent ledger) is banked and pushed regardless. When it
-> lands, fold it in as a normal update rather than re-running the rotation.
+> **Report:** `Deliverables/2026-08-25-session-report-asdair-manual-shop.md`
+> (payload: `Deliverables/2026-08-25-session-report-asdair-manual-shop-payload.json`) — committed, Supabase
+> populated (`rotation_id 03b6484d-ac83-4423-a8ad-96d006813e1f`, verified), CAPAE synced (4 families
+> applied, 0 unknown, 0 rejected). **Closing head: `cf672dbb5eeac4a56e0516a7894ab8fe4b9c2c55`** (later
+> commits on the branch are payload-correction housekeeping only, not further product work).
 >
-> - **Intended path:** `Deliverables/2026-08-25-session-report-asdair-manual-shop.md`
-> - **Intended payload:** `Deliverables/2026-08-25-session-report-asdair-manual-shop-payload.json`
-> - **Ledger already banked (not outstanding):** `Deliverables/2026-08-25-subagent-token-ledger-asdair-manual-shop.md`
-> - **If it has landed by the time you read this** and Larry has not yet committed/populated Supabase from
->   it: commit both files, run `node tools/session-report/populate.mjs --file <payload.json>`, then
->   `node tools/session-report/capae-sync.mjs <payload.json>`, then remove this block (re-cut, don't just
->   delete around it) and update the pointer below to the real committed head.
-> - **If it still hasn't landed**, it is safe to leave commissioned and unread across further rotations —
->   an analytical return that may legitimately arrive after a `/clear` is not a precondition of one.
+> **The grade is mixed and worth reading in full, not just banking.** Two CAPAE families **recurred**
+> despite being in Larry's session-opening brief — `work-order-not-generated` (all 4 Asdair dispatches
+> tonight went out as plain-English task labels, none through the generated-envelope route, one session
+> after this exact family reached 11-of-11 clean) and `control-cannot-reach-what-it-checks` (the Regulars
+> page's own checkbox/quantity state was trusted instead of the real trolley, and silently lied — caught
+> only by auditing the real trolley and real network traffic afterwards, not by the tool's own success
+> signal). Two others logged their **first-ever clean exposure**: `built-tested-never-activated` and
+> `record-amended-body-not-recut`. Full six-question-per-family detail in the report itself.
+>
+> **Subagent ledger** (already banked separately): `Deliverables/2026-08-25-subagent-token-ledger-asdair-manual-shop.md`.
 
 ## ⚑ WORK CLASSIFICATION — read this before the detail *(per [[Templates/wayfinder-plan]])*
 
