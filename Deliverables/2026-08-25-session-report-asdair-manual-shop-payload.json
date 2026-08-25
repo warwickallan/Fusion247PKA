@@ -1,43 +1,41 @@
 {
-  "rotation": {
-    "session_date": "2026-08-25",
-    "branch": "wo/2026-08-23-cockpit-grid",
-    "closing_head": "cf672dbb5eeac4a56e0516a7894ab8fe4b9c2c55",
-    "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
-    "deliverable_path": "Deliverables/2026-08-25-session-report-asdair-manual-shop.md",
-    "host": "claude-code",
-    "host_version": null,
-    "elapsed_minutes": null,
-    "total_context_tokens_in": null,
-    "total_context_tokens_out": null,
-    "parent_channel_available": true,
-    "queued_messages": null,
-    "wo_first_dispatch_success": 2,
-    "wo_amendments": 0,
-    "wo_refusals": 0,
-    "doc_lines_changed": null,
-    "product_lines_changed": 0,
-    "allocation_product_pct": 45,
-    "allocation_admin_pct": 10,
-    "allocation_evidence_pct": 20,
-    "allocation_rework_pct": 25,
-    "allocation_waiting_pct": 0,
-    "total_subagent_tokens": 569733,
-    "wo_total": 4,
-    "git_stat": {
-      "commits": ["d57183a", "0c3de84", "deb426c"],
-      "note": "Only 7-char abbreviated commit ids known to Pax at write time; expanded to the full closing_head SHA by Larry post-return (deb426c was pushed after Pax was dispatched, adding the outstanding-report pointer commit). No Bash/git access in Pax's role to produce a real `git diff --stat`. Per Larry's Work Order description all three commits are Wayfinder/Deliverables-only, no services/** changes -- SINGLE-SOURCE as to content, not independently diffed by Pax."
-    },
-    "unestablished": [
-      "elapsed_minutes: no explicit session-start/session-end timestamp was visible to Pax. Best textual bound: session opened pre-midnight 2026-08-24; AsdAIr runtime crash was found at 20:18 UTC 24 Aug during this session's pre-flight reconnaissance (crash itself pre-dated discovery); rotation is being written in the early hours of 2026-08-25. At least 34m22s of that span is measured subagent wall-clock (excluding 2 unmeasured dispatches); the live browser-driving portion, which is most of the session, is not separately timestamped anywhere Pax could read.",
-      "total_context_tokens_in / total_context_tokens_out: only approximate 'tokens remaining' spot readings were available (~15,000,000 at session open, ~14,976,000 most recent visible reading), not an instrumented in/out split. Delta by that measure is roughly 24,000 tokens, almost certainly an undercount since it excludes live browser-driving turns.",
-      "doc_lines_changed: Pax has no Bash/git access in this role and could not run a diff to establish this.",
-      "host_version: not established.",
-      "queued_messages: not established."
-    ],
-    "notes": "Manual, one-off collaborative shop -- Warwick and Larry built SHOP-2026-08-24 together in chat, Larry personally driving the ASDA browser under Warwick's explicit one-off authorisation ('you may drive the browser'), confirmed as a one-off exception when Larry asked directly, not a reversal of the standing S-3 architecture. The normal AsdAIr autonomous route was unavailable anyway: the runtime was found dead (crashed 20:18 UTC 24 Aug, logon-recovery's one retry failed). Result: shop id 38, BASKET_READY, 47 lines / 69 items / GBP 162.32, on Warwick's real ASDA account; no slot booked, no checkout done. Full report in the companion Markdown deliverable, including a 4-family CAPAE comparison against the session-opening brief."
+  "session_date": "2026-08-25",
+  "branch": "wo/2026-08-23-cockpit-grid",
+  "closing_head": "cf672dbb5eeac4a56e0516a7894ab8fe4b9c2c55",
+  "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-25-session-report-asdair-manual-shop.md",
+  "host": "claude-code",
+  "host_version": null,
+  "elapsed_minutes": null,
+  "total_context_tokens_in": null,
+  "total_context_tokens_out": null,
+  "parent_channel_available": true,
+  "queued_messages": null,
+  "wo_first_dispatch_success": 2,
+  "wo_amendments": 0,
+  "wo_refusals": 0,
+  "doc_lines_changed": null,
+  "product_lines_changed": 0,
+  "allocation_product_pct": 45,
+  "allocation_admin_pct": 10,
+  "allocation_evidence_pct": 20,
+  "allocation_rework_pct": 25,
+  "allocation_waiting_pct": 0,
+  "total_subagent_tokens": 569733,
+  "wo_total": 4,
+  "git_stat": {
+    "commits": ["d57183a", "0c3de84", "deb426c", "cf672db", "fd4193a"],
+    "note": "Only 7-char abbreviated commit ids known to Pax at write time; closing_head above expanded to the full verified SHA by Larry (via `git rev-parse HEAD`) after Pax returned, since deb426c/cf672db/fd4193a were all cut after Pax was dispatched. No Bash/git access in Pax's role to produce a real `git diff --stat`. Per Larry's Work Order description all commits are Wayfinder/Deliverables-only, no services/** changes -- SINGLE-SOURCE as to content for the pre-dispatch commits, not independently diffed by Pax."
   },
-  "specialist_dispatch": [
+  "unestablished": [
+    "elapsed_minutes: no explicit session-start/session-end timestamp was visible to Pax. Best textual bound: session opened pre-midnight 2026-08-24; AsdAIr runtime crash was found at 20:18 UTC 24 Aug during this session's pre-flight reconnaissance (crash itself pre-dated discovery); rotation is being written in the early hours of 2026-08-25. At least 34m22s of that span is measured subagent wall-clock (excluding 2 unmeasured dispatches); the live browser-driving portion, which is most of the session, is not separately timestamped anywhere Pax could read.",
+    "total_context_tokens_in / total_context_tokens_out: only approximate 'tokens remaining' spot readings were available (~15,000,000 at session open, ~14,976,000 most recent visible reading), not an instrumented in/out split. Delta by that measure is roughly 24,000 tokens, almost certainly an undercount since it excludes live browser-driving turns.",
+    "doc_lines_changed: Pax has no Bash/git access in this role and could not run a diff to establish this.",
+    "host_version: not established.",
+    "queued_messages: not established."
+  ],
+  "notes": "Manual, one-off collaborative shop -- Warwick and Larry built SHOP-2026-08-24 together in chat, Larry personally driving the ASDA browser under Warwick's explicit one-off authorisation ('you may drive the browser'), confirmed as a one-off exception when Larry asked directly, not a reversal of the standing S-3 architecture. The normal AsdAIr autonomous route was unavailable anyway: the runtime was found dead (crashed 20:18 UTC 24 Aug, logon-recovery's one retry failed). Result: shop id 38, BASKET_READY, 47 lines / 69 items / GBP 162.32, on Warwick's real ASDA account; no slot booked, no checkout done. Full report in the companion Markdown deliverable, including a 4-family CAPAE comparison against the session-opening brief.",
+  "specialists": [
     {
       "specialist": "asdair",
       "dispatches": 5,
@@ -97,39 +95,32 @@
   ],
   "findings": [
     {
-      "capae_family": "work-order-not-generated",
-      "disposition": "RECURRENCE",
-      "summary": "All 4 Asdair dispatches this session went out with plain-English task labels, none in the WO-YYYY-MM-DD-NN numbered/generated-envelope format used elsewhere on this map, and no envelope.mjs reference is evidenced. Inferred from label-format and absence of evidence, not directly witnessed by Pax.",
-      "compared_to_previous": "degraded (2026-08-19 reached 11 of 11 orders generated)",
-      "still_repeating_despite_brief": true
+      "family": "work-order-not-generated",
+      "exposure": "recurrence",
+      "summary": "All 4 Asdair dispatches this session went out with plain-English task labels, none in the WO-YYYY-MM-DD-NN numbered/generated-envelope format used elsewhere on this map, and no envelope.mjs reference is evidenced. Inferred from label-format and absence of evidence, not directly witnessed by Pax. Compared to previous: degraded (2026-08-19 reached 11 of 11 orders generated). Still repeating despite being in Larry's opening brief: yes.",
+      "evidence_ref": "Deliverables/2026-08-25-session-report-asdair-manual-shop.md"
     },
     {
-      "capae_family": "control-cannot-reach-what-it-checks",
-      "disposition": "RECURRENCE",
-      "summary": "The Regulars-page checkbox state was trusted as a proxy for real trolley quantity and for bulk-add success; both produced silent wrong states, caught only by a full audit of the real trolley / real network traffic after the fact.",
-      "compared_to_previous": "unchanged (family entered the session at 0 clean of 6 occurrences)",
-      "still_repeating_despite_brief": true
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "recurrence",
+      "summary": "The Regulars-page checkbox state was trusted as a proxy for real trolley quantity and for bulk-add success; both produced silent wrong states, caught only by a full audit of the real trolley / real network traffic after the fact. Compared to previous: unchanged (family entered the session at 0 clean of 6 occurrences). Still repeating despite being in Larry's opening brief: yes.",
+      "evidence_ref": "Deliverables/2026-08-25-session-report-asdair-manual-shop.md"
     },
     {
-      "capae_family": "built-tested-never-activated",
-      "disposition": "CLEAN-EXPOSURE",
-      "summary": "New rules 53 and 54 were explicitly confirmed reachable before being banked. A pre-existing broken rule (id 52, directive='map' with no match target) was discovered, not created, this session, and remains an open residual Larry lacks the DB grant to fix.",
-      "compared_to_previous": "improved (appears to be this family's first recorded clean exposure; entered at 0 of 9)",
-      "still_repeating_despite_brief": "no for new work; yes as an unrepaired legacy instance"
+      "family": "built-tested-never-activated",
+      "exposure": "clean",
+      "summary": "New rules 53 and 54 were explicitly confirmed reachable before being banked. A pre-existing broken rule (id 52, directive='map' with no match target) was discovered, not created, this session, and remains an open residual Larry lacks the DB grant to fix. Compared to previous: improved (appears to be this family's first recorded clean exposure; entered at 0 of 9). Still repeating: no for new work, yes as an unrepaired legacy instance.",
+      "evidence_ref": "Deliverables/2026-08-25-session-report-asdair-manual-shop.md"
     },
     {
-      "capae_family": "record-amended-body-not-recut",
-      "disposition": "CLEAN-EXPOSURE",
-      "summary": "The Wayfinder's SEND-THE-PHOTO-TUESDAY block was headed SUPERSEDED and re-cut in place, explicitly stating 'Re-cut, not appended above, per the amendment discipline this map itself states.'",
-      "compared_to_previous": "improved (appears to be this family's first recorded clean exposure; entered at 0 of 8)",
-      "still_repeating_despite_brief": false
+      "family": "record-amended-body-not-recut",
+      "exposure": "clean",
+      "summary": "The Wayfinder's SEND-THE-PHOTO-TUESDAY block was headed SUPERSEDED and re-cut in place, explicitly stating 'Re-cut, not appended above, per the amendment discipline this map itself states.' Compared to previous: improved (appears to be this family's first recorded clean exposure; entered at 0 of 8). Still repeating despite being in Larry's opening brief: no.",
+      "evidence_ref": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md"
     },
     {
-      "capae_family": null,
-      "disposition": "OBSERVATION",
-      "summary": "Non-CAPAE-mapped rework this session: free-search-vs-Favourites correction, wrong-machine (Surface vs expected machine) confusion, a live Cloudflare/ASDA bot-detection block traced to a VPN-routed IP, and an ASDA-side React hydration crash diagnosed via network trace. None required a formal Work Order refusal or amendment cycle; all were live in-chat corrections between Larry and Warwick.",
-      "compared_to_previous": null,
-      "still_repeating_despite_brief": null
+      "family": null,
+      "summary": "OBSERVATION, not CAPAE-mapped: free-search-vs-Favourites correction, wrong-machine (Surface vs expected machine) confusion, a live Cloudflare/ASDA bot-detection block traced to a VPN-routed IP, and an ASDA-side React hydration crash diagnosed via network trace. None required a formal Work Order refusal or amendment cycle; all were live in-chat corrections between Larry and Warwick."
     }
   ]
 }
