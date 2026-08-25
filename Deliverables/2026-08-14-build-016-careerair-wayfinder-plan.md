@@ -649,3 +649,56 @@ opened linked in, open opportunities cockpit in seperate tab when you are ready.
 - **Zero applications sent, zero employer contact.** Unchanged and correct.
 - The twelve open questions, above, remain Warwick's.
 
+
+## ⚑ AMENDMENT 4a — item 2 built, and the ONE thing that is not yet true
+
+**WO-2026-08-25-02 returned PARTIAL, and PARTIAL is the correct verdict, not a shortfall.**
+
+**PASS:** AC2 (the `down` direction, proven at six clock positions with an exact boundary and **two mutations
+made to go red**), AC3 (the deliberate `graph_auth_required` mute preserved — sha256 identical before and
+after), AC4 (recommendation only; no scheduled task touched), AC5 (secret scan exit 0, 79 files).
+
+**The diagnosis in the Work Order was WRONG and was corrected by the worker before any file was written.**
+Larry wrote *"nothing writes `up`, therefore `collector_state` can never leave `down`"*. It left `down` on
+2026-08-23 at 11:33 via the webhook, and was stamped back at 21:50 the same evening by the Graph collector
+— which was **still running on the 23rd**. Larry had read scheduled-task trigger `StartBoundary` values as
+disable dates. The real defect was **three writers sharing one last-writer-wins field with no provider
+attribution**, and patching Gmail to call the same function would have reproduced it wearing a new hat.
+
+### ⛔ ON THE FRONTIER UNTIL THE REAL EVENT — do not mark this done
+
+**AC1 is PARTIAL by design.** `collect()` records provider-scoped liveness, proven over an **injected
+in-memory IMAP transport against a temp ops file**. That is capability. It is **not** completed automation
+(`CLAUDE.md` § "Nothing may live only in Larry's head"), and the worker labelled it so rather than letting
+the limit sit beside the verdict as a caveat.
+
+**THE ACCEPTANCE TEST, NAMED SO IT CANNOT DECAY INTO A HABIT:**
+
+> **After the next scheduled `CareerAIR-Gmail-Collect` run (16:50 daily), read
+> `C:/.fusion247/private/careerair/runtime/ops/state.json` and confirm `collectors.gmail` was written BY
+> THAT RUN — a fresh `last_run_at` and `last_success_at`, with `active_collector: "gmail"`.**
+>
+> Until that is observed, this outcome is **NOT** complete and must not be reported as such. If it does not
+> happen, the wiring is wrong and the residual below is the first place to look.
+
+**The live record was never written during the build** — md5 `53c66809d2a718a92efbc360510875e5` before the
+first edit and after the last command.
+
+### Residuals carried, none blocking
+
+- **The wrapper's failure paths cannot record `down`.** `CANNOT START` and `NOT CONNECTED` are decided in
+  `scripts/careerair-gmail-collect.mjs`, outside the declared surface, before `collect()` is reached.
+  Staleness catches it within 26h. A follow-up Work Order is recommended; **Warwick decides whether it is
+  raised** — a reported finding is an observation, not an instruction.
+- **The legacy writers still stamp the shared field directly** (`endpoint.mjs`, `graph-collect.mjs`,
+  `ops-liveness.mjs`). Live exposure is nil while Graph-Collect is Disabled; **re-enabling it without
+  migrating those call sites would restore the 2026-08-23 stomp.**
+- **`CareerAIR-Ops-Liveness` must NOT be re-enabled as it stands** — it derives `collector_state` from local
+  webhook reachability on 8787, a different subsystem, twice an hour. The mute holds correctly; the problem
+  is the stamping, not the alerting.
+- **Larry owns one reconciliation:** `src/cockpit/server.mjs:360` reads `ops.collector_state`, whose values
+  are unchanged but whose **meaning** is now "the active collector's liveness" rather than "whatever wrote
+  last". Recommendation on the table is that the cockpit move to `collectors.gmail`.
+
+**No Veritas gate on any of this.** Builder self-test evidence only, and labelled as such by the builder.
+
