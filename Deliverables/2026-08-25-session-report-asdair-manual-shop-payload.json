@@ -2,7 +2,7 @@
   "rotation": {
     "session_date": "2026-08-25",
     "branch": "wo/2026-08-23-cockpit-grid",
-    "closing_head": "deb426c08cd48866d9d6a7aea91fff5687690982",
+    "closing_head": "cf672dbb5eeac4a56e0516a7894ab8fe4b9c2c55",
     "map_path": "Deliverables/2026-08-04-build-015-asdair-wayfinder-plan.md",
     "deliverable_path": "Deliverables/2026-08-25-session-report-asdair-manual-shop.md",
     "host": "claude-code",
