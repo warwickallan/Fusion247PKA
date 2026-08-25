@@ -333,11 +333,19 @@ precisely how a dead collector looked healthy for eight days.
 
 ## 14. RESUMABLE STATE
 
-**Phase:** BUILD-016 Phase 1, Application Engine. **Gate:** the only verdict is **Veritas Gate 1 FAIL** at
-`0cf70c9`, on absent capability. **No PASS exists.**
-**Frontier:** the Warwick decision at the top of this map, then the measurement task.
-**Last CareerAIR development activity: 2026-08-06** — commit `bd11f96`. **Eight days idle by design**,
-parked deliberately, not drifted.
+**⚠ RE-CUT 2026-08-25 (Amendment 4). The rows below described this map as it stood on 2026-08-14 and
+were contradicted by Amendments 1–3. Superseded in place rather than left standing.**
+
+**Phase:** BUILD-016 Phase 1, Application Engine — **split by Amendment 1** into an automated scanning
+half and a deliberately collaborative CV/application half.
+**Gate:** the only Veritas verdict on this build remains **Gate 1 FAIL** at `0cf70c9`, on absent
+capability. **No PASS exists, and none has been sought since** — every outcome of Amendments 2 and 3 is
+builder-evidenced, cross-checked between agents, and explicitly NOT assured.
+**Frontier:** see the ⚡ WORK CLASSIFICATION block in **Amendment 4** at the foot of this map. It is the
+only live statement of the frontier; the "Warwick decision at the top of this map" named here was
+settled by Amendment 1 on 2026-08-22, and the measurement task by Amendment 3.
+**Last CareerAIR development activity: 2026-08-25** — this session. The "eight days idle by design"
+recorded here was true of 2026-08-06 → 2026-08-14 and is history, not current state.
 **Sources reconciled into this map:** the 2026-08-14 raw recovery
 (`2026-08-14-careerair-state-recovery-RAW.md`) · `BACKLOG.md` C-10 · the seven public CareerAIR evidence
 documents · the Proofline map's CareerAIR rows · the private tree's contracts, build record, `HELD-ITEMS`
@@ -583,3 +591,61 @@ have fixed it. Classifying them was the fix.
   instruction into a shared spec that five agents read; it would have put a forbidden phrasing into up
   to 31 documents. **The refusals are why it reached nothing.** Recorded in the master as Larry's
   error, dated, and explicitly not attributed to Warwick.
+
+---
+
+# ⚑ AMENDMENT 4 — session of 2026-08-25. **ACTIVE SESSION WORK PACKAGE, authorised by Warwick.**
+
+> **Privacy boundary unchanged** and as ruled on 2026-08-24: the service name may appear here; no
+> employer, role, recruiter, vacancy, salary or opportunity URL may. This amendment names none.
+
+## ⚑ WORK CLASSIFICATION
+
+| Class | Item |
+|---|---|
+| **FRONTIER** (exactly one) | **BUILD — the pre-send application record.** Warwick's own rule is that the ledger opens BEFORE the irreversible act, and it holds zero rows. Nothing may be sent until it does. |
+| **NEXT** | **REMEDIATE — the ops health record cannot report healthy.** `collector_state` can only be set `up` by `touchContact()`, and the live daily route is not calling it. |
+| **NEXT** | **ADMIN — convergence.** 19 commits (plus this session's) have never reached `main`. The assurance route is owed over the whole boundary, not a bare merge. |
+| **NEXT** | **ACCEPT — the browser ops session.** Warwick works the opportunity cockpit with Larry in the side panel, LinkedIn open alongside. Requested for immediately after the three items above. |
+| **SIDECAR / NON-BLOCKING** | The runtime projection of the master source is still owed — nine 2026-08-23/24 entries read `projected_to: NOT PROJECTED`. |
+| **PARKED** | Model-API credits exhausted; the runtime fit gate still cannot score. Unchanged from Amendment 3. |
+| **PARKED** | **The twelve open questions of Amendment 3.** Warwick did not take them this session. They are HIS decision queue and remain open — not deferred by Larry, not closed. |
+
+## ACTIVE SESSION WORK PACKAGE — Warwick, 2026-08-25
+
+**His words, quoted:** *"Do these three … Close the ledger gap first — build the pre-send record so
+nothing goes out unrecorded … Fix the ops health record so collector liveness is honest again … Take
+the 19 commits to main — they've been sitting unmerged since the 23rd, and that needs the assurance
+route, not just a merge. Then I want to work through the Ops with you in the side panel browser, I have
+opened linked in, open opportunities cockpit in seperate tab when you are ready."*
+
+### Acceptance criteria — functional, numbered
+
+1. **A pre-send application record exists and is written by the real production event.** A row in
+   `careerair.application` is created BEFORE any document leaves, carrying the opportunity, the attempt,
+   the state, and the exact version pointer that will be submitted. Capability alone does not satisfy
+   this — see § "Nothing may live only in Larry's head" in `CLAUDE.md`.
+2. **The record cannot be bypassed.** Sending without a prior row is not merely discouraged; the route
+   that sends has no path that skips it.
+3. **`collector_state` can reach `up` from the live route**, established by execution, and can also
+   truthfully report `down` when the collector genuinely is. A health record that can only ever say one
+   thing is not a health record — and the fix must not be to make it always say `up`.
+4. **The deliberate `graph_auth_required` mute is preserved.** It is muted ON PURPOSE and its unmute
+   instructions stay intact. Fixing liveness must not silently clear a truthful incident.
+5. **The branch converges to `main` through the assurance route** — Veritas Gate 1 on the boundary,
+   then Codex at the PR, then Warwick's merge decision. Not a bare merge.
+
+### Larry's reading, labelled as Larry's and NOT attributed to Warwick
+
+- Warwick said "the 19 commits". Items 1 and 2 land on the same branch, so the boundary assured is the
+  19 **plus this session's work** — one boundary, one gate, rather than gating twice an hour apart.
+  Stated to him at the time of acceptance; he did not object, and he did not explicitly rule on it.
+- The browser ops session is **ACCEPT-class work with Warwick present**. It is not engineering and does
+  not need a gate. It must not be allowed to become the apparent frontier of the build.
+
+### Residuals on arrival — carried, not hidden
+
+- **No Veritas gate exists on ANY of Amendment 3's work.** 38 documents are builder-evidenced only.
+- **Zero applications sent, zero employer contact.** Unchanged and correct.
+- The twelve open questions, above, remain Warwick's.
+
