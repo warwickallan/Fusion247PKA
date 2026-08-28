@@ -194,3 +194,55 @@ Report how many existing rows carry `outcome='acquired'` with zero field rows an
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-28. Read-back accepted with corrections.
+
+**This amendment is LARRY'S, not Warwick's.** It settles Keel's CLARIFY read-back of 2026-08-28.
+Nothing here is a Warwick ruling and nothing here is attributed to him.
+
+## ⛔ THE ORDER WAS WRONG, AND THE WORKER PROVED IT
+
+`capability_evidence (a)` claimed both durable homes were available and that **"no schema decision is
+owed"**. Keel established from the durable migration source that this is **half false**:
+
+- `migrations/006-careerair-acquisition.sql` creates trigger `opportunity_source_immutable_trg`
+  (BEFORE UPDATE OR DELETE) raising *"the original is immutable; only attachment_state and note may
+  change"*, and grants `careerair_derivative_writer` only `update (attachment_state, note)`.
+- **`opportunity_source.original_text` therefore CANNOT be written after intake** — refused by trigger
+  and by absence of grant. `src/intake/memoryOpportunityStore.js:264` states the same rule in code.
+- `migrations/004-careerair-opportunity.sql:592` DOES grant `update (… source_text …)` on
+  `careerair.opportunity`, and carries no immutability trigger.
+
+**Larry authored that false line and repeated it to Warwick as established.** It is corrected here.
+
+## RULINGS — all five are ordinary technical choices, settled by Larry under CLAUDE.md
+## §"Explicitly NOT Warwick decisions". None was escalated.
+
+1. **C1 — durable text home is `careerair.opportunity.source_text`.** The `acceptance_property`
+   already reads `original_text non-null OR source_text non-empty`; the OR limb is satisfied and no
+   schema decision is owed *for this order*. **Do NOT insert synthetic rows into immutable evidence**
+   to reach `original_text` — that is a provenance decision and it is Silas's, not Keel's. It is not
+   raised as a Work Order; it is recorded once, non-blocking, for Warwick's decision.
+2. **A1 — "impossible, not merely absent" means enforced in the only writer.** A guard in
+   `src/acquire/`, NOT a database CHECK constraint. `migrations/` is out of surface and stays out.
+3. **M1 — `machine_surface` GAINS EXACTLY ONE ENTRY:**
+   `C:/.fusion247/private/careerair/config/job-alert-senders.json`
+   Configuration only, no credential content, matching the existing `config/outlook-scout.json`
+   precedent loaded by `src/email/contract.mjs`. The sender list is CONFIGURATION and remains so.
+   **No other surface entry is added or widened.**
+4. **M2 / M3 — AC2, AC5 and AC3's live SQL evidence are LARRY'S to execute after integration.**
+   Keel returns **PARTIAL** on those three by design. **Keel must NOT report AC2 satisfied on a
+   hand-run.** AC2 is proven only by the scheduled `CareerAIR-Gmail-Collect` run (next: 29/08 16:50)
+   and by the rows it creates. Capability is not automation.
+5. **C2 — the order's "secret-scan not applicable to absolute machine paths" line is SUPERSEDED.**
+   It is applicable; Keel already probed it (exit 0, 92 files). Run the real surface-scoped scan and
+   report exit code and coverage. Exit 2 over this private surface is blocking, not weighable.
+
+## Standing, unchanged by this amendment
+
+- **`network: none` stands.** The LinkedIn guest-endpoint method offered in the dispatch is Larry's
+  evidence for the liveness question and is **NOT part of this order**. Keel makes no outbound HTTP.
+- **No browser, of any kind.**
+- **`credential_scope: none` stands.** No env file, no token, no DSN.
