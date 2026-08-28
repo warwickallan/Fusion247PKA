@@ -776,3 +776,66 @@ mutation-proven three ways, **and CI is now green on the pushed head.**
 - **Larry passed on an unverified negative twice** — a substring grep read as an anchor match, and a
   claim that no raw email payload existed when the bodies were in the database all along. Both were
   caught by workers who checked rather than inherited.
+
+---
+
+# ⚑ AMENDMENT 6 — Warwick, 2026-08-28. **THE LANGUAGE. A PRODUCT DECISION, BINDING.**
+
+> **His words, verbatim, 2026-08-28:**
+>
+> *"we also need to change the language. an opportunity is something that meets the qualification
+> criteria to apply for, once applied for it becomes an application.*
+>
+> *anything that comes in raw is not yet qualified is a prospect."*
+
+**This is now the ONLY correct vocabulary for BUILD-016. It is canonical here and every other surface
+points at it.** Larry's consequent record-keeping is below the quoted ruling and is labelled as
+Larry's — none of it is attributed to Warwick.
+
+## THE THREE TERMS
+
+| Term | Definition | When it becomes the next thing |
+|---|---|---|
+| **PROSPECT** | Anything that has arrived RAW and is **not yet qualified**. A job-alert subject line, an unread advert, a link someone sent. It may be junk. Most of it is. | When it is qualified against the criteria. |
+| **OPPORTUNITY** | A prospect that **meets the qualification criteria to apply for**. It has earned Warwick's attention. | When it is applied for. |
+| **APPLICATION** | An opportunity that **has been applied for**. | — |
+
+**A prospect is not an opportunity. Calling one an opportunity is a lie about how much work has been
+done to it, and it is exactly the lie the current system tells.**
+
+## ⛔ WHAT THIS MAKES FALSE — Larry's assessment, recorded 2026-08-28
+
+**The estate currently calls EVERYTHING an opportunity from the moment it arrives.** Measured tonight:
+
+- `careerair.opportunity` holds **695 rows**. Under the new language, **the overwhelming majority are
+  PROSPECTS**, not opportunities — 429 are already `intake_status='discarded'`, i.e. they never
+  qualified at all.
+- The CareerAIRbot card says *"N new opportunities"* on arrival. **Under this ruling that line is
+  false on its face** — nothing has been qualified at that point. It should read **prospects**.
+- `email_message.outcome = 'new-opportunity'` is likewise mis-named at the point it is written.
+
+**This is why 62 emails produced a card saying nothing useful.** The word "opportunity" was doing the
+work of three different states, so the card could never tell Warwick which one he was looking at.
+
+## THE MAPPING — Larry's, for implementation. Not Warwick's words.
+
+| Today | Becomes |
+|---|---|
+| `opportunity` row at intake, `intake_status='captured'`, never scored | **prospect** |
+| `opportunity` row that has passed the fit gate / qualification criteria | **opportunity** |
+| a row in the application log with a `submitted_at` | **application** |
+| card line *"N new opportunities"* | *"N new prospects"* |
+| card line for qualified items (does not exist yet) | *"N new opportunities"* — **this is the line that is worth reading** |
+
+## ⚠ NOT DONE YET, AND NAMED SO IT CANNOT DECAY INTO A HABIT
+
+**Larry has changed the LANGUAGE here. He has NOT yet changed the CODE, the SCHEMA or the CARD.**
+
+- The database still names its table `careerair.opportunity` and still writes `new-opportunity`.
+- The CareerAIRbot card still says *"new opportunities"* for unqualified arrivals.
+- **A rename of a live table while a pipeline is running is how data is lost.** It is owed as a
+  proper forward-only migration plus a code change, not a find-and-replace tonight.
+
+**Until that lands, every human-facing report — Larry's included — uses the NEW words even where the
+column names still use the old ones.** A report that says "695 opportunities" is wrong from now on.
+The truthful sentence is "695 prospects, of which a small number ever qualified".
