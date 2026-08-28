@@ -41,7 +41,7 @@ tags: [build-016, careerair, notification, classification]
 # --- scope ---
 outcome: An email that requires Warwick to DO something — an assessment invitation, an interview offer, anything carrying a deadline — reaches him on CareerAIRbot from the scheduled run itself, naming the employer, the role, what is required, by when, and the link. Today the machinery runs correctly and publishes a card that names nothing, so a three-business-day assessment deadline was indistinguishable from routine noise and was missed.
 # guidance: one sentence — what is TRUE when this is done. If AUTOMATIC, acceptance must exercise the real production event; if manual, say so. See work-order template § intended-automatic.
-acceptance_property: For a message the classifier routes to `action-required`, the notification published by a REAL SCHEDULED RUN names the employer, the role, the required action, and the deadline wherever the source states one. A card reporting only a count is a FAILURE of this order, not a partial pass. Separately: a message that states a candidate deadline or requires a candidate action MUST classify as `action-required` and MUST NOT fall through to `needs-warwick-review`.
+acceptance_property: For a message the classifier routes to `action-required`, the notification published by a REAL SCHEDULED RUN carries enough for Warwick to act without opening anything, and a card reporting only a count is a FAILURE of this order, not a partial pass. The TRIGGER for `action-required` is ACTION LANGUAGE addressed to the candidate. A stated deadline is an ENRICHMENT FIELD and MUST NEVER be a trigger on its own — see AMENDMENT 1 §2.
 # guidance: the ONE property whose truth decides this WP, checkable without being told the answer. "Tests pass" is not one.
 integration_owner: larry
 veritas_gate: 1
@@ -102,7 +102,7 @@ live_authority: read_and_write_within_private_careerair_subtree_only
 # DEVIATION from standing default `none`. ESCALATION: Warwick, 2026-08-28, in session: 'just please sort it all FFS' — standing authority for the CareerAIR private subtree, file writes only, no live DB, no credential
 network: none
 dependency_policy: no-new-runtime-deps
-private_surface: none
+private_surface: C:/.fusion247/private/careerair/**
 
 # --- environment ---
 worktree: n/a — the machine_surface is outside any git repository
@@ -198,7 +198,7 @@ AC5. NOT EXECUTABLE BY KEEL, and must not be claimed: proven by a REAL SCHEDULED
 | **live_authority** | DEVIATED (operative) — read_and_write_within_private_careerair_subtree_only  ·  supersedes standing default `none` | `order frontmatter (deviation) — ESCALATION: Warwick, 2026-08-28, in session: 'just please sort it all FFS' — standing authority for the CareerAIR private subtree, file writes only, no live DB, no credential` |
 | **network** | none | `Team Knowledge/Templates/work-order.md:authority defaults` |
 | **dependency_policy** | no-new-runtime-deps | `Team Knowledge/Templates/work-order.md:authority defaults` |
-| **private_surface** | none | `Team Knowledge/Templates/work-order.md:authority defaults` |
+| **private_surface** | C:/.fusion247/private/careerair/** | corrected by AMENDMENT 1, 2026-08-28 (was: none — a GL-012 contradiction on the face of the order) |
 | **git_authority** | GRANTED — `Team/Keel - Implementation Engineer/AGENTS.md` § The integration role @ blob a7f9cfe3eb6b (2,831 chars — read it there; not inlined, per the SSOT rule) | `Team/Keel - Implementation Engineer/AGENTS.md:The integration role — durable and bounded (Warwick's ruling, 2026-08-02)` |
 | **worktree** | n/a — no worktree supplied | `absent-input` |
 | **producible_evidence** | WORKER TOOL GRANT (not product authority) — acceptance evidence MAY require an executed command · command execution: available (tools: includes Bash) · file authorship: available (tools: includes Write) · file modification: available (tools: includes Edit) · network fetch: NOT available (tools: has no WebFetch) · network search: NOT available (tools: has no WebSearch) | `worker tool grant (not product authority)` |
@@ -208,3 +208,152 @@ AC5. NOT EXECUTABLE BY KEEL, and must not be claimed: proven by a REAL SCHEDULED
      Before issue, RECOMPUTE: node tools/wo/envelope.mjs --count-markers <file>
      An order is unready while either recomputed count is above zero AFTER Larry authors slots.
      Do not treat this footer as current once the file has been edited. -->
+
+---
+
+# ⚑ AMENDMENT 1 — Larry, 2026-08-28. Read-back CLARIFY answered; six corrections, five of them the worker's.
+
+**This amendment is LARRY'S.** Nothing in it is attributed to Warwick and nothing here is his ruling.
+Keel returned CLARIFY on this order and was right on every substantive point. The order as issued was
+defective in six ways. Five were found by the worker; the blocking one was mine.
+
+## 1. BLOCKING, AND CORRECTED IN THE FRONTMATTER — `private_surface` was `none`
+
+Every writable path is inside `C:/.fusion247/private/careerair/`, and the field whose entire purpose is
+to carry GL-012 into the dispatch said the boundary did not apply. **Corrected to
+`C:/.fusion247/private/careerair/**`.** This is a *read and write* declaration: the worker may read
+across that subtree — it must read `applications.mjs`, `links.mjs`, `store-pg.mjs`, `migrations/010`,
+`config/outlook-scout.json` and the existing tests to build this — while `machine_surface` remains the
+**closed WRITE list**. Credential material stays forbidden inside it.
+
+**Consequence the worker correctly insisted on:** an unscannable surface at handback is now
+**blocking**, not merely reportable.
+
+## 2. THE ACCEPTANCE PROPERTY BUILT THE CRY-WOLF CLASSIFIER. Corrected in the frontmatter.
+
+As issued it read *"states a candidate deadline **or** requires a candidate action"*. **Every job
+advert states a closing date.** That trigger reclassifies routine advert traffic as action-required and
+the card is ignored by the second day — **the exact failure this order exists to prevent, delivered by
+its own acceptance property.** The worker caught it.
+
+**The trigger is ACTION LANGUAGE ADDRESSED TO THE CANDIDATE. The deadline is what the card then
+CARRIES. A deadline alone is never a trigger.**
+
+## 3. AC1 WAS AIMED AT THE WRONG PLACE. Replaced.
+
+The order implied a phrase-list gap. **It is not a phrase-list gap, and that is now proven from the
+durable rows rather than from the shape of the symptom.**
+
+`needsWarwickAction()` is called from exactly one place — `triageApplicationUpdate`
+(`classify.mjs:260`). The missed message arrived on the **`application-updates`** channel. Larry
+established from `careerair.email_processing_outcome` that the recorded row reads:
+
+    outcome:                     needs-warwick-review
+    reason_code:                 no_identifier_to_match_on
+    detail.proposed_if_matched:  "recruiter-or-employer-action-required"
+
+**The correct verdict WAS computed.** `matchApplication` found no identifier — the message had been
+forwarded, so `sender_domain` was the user's own — and **`process.mjs:333-341` discarded the verdict
+into `detail.proposed_if_matched`, where nothing counts it.** `counts.actionRequired` (`:498`)
+increments only from the matched path, so the run reported **0** items needing action while holding the
+right answer in its own durable row. Structurally the same computed-then-thrown-away defect that
+`process-outcome-detail.test.mjs` was written to stop, recurring in the outcomes path.
+
+**AC1 IS REPLACED BY:**
+
+    AC1a. APPLICATION-UPDATES CHANNEL - stop discarding the verdict. Where triage says
+          action-required and no application matched, record
+          `recruiter-or-employer-action-required`, append NO application event (a wrong match
+          remains worse than an unmatched message), and COUNT it.
+          The worker verified no migration is needed: migration 010's
+          email_message_outcome_check (:135) and email_processing_outcome_vocabulary_check
+          (:395) already permit that outcome with no dependency on an application event, and
+          the email_needs_review view (:794) already selects both.
+          Zero new phrases, zero new false-positive surface.
+
+    AC1b. OPPORTUNITIES CHANNEL - a high-precision branch in the NO-LINKS region only: after
+          the `extraction.links.length > 0` check and before the fall-throughs at
+          classify.mjs:210/233/239. A message carrying NO vacancy links AND explicit candidate
+          action language is not a job alert. Genuine advert traffic never reaches it.
+
+**Both are required.** Each is independently correct, and the channel is known for only one message.
+
+## 4. AC2 ASKED FOR TWO FIELDS THE SYSTEM DOES NOT HOLD. Replaced.
+
+`matchApplication` deliberately refuses employer-name and role-title matching and says so at length;
+its hints carry counts, enums and a domain — **no employer, no role.** On an unmatched message there is
+no `applicationId` to look them up from either. Inferring them from a subject line is the
+confident-plausible-wrong inference this codebase refuses everywhere.
+
+**AC2 IS REPLACED BY:** the card carries the **subject line VERBATIM**, the **sender**, the **matched
+action phrase**, the **deadline where one is stated**, and the **link**; plus the `applicationId` where
+the message DID match. This follows the precedent already set at `classify.mjs:160`, which keeps an
+employer's own words rather than paraphrasing them — *"Paraphrasing an employer's status is the sort of
+small lie that later reads as fact."*
+
+**THE DEADLINE IN THE REAL CASE IS RELATIVE, NOT ABSOLUTE** — *"within 3 business days"*, with no date
+anywhere in the message. **A card carrying only an absolute date would have carried nothing here.**
+Handle the relative form, or state plainly that you have not.
+
+## 5. AC3 ASKED FOR A PROOF OF A GUARD THAT IS NOT INSTALLED. Replaced.
+
+`createCockpitSink` (`summary.mjs:141`) never calls `renderSummaryText` and never calls
+`assertNoPersonalData`; it serialises counts to JSON directly. **AC3 IS REPLACED BY:** prove the
+cockpit sink still writes **counts only** and that no enriched field reaches that file. The failure
+card and the non-action-required classes are genuinely guarded today; prove those unchanged as written.
+
+## 6. THE LEAK I ASKED THE WORKER TO HUNT FOR — IT FOUND ONE. Binding design constraint.
+
+**`scripts/careerair-email-run.mjs:155` does `console.log(renderSummaryText(summary))` on every
+scheduled run.** Enriching `renderSummaryText` itself would print the subject, deadline and link to the
+scheduled task's console and into anything capturing it — **outside the Telegram sink and outside
+Larry's ruling, which was Telegram-only.** `scripts/prove-email-intake.mjs` (:413, :459, :690-706) also
+asserts that function's output and is NOT in the write surface.
+
+**BINDING:** the enriched render is a **SEPARATE FUNCTION**, called **ONLY** from inside
+`createTelegramSink.publish`, with the relaxed allowance applying **ONLY** to action-required items.
+**`renderSummaryText` keeps its current counts-only behaviour and its current guard, unchanged, for
+every other caller.** The stdout line keeps printing counts; `prove-email-intake.mjs` stays green
+untouched.
+
+Also settled, both inside the write surface: the enriched text must be **length-bounded** — one
+Telegram message per run, and several action-required items must not silently truncate the last — and
+`buildSummary` (`process.mjs:576`) gains a field so `perMessage` can carry more than
+`{emailMessageId, outcome}`.
+
+## 7. THE ACCEPTANCE COMMAND — Larry's to name, and it is named here
+
+There is no `tests/email/run.mjs` and the worker may not create one. Use an explicit file list:
+
+    node --test tests/email/classify-action-required.test.mjs tests/email/action-required-notification.test.mjs
+
+**Report the `# tests` and `# pass` counts, never the exit code alone** — on this Node a directory
+throws and a non-matching glob exits 0 having run nothing. A control that can pass by doing nothing
+eventually will.
+
+**The order's "secret-scan not applicable to absolute machine paths" line is SUPERSEDED** — the worker
+falsified it by execution (exit 0, 4 files, 26 detection classes). Run the surface-scoped scan over all
+six paths at handback and report exit code plus coverage. **Do not scan the whole subtree** — `runtime/`
+holds a credential-shaped file and `node_modules/`.
+
+## 8. THE REAL CAPTURED SHAPE — supplied, and deliberately NOT in this repo
+
+**READ-ONLY INPUT. Private tree. Not in `machine_surface`, not writable:**
+
+    C:/.fusion247/private/careerair/runtime/fixtures/wo-2026-08-28-01-action-required-shape.json
+
+Written by Larry from `careerair.email_message` id 1519 and `careerair.email_processing_outcome`. It
+carries the real subject, sender, channel, the eight action and deadline sentences, and the durable
+outcome row quoted above. **It names an employer and a role and MUST NEVER be copied into
+`C:/Fusion247PKA`** — which is precisely why it lives there and not here. AC1's tests are written
+against it.
+
+## Unchanged by this amendment
+
+**AC4** (mutation proof) and **AC5** stand exactly as issued. **AC5 remains Larry's** and may not be
+claimed by the worker on a hand-run or a green suite.
+
+All three email slots are scheduled and live — 08:00, 12:00 and 17:00, verified by `schtasks` on
+2026-08-28. The 17:00-only run cards are publication correctly suppressed on an empty queue, since the
+collector runs at 16:50. That is not a defect and no work is owed on it. **Next opportunity to prove an
+enriched card: 2026-08-29 17:00.**
