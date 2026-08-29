@@ -839,3 +839,70 @@ work of three different states, so the card could never tell Warwick which one h
 **Until that lands, every human-facing report — Larry's included — uses the NEW words even where the
 column names still use the old ones.** A report that says "695 opportunities" is wrong from now on.
 The truthful sentence is "695 prospects, of which a small number ever qualified".
+
+---
+
+# ⚑ AMENDMENT 7 — Warwick, 2026-08-29. **RECALL BEATS PRECISION. THE GATE STOPS BEING A BIN.**
+
+> **His words, verbatim:**
+>
+> *"I am NOT trying to create the perfect auto prospect system and now we have cleared the backlog,
+> I'd much rather a prospect was scored to high and became an opportunity than scored to low and
+> binned and me never see it, this was the original mistake until we both went manual intervention.*
+>
+> *we can use the rubric and the API but they were developed when this was supposed to be a Larry
+> less autonomous app, that's not what this is anymore.*
+>
+> *I care most that I know I'm not missing opportunities, that quality personalised CVs are written
+> for applications and that nothing is missed."*
+
+**This supersedes the design intent of the fit gate and of WO-2026-08-29-01 as issued.** Larry's
+consequent reasoning is below the quote and is labelled as Larry's.
+
+## ⛔ THE RULING
+
+1. **NOTHING IS BINNED.** A prospect that scores low is still shown. **The score is a SORT ORDER and
+   a SUMMARY, never a filter.** The `>=7` rule keeps its meaning as *"this one is worth your
+   attention first"* — it stops meaning *"discard the rest"*.
+2. **Asymmetric error preference, stated by him:** a prospect scored TOO HIGH and promoted is
+   **acceptable**. A prospect scored TOO LOW and never seen is **the original mistake**. Where the
+   gate is uncertain, it errs UP.
+3. **The autonomy premise is withdrawn.** The rubric and the model gateway were built for a
+   Larry-less autonomous product. **That is not what this is.** Warwick works the application stage
+   with Larry. The machinery has to be trustworthy up to *"here is everything, best first"* — not up
+   to *"I have decided what you do not need to see."*
+4. **The three things that matter, in his order:**
+   **(a) he is not missing opportunities · (b) quality personalised CVs are written for applications
+   · (c) nothing is missed.**
+
+## What this makes FALSE — Larry's assessment
+
+- **The acceptance property of WO-2026-08-29-01 as issued is wrong.** It said items below 7 are
+  *"recorded and NOT surfaced — Warwick should never see a raw prospect."* **That is now the
+  defect, not the feature.** It is re-cut.
+- **The evidence-projection debt stops being a blocker.** `careerair.evidence` holds 105 rows,
+  newest **2026-07-30** — so the whole AI build estate is missing from what the gate reads. Under a
+  filtering gate that silently under-scored every AI role. Under a ranking gate it only mis-ORDERS
+  them, and Warwick still sees them. **Still worth fixing for accuracy. No longer gates the build.**
+- **The missing knockout band stops being a blocker too, and changes shape.** Rubrik scored 8/10
+  while requiring fluent French. Under a filter that is a false positive to be suppressed. **Under
+  a ranking board it is a FLAG printed beside the role** — *"requires fluent French"* — and Warwick
+  decides in two seconds. **A blocker is DISPLAYED, never used to hide a row.**
+- **The known uncapped 10/10** (an advert declaring no essentials, so `CAPS.essential_gaps` has
+  nothing to bite on) is tolerable rather than urgent. It over-scores. Over-scoring is now the
+  acceptable direction.
+- **Degraded scoring is LABELLED, not prevented.** Two silent fallbacks exist today — `reason()`
+  routes to the box model when no gateway is configured, and `buildRequirements` sets
+  `degraded = true` and returns requirements anyway. Under the old design those were dangerous
+  because a degraded score could silently bin a role. **Under this ruling they must simply be
+  visible: the row says the score is degraded and stays on the board.**
+
+## ⛔ WHAT STILL MUST NOT HAPPEN
+
+**"Show everything" is NOT "show a count".** The failure of 2026-08-26 and 2026-08-28 was a card
+saying *"8 needs your review"* and *"62 needs your review"*. **A number is not a list.** The output
+must NAME employer, role, score and blockers, ranked. Recall without legibility is the same defect
+wearing a different hat.
+
+**And nothing here weakens the claims controls.** Over-scoring a prospect is acceptable.
+Over-claiming on a CV is not, and never becomes so.
