@@ -1,0 +1,23 @@
+# VlogOps — line endings are LOAD-BEARING here, not a style preference.
+#
+# This repository has `core.autocrlf=true` and no root `.gitattributes`, so without this file a
+# checkout on Windows and a checkout on Linux hold different bytes for the same committed file.
+# For most files that is merely untidy. For two of them it changes a stored identity:
+#
+#   src/scribe/contract/*.md   the Scribe contract's sha256 IS its version. Two identities for
+#                              one contract, decided by the checking-out operating system, would
+#                              make `contract_id` and every `package_id` derived from it depend
+#                              on where the draft happened to run.
+#
+#   db/*.sql, src/**, test/**  the proofs read and hash these; a CRLF surprise is exactly how a
+#                              source-scanning control in this estate has silently broken before.
+#
+# `src/scribe/contract.mjs` folds CRLF before hashing anyway, and that is the mechanism. THIS
+# FILE IS DEFENCE IN DEPTH — a checkout setting can be lost, and the identity must hold regardless.
+# Neither one is permitted to be the only protection.
+
+* text=auto eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf

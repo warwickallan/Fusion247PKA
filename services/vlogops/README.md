@@ -99,13 +99,46 @@ separately versioned, because conflating them is how "chronological" quietly sta
 story, and not a hook for Phase 3. The map stops the compiler at a bounded evidence pack and so
 does this code.
 
+## Phase 3 — Scribe and the Master Story Package, in one paragraph
+
+Scribe is **not a drafting agent**. It is a **versioned contract** (`src/scribe/contract/*.md`,
+identified by the sha256 of its own bytes) plus everything deterministic around it, with the
+language model confined to **one seam** that refuses rather than substitutes. A package is **one
+canonical creative truth** — a story question, beats and narrative claims, stored as rows — with
+**four siblings derived from it**: script, blog, titles and thumbnail direction.
+
+**The design decision worth reading before the code:** there is no stored blog document and no
+stored script document. A sibling is a **projection of cited rows**, and the citations are
+foreign keys. The obvious alternative — generate prose, then validate it for uncited sentences —
+is advisory dressed as enforcement: it runs after the fact, it can be skipped, and its verdict
+is an opinion about text. Here there is no free prose to police.
+
+| Property | How it is held |
+|---|---|
+| **Every sibling segment carries a citation** | `NOT NULL` columns. A segment with no evidence is not a writable row. |
+| **Every citation resolves to a pack entry** | `FK -> vlogops.evidence_pack_entry (pack_id, source_ref)` — Phase 2's own unique key, reused. |
+| **A citation cannot reach another pack** | `FK -> vlogops.story_package (package_id, pack_id)`. |
+| **A sibling cannot assert what the master does not** | `FK -> vlogops.story_claim_citation (package_id, claim_id, pack_id, source_ref)`. A sibling may not bring its own evidence. |
+| **A sibling cannot exist without a master** | `FK -> vlogops.story_claim`. Remove the beat and the sibling goes with it. |
+| **Every master claim rests on something** | A deferred constraint trigger — the one thing a foreign key cannot say. |
+| **The header cannot misreport its body** | A deferred constraint trigger ties `claim_count`/`segment_count` to the rows. |
+| **Versioned, and unreachable by a later contract** | Identity is `sha256` of the contract's bytes, stored on the package; the package is immutable, so a new contract makes a new row and never rewrites an old one. |
+| **The model seam refuses loudly** | No gateway, or a gateway with no model named → `EVLOGOPSNOMODEL`, exit `69`. **No fallback, and no default model name.** |
+| **Deterministic where determinism is honest** | The prompt, the citations, the structure and `derivation_id` are pure functions of pack + contract. **The model's words are not, and nothing here claims they are.** |
+
+**⛔ What a green suite over this proves, and what it does not.** Every proof runs over a
+deterministic stub. They establish the **contract** and the **plumbing**. They say **nothing**
+about whether Scribe writes in Warwick's voice — that is a creative judgement, it is Warwick's
+alone, and it happens at **Phase 5**. See `samples/README.md`.
+
 ## Layout
 
 ```
 db/001_vlogops_content_seed.sql   the seed schema — additive, idempotent, forward-only
 db/002_vlogops_evidence_pack.sql  the pack schema — same discipline, same namespace
-db/teardown.sql                   reverses both, and nothing else
-src/config.mjs                    aggregated startup validation + the budgets
+db/003_vlogops_story_package.sql  the package schema — traceability AS FOREIGN KEYS
+db/teardown.sql                   reverses all three, and nothing else
+src/config.mjs                    aggregated startup validation + the budgets + the version labels
 src/db.mjs                        lazy pool + the single-transaction seal
 src/identity.mjs                  canonical manifest, hashing, normalisation
 src/snapshot.mjs                  capture, provenance, integrity verification
@@ -113,8 +146,18 @@ src/intake.mjs                    the seal all three routes converge on
 src/routes/{records,promotion,supplied}.mjs
 src/pack.mjs                      dedupe · select · order · pack identity  (PURE)
 src/compiler.mjs                  the compile seal, and the read-back
+src/scribe/contract/scribe-v1.md  THE VERSIONED CONTRACT — its bytes are its identity
+src/scribe/contract.mjs           loading and identifying a contract version
+src/scribe/model.mjs              THE MODEL SEAM — refuses, never substitutes
+src/scribe/prompt.mjs             deterministic prompt assembly + derivation identity  (PURE)
+src/scribe/proposal.mjs           the named-refusal layer, before anything is written  (PURE)
+src/scribe/package.mjs            package identity + the sibling projection  (PURE)
+src/scribe/stub.mjs               the deterministic placeholder composer — NOT a model
+src/scribe/store.mjs              the draft seal, and the traceability read-back
 bin/vlogops-intake.mjs            the intake CLI
 bin/vlogops-compile.mjs           the compiler CLI
+bin/vlogops-scribe.mjs            the Scribe CLI
+samples/                          one real package, committed, labelled as stub output
 test/                             the proofs, and the runner that cannot go green on nothing
 ```
 
@@ -132,7 +175,17 @@ node bin/vlogops-intake.mjs supplied --angle "<angle>" --file notes.md
 # then compile a seed into its evidence pack, and check it back
 node bin/vlogops-compile.mjs compile --seed <seed_id> --emit pack.json
 node bin/vlogops-compile.mjs verify  --pack <pack_id>
+
+# then draft the Master Story Package from that pack, and check its traceability
+node bin/vlogops-scribe.mjs status                        # which contract, and is a model configured
+node bin/vlogops-scribe.mjs draft  --pack <pack_id> --emit package.md
+node bin/vlogops-scribe.mjs verify --package <package_id>
 ```
+
+`draft` defaults to `--model gateway` and **refuses with exit `69`** when no gateway and model
+are configured. That default is deliberate: one that quietly stubbed would make every run a lie
+about what produced it. `--model stub` is available, must be asked for by name, and stamps the
+package with a binding that says so permanently.
 
 `npm test` needs `initdb`, `pg_ctl`, `postgres` and `createdb` on PATH (or `POSTGRES_BIN`
 pointing at the Postgres bin directory). It never touches an existing database: it creates
@@ -142,9 +195,10 @@ a pre-existing `$DATABASE_URL` instead — that is the CI service-container path
 ## Applying the migration to the managed project
 
 **Not from here.** This service is proven entirely against a disposable local cluster and
-never connects to the managed project. Applying `db/001_*.sql` there is a live action that
-belongs to Larry, after review. The migration is additive, issues no grants, and touches no
-other namespace — and `db/teardown.sql` reverses exactly what it added.
+never connects to the managed project. Applying `db/001_*.sql`, `db/002_*.sql` or
+`db/003_*.sql` there is a live action that belongs to Larry, after review. Every one of them is
+additive, issues no grants, and touches no other namespace — and `db/teardown.sql` reverses
+exactly what they added.
 
 ## Operations
 
