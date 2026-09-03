@@ -49,6 +49,16 @@ import {
   ASDAIR_DISPLAY_NAME_ROUTE, proxyAsdairDisplayName,
   ASDAIR_COMMAND_ROUTE, proxyAsdairCommand,
 } from './asdair-list.mjs';
+// The opportunity grid, its detail route, and the private-store reading route. Its own module for
+// exactly the reason given five imports above — a handler that lives in THIS file cannot be executed
+// by any gate, because importing this file opens live pools. careerair.mjs imports node builtins
+// only and takes the READ pool as a parameter, so careerair-check.mjs runs every one of its
+// decisions with no credentials present at all.
+import {
+  careerairListResponse, careerairDetailResponse, careerairCvResponse,
+  careerairStatusWrite, careerairStartupLine, careerairPresendResponse,
+  JSON_HEADERS as CAREERAIR_JSON_HEADERS,
+} from './careerair.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 // The serving context — which directory is served, and which tree the overlay must stay out of —
@@ -501,6 +511,99 @@ const server = http.createServer(async (req, res) => {
     // CAPAE. Same READ pool `q`, same never-throws contract: a database failure is HTTP 200
     // { ok:false, error } and takes no other route down with it.
     if (req.url.startsWith('/api/capae')) return j(res, 200, await capaeResponse(q));
+    // The opportunity grid. Same READ pool `q` and the same never-throws contract as the two routes
+    // above: a database failure is HTTP 200 { ok:false, error } and takes nothing else down.
+    if (req.url.startsWith('/api/careerair/opportunities')) return j(res, 200, await careerairListResponse(q, process.env));
+    if (req.url.startsWith('/api/careerair/opportunity')) {
+      const id = new URL(req.url, 'http://x').searchParams.get('id');
+      return j(res, 200, await careerairDetailResponse(q, id));
+    }
+    // Warwick's own status for one opportunity. The ONLY write on the CareerAIR surface.
+    //
+    // BOTH POOLS, DELIBERATELY: `q` (cp_directus) validates the id against the real opportunity set,
+    // because migration 290 gave `cp_worker` no reach into the `careerair` schema at all; `w`
+    // (cp_worker) performs the upsert into the cockpit's own table. The reasoning, and the race that
+    // this trade accepts, is written up in careerair.mjs beside the function.
+    //
+    // Unlike the list routes this answers with a REAL HTTP STATUS rather than 200-with-an-error, the
+    // same choice the CV route makes: a refusal here is a boundary decision, and a boundary that
+    // reports itself as 200 is one nobody can see holding. The page needs to tell "saved" from "not
+    // saved" without parsing prose, because it puts the control back when the write fails.
+    if (req.url.startsWith('/api/careerair/status') && req.method === 'POST') {
+      let raw = '';
+      req.on('data', (d) => { raw += d; if (raw.length > 4096) req.destroy(); });
+      req.on('end', async () => {
+        let body = null;
+        try { body = JSON.parse(raw || '{}'); } catch { return j(res, 400, { ok: false, error: 'bad_json' }); }
+        // careerairStatusWrite NEVER throws and never returns e.message — see its header. The try is
+        // for the transport, not for it.
+        try {
+          const out = await careerairStatusWrite({ q, w }, body);
+          return j(res, out.status, out.body);
+        } catch (e) {
+          // A code, never a message: a pg failure message can carry a role name or a host.
+          return j(res, 500, { ok: false, error: 'status_write_failed', detail: (e && e.code) || 'unknown' });
+        }
+      });
+      return;
+    }
+    // The private reading route. It is the ONLY route on this server that reads the private store, and
+    // it is the only one that answers with a real HTTP status rather than 200-with-an-error-field:
+    // a refusal here is a boundary decision, and a boundary that reports itself as 200 is a boundary
+    // nobody can see holding. `BIND` is passed in so the loopback guard tests what this process is
+    // ACTUALLY bound to, never a constant this file believes about itself.
+    // Warwick is committing to a tailored document. THE RECORD OPENS BEFORE THE ACT — and this route
+    // records only: it sends nothing, contacts no employer and automates nothing.
+    //
+    // The write itself happens in the private CareerAIR service over LOOPBACK, because migration 290
+    // gave neither pool on this server any reach into the `careerair` schema — see the pre-send block
+    // in careerair.mjs. `post` is injected so that careerair.mjs keeps its no-network property and the
+    // gate can execute every branch of this with no network at all.
+    if (req.url.startsWith('/api/careerair/presend') && req.method === 'POST') {
+      let raw = '';
+      req.on('data', (d) => { raw += d; if (raw.length > 4096) req.destroy(); });
+      req.on('end', async () => {
+        let body = null;
+        try { body = JSON.parse(raw || '{}'); } catch { return j(res, 400, { ok: false, error: 'bad_json' }); }
+        const bound = server.address();
+        const out = await careerairPresendResponse(process.env, body, {
+          bind: (bound && bound.address) || BIND,
+          post: async (url, payload) => {
+            // A short timeout, because the page is waiting and an unanswered click must resolve to a
+            // visible "not recorded" rather than a spinner. `resolvePresendUrl` has already refused
+            // any non-loopback target, so this hop cannot leave the machine.
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(), 5000);
+            try {
+              const r = await fetch(url, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: ac.signal,
+              });
+              let parsed = null;
+              try { parsed = await r.json(); } catch { parsed = null; }
+              return { status: r.status, body: parsed };
+            } finally { clearTimeout(timer); }
+          },
+        });
+        return j(res, out.status, out.body);
+      });
+      return;
+    }
+    if (req.url.startsWith('/api/careerair/cv')) {
+      const id = new URL(req.url, 'http://x').searchParams.get('id');
+      // ⚠️ THE BOUND ADDRESS, NOT THE REQUESTED ONE. `BIND` is what this process ASKED for;
+      // `server.address().address` is what the socket actually IS, which is the thing the guard is
+      // about. They differ: Node normalises `0:0:0:0:0:0:0:1` to `::1`, so the requested string
+      // could be denied while the socket was genuinely loopback. Falls back to `BIND` only if the
+      // server is somehow not listening, which cannot happen inside a request handler.
+      const bound = server.address();
+      const out = careerairCvResponse(process.env, id, { bind: (bound && bound.address) || BIND });
+      const body = JSON.stringify(out.body);
+      res.writeHead(out.status, { ...CAREERAIR_JSON_HEADERS, 'content-length': Buffer.byteLength(body) });
+      return res.end(body);
+    }
     // The four provenance fields are the object provenance.mjs builds and the gate executes — the
     // endpoint does not assemble its own version of the answer.
     if (req.url.startsWith('/api/health')) return j(res, 200, { status: 'ok', build: BUILD, ...PROVENANCE });
@@ -525,4 +628,9 @@ server.listen(PORT, BIND, () => {
   // A boundary whose configuration was silently discarded is a boundary nobody can tell is set
   // wrongly. Said once, out loud, at startup — never silently dropped.
   for (const warning of PRIVATE_API.configWarnings) console.warn(warning);
+  // Same reasoning as the overlay line above, applied to the private reading store: an unset root
+  // and a misconfigured one both serve exactly nothing, so without this line a typo is
+  // indistinguishable from switching the feature off. The VERDICT is printed; the path never is.
+  const ca = careerairStartupLine(process.env);
+  console[ca.level](ca.message);
 });

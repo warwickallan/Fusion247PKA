@@ -190,6 +190,140 @@ curl -s -X POST -H 'content-type: application/json' \
     answers `ok:false` saying the read role has not been granted access; it does not crash and it
     takes no other route down.
 
+## The opportunity grid — operating it
+
+**One page, `/careerair.html`, reachable from the Apps tile labelled "Opportunities".** It lists every
+live opportunity the database holds, scored, with a link out to the original advert and — where one
+exists — a reading view of the tailored document. It is a page Warwick opens; nothing about it is
+automatic and nothing is scheduled.
+
+**It now holds ONE piece of state: Warwick's own status for each opportunity** — `todo` ·
+`reviewed` · `applied` · `closed` ("no longer accepting"). That is the only write on this surface,
+and it goes to the cockpit's OWN table (`cockpit.careerair_status`, migration 291). **The CareerAIR
+module data is still read-only to this page and always will be**: `cp_worker` holds no grant of any
+kind in the `careerair` schema, which is a property of migration 290 rather than of this code.
+
+**Routes** — reads use `q` (the `cp_directus` SELECT-only pool); the one write uses `w`
+(`cp_worker`):
+
+- `GET /api/careerair/opportunities` — the grid payload. **Failure is HTTP 200 `{ok:false, error}`**,
+  the same never-throws contract as `/api/capae` and `/api/rotation-reports`.
+- `GET /api/careerair/opportunity?id=<n>` — long-form detail for one row, fetched only on expand.
+- `GET /api/careerair/cv?id=<n>` — the tailored document, read from the private store **at request
+  time**. This is the one route that answers with a real HTTP status rather than 200-with-an-error,
+  because a refusal here is a boundary decision and a boundary that reports itself as `200` is one
+  nobody can see holding.
+- `POST /api/careerair/status` — body `{id, status}`. Records Warwick's status for one opportunity.
+  Also answers with a **real HTTP status**, for the same reason and one more: the page puts the
+  control back when a write fails, so it has to be able to tell "saved" from "not saved" without
+  reading prose. `400` an unknown status or a malformed id · `404` no such live opportunity ·
+  `200` `{ok:true, id, status}`. **It uses BOTH pools** — `q` validates the id against the real
+  opportunity set (`cp_worker` cannot see that schema at all), `w` performs the upsert.
+  **No error body from this route ever carries a message, only a code** — a `pg` message can contain
+  a role name or a host, which is the leak `724f19f` closed on the CV route.
+
+### What Mack needs to know
+
+**Start / stop / restart: unchanged.** This adds no process, no scheduled task and no supervisor
+entry. It is served by the same `server.mjs` on 8090 as everything else, so the existing start, stop
+and restart instructions under **Run** above are the whole story.
+
+**`public/*` is live on save; `server.mjs`, `careerair.mjs` and the other loaded modules need a
+restart.** A change to the page (`careerair.html`, `careerair.js`, `careerair.css`, `apps.js`,
+`app.js`) is live on the next reload. A change to `careerair.mjs` or to the route wiring in
+`server.mjs` is **not live until the cockpit is restarted** — the same rule this README already
+states for `capae.mjs` and `rotation-report.mjs`.
+
+**The status table needs no operating attention, and its emptiness is not a fault.** `todo` is
+expressed as the ABSENCE of a row, so `cockpit.careerair_status` starts empty and only ever holds
+one row per opportunity Warwick has actually touched. A count of zero there means he has not started,
+never that the feature is broken. Nothing backfills it and nothing prunes it.
+
+**The NEW lozenge stores nothing, and there is nothing to operate.** A row wears an amber `NEW`
+marker when **`firstSeen` is within 7 days AND its status is still `todo`** — both facts are already
+in the list payload, so no table, column, job or backfill exists for this and none can go stale. A
+row stops being new the moment Warwick sets any status on it (that is the "or until they are
+interacted with" half of the ask) or when the 7 days elapse, whichever comes first. `New only` is a
+seventh option on the existing **Status** filter, so it inherits the same hidden-row count and
+one-tap restore as every other mode and can never hide rows silently.
+
+**⚠️ The 7 days are measured against the BROWSER's clock, not the server's.** `Date.now()` is read
+on Warwick's phone or laptop, fresh at each repaint. Two consequences worth knowing before anyone
+debugs a "wrong" lozenge: a device whose clock is wrong will draw the wrong markers, and a page left
+open overnight keeps yesterday's boundary until something repaints it. This is deliberate — the
+marker is a visual hint on a triage list and is never a stored fact, and every other filter on this
+page is already computed client-side. The rule itself lives beside this note in
+`public/careerair.js` (`isNewOpportunity`), and `careerair-check.mjs` executes it under a frozen
+clock rather than matching its source.
+
+**Expect nearly every row to be NEW while the collector is down.** There is no automatic sweep at
+present, so a large block of opportunities shares a single `firstSeen`. That is the rule behaving
+correctly on the data it has, not a defect, and it resolves itself as soon as arrivals are spread
+over real days again.
+
+**One environment variable, and Mack owns its value:**
+
+| Variable | Required? | Effect when absent |
+|---|---|---|
+| `COCKPIT_CAREERAIR_ROOT` | Optional | The grid still renders in full. Every row reports "no tailored document". |
+
+It must be an **absolute path** to the private store root; a relative path is refused. The service
+says which state it is in **once, at startup**, and never prints the path:
+
+```
+CareerAIR: CV store configured — 9 tailored CV(s) readable. (Path not printed.)
+CareerAIR: no CV store — COCKPIT_CAREERAIR_ROOT is not set, so no CV is served. …
+```
+
+**Read that line on every restart.** An unset root and a mistyped one both serve exactly nothing, so
+without it a typo is indistinguishable from the feature being switched off.
+
+### Reading the page's health without opening it
+
+- `curl -s http://127.0.0.1:8090/api/careerair/opportunities | head -c 300` — expect `"ok":true`. The
+  payload carries **`countsAgree`**, which compares the rows it built against an independent
+  `count(*)`. **If that is ever `false`, rows are missing from the page** and it says so on screen in
+  red. That is the one field worth watching.
+- `cvSource` in the same payload is `configured` · `unconfigured` · `not-absolute` · `missing`.
+- `statusCounts` in the same payload breaks the rows down by status. **It is derived from the rows
+  in that payload — it is NOT a second independent measurement**, and only `dbCount` is. Do not read
+  agreement between `statusCounts` and the row count as evidence of anything.
+- **The page hides "no longer accepting" rows BY DEFAULT, and says so.** The count line names how many
+  it is holding back and carries a one-tap button to show them. **The filtering happens entirely in
+  the browser** — the API always returns every live opportunity — which is what keeps `countsAgree`
+  meaningful. A status filter added to `LIST_SQL` would break it, and adding the same filter to the
+  count statement to "fix" that would hollow it out completely. `careerair-check.mjs` asserts both.
+- `node services/cockpit/careerair-check.mjs` — the gate. It prints the number of assertions it
+  executed and **exits non-zero if it could not reach the database**, so it can never go green by
+  doing nothing.
+
+### Two failure modes and what they mean
+
+- **The page says "the list could not be read".** The database read failed. This is *not* an empty
+  list and the page deliberately does not present it as one. Check the read role still has its grants
+  (`services/control-plane/db/mypka/290_careerair_cockpit_read_grants.sql`, safe to re-run).
+- **Every row says "no tailored document" when it should not.** `COCKPIT_CAREERAIR_ROOT` is unset or
+  wrong. Read the startup line. Nothing else in the page is affected.
+- **A card says "NOT SAVED" under its status control.** The write was refused or never arrived, and
+  **the control has been put back to what was actually stored** — what is on screen is the truth, and
+  Warwick has not silently lost a decision. If it persists, check that migration 291 has been applied
+  and that `cp_worker` still holds `select, insert` plus `update (status, updated_at)` on
+  `cockpit.careerair_status` (`services/control-plane/db/mypka/291_careerair_status.sql`, safe to
+  re-run). The card names the reason in Warwick's terms; the server log carries the error code.
+
+### The boundary, stated so it is not eroded by accident
+
+The tailored documents are **read at request time and never copied** — not into `public/`, not into
+this repository, not into a cache and not into a log line. Three properties hold that, and
+`careerair-check.mjs` asserts all three: the private root arrives **by environment variable** so no
+machine path exists in this repo; the route **refuses unless the server is bound to loopback**; and
+the opportunity id is digits that **select** a directory from a listing rather than being joined onto
+a path. The response carries `cache-control: no-store`.
+
+**If the cockpit is ever rebound to a non-loopback address, the document route stops serving.** That
+is deliberate. It is not a fault to work around, and the fix is to leave the cockpit on loopback
+behind `tailscale serve`, exactly as the **Expose** section above describes.
+
 ## Not yet (see Deliverables/BACKLOG.md)
 Autostart-on-boot (held until accepted over Directus); inline TubeAIR-packet render in Outputs;
 shopping-Accept household write; projector-level output dedup; Builds/System live projections.

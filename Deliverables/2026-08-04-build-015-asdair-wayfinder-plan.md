@@ -44,6 +44,25 @@
 > in response to it.** The regrowth cap (root `CLAUDE.md`) applies at full force. **The ruling removes
 > architecture; it does not commission machinery.**
 
+> ## ✅ ROTATION 2026-08-25 CLOSED — session-performance report landed and is folded in.
+>
+> **Report:** `Deliverables/2026-08-25-session-report-asdair-manual-shop.md`
+> (payload: `Deliverables/2026-08-25-session-report-asdair-manual-shop-payload.json`) — committed, Supabase
+> populated (`rotation_id 03b6484d-ac83-4423-a8ad-96d006813e1f`, verified), CAPAE synced (4 families
+> applied, 0 unknown, 0 rejected). **Closing head: `cf672dbb5eeac4a56e0516a7894ab8fe4b9c2c55`** (later
+> commits on the branch are payload-correction housekeeping only, not further product work).
+>
+> **The grade is mixed and worth reading in full, not just banking.** Two CAPAE families **recurred**
+> despite being in Larry's session-opening brief — `work-order-not-generated` (all 4 Asdair dispatches
+> tonight went out as plain-English task labels, none through the generated-envelope route, one session
+> after this exact family reached 11-of-11 clean) and `control-cannot-reach-what-it-checks` (the Regulars
+> page's own checkbox/quantity state was trusted instead of the real trolley, and silently lied — caught
+> only by auditing the real trolley and real network traffic afterwards, not by the tool's own success
+> signal). Two others logged their **first-ever clean exposure**: `built-tested-never-activated` and
+> `record-amended-body-not-recut`. Full six-question-per-family detail in the report itself.
+>
+> **Subagent ledger** (already banked separately): `Deliverables/2026-08-25-subagent-token-ledger-asdair-manual-shop.md`.
+
 ## ⚑ WORK CLASSIFICATION — read this before the detail *(per [[Templates/wayfinder-plan]])*
 
 | | Work type | Outcome | Owner | Model / effort | Blocks what | Done when |
@@ -6043,24 +6062,79 @@ exists.**
 > exactly ONE `decisionEvidence` row in the whole database.** Nothing ran. **A next action that depends on
 > someone opening a session is not scheduled; it is hoped for.**
 >
-> ### 🎯 THE EXACT NEXT ACTION WHEN BUILD-015 RESUMES — **TUESDAY 25 AUGUST 2026**
+> ### ⛔ SUPERSEDED 2026-08-25 — "SEND THE PHOTO TUESDAY" DID NOT HAPPEN THE WAY THIS BLOCK EXPECTED.
+> **Re-cut, not appended above, per the amendment discipline this map itself states.**
 >
-> **Nothing further is owed from engineering.** Send Warwick **one** message saying only:
-> **SEND THE PHOTO TO @Fusion247shopperbot.** Then observe the joined route end to end from the durable
-> rows, fix whatever it exposes, repeat until it genuinely works, and send the SAME integrated route to
-> **Veritas Gate 2** with the twelve prior findings as regression targets. Then bounded estate reconcile,
-> then Codex. **Do not ask Warwick to approve the architecture again — he has ruled on it three times.**
+> **What this block used to direct:** wait for Warwick to send a photo to @Fusion247shopperbot through the
+> normal Telegram → runtime pipeline, then observe that integrated route end to end. **That did not
+> happen.** Instead, Warwick opened the session the night of 2026-08-24 and said: **"right we do this
+> between us tonight. Asdair can sort the order, you may drive the browser."** — an explicit, one-off
+> product decision to build this week's shop manually and collaboratively in chat, with Larry personally
+> driving the ASDA browser (Claude in Chrome, on the Surface machine). **This is NOT a reversal of S-3 or
+> the standing architecture** — Warwick confirmed it as a one-off exception for that night only when asked
+> directly, not a general licence for Larry to be in the weekly runtime going forward. Checkout, payment,
+> slot booking and credentials stayed with Warwick throughout, as required regardless of the exception.
 >
-> **Shop-ref collision check must be RE-RUN at the time**, not inherited: the ref is `SHOP-<UTC arrival
-> date>`, and it folds into an existing shop if that row is non-terminal. On 2026-08-22 there is no
-> `SHOP-2026-08-22` row; `SHOP-2026-08-19` (id 35) is **still `READY_TO_SHOP`** and would still absorb a
-> photo sent on a 19th. **Check the row, do not trust this sentence.**
+> **Why the normal route wasn't available anyway, established by execution that night:** the AsdAIr runtime
+> was found **dead** — crashed at 20:18 UTC on an unhandled Postgres connection drop, and the scheduled
+> logon-recovery task's one attempt (22:46 local) failed with exit code 1. **This is unrelated to the
+> manual-build decision** — Warwick chose to work manually before the crash was even discovered, and the
+> crash was found during pre-flight reconnaissance for the manual route. **The runtime's dead/crashed state
+> is itself still an open item — nobody has fixed or restarted it.**
 >
-> **The runtime was live and healthy at park** — pid 32024, lock held, armed, not stalled, `problems: []`,
-> offset consumed. **Re-verify before asking for the photograph**; three days of uptime is not a promise.
+> **What actually happened, in order:** Warwick sent a photo of his handwritten list directly into chat
+> (not via ShopperBot). Larry transcribed it (best-effort OCR of rotated handwriting) and dispatched Asdair
+> to resolve the transcription against the household catalogue/rules — Asdair flagged 7 items needing
+> Warwick's eyes on the photo (resolved) plus a dozen genuinely-new/uncertain items for live search. Larry
+> then built the trolley by hand: Regulars-page bulk-add for known items (after an early false start
+> free-searching everything — corrected on Warwick's instruction to use Regulars & Favourites), then
+> per-item live search for the rest, favouriting every genuinely new product. **A live ASDA/Cloudflare
+> bot-detection block hit mid-session** (triggered by Larry's automated navigation over a VPN-routed IP);
+> resolved when Warwick turned his VPN off. **A separate ASDA-side React hydration crash** (`error #418`/
+> `#423`) later caused several Add-to-basket clicks to silently not reach ASDA's server at all — caught by
+> checking actual network traffic, not by trusting the UI; fixed by a full page reload. **The regulars
+> "Add selected to trolley" bulk action also silently dropped several quantities and two whole line items**
+> (sausage mash, and the sausages-with-buttery-mash duplicate risk) — caught only by a full audit of the
+> REAL trolley page against the target list, not by trusting the Regulars-page checkbox state. **None of
+> this reached the runtime's own code paths** — it is all live-account/live-site behaviour observed from
+> outside, evidence for future engineering, not a runtime defect fixed tonight.
 >
-> **⛔ The 2026-08-18-morning block that stood here is REPLACED, not appended to.** It described seven
-> open gaps and a route that had never run. Both are overtaken by what follows.
+> **Result, verified against the real ASDA trolley, not inferred:** **`SHOP-2026-08-24`** (shop id 38,
+> `BASKET_READY`) — **47 product lines, 69 items, order total £162.32** (flagged `outside_budget_range` —
+> above the usual £120–150 band), on Warwick's real ASDA account. **No slot booked, no checkout done** —
+> both remain Warwick's, untouched by Larry throughout, consistent with S-3. Nine substitution/judgement
+> flags recorded against the shop (Ben & Jerry's pack format, Kleenex pack format, Febreze Vanilla variant
+> now believed genuinely discontinued not just out-of-stock, Radox and Impulse scent guesses, Sweetex and
+> Bloo dropped-not-substituted per standing rule, Sure deodorant dropped on Warwick's instruction, Nescafé
+> Azera left out as not-on-offer) — full detail in `asdair.order_events` for order id 7. Two new standing
+> rules banked and confirmed reachable: roast beef → Exceptional range always (rule 53 — also fixed a
+> silent defect in the earlier attempt, rule 52, which had `directive='map'` but no actual match target and
+> was structurally unreachable by the planner); sugar → 1kg (rule 54). A third rule (55, Ben & Jerry's tub
+> resolution) was promoted on Asdair's own initiative after holding two weeks running — **flag if you'd
+> rather that stayed a one-off, it wasn't one of the two rules you asked for.**
+>
+> **Genuinely open, not resolved tonight, not Larry's to close alone:**
+> 1. **The dead runtime has not been restarted or diagnosed further.** Its logon-recovery task is still
+>    enabled and will fire on the next reboot; if that happens before `SHOP-2026-08-24` reaches a terminal
+>    state, the pipeline could start auto-advancing it in parallel with nothing (harmless right now since
+>    the shop only needs Warwick's checkout, but worth knowing).
+> 2. **Febreze "Sun-Kissed Vanilla" — is the Butterscotch swap now the permanent standing rule, or a
+>    per-week manual call?** Two weeks running now with the original genuinely absent from ASDA's
+>    catalogue, not just out of stock. Asked, not yet answered.
+> 3. **Rule 52's silent-no-op defect** (a `map` rule with no reachable target) needs an engineering pass —
+>    `asdair_rw` has no `UPDATE` grant on `asdair.rules` at all, so it could only be worked around, not
+>    fixed, tonight.
+> 4. **The joined route (photo → Telegram → runtime, end to end, for real) has STILL never run.** Tonight
+>    proved the household-facing outcome (a correct, real trolley) can be reached by a different route under
+>    an explicit one-off exception — it did not exercise, and does not substitute for, the autonomous
+>    runtime this build exists to deliver. **Veritas's discharge condition (one real photograph through the
+>    real runtime) is unchanged and still unmet.**
+>
+> **The exact next action, until Warwick says otherwise:** he books a slot and checks out `SHOP-2026-08-24`
+> in his own time — nothing engineering-side is owed. Whenever BUILD-015 resumes as active work (not just a
+> repeat of tonight's manual exception), the frontier is still what it always was: get the runtime back up,
+> get a real photo through the real pipeline, and close the Veritas discharge condition. **The runtime
+> being dead is the first thing to check before assuming a normal Telegram-driven week will work.**
 >
 > ### THE ONE THING THAT CHANGED EVERYTHING, and it is not a code change
 >
