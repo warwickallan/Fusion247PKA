@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=EqVJT2au7zk",
+  "video_id": "EqVJT2au7zk",
+  "captured_at": "2026-09-13T23:06:24+00:00",
+  "title": "Top 10 Claude AI Side Hustles That Can Pay A Full-Time Income (Ranked)",
+  "channel": "Shane Hummus",
+  "published_date": "2026-09-10",
+  "duration_seconds": 1781,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 978,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-09-13__top-10-claude-ai-side-hustles-that-can-pay-a-full-time-incom__EqVJT2au7zk",
+  "files": [
+    "TubeAIR Report - top-10-claude-ai-side-hustles-that-can-pay-a-full-time-incom - EqVJT2au7zk.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}
