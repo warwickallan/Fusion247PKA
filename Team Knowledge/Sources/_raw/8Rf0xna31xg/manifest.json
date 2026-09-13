@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=8Rf0xna31xg",
+  "video_id": "8Rf0xna31xg",
+  "captured_at": "2026-09-13T23:06:20+00:00",
+  "title": "How a Faceless Channel Made $39K With Claude + ChatGPT",
+  "channel": "Sanji Nai-Chien",
+  "published_date": "2026-08-24",
+  "duration_seconds": 1430,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 621,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-09-13__how-a-faceless-channel-made-39k-with-claude-chatgpt__8Rf0xna31xg",
+  "files": [
+    "TubeAIR Report - how-a-faceless-channel-made-39k-with-claude-chatgpt - 8Rf0xna31xg.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}
