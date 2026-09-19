@@ -53,10 +53,10 @@ file_surface:
   # (empty — machine_surface order)
 # machine_surface: CLOSED LIST. Write permitted here and ONLY here. Absolute machine paths.
 machine_surface:
-  - C:/.fusion247/private/careerair/src/graph/
-  - C:/.fusion247/private/careerair/scripts/careerair-graph-harvest.mjs
-  - C:/.fusion247/private/careerair/scripts/careerair-graph-report.mjs
-  - C:/.fusion247/private/careerair/tests/graph/
+  - C:/.fusion247/private/careerair/src/kgraph/
+  - C:/.fusion247/private/careerair/scripts/careerair-kgraph-harvest.mjs
+  - C:/.fusion247/private/careerair/scripts/careerair-kgraph-report.mjs
+  - C:/.fusion247/private/careerair/tests/kgraph/
   - C:/.fusion247/private/careerair/src/journey/journey.mjs
   - C:/.fusion247/private/careerair/src/email/process.mjs
 out_of_scope_policy: report-only
@@ -70,13 +70,13 @@ worker_contract:
   governance_sha: 6c8f7e665c94ae0fccb6cfbea30dda332375e2c9
 
 contract_basis:
-  - surface: C:/.fusion247/private/careerair/src/graph/
+  - surface: C:/.fusion247/private/careerair/src/kgraph/
     permitted_by: "machine_surface — absolute machine path; NOT matched against repo contract patterns. Requires a live_authority deviation naming this exact surface. WP-3E / WO-20 shape."
-  - surface: C:/.fusion247/private/careerair/scripts/careerair-graph-harvest.mjs
+  - surface: C:/.fusion247/private/careerair/scripts/careerair-kgraph-harvest.mjs
     permitted_by: "machine_surface — absolute machine path; NOT matched against repo contract patterns. Requires a live_authority deviation naming this exact surface. WP-3E / WO-20 shape."
-  - surface: C:/.fusion247/private/careerair/scripts/careerair-graph-report.mjs
+  - surface: C:/.fusion247/private/careerair/scripts/careerair-kgraph-report.mjs
     permitted_by: "machine_surface — absolute machine path; NOT matched against repo contract patterns. Requires a live_authority deviation naming this exact surface. WP-3E / WO-20 shape."
-  - surface: C:/.fusion247/private/careerair/tests/graph/
+  - surface: C:/.fusion247/private/careerair/tests/kgraph/
     permitted_by: "machine_surface — absolute machine path; NOT matched against repo contract patterns. Requires a live_authority deviation naming this exact surface. WP-3E / WO-20 shape."
   - surface: C:/.fusion247/private/careerair/src/journey/journey.mjs
     permitted_by: "machine_surface — absolute machine path; NOT matched against repo contract patterns. Requires a live_authority deviation naming this exact surface. WP-3E / WO-20 shape."
@@ -102,7 +102,10 @@ live_authority: read_and_write_within_private_careerair_subtree_only
 # DEVIATION from standing default `none`. ESCALATION: Warwick, 2026-09-19 — BUILD-016 Wayfinder Amendment 8 ('Carry on all 3, just don't break anything that works'); same bounded shape as WO-2026-08-29-01
 network: none
 dependency_policy: no-new-runtime-deps
-private_surface: none
+private_surface: C:/.fusion247/private/careerair/**
+# AMENDED AT READ-BACK 2026-09-19 (Keel contradiction 1): the generated standing default `none`
+# contradicted the machine_surface; frontmatter governs, same GL-012 one-exact-subtree shape as
+# WO-2026-08-29-01. The envelope table's `none` below is the known generator emission, superseded here.
 
 # --- environment ---
 worktree: n/a - the machine_surface is outside any git repository
@@ -127,7 +130,7 @@ operational_handoff: none - additive module inside an already-released service; 
 
 ## Acceptance criteria
 
-AC1. HARVEST, idempotent. `careerair-graph-harvest.mjs` reads persisted adverts and their adopted
+AC1. HARVEST, idempotent. `careerair-kgraph-harvest.mjs` reads persisted adverts and their adopted
      requirement sets from the pipeline's Postgres and MERGEs (:JD)-[:AT]->(:Employer),
      (:JD)-[:TITLED]->(:Title), (:JD)-[:HAS_REQ]->(:Requirement)-[:MENTIONS]->(:Term) into the
      dedicated graph over the HTTP tx API. Running it twice adds ZERO nodes and ZERO relationships
@@ -135,7 +138,7 @@ AC1. HARVEST, idempotent. `careerair-graph-harvest.mjs` reads persisted adverts 
 AC2. MASTER SEED, idempotent. The four masters under runtime/masters/*/cv.md parse into
      (:EvidenceBullet)-[:IN_MASTER]->(:Master) with (:EvidenceBullet)-[:PROVEN_FOR {weight}]->(:Title)
      derived from the cluster. Re-run adds zero duplicates.
-AC3. REPORT. `careerair-graph-report.mjs <jd-id>` emits (a) the coverage table - covered / adjacent /
+AC3. REPORT. `careerair-kgraph-report.mjs <jd-id>` emits (a) the coverage table - covered / adjacent /
      gap per requirement, evidence ranked by PROVEN_FOR weight for the JD's title family - and
      (b) the ATS keyword sheet. Terms with never_claim=true, and platform terms with held=false,
      NEVER appear on the sheet.
@@ -145,13 +148,16 @@ AC4. CLAIMS SEED, fail-closed. Harvest init MERGEs the standing never-claim term
 AC5. PIPELINE HOOK, failure-isolated. The scheduled run additively invokes harvest for newly
      acquired adverts inside a guard such that ANY graph failure leaves the run and its card
      untouched, with the failure visible in the run's outcome detail (never silent). A kill-switch
-     env var (CAREERAIR_GRAPH_DISABLED=1) bypasses the hook entirely.
+     env var (CAREERAIR_KGRAPH_DISABLED=1) bypasses the hook entirely.
 AC6. CONTAINMENT. Every graph write goes ONLY to the dedicated instance. The connection module
      REFUSES (throws, non-zero) any URI whose port is 7474 or 7687 or that omits an explicit port -
      test-proven with both refused shapes.
 AC7. MUTATION-PROVEN against this order's defect classes, each RED with a non-zero executed count
      and a provably changed source, then restored GREEN: (a) break MERGE idempotency so re-harvest
-     duplicates - AC1 test goes RED; (b) disable the never_claim filter - a prohibited term appears
+     duplicates - AC1 test goes RED. (AMENDED AT READ-BACK: with live creds absent, AC7(a) is
+     proven against the in-memory fake graph client with MERGE-key semantics plus assertions on
+     the generated statements, and MUST carry the verbatim label 'proven under a fixture - live
+     counts are Larry's (AC8)'. The label moves the verdict: AC1's live half stays Larry's.); (b) disable the never_claim filter - a prohibited term appears
      and AC3 test goes RED; (c) point the hook at a closed port WITHOUT the guard - the simulated
      run aborts and AC5 test goes RED; (d) weaken the AC6 URI refusal - RED.
 AC8. NOT EXECUTABLE BY KEEL and must not be claimed: a REAL scheduled run harvesting a REAL newly
@@ -161,14 +167,19 @@ AC8. NOT EXECUTABLE BY KEEL and must not be claimed: a REAL scheduled run harves
 
 ## Required evidence
 
-- `node --test tests/graph/` - report the `# tests` and `# pass` counts from the runner output,
-  never the exit code alone; a zero-count run is a FAILURE. Live-DB integration tests print NOT RUN
-  and exit non-zero without credentials; say so plainly in the return.
-- `bash scripts/secret-scan.sh --surface C:/.fusion247/private/careerair/src/graph/` and the same
+- `node tests/kgraph/run.mjs` (house runner: explicit file list, zero-count guard, exit 2) AND
+  `node tests/kgraph/mutation.mjs` - report the `# tests` and `# pass` counts from runner output,
+  never the exit code alone; a zero-count run is a FAILURE. (AMENDED AT READ-BACK: the directory
+  form `node --test tests/kgraph/` is defective on this machine's Node v22 - MODULE_NOT_FOUND -
+  proven by Keel against tests/email/.) Live-DB integration tests print NOT RUN and exit non-zero
+  without credentials; say so plainly in the return.
+- `bash scripts/secret-scan.sh --surface C:/.fusion247/private/careerair/src/kgraph/` and the same
   for each script file in machine_surface - report exit code AND the scanned-file count (the real
   executable form adopted at WO-2026-08-29-01 closure).
 # guidance: the exact command that must be EXECUTED — assert the reported count, never the exit code alone
-- `bash scripts/secret-scan.sh --surface (machine_surface — secret-scan not applicable to absolute machine paths; report machine_surface list instead)` → report exit code AND coverage. Exit 2 is NOT SCANNED, never a pass
+- SUPERSEDED AT READ-BACK (Keel contradiction 2): the generated line here claimed the scan is not
+  applicable to machine paths; the authored `--surface` line above is the governing form (proven
+  executable: exit 0, files-scanned count reported). Exit 2 is NOT SCANNED, never a pass.
 
 ## Inputs supplied
 
@@ -202,7 +213,7 @@ AC8. NOT EXECUTABLE BY KEEL and must not be claimed: a REAL scheduled run harves
 
 1. READ-BACK first (SOP-022): outcome, plan, what the order fails to settle, what looks wrong.
    HOLD until Larry accepts. Do not begin implementing.
-2. Pure modules first in src/graph/ - term normalisation, master parser, cypher builders, the AC6
+2. Pure modules first in src/kgraph/ - term normalisation, master parser, cypher builders, the AC6
    connection guard - unit-tested without any live service.
 3. Harvest + seed commands (env-gated live path; NOT RUN pattern when creds absent).
 4. Report command.
@@ -211,6 +222,26 @@ AC8. NOT EXECUTABLE BY KEEL and must not be claimed: a REAL scheduled run harves
 6. Full suite + scoped secret scans. Return diff and evidence to Larry. Do not commit, do not
    push. AC8 is Larry's.
 # guidance: order of work, the read-back HOLD, and the git endpoint (push? PR? neither?)
+
+---
+
+## AMENDMENT AT READ-BACK — Larry, 2026-09-19 (Keel read-back #1, CLARIFY answered)
+
+All five points settled; this is the ONE amendment cycle SOP-022 allows before proceeding:
+(a) private_surface frontmatter corrected to the careerair subtree (above).
+(b) Test-evidence command replaced with the house-runner pair (above).
+(c) AC7(a) fixture mechanism ACCEPTED with the mandatory fixture label (above).
+(d) NAMESPACE AMENDED graph->kgraph throughout: src/kgraph/, tests/kgraph/,
+    careerair-kgraph-*.mjs, CAREERAIR_KGRAPH_DISABLED. Keel's finding is right - 'graph' in this
+    codebase means Microsoft Graph (mail collection), and a kill-switch that reads as 'disable
+    mail' is an operator hazard. machine_surface and contract_basis entries updated to match.
+(e) CONFIRMED: hook placement at the process.mjs acquireCreated seam; missing CAREERAIR_NEO4J_*
+    config surfaces as a visible 'kgraph skipped: not configured' in outcome detail and is
+    AC5-compliant; journey.mjs may remain untouched if title wiring does not need it (report it);
+    lexical classification rules and initial PROVEN_FOR weights are Keel's to define in this
+    slice; Application/Outcome backfill is NOT built (later Larry work, per proposal); the DSN
+    name is DATABASE_URL via process.env only. Masters-to-cloud privacy: resolved by Warwick's
+    Amendment 8 infrastructure approval (tailnet-only host), as Keel read it.
 
 ---
 
