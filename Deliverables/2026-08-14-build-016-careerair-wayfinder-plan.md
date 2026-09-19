@@ -974,3 +974,34 @@ the record. WO-01 is now `closed-already-satisfied` — withdrawn, not built twi
 | **SIDECAR — DONE** | The dedicated Neo4j service is **DEPLOYED AND VERIFIED** 2026-09-19: Coolify service `careerair-neo4j` (uuid o8n5usax2ovrvt9oplf5lkzk), `neo4j:5-community` 5.26.30, tailnet ports 7475 (http) / 7688 (bolt), own volume, creds off-repo in `C:/.fusion247/careerair-neo4j.env`. Health-checked by executed Cypher; wrong-password probe refused 401; production Brain ports (7474/7687) untouched and separately confirmed still serving. |
 | **PARKED (recorded once)** | Keel's out-of-scope MEDIUM finding: a credential-value-shaped file `runtime/ZAPIER-X-CareerAIR-Token-VALUE-ONLY.txt` inside the private careerair subtree, contra GL-012's no-credential-material rule. Local-only, off-repo tree. For Warwick's disposition at reconciliation; no machinery built. |
 | **PARKED** | Assurance status of the ~2026-09-02 score-at-acquisition boundary (whether a Veritas pass exists for it) — establish at the next BUILD-016 reconciliation; not re-reviewed from this thread. |
+
+## ⚑ AMENDMENT 8b — Larry, 2026-09-19 late. **KGRAPH SLICE 1 INTEGRATED; LIVE HALVES EXECUTED; AC8 AWAITS THE 08:00 RUN.**
+
+**Larry's record.** Keel returned WO-2026-09-19-01 COMPLETED: 26 files, 0 outside surface,
+tests/kgraph 58/58, mutations 7/7 killed, gate 97/97 and email 206/206 unchanged-green, six scoped
+secret scans clean, `journey.mjs` untouched (title wiring not needed — reported per amendment e).
+Read-back #1 caught five defects including the Microsoft-Graph namespace collision (adopted:
+everything is **kgraph**); one amendment cycle used (commit 3ae4141).
+
+**Live halves executed by Larry the same evening, real services, real data:**
+- Harvest: **304 adverts (87 with adopted requirement sets) + 4 masters → 2,814 nodes / 7,646
+  relationships** in careerair-neo4j. Second pass created **0 nodes / 0 rels** — **idempotency
+  PROVEN LIVE** (AC1/AC2 live halves complete). Claims seed present (AC4 live).
+- Report PROVEN LIVE against JD 1595 (a real adopted 48-requirement advert): coverage classes and
+  ranked master evidence render; claims-safe sheet logic exercised. Two curation observations
+  recorded, not defects: upstream requirement extraction admits boilerplate rows (now VISIBLE via
+  the graph), and title families outside the four master clusters rank at weight 0 as designed.
+- Config defect found and fixed in LARRY's env file (not Keel's code): the URI I wrote at container
+  creation was bolt://…:7688; the client speaks the HTTP tx API — corrected to http://…:7475.
+
+**Activation:** `careerair-email-run.cmd` now carries `--env-file-if-exists=C:/.fusion247/careerair-neo4j.env`
+(the estate's TQA-001 missing-file-safe pattern — the edit cannot fail the run). Schedulers
+confirmed: Windows tasks CareerAIR-Email-0800/1200/1700 execute this cmd.
+
+**⛔ ON THE FRONTIER OF THIS PROGRAMME UNTIL THE REAL EVENT: AC8 is BUILT-NOT-VERIFIED.** The next
+scheduled run (2026-09-20 08:00) is the production event. Evidence owed: the run's outcome detail
+showing the kgraph summary (harvested-N or a visible skip/failure, never silence) plus the graph
+delta. **Only after that evidence exists does the ONE Veritas Gate 1 dispatch for this Work
+Package boundary fire** — commissioning question satisfied then, not before. Until both, no
+completion is claimed: the honest statement is **integrated and live-proven manually; automatic
+path built, not yet verified.**
