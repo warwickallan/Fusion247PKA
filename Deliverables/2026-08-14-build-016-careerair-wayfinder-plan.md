@@ -906,3 +906,71 @@ wearing a different hat.
 
 **And nothing here weakens the claims controls.** Over-scoring a prospect is acceptable.
 Over-claiming on a CV is not, and never becomes so.
+
+---
+
+# ⚑ AMENDMENT 8 — Warwick, 2026-09-19. **THE JD-TERM GRAPH IS APPROVED. THREE RULINGS.**
+
+> **His words, verbatim (Apps/RAG exploration thread):**
+>
+> *"what if when you analyse a job description, key terms and phrases are captured and linked
+> together, then when you write a cv for another similar position, not only can you draw from the
+> master/cannonical cvs but you can ensure that they are RAG key word matched"*
+>
+> *"dont touch anything in production for now as its working amazingly anyway!"*
+>
+> *"Carry on all 3, just don't break anything that works and to confirm. We extract from CVs based
+> on Job titles, we reverse to build."*
+
+**What his words settle:** the graph direction is approved; the sequencing and infrastructure
+options put to him in `Deliverables/2026-09-19-build-016-jd-term-graph-proposal.md` are approved
+as recommended ("all 3"); extraction runs FROM the CVs keyed by JOB TITLE and building a CV is the
+REVERSE traversal; and nothing currently working may be broken — all changes additive or
+separately contained.
+
+## Larry's consequent record — labelled as Larry's
+
+1. **Direction:** JD-term graph + sentence-level semantic coverage as a BUILD-016 extension.
+   Proposal: `Deliverables/2026-09-19-build-016-jd-term-graph-proposal.md`. Full schema (with the
+   title axis added per his ruling): `C:/.fusion247/private/careerair/design/2026-09-19-jd-term-graph-schema-sketch.md`.
+2. **Sequencing:** `WO-2026-08-29-01` (rank every prospect, hide none — implements Amendment 7)
+   is issued FIRST, unchanged. The graph slice follows as a separate order reading the same
+   persisted advert text. WO-01 moves from draft to issued at this amendment.
+3. **Infrastructure:** a separate `neo4j:5-community` container on the existing Coolify host —
+   own volume, credentials, port. **The production Brain (LightRAG/Neo4j) and its views are not
+   touched.** Tag-sharing the Brain graph was considered and rejected (recorded in the proposal).
+
+## ⚑ WORK CLASSIFICATION — this amendment's effect only
+
+| Class | Item |
+|---|---|
+| **FRONTIER** | **UNCHANGED by this amendment.** The live frontier remains the collaborative application/interview stage worked with Warwick in the operational thread. The graph programme is machinery UNDER that outcome and never displaces it. |
+| **NEXT** | Issue WO-2026-08-29-01 to Keel (envelope preflight, read-back, background dispatch). |
+| **NEXT (after WO-01 returns)** | Draft and issue the graph-slice Work Order (harvest + seed + coverage report, per proposal § walking skeleton). |
+| **SIDECAR / NON-BLOCKING** | Deploy the dedicated `neo4j:5-community` service on the Coolify host — additive, read-first discovery, reversible by container deletion. Blocks nothing; the graph slice consumes it when it lands. |
+| **PARKED** | SIMILAR_TO batch maintenance; any ontology tooling; auto-CV-generation from the graph (explicit non-goals in the proposal). |
+
+**Standing constraint carried onto every order this amendment spawns:** *"don't break anything
+that works"* — the production Brain, the live CareerAIR scheduled run, and the sending pipeline
+continue untouched; failures of the new machinery must be incapable of harming them.
+
+## ⚑ AMENDMENT 8a — same session, 2026-09-19. **THE WO-01 ROW OF AMENDMENT 8 IS RE-CUT: THE WORK WAS ALREADY LIVE.**
+
+**Larry's record, correcting Larry's own Amendment 8 rows in the same session (supersede the body,
+never leave contradicted rows standing).** At Keel read-back #3, Keel established by execution that
+WO-2026-08-29-01's outcome has been implemented and running in production since ~2026-09-02:
+`src/journey/assessment-run.mjs` (the M2 extraction, AC4 closed vocabulary) · `process.mjs` and
+`summary.mjs` wired per B1/B2/B3 · `tests/email/score-at-acquisition.test.mjs` 44/44 green ·
+`tests/gate` 97/97 green · **ten real per-run ranked boards in `runtime/board/`, 2026-09-02
+through 2026-09-18**. The WO file's `draft` status was stale paperwork; the machine was ahead of
+the record. WO-01 is now `closed-already-satisfied` — withdrawn, not built twice.
+
+**Amendment 8's WORK CLASSIFICATION is re-cut accordingly:**
+
+| Class | Item |
+|---|---|
+| **FRONTIER** | Unchanged — the collaborative application/interview stage. |
+| **NEXT** | ~~Issue WO-2026-08-29-01~~ **superseded: already satisfied.** → **Draft and issue the graph-slice Work Order** (harvest + title-axis seed + coverage report, per the 2026-09-19 proposal). |
+| **SIDECAR — DONE** | The dedicated Neo4j service is **DEPLOYED AND VERIFIED** 2026-09-19: Coolify service `careerair-neo4j` (uuid o8n5usax2ovrvt9oplf5lkzk), `neo4j:5-community` 5.26.30, tailnet ports 7475 (http) / 7688 (bolt), own volume, creds off-repo in `C:/.fusion247/careerair-neo4j.env`. Health-checked by executed Cypher; wrong-password probe refused 401; production Brain ports (7474/7687) untouched and separately confirmed still serving. |
+| **PARKED (recorded once)** | Keel's out-of-scope MEDIUM finding: a credential-value-shaped file `runtime/ZAPIER-X-CareerAIR-Token-VALUE-ONLY.txt` inside the private careerair subtree, contra GL-012's no-credential-material rule. Local-only, off-repo tree. For Warwick's disposition at reconciliation; no machinery built. |
+| **PARKED** | Assurance status of the ~2026-09-02 score-at-acquisition boundary (whether a Veritas pass exists for it) — establish at the next BUILD-016 reconciliation; not re-reviewed from this thread. |
