@@ -1005,3 +1005,13 @@ delta. **Only after that evidence exists does the ONE Veritas Gate 1 dispatch fo
 Package boundary fire** — commissioning question satisfied then, not before. Until both, no
 completion is claimed: the honest statement is **integrated and live-proven manually; automatic
 path built, not yet verified.**
+
+**8b addendum — Larry, 2026-09-20 11:50.** The 2026-09-20 08:00 production run fired under the new
+launcher: **status succeeded, production unharmed** (don't-break constraint held on a real run) —
+but it processed 0 messages and acquired 0 opportunities, so **the harvest hook executed zero
+times and AC8's positive evidence does not yet exist.** A manual boot of the production launcher
+(labelled capability-only) proved the import chain and env wiring load clean and the run-level
+idempotency guard refuses a duplicate slot. **AC8 completes at the first scheduled run that
+actually ACQUIRES an advert** (next candidates: today 12:00/17:00; realistically Monday's alert
+volume). Veritas Gate 1 stays held until then. Interim honest status unchanged: integrated,
+live-proven manually, automatic path built and boot-proven, not yet event-verified.
