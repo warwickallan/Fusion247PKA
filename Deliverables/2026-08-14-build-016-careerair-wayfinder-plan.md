@@ -1036,3 +1036,21 @@ Gmail-receipt verification gate and sweeps at 08:30/13:30/17:30 UK (its reconcil
 silent-forward losses, Cornerstone and Intelex — both independently covered by the browser lane,
 zero material loss). Open cadence proposal (collect+run at 09:00/14:00/18:00) and the Indeed
 bare-address collector match remain Warwick decisions, undecided.
+
+## ⚑ AMENDMENT 8d — Larry, 2026-09-21. **VERITAS GATE 1: PASS. WO-2026-09-19-01 COMPLETE.**
+
+**Larry's record.** First review returned HOLD on one finding (AC8's second conjunct — no report
+had been generated from a run-acquired advert). Discharged the same session: the report executed
+against JD 1597, one of run 173's twelve (exit 0, 91 lines, 26 requirements, title axis engaged
+at w=1, zero never-claim terms on the sheet). Veritas's focused confirmation verified authenticity
+by renderer byte-shape, corroborated provenance against run 173's own board file, and settled the
+receipt-hash question (body-scope hashing; commit intact). **Finding 2 PASS · AC8 PASS · overall
+Gate 1 PASS. AC1–AC7 stood from the first review; no scope reopened.** Receipts (both committed
+verbatim): `Deliverables/veritas-wo-2026-09-19-01-gate1-receipt.md` (the HOLD, preserved as the
+true first-review record) and `veritas-wo-2026-09-19-01-gate1-confirmation-receipt.md`.
+
+**WO-2026-09-19-01 is COMPLETE.** Non-blocking findings 1 (orphan-mechanism wording), 3 (cosmetic
+title-family truncation) and 4 (the parked credential-shaped file) go to the scheduled
+reconciliation, not to new work. Next kgraph review trigger: a material change to the promised
+outcome only. NEXT on this programme (both awaiting Warwick): the cadence alignment decision, the
+Indeed bare-address match decision; then slice 2 (embeddings) pending his embedding-route call.
