@@ -4,7 +4,7 @@ description: "The daily job-search round. Pull the email intake, sweep LinkedIn 
 user_invocable: true
 ---
 
-# /careerair — the daily round
+# /careerair: the daily round
 
 You are Larry.
 
@@ -13,7 +13,7 @@ READ-AND-REPORT routine. It sends nothing, applies to nothing and contacts nobod
 
 > **Built 2026-09-21 after an evening where the pipeline surfaced a role Warwick had already been
 > rejected from, one he applied to the week before, an SAP procurement role, a payments contract and a
-> high-voltage electrician's job — all scored 7 to 9 and all presented to him as "open".** The
+> high-voltage electrician's job, all scored 7 to 9 and all presented to him as "open".** The
 > screening this file mandates is the whole point of it. Skipping to the list is how that happened.
 
 **This is a WRAPPER over scripts that already exist. Do not build a service, a store, a register or a
@@ -21,7 +21,44 @@ new screen. If you find yourself writing one, you have misread this file.**
 
 ---
 
-## Step 1 — Intake. What has arrived by email.
+## ⚑ WHERE EVERYTHING LIVES. Read this before running anything.
+
+**None of this is in the repository.** The whole CareerAIR runtime lives in the private tree:
+
+```
+ROOT:  C:/.fusion247/private/careerair/
+```
+
+**Every relative path below is relative to that root.** Declared private surface for this routine is
+`C:/.fusion247/private/careerair/**` plus READ of the send folder; load `GL-012` before touching it.
+
+| What | Path under ROOT |
+|---|---|
+| **The search terms** | `config/search-terms.json` |
+| Job-board sender list | `config/job-alert-senders.json` |
+| Gmail collector | `scripts/careerair-gmail-collect.mjs` |
+| Email intake run | `scripts/careerair-email-run.mjs` |
+| Guest-API sweep | `scripts/sweep-windowed.mjs` |
+| Sweep triage screen | `scripts/triage-windowed.mjs` |
+| Prior-work check | `src/gate/prior-work.mjs` |
+| Role-shape screen | `src/gate/role-shape.mjs` |
+| Published boards | `runtime/board/` |
+| Sweep output | `runtime/sweeps/` |
+| Application folders and ledgers | `runtime/applications/` |
+| Standing form answers | `runtime/applications/_STANDING-FORM-VALUES.md` |
+| CV masters | `runtime/masters/` |
+| **The send folder (outside ROOT)** | `C:/Users/Buggly/Documents/CareerAIR CVs` |
+
+Every script needs the env-file pair and reads its own credentials. Never prepare the shell, never
+pass a connection string:
+
+```
+node --env-file=C:/.fusion247/careerair.env --env-file=C:/.fusion247/fusion-capture-gateway.env <script> [args]
+```
+
+---
+
+## Step 1. Intake: What has arrived by email.
 
 The Gmail collector and the email runs are **already on the Windows scheduler**. Check before you
 invoke anything:
@@ -42,39 +79,66 @@ The run publishes a board under `runtime/board/`. Read it. Do not re-derive it.
 address need an entry in `config/job-alert-senders.json`. A healthy collector reporting `new=0` means
 its channel found nothing, **not** that nothing arrived.
 
-## Step 2 — Sweep. What is live on LinkedIn.
+## Step 2. Sweep: What is live on LinkedIn.
 
 Two routes, and they do not return the same thing:
 
-**The guest API sweep** — `scripts/sweep-windowed.mjs [N]`, 24h and 7d windows, North West ring and
+**The guest API sweep.** `scripts/sweep-windowed.mjs [N]`, 24h and 7d windows, North West ring and
 UK-wide. Fast, no login, writes `runtime/sweeps/<date>-windowed.tsv`. Its measured quirks are recorded
 in `config/search-terms.json` under `_api_facts` and you should not re-derive them: page size is 10
 not 25, the ceiling is ~100 per query, `f_TPR` barely filters, and the title must be parsed from the
 href slug because the card markup returns empty strings silently.
 
-**The logged-in browser** — for anything the guest API cannot see. A real row has been missed by the
+**The logged-in browser.** For anything the guest API cannot see. A real row has been missed by the
 API and found only in the browser, so where Warwick asks for the browser specifically, use it.
 
-The search terms live in `config/search-terms.json`: 73 terms across four clusters matching the four
-CV masters. **Geography is decided from the advert BODY, never from the card**, because remote roles
-are tagged to cities and the location label has been wrong in both directions.
+### Running a term in the browser
 
-## Step 3 — Screen. **This is the step that earns the skill.**
+**The terms are in `config/search-terms.json` (73 of them). Read that file; do not carry terms in
+your head and do not retype them from memory.** Each carries a `cluster`, a `state` and a measured
+`yield`.
+
+**Selection:** take `state: "core"`, sort by `yield` descending, and run the top eight to ten. Running
+all 73 through a browser is not feasible and the yield figures exist so you do not have to.
+`state: "search-but-expect-zero"` is exactly what it says. `state: "body-screen-only"` terms are too
+broad to search and are applied when reading a body.
+
+**One term, one URL:**
+
+```
+https://www.linkedin.com/jobs/search/?keywords=<term>&location=United%20Kingdom&f_TPR=r86400&sortBy=DD
+```
+
+`f_TPR=r86400` is the last 24 hours; `r604800` is 7 days. `sortBy=DD` puts newest first, so page one
+is the useful page.
+
+**Location is `United Kingdom`, deliberately.** The `geography` block in the same file explains why
+and it is not negotiable: LinkedIn tags many remote roles to a city, `f_WT=2` is ignored by the guest
+search, and killing on the city label once discarded 2,281 rows of which 692 passed the role screen.
+**Geography is decided from the advert BODY, never from the card.** The file also holds the accept
+lists and the note that 25 miles from Birkenhead excludes Manchester, which is why Manchester rows
+only ever appear on a manual sweep.
+
+**Reading the results:** the list is virtualised, so scroll it to load rows before extracting, and
+pull the cards out of the DOM. Do **not** use page-text extraction on the search page, because it returns the
+detail pane of the selected job, not the list.
+
+## Step 3. Screen. **This is the step that earns the skill.**
 
 Run every candidate through all three, in order. **A list that has not been through these is not a
 shortlist, it is a dump.**
 
-**a. Prior work — `src/gate/prior-work.mjs`.** Has anything already been done about this?
+**a. Prior work, `src/gate/prior-work.mjs`.** Has anything already been done about this?
 Matching is **employer → role → id, in that order**. Warwick's ruling, 2026-09-21:
 
 > *"Company name should be first clue! Then job role, then an ID… IDs should be tie breakers and
 > validators, not key search term."*
 
 An absent id, or an id in a different scheme, **must never prevent a match**. Same advert blocks.
-**Same employer, different role, WARNS and does not block** — deliberate re-application to one
+**Same employer, different role, WARNS and does not block.** Deliberate re-application to one
 employer is normal and has happened.
 
-**b. Role shape — `src/gate/role-shape.mjs`.** Nine hard gates and twenty-four shape patterns, lifted
+**b. Role shape, `src/gate/role-shape.mjs`.** Nine hard gates and twenty-four shape patterns, lifted
 from the sweep triage. It **ranks rather than bins**, per the 2026-08-29 amendment. Without it, a
 non-software job scores 9 on delivery verbs alone.
 
@@ -86,7 +150,7 @@ automated screens on 2026-09-21; all three died on the first paragraph of their 
 Warwick has never worked in kills the role however well the delivery language matches. Integrating
 **into** a platform is not implementing it.
 
-## Step 4 — Report.
+## Step 4. Report.
 
 **Short. Opinionated. Body-read.** For each row worth his time: employer, role, location, what it
 actually is, why it fits or does not, and the one thing that would kill it.
