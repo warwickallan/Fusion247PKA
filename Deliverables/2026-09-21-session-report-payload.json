@@ -1,0 +1,279 @@
+{
+  "session_date": "2026-09-21",
+  "session_name": "Apps and Opps \u2442 [3d400a]",
+  "forked_from": "Apps and Opps [2762c8]",
+  "branch": "worktree-build-careerair-reconciliation",
+  "closing_head": "2bf7ea488c7774b93403d16e88bcda8b169dca5d",
+  "map_path": null,
+  "map_note": "No Wayfinder map governed this session. The branch base commit 045c7c2 states the route in its own subject: 'CareerAIR is the active frontier - and the goal is applications going out, not a wired runtime.' Recorded as a fact, not graded here.",
+  "deliverable_path": "Deliverables/2026-09-21-session-report-apps-and-opps-fork.md",
+
+  "host": "claude-code",
+  "host_version": null,
+  "host_version_note": "UNESTABLISHED. No statusline health file exists for this session id, so no version string could be read.",
+  "elapsed_minutes": 561.49,
+
+  "total_subagent_tokens": 1045241,
+  "total_context_tokens_in": null,
+  "total_context_tokens_out": null,
+
+  "parent_channel_available": true,
+  "queued_messages": null,
+
+  "wo_total": 0,
+  "wo_first_dispatch_success": null,
+  "wo_amendments": null,
+  "wo_refusals": 0,
+
+  "doc_lines_changed": 271,
+  "product_lines_changed": 0,
+
+  "allocation_product_pct": 12.53,
+  "allocation_evidence_pct": 29.36,
+  "allocation_rework_pct": 8.39,
+  "allocation_admin_pct": 0.0,
+  "allocation_waiting_pct": null,
+
+  "git_stat_larry_measured": {
+    "key_name_note": "Key name retained for tool compatibility only. Measured by PAX, not by Larry.",
+    "session_start_hook_utc": "2026-09-21T10:47:44.732Z",
+    "session_start_source": "~/.mypka/governor/capae-opening.json snapshot_at",
+    "worktree_created_utc": "2026-09-21T19:35:53Z",
+    "session_opening_commit": "8dc37737ed2ef4f5e3485bb1a6c417de8deb38a7",
+    "session_opening_commit_utc": "2026-09-21T19:56:47Z",
+    "closing_head": "2bf7ea488c7774b93403d16e88bcda8b169dca5d",
+    "closing_head_utc": "2026-09-21T20:09:14Z",
+    "closing_head_pushed_utc": "2026-09-21T20:09:16Z",
+    "head_at_report_authoring": "2bf7ea488c7774b93403d16e88bcda8b169dca5d",
+    "declared_closing_head_drift_commits": 0,
+    "drift_note": "THIRD ZERO-DRIFT ROTATION IN THE SERIES WHERE ONE WAS MEASURED. refs/heads/worktree-build-careerair-reconciliation and refs/remotes/origin/worktree-build-careerair-reconciliation BOTH read 2bf7ea4 when the witness began. Committing this report and its payload makes it +1, the structural minimum.",
+    "elapsed_seconds_from_session_start": 33689.3,
+    "elapsed_minutes_from_session_start": 561.49,
+    "elapsed_minutes_from_first_commit": 12.45,
+    "working_span_minutes_git_observable": 12.45,
+    "working_span_pct_of_session": 2.2,
+    "worktree_lifetime_minutes": 33.35,
+    "worktree_lifetime_pct_of_session": 5.9,
+    "git_silent_minutes": 549.04,
+    "git_silent_note": "NOT IDLE AND NOT LABELLED SO. Everything before 2026-09-21T19:35:53Z happened in C:/.fusion247/private/careerair/ with no repository involved. Two applications, an intake repair, two new gate modules and a wiring change all landed in that window. THE GIT-OBSERVABLE SPAN IS NOT A PROXY FOR WORK IN THIS SESSION AND MUST NOT BE COMPARED WITH EARLIER ROTATIONS AS IF IT WERE.",
+    "commits_in_range": 3,
+    "commits_product_code": 0,
+    "commits_documentation_and_record": 3,
+    "files_changed_in_range": 2,
+    "files_changed_list": ".claude/commands/careerair.md (184 lines, new); Deliverables/2026-09-21-subagent-token-ledger-apps-and-opps-fork.md (87 lines, new)",
+    "lines_changed": 271,
+    "lines_changed_basis": "WHOLE-FILE COUNTS, NOT DELTAS. No diff capability in this dispatch. Both files are new in the range so the whole-file count equals the addition; no deletions could be measured.",
+    "record_to_product_ratio_whole_session": null,
+    "record_to_product_ratio_note": "UNDEFINED, because the in-repository product denominator is ZERO. That is a true statement about where the work lives, not a criticism. Product change outside Git: src/gate/prior-work.mjs 155 lines new, src/gate/role-shape.mjs 83 lines new, src/email/links.mjs 790 lines modified (delta UNESTABLISHED), src/journey/assessment-run.mjs modified at 485-494 (delta UNESTABLISHED), runtime/applications/HOW-TO-APPLY.md 200 lines modified (delta UNESTABLISHED).",
+    "pushes_to_origin_branch": 2,
+    "push_1_utc": "2026-09-21T20:05:23Z",
+    "push_1_head": "bb63040452365e3e76b9682a94df5dd60273ede3",
+    "push_2_utc": "2026-09-21T20:09:16Z",
+    "push_2_head": "2bf7ea488c7774b93403d16e88bcda8b169dca5d",
+    "pushes_to_origin_main": 0,
+    "force_pushes": 0,
+    "unpushed_window_seconds": 516,
+    "unpushed_window_note": "Commit 8dc3773 (19:56:47Z) existed only inside the worktree until the first push at 20:05:23Z: 8 MINUTES 36 SECONDS. The worktree IS locked (C:/Fusion247PKA/.git/worktrees/build-careerair-reconciliation/locked reads 'claude session build-careerair-reconciliation (pid 10720)'), which protects it from `git worktree prune` but not from `worktree remove --force` or from disk loss. 'Deletable' overstates the risk; 'unrecoverable from origin for eight and a half minutes' is exact.",
+    "branch_merged_to_main": false,
+    "convergence_verified_independently": "NOT CONVERGED, AND CORRECTLY SO. The branch is 3 commits ahead of main (045c7c2) and has never been merged. Local head and origin head agree exactly. No stash, no second worktree on this branch, no dangling ref for it. THE ESTATE-WIDE CONVERGENCE QUESTION IS OUT OF SCOPE for this witness and is not asserted either way.",
+    "measured_by": "Pax, read directly from .git/worktrees/build-careerair-reconciliation/logs/HEAD (5 lines), COMMIT_EDITMSG, ORIG_HEAD, CLAUDE_BASE, locked, .git/refs/heads/worktree-build-careerair-reconciliation, .git/refs/remotes/origin/worktree-build-careerair-reconciliation and .git/logs/refs/remotes/origin/worktree-build-careerair-reconciliation (2 lines). Unix seconds converted against the anchor 2026-09-21T00:00:00Z = 1789948800.",
+    "note": "FIFTH CONSECUTIVE ROTATION WITH NO SHELL AND NO GIT BINARY. Commit classification derived from reflog subjects, COMMIT_EDITMSG and reading the working tree."
+  },
+
+  "allocation_full": {
+    "denominator_note": "Shares of SUBAGENT TOKEN TRAFFIC (Total A = 1,045,241 deduplicated), not of wall clock and not of total session effort. Larry's own context is a LEVEL and is never added to this FLOW. Lane splits for the persistent agent are derived from the ledger's CUMULATIVE deltas; the two rows spanning the ledger's recorded non-monotonic anomaly (returns #6/#7) are correspondingly less firm and that is stated rather than smoothed.",
+    "operating_the_product": { "agents": 1, "dispatches": 10, "tokens": 607333, "pct": 58.1, "what": "Composing and submitting two applications: CV work-order read-back (held), two tailored CVs, two rewrites after external review FAIL, one artefact row refused by the QA guard, two close-outs, two standing rulings banked and one duplicate STOPPED." },
+    "assurance_and_evidence": { "agents": 2, "dispatches": 2, "tokens": 306900, "pct": 29.36, "what": "Two single-dispatch adversarial CV reviews under an explicit fable model override Warwick authorised by name. Both returned FAIL. Both were actioned into the bytes actually sent. Both were capped at 25 tool calls and both returned inside the ceiling at 12." },
+    "product_implementation": { "agents": 1, "dispatches": 2, "tokens": 131008, "pct": 12.53, "what": "Reconciliation reconnaissance, then the prior-work reconciliation and role-shape screen built and proven. 67 tool uses across the two." },
+    "record_governance": { "agents": 0, "dispatches": 0, "tokens": 0, "pct": 0.0, "what": "ZERO MEASURED. Larry authored the /careerair command file and the subagent token ledger himself, so the cost is in his own context and is UNMEASURED, NOT ZERO." },
+    "rotation_reporting": { "agents": 1, "dispatches": 1, "tokens": null, "pct": null, "what": "This witness. Its cost falls in the NEXT session's ledger, as /rotate step 6 permits, and is UNESTABLISHED here." },
+    "corrective_rework": { "agents": 1, "dispatches": 2, "tokens": 87653, "pct": 8.39, "what": "FLOOR, NOT A TOTAL. Returns #3 and #8 are explicitly 'rewrite after external review FAIL' (deltas 44,012 and 43,641). The floor rises to 105,219 (10.07%) if return #4, the v2 artefact row refused by the guard, is counted as rework caused by a constraint Larry did not anticipate. Rework inside a dispatch is not separable from its agent's cumulative total." },
+    "waiting_on_warwick": { "bound_minutes": null, "pct_bound": null, "what": "UNESTABLISHED, and for the first time in this series the reason is not instrumentation. WARWICK WAS INSIDE THE WORK, not waiting outside it: the durable records show him deciding within the act (the Cornerstone NDA accepted with 'Tick, go to next', the outlook-not-gmail correction, the discipline-stretch call, the keying ruling quoted verbatim into prior-work.mjs). There is no meaningful waiting interval to measure." },
+    "delivery_tax_assurance_to_product": "306,900 : 131,008 = 2.34 : 1 against BUILD work alone, which looks terrible and is the wrong denominator. Against everything the session produced (product implementation + operating the product = 738,341) it is 0.42 : 1. Both are given because neither alone is honest: this was an operations session with a build inside it, and the reviewers were reviewing the OUTPUT, not the BUILD.",
+    "reviewer_yield": "TWO DISPATCHES, TWO FAIL VERDICTS, TWO PRODUCT CHANGES. 306,900 tokens, 2 actioned defects, 153,450 tokens per actioned defect. Expensive per defect and cheap per outcome: both defects were in documents about to be sent to a real employer, and both rewrites are the versions that went.",
+    "occupancy_to_traffic_ratio": null,
+    "occupancy_to_traffic_note": "UNCOMPUTABLE. Larry's context was never read from the instrument at either end.",
+    "burn_rate_tokens_per_wall_clock_minute": 1861.6,
+    "burn_rate_tokens_per_git_observable_minute": null,
+    "burn_rate_note": "ONLY THE WALL-CLOCK BASIS IS OFFERED. A per-git-observable-minute figure would divide 1,045,241 by 12.45 and produce 83,955, which would be a meaningless number in a session where 97.8% of the work happened outside the repository. Mean traffic per measured dispatch is 74,660 across 14 dispatches, against 123,747 across 38 on 2026-08-19."
+  },
+
+  "quota_and_context": {
+    "closing_context_used_pct": null,
+    "closing_context_remaining_pct": null,
+    "closing_context_input_tokens": null,
+    "closing_context_window": null,
+    "closing_context_source": null,
+    "closing_context_note": "UNESTABLISHED. No file under ~/.mypka/governor/health/C--Fusion247PKA/ carries the short id 3d400a, and the mapping between the displayed session short id and the sampler's filename is itself unverified, so absence is not proof of a missing sample. FIRST ROTATION IN THE SERIES WITH NO CLOSING READING AT ALL.",
+    "opening_context_reading": null,
+    "opening_context_note": "UNESTABLISHED, structurally, for the FIFTH report running. The committed subagent ledger states it at its own line 86 rather than estimating, which is the correct behaviour and is recorded as such.",
+    "total_measured_context_movement": null,
+    "total_measured_quota_movement_seven_day_points": null,
+    "quota_movement_note": "UNESTABLISHED. The partial mitigation used on 2026-08-19 (reading the seven-day rate-limit bucket from two health samples) is unavailable because no health sample exists for this session.",
+    "five_hour_at_close_pct": null,
+    "seven_day_at_close_pct": null,
+    "binding_constraint": "UNESTABLISHED. No instrument reading exists at either end of this session."
+  },
+
+  "capae_opening_brief": {
+    "path": "~/.mypka/governor/capae-opening.json",
+    "present_and_readable": true,
+    "snapshot_at": "2026-09-21T10:47:44.732Z",
+    "content_written_at": "2026-08-25T14:53:45.378Z",
+    "staleness_at_snapshot": "26 days 19h 53m 59.354s",
+    "families_carried": 4,
+    "previous_rotation_populate_at": "2026-08-25T14:53:24.632Z",
+    "ordering_gap_seconds": null,
+    "ordering_gap_human": "NOT APPLICABLE, AND THAT IS THE FINDING. There is no ordering gap this time because NO ROTATION HAS POPULATED SINCE 25 AUGUST. session-report-populate.jsonl ends at 2026-08-25T14:53:24.632Z, twenty seconds before the brief's content was written, and carries no later entry. THE BRIEF IS NOT ONE SYNC BEHIND; IT IS THE LAST SYNC THERE WAS.",
+    "brief_accuracy": [
+      { "family": "work-order-not-generated", "brief_said": "occurrences 7, clean 0", "true_at_snapshot": "UNVERIFIABLE", "direction": "unknown" },
+      { "family": "control-cannot-reach-what-it-checks", "brief_said": "occurrences 7, clean 0, CHALLENGED", "true_at_snapshot": "UNVERIFIABLE", "direction": "unknown" },
+      { "family": "built-tested-never-activated", "brief_said": "occurrences 9, clean 1", "true_at_snapshot": "UNVERIFIABLE", "direction": "unknown" },
+      { "family": "record-amended-body-not-recut", "brief_said": "occurrences 8, clean 1", "true_at_snapshot": "UNVERIFIABLE", "direction": "unknown" }
+    ],
+    "brief_accuracy_note": "EVERY ROW IS UNVERIFIABLE AND THE REASON IS DIFFERENT FROM PREVIOUS ROTATIONS. In this series the accuracy check has always been 'compare the frozen brief against capae-active.json after the next sync'. NO SYNC HAS OCCURRED SINCE 2026-08-25, so capae-active.json is byte-equivalent to the snapshot's source by construction and comparing them proves nothing. THE PREVIOUS FORK OF THIS LANE, CLOSED EARLIER ON 2026-09-21, DECLINED TO SYNC DELIBERATELY AND SAID SO IN WRITING (runtime/2026-09-21-session-record-apps-and-opps-fork.md, section 'CAPAE observation'), on the ground that rewriting the precomputed brief from an applications fork would alter what a fresh Larry is told about BUILD risks it never exercised. That reasoning is sound and the consequence is this: THE ACCUMULATED CAPAE RECORD IS NOW TWENTY-SIX DAYS BEHIND THE ESTATE.",
+    "staleness_guard": {
+      "constant": "STALE_AFTER_DAYS = 14",
+      "source": "~/.mypka/governor/capae-brief.mjs:27",
+      "predicate": "capae-brief.mjs:151-153 computes Math.floor((now - written_at)/86400000) and warns when >= 14",
+      "computed": "Math.floor(26.83) = 26",
+      "would_have_fired": true,
+      "actually_fired": null,
+      "note": "THE THREE PREVIOUS REPORTS RECORDED THIS GUARD AS STRUCTURALLY UNABLE TO DETECT THE DEFECT IT EXISTS FOR, because the defect they measured was ORDINAL (one sync behind, minutes old) and the guard is TEMPORAL (fourteen days). THIS ROTATION IS THE FIRST WHERE THE TEMPORAL CONDITION IS GENUINELY SATISFIED: 26 >= 14 is true on the two timestamps read. WHETHER THE LINE ACTUALLY RENDERED IS UNESTABLISHED, because SessionStart output is not durable. Both halves are stated because a guard that would fire and a guard that did fire are different facts."
+    }
+  },
+
+  "notifications": [
+    {
+      "message_id": 658,
+      "ts": "2026-09-21T11:03:39.911Z",
+      "bytes": 641,
+      "outcome": "sent",
+      "exit": 0,
+      "nearest_event": "ORIENTATION WINDOW. 15 minutes 55 seconds after the SessionStart snapshot, and 5 minutes 8 seconds after the manual email intake run rendered at 10:58:31.209Z. Rule 4a requires the notification path to be confirmed available at orientation and it was.",
+      "content": "UNESTABLISHED - the ding log records bytes, never bodies"
+    }
+  ],
+
+  "notification_findings": {
+    "sends_in_window": 1,
+    "failures": 0,
+    "availability_confirmed_at": "2026-09-21T11:03:39.911Z",
+    "availability_latency_from_session_start": "15m 55s",
+    "routine_narration_candidates": 0,
+    "verdict": "NO RULE 4a FAILURE GRADED, AND THE REASONING IS EVIDENTIAL RATHER THAN CHARITABLE. One notification across a 561-minute session containing two live ATS submissions looks low against the written criteria, which name a substantive outcome Warwick would reasonably want to know immediately. But the durable records of BOTH submissions show him deciding INSIDE the act: 'Tick, go to next' on a real Cornerstone NDA governed by California law, the outlook-not-gmail correction, the Concerto-BMS discipline-stretch call, and the keying ruling quoted verbatim into src/gate/prior-work.mjs:4-7. A NOTIFICATION EXISTS TO REACH A MAN WHO HAS PUT THE PHONE DOWN. HE HAD NOT. Separately and to his credit, ZERO routine-narration sends: the estate's own hardest-learned notification rule is 'never ding just to check in', and it held.",
+    "message_id_gaps": "658 follows 657 (2026-09-20T23:21:11.720Z) and 631 (2026-09-14). The gaps are in the BOT's message counter, not in ding.mjs's log, and say nothing about this session."
+  },
+
+  "specialists": [
+    { "name": "careerair", "agent_id": "a27289688929ad1ff", "dispatches": 12, "tool_uses": 368, "tokens": 738341, "basis": "final cumulative", "model": null, "model_note": "UNESTABLISHED", "verdict": "One long-lived agent carried the entire CV, application and reconciliation lane. 93.9% of all tool uses in the session. Its read-back on the first dispatch HELD the order, which is the read-back working." },
+    { "name": "fable (general-purpose, explicit model override)", "agent_id": "ad0c9c5f18c869305", "dispatches": 1, "tool_uses": 12, "tokens": 158404, "basis": "single dispatch", "model": "fable", "model_note": "Warwick authorised this model BY NAME for this session. Standing rule is confirm-first hardlock.", "verdict": "FAIL, actioned. Capped at 25 tool calls, returned at 12." },
+    { "name": "fable (general-purpose, explicit model override)", "agent_id": "a2cabe61a3282d775", "dispatches": 1, "tool_uses": 12, "tokens": 148496, "basis": "single dispatch", "model": "fable", "model_note": "As above.", "verdict": "FAIL, actioned. Capped at 25 tool calls, returned at 12." }
+  ],
+
+  "ledger_verification": {
+    "ledger_path": "Deliverables/2026-09-21-subagent-token-ledger-apps-and-opps-fork.md",
+    "committed_at": "2bf7ea4, 2026-09-21T20:09:14Z",
+    "re_derived_by_pax": false,
+    "re_derivation_note": "NOT RE-DERIVED, BY INSTRUCTION. The dispatch brief supplied the ledger and directed that it be used rather than reconstructed. Its three totals and its one unresolved anomaly are carried forward unchanged, including the anomaly.",
+    "anomaly_carried": "Return #6 reads 463,790 against return #5's 480,856. On a cumulative model that is impossible. The ledger records it as UNRESOLVED and does not smooth it. This report does the same, and notes the one consequence: the lane split between 'operating the product' and 'product implementation' in allocation_full is derived from cumulative deltas, so the rows spanning #6 and #7 are less firm than the rest.",
+    "closing_head_in_ledger": "bb63040",
+    "closing_head_in_ledger_note": "NOT A DEFECT. The ledger was written before it was itself committed, so it names the head it could see. The true closing head is 2bf7ea4, which is the commit that added the ledger."
+  },
+
+  "work_orders": [],
+  "work_orders_note": "EMPTY, AND THAT IS THE FINDING. Zero Work Orders were issued and zero generated envelopes exist. Deliverables/2026-09-* contains exactly one file (the token ledger); the newest wo- file in Deliverables/ is dated 2026-08-19. One envelope was generated and abandoned per Larry's disclosure; it left no artefact anywhere in the repository.",
+
+  "findings": [
+    {
+      "family": "work-order-not-generated",
+      "exposure": "recurrence",
+      "summary": "RECURRENCE, AND THE WORST ROW IN THE REPORT. Twelve dispatches to one persistent agent doing substantive bounded build work (one return reads 'reconciliation built and proven' at 48 tool uses), against ZERO generated Work Order envelopes anywhere in the repository. A repository-wide glob of Deliverables/2026-09-* returns ONE file, the token ledger; a glob of Deliverables/*wo* returns 71 files, NONE dated later than 2026-08-19. LARRY'S STATED REASON IS CORROBORATED FROM THE SOURCE RATHER THAN FROM HIM: tools/wo/envelope.mjs lines 1089-1206 emit exactly 26 AUTHOR REQUIRED markers (24 when worktree and branch are supplied, as they would have been here). THE NUMBER HE GAVE IS THE NUMBER IN THE CODE. AND IT RECURRED IN A SHAPE THE PREVENTION DOES NOT COVER: the brief's cause says the control is 'skipped at the moment of dispatch'. It was not skipped. It was INVOKED, its cost was seen, and it was ABANDONED. 'Generate the envelope, read it back, then issue' has nothing to say about a generated envelope that is too expensive to author. THAT IS A GAP IN THE MUST, NOT AN EXCUSE FOR THE MISS, and it is recorded under the existing slug because the same prevention target addresses both. Prevention held: NO. Comparison: NO COMPARABLE PRIOR EXPOSURE at the adjacent rotation, which graded none-this-session on zero Work Orders; DEGRADED against the last comparable exposure, 2026-08-19 at 11 of 11 generated. Question 6: YES, it was the first family in the brief. ONE MITIGATION ON THE RECORD: ledger return #1 is 'CV work-order read-back, held', so a read-back did happen on the first dispatch and it HELD the order.",
+      "evidence_ref": "tools/wo/envelope.mjs:1089-1206,55-63,932,941; Deliverables/2026-09-21-subagent-token-ledger-apps-and-opps-fork.md:17-30; Deliverables/ directory listing (643 files, no 2026-09 work order)"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "recurrence",
+      "summary": "RECURRENCE AT THREE INSTANCES, AND TWO OF THE THREE WERE FOUND AND CLOSED INSIDE THE SESSION, IN SHIPPED PRODUCT CODE, BY A WORKER. (1) CLOSED: src/gate/prior-work.mjs:99-108, verbatim - 'An earlier draft skipped it as itself and the control silently never fired: opportunity 1620 (Medable) scored 8 and PROCEEDED with an application already on the row. A guard that makes the check pass by examining nothing is the failure this whole exercise exists to end.' The family named as the family, caught before it shipped. (2) CLOSED: src/email/links.mjs:179-186 - across all 126 stored Indeed digests, /rc/clk/dl carried 357 URLs, 357 with a 16-hex jk, 206 DISTINCT jobs, while /pagead/clk/dl carried 759 URLs and ZERO with a jk of any shape. 'Before this rule existed those 126 messages produced exactly ZERO opportunities between 2026-08-28 and 2026-09-21, WHILE THE COLLECTOR AND THE PROCESSOR BOTH REPORTED HEALTHY.' Health measured through a surface merely correlated with the outcome, for twenty-four days, silently. (3) OPEN AND NOT NOTICED: scripts/build-application-ledger.mjs:42 reads `const [folder, status, why] = line.split('\\t')` against runtime/applications/LEDGER-SETTLED.tsv, whose rows 114-133 - TWENTY ROWS INCLUDING BOTH OF THIS SESSION'S - are eight columns and DATE-KEYED, so folder resolves to 2026-09-16 through 2026-09-21 and matches no application folder that exists. The guard `if (folder && status)` passes, so nothing warns. The file's own line 3 states it is 'Read FIRST by scripts/build-application-ledger.mjs and beats every derived rule in it' - UNTRUE FOR TWENTY OF ITS ROWS, SILENTLY. GRADED NON-BLOCKING: the live gate reads careerair.application in Postgres, not this file, so no current journey is misdirected. (4) MINOR, RECORD AND PARK: src/journey/assessment-run.mjs:489-490 comments 'A failure here must never silently re-open the gate' and the catch sets blocked:false, which does re-open it - loudly, with a warning and error:true, so the word 'silently' is honoured and the spirit is not. Prevention held: PARTIALLY, AND BETTER THAN THE COUNT SUGGESTS - the must (make it fail on purpose) was executed twice on the session's own new code, with the failing case written into the comment where the next reader will find it. Comparison: IMPROVED against 2026-08-19's ten instances and 'prevention held: NO on breadth'. Question 6: YES, on the ledger parser.",
+      "evidence_ref": "src/gate/prior-work.mjs:99-108,110-120; src/email/links.mjs:101-103,173-195; scripts/build-application-ledger.mjs:33-45; runtime/applications/LEDGER-SETTLED.tsv:3-6,114-133; src/journey/assessment-run.mjs:485-494"
+    },
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "clean",
+      "summary": "CLEAN, AND THE STRONGEST RESULT OF THE SESSION. Every piece of product built today reached a REAL PRODUCTION EVENT on the same day, and the evidence is production artefacts rather than test output. (a) THE REPAIRED LINK RULE RAN THROUGH THE SCHEDULER, NOT A MANUAL INVOCATION: runtime/email-runs/careerair-email-2026-09-21-17-00.json, runRef careerair-email:2026-09-21:17:00, slot 17:00, status succeeded, renderedAt 2026-09-21T16:06:13.567Z, 4 messages processed, 8 new opportunities, 7 scored, 0 failures, with a board published at runtime/board/careerair-email-2026-09-21-17-00.md. THE CANONICAL TEST IN 'NOTHING MAY LIVE ONLY IN LARRY'S HEAD' IS SATISFIED: the real production event invoked it. (b) THE PRIOR-WORK GATE IS WIRED INTO THE LIVE PATH, NOT PARKED BESIDE IT: src/journey/assessment-run.mjs:485-494 calls checkPriorWork and folds it and shape.shapeOk into proceedAfterPriorWork, which is what the returned object's `proceed` is set from. (c) IT RAN ON A REAL ADVERT AND PRODUCED A REAL RESULT: 4468676759-cornerstone-ondemand/FORK-NOTES.md:16-34, 'Re-application check: CLEAN, and it found something worth recording', checked on advert id, surfacing the 2026-09-01 Educe gate on the same PRODUCT and then correctly distinguishing partner-implements-the-product from vendor-hires-for-its-own-platform FROM THE ADVERT BODY. (d) BOTH APPLICATIONS REACHED AN EMPLOYER CONFIRMATION PAGE, QUOTED, with CV byte counts CHECKED BEFORE THE CLICK rather than asserted after it (251,126 and 251,444). Prevention held: YES. Comparison: IMPROVED - the adjacent rotation graded none-this-session on zero repo commits; the last comparable exposure, 2026-08-19, was a recurrence with a late discharge at the close. Question 6: NO. ONE QUALIFICATION, STATED BECAUSE IT IS THIS FAMILY'S OWN BAR AND BELONGS INSIDE THE GRADE RATHER THAN BESIDE IT: the headline figure is a RECOVERY PROOF AGAINST STORED BYTES, NOT A PRODUCTION RECOVERY. 206 distinct jobs are proven RECOVERABLE from the 126 stored digests; the 17:00 production run created EIGHT opportunities. THE BACKLOG HAS NOT BEEN RECOVERED AND THAT IS THE OUTSTANDING HALF OF THIS WORK.",
+      "evidence_ref": "runtime/email-runs/careerair-email-2026-09-21-17-00.json; runtime/email-runs/careerair-email-manual-2026-09-21-11-55.json; runtime/board/careerair-email-2026-09-21-17-00.md; src/journey/assessment-run.mjs:485-494; runtime/applications/4468676759-cornerstone-ondemand/FORK-NOTES.md:16-34; runtime/applications/4468099206-kingdom-services/APPLICATION-STATE.md:5-10,32-48; runtime/applications/LEDGER-SETTLED.tsv:132-133"
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "recurrence",
+      "summary": "RECURRENCE, AND A STEP BACKWARDS FROM THE ROTATION IMMEDIATELY BEFORE IT, WHICH WAS CLEAN ON THIS FAMILY. AGAINST: runtime/applications/LEDGER-SETTLED.tsv lines 4-6 declare 'Three tab-separated columns: folder <TAB> status <TAB> why' and a status vocabulary of 'SUBMITTED, REJECTED, NOT-SENT-GATED, READY, WITHDRAWN'. Rows 114-133 carry EIGHT columns, key on a DATE, and use INTERVIEW, STALE, PASSED, RESPONDED and DUPLICATE-DO-NOT-APPLY. THE DRIFT BEGAN AT ROW 114 ON 2026-09-17, BEFORE THIS SESSION; THIS SESSION APPENDED ROWS 132 AND 133 IN THE DIVERGENT SHAPE AND DID NOT RE-CUT THE HEADER. Extending a contradiction is the family in its mildest form, and it is the same act that produces finding (3) of control-cannot-reach-what-it-checks. FOR, AND IT IS SUBSTANTIAL, WHICH IS WHY THIS GRADES AS A RECURRENCE ON THE CLERICAL INSTANCE RATHER THAN A COLLAPSE OF THE DISCIPLINE: 4468099206-kingdom-services/APPLICATION-STATE.md:50-59 corrects two stored facts IN PLACE with the superseded reading quoted and closed - 'The FORK-NOTES recorded this as an open contradiction to verify; IT IS NOW SETTLED. DO NOT RE-RAISE IT.' And src/email/links.mjs:101-103 supersedes the module's OWN HEADER in place - 'THE INDEED ALERT SENDER IS NO LONGER ON THAT LIST. It was named here as unevidenced, WHICH WAS TRUE WHEN WRITTEN.' That is the required behaviour, executed twice, unprompted, on the two records that were load-bearing. Prevention held: MIXED - held on both load-bearing product records, failed on the ledger header. Comparison: DEGRADED against the adjacent rotation, which graded this family CLEAN on exactly this behaviour. Question 6: YES, on the ledger header.",
+      "evidence_ref": "runtime/applications/LEDGER-SETTLED.tsv:1-15,40,77,114-133; runtime/applications/4468099206-kingdom-services/APPLICATION-STATE.md:50-59; src/email/links.mjs:98-103; runtime/2026-09-21-session-record-apps-and-opps-fork.md:66-75"
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "recurrence",
+      "summary": "THE MOST CONSEQUENTIAL FINDING IN THIS REPORT, AND IT EXPLAINS WARWICK'S OWN WORDS: 'These are all complete bollocks, I'm a software guy!' THE SCREEN PRODUCED A REASON AND THE BOARD DID NOT PRINT IT. runtime/board/careerair-email-2026-09-21-17-00.md, THE PRODUCTION ARTEFACT A HUMAN READS, carries 'Recommendation: apply' on item 3 (Workday Advanced Compensation Architect/Consultant, Kognitiv, 8/10), item 5 (Software Solutions Project Manager A12DD3B, Referment, 8/10, LinkedIn id 4468848313), item 6 (Workday Integrations Manager, Cognizant, 7/10) and item 8 (Salesforce Delivery Manager, Inardua, 7/10). LEDGER-SETTLED.tsv:124 RECORDS 4468848313 AS SUBMITTED ON 2026-09-18, THREE DAYS EARLIER. src/gate/role-shape.mjs:24 matches Workday and Salesforce BY NAME in the named-platform gate. THE GATES ARE NOT ABSENT. THEY RANK RATHER THAN BIN, DELIBERATELY, on Warwick's own 2026-08-29 amendment quoted at role-shape.mjs:10-14: 'I would much rather a prospect was scored too high and became an opportunity than scored too low and binned.' A blocker is therefore 'a REASON carried alongside the row, never a delete.' AND THE BOARD TEMPLATE DOES NOT RENDER THE REASON. So on the page Warwick actually reads, a role carrying a named-platform blocker is TYPOGRAPHICALLY IDENTICAL to one carrying none. A RANK-DON'T-BIN SCREEN WHOSE REASONS ARE INVISIBLE ON THE ARTEFACT THE HUMAN READS IS INDISTINGUISHABLE FROM NO SCREEN AT ALL. That is this family in its purest form: THE CONTROL REACHES THE ROW AND DOES NOT REACH THE READER. UNESTABLISHED, AND IT MATTERS: whether prior-work.mjs and role-shape.mjs were live at 16:06:13Z. No shell, no deployment record. THE FINDING STANDS EITHER WAY - if they were live the reasons were dropped; if they were not, the board was produced by the unscreened path the session was built to replace. THE FIX IS A RENDERING CHANGE, NOT A SCREENING ONE, AND THE REASONS ALREADY EXIST ON THE ROW. NO NEW MECHANISM IS PROPOSED.",
+      "evidence_ref": "runtime/board/careerair-email-2026-09-21-17-00.md:17-70; runtime/applications/LEDGER-SETTLED.tsv:124,130; src/gate/role-shape.mjs:10-14,20-31,33-42; .claude/commands/careerair.md:126-152"
+    },
+    {
+      "summary": "THE TWO CVs THAT WERE ACTUALLY SENT HAVE NO ARTEFACT ROW DESCRIBING THEIR BYTES, AND THIS IS THE ONE ITEM ON THE PAGE THAT NEEDS WARWICK. migrations/017-careerair-cv-qa-review.sql:152-154 defines the CHECK constraint cv_qa_review_no_fable with its own comment: 'Fable is excluded BY NAME (Warwick's standing hardlock + SOP Rule 2). SUBSTRING, NOT EQUALITY, SO NO VERSIONED VARIANT PASSES.' Lines 225-307 define cv_artifact_qa_chain_guard, installed at 304-307 as a BEFORE INSERT OR UPDATE trigger on careerair.cv_artifact. The session's two adversarial reviews ran UNDER AN EXPLICIT FABLE MODEL OVERRIDE WARWICK AUTHORISED BY NAME; both returned FAIL; both were actioned, and both sent CVs are recorded as the post-rewrite versions. THE CONSEQUENCE, QUOTED FROM THE DURABLE RECORD RATHER THAN INFERRED: 'The cv_qa_review row and the version 2 cv_artifact row remain BLOCKED by the cv_qa_review_no_fable CHECK constraint and the cv_artifact_qa_chain_guard trigger, pending Warwick's ruling. Neither was attempted again. Consequence to carry: cv_artifact 290 still describes the pre-rewrite bytes, SO NO CV_ARTIFACT ROW DESCRIBES THE FILE THAT WAS ACTUALLY SENT.' GRADED HONESTLY ON BOTH SIDES. THE CONTROL WORKED AND WAS NOT WORKED AROUND, which is the correct behaviour and is the single strongest act of the session against family 2's must. AND the standing state is that documents sent to two real employers today have QA PROVENANCE ONLY IN PROSE, while the schema built to carry that provenance refuses the reviewer Warwick chose. THIS IS NOT A HOBBY-BRAIN ESCALATION: no credential, no money, no private exposure, no irreversible action. It is reported because it is the kind of gap that is invisible until somebody asks WHICH REVIEWER PASSED THE CV YOU SENT, and the answer is a sentence in a markdown file. THE SENT BYTES ARE IDENTIFIED BY HASH IN THE APPLICATION RECORD INSTEAD (cv.md sha256[0:16] bc6846de8277e558, pdf 59d2f6d5df9cfb17 for Kingdom; pdf sha d05daabb990e4644 for Cornerstone), WHICH IS AN HONEST MITIGATION AND NOT A SUBSTITUTE.",
+      "evidence_ref": "migrations/017-careerair-cv-qa-review.sql:146-155,181-185,222-231,298-307; runtime/applications/4468099206-kingdom-services/APPLICATION-STATE.md:36-38,71-80; runtime/applications/LEDGER-SETTLED.tsv:132-133; Deliverables/2026-09-21-subagent-token-ledger-apps-and-opps-fork.md:29-30,82-84"
+    },
+    {
+      "summary": "THE EM-DASH LEAD IS PARTIALLY REFUTED, AND THE SCOPE CONFLICT UNDERNEATH IT IS THE REAL ITEM. MEASURED: runtime/applications/HOW-TO-APPLY.md is 200 lines and contains SEVEN em dashes, at lines 1, 17, 30, 49, 50, 57 and 149. LINES 49 AND 50 ARE THE LINE THAT STATES THE RULE: 'Run the mechanical gate on the file bytes - em dashes 0, en dashes 0, smart quotes 0, forbidden patterns 0 - and report MEASURED counts.' REFUTED IN PART: the file is NOT under version control, so individual line ages cannot be established. Six of the seven sit in the older body. THE ONLY EM DASH INSIDE A SECTION THIS SESSION DEMONSTRABLY ADDED (line 149) SITS INSIDE A VERBATIM QUOTATION OF SUPERSEDED TEXT PRESERVED ON PURPOSE - 'The superseded text, quoted so nobody reinstates it from memory'. 'TWICE IN THE SESSION' IS UNESTABLISHED. AND THE COMMITTED /careerair COMMAND FILE CONTAINS ZERO EM DASHES, WHICH IS COMPLIANCE RATHER THAN BREACH. THE ITEM WORTH CARRYING IS THE SCOPE CONFLICT: the executable rule carries applies_to=application and src/writing/checks/punctuation.mjs:22-35 sets the maximum to ZERO FOR APPLICATION ARTEFACTS, with its own incident recorded at lines 3-6 ('An em dash reached a submitted cover letter from a system whose anti-AI-writing pack was canonical, correct and present'). BUT statement A-01 in canonical/tier1/warwick-careerair-writing-and-claims-rules.md:132 quotes Warwick as 'Anti-AI writing pack applies to EVERY ARTIFACT: no em dashes'. ON THE EXECUTABLE SCOPE AN INTERNAL RULES FILE IS NOT IN BREACH. ON A-01'S WORDING IT IS. NOTHING RECONCILES THE TWO, and that is why this lead can be argued both ways by two honest readers. ON THE BINDING SURFACE THE RULE HELD: the Kingdom cover note is recorded as 1,211 characters with ZERO em dashes and no concession sentence.",
+      "evidence_ref": "runtime/applications/HOW-TO-APPLY.md:1,17,30,49,50,57,149; src/writing/checks/punctuation.mjs:1-35; canonical/tier1/warwick-careerair-writing-and-claims-rules.md:41,52-56,132-134; .claude/commands/careerair.md (0 occurrences); runtime/applications/4468099206-kingdom-services/APPLICATION-STATE.md:45"
+    },
+    {
+      "summary": "THE UNPUSHED COMMAND FILE - MEASURED, AND THE RISK IS SMALLER THAN THE LEAD SAYS WHILE THE HABIT IS THE ONE THE ESTATE ALREADY KNOWS ABOUT. Commit 8dc3773 landed at 2026-09-21T19:56:47Z. THE FIRST PUSH TO ORIGIN OCCURRED AT 20:05:23Z AND CARRIED bb63040, so 8dc3773 existed ONLY inside the worktree for 8 MINUTES 36 SECONDS. THE WORKTREE IS LOCKED: C:/Fusion247PKA/.git/worktrees/build-careerair-reconciliation/locked reads 'claude session build-careerair-reconciliation (pid 10720)', which protects it from `git worktree prune` but NOT from `worktree remove --force` or from disk loss. 'DELETABLE' OVERSTATES THE RISK; 'UNRECOVERABLE FROM ORIGIN FOR EIGHT AND A HALF MINUTES' IS EXACT. THE SECOND COMMIT WAS PUSHED IN 2 SECONDS (2bf7ea4 at 20:09:14Z, push at 20:09:16Z), which is the right reflex arriving after the prompt rather than before it. This is the estate's own 'recorded is not visible' lesson in its cheapest form: the durable state was correct and the REMOTE did not know it.",
+      "evidence_ref": ".git/worktrees/build-careerair-reconciliation/logs/HEAD:3-5; .git/logs/refs/remotes/origin/worktree-build-careerair-reconciliation:1-2; .git/worktrees/build-careerair-reconciliation/locked"
+    },
+    {
+      "summary": "TWO LEADS I COULD NOT CORROBORATE, RECORDED AS ABSENCES RATHER THAN DROPPED. (1) THE NEGATIVE ASSERTION AND THE TWO GUARDS. The lead is that Larry asserted 'nothing blocks it' having checked only CHECK constraints and missed a trigger. THE CLASS IS CONFIRMED FROM THE SCHEMA: the surface genuinely carries TWO INDEPENDENT GUARDS, a CHECK constraint (cv_qa_review_no_fable) and a BEFORE INSERT OR UPDATE trigger (cv_artifact_qa_chain_guard_trg), in the same migration - which is exactly the shape in which 'I checked the constraints' is an incomplete negative, and the estate's own standing rule is that NEGATIVE CLAIMS REQUIRE VERIFICATION. WHETHER LARRY MADE THAT SPECIFIC ASSERTION HAS NO ARTEFACT AND IS HIS DISCLOSURE ALONE. What IS established is that a worker's catch, not Larry's check, is what stands in the record. (2) THE RELAYED WORKER CLAIM. Searched the private tree's application records, the committed range and the session's own artefacts. NOTHING CARRIES IT. SAME DISPOSITION THE 2026-08-19 REPORT REACHED ON THE 125-LINE SHORT MERGE: THE FINDING IS THE ABSENCE. An error that survives only in a transcript is, by this estate's own standard, indistinguishable from one that was never recorded. I DO NOT DISPUTE THE ACCOUNT; I COULD NOT CORROBORATE IT. SINGLE-SOURCE, FLAGGED.",
+      "evidence_ref": "migrations/017-careerair-cv-qa-review.sql:152-154,304-307; runtime/applications/4468099206-kingdom-services/APPLICATION-STATE.md:71-80; exhaustive search of Deliverables/2026-09-*, runtime/applications/**, runtime/2026-09-21-session-record-apps-and-opps-fork.md"
+    },
+    {
+      "summary": "A ONE-DIGIT DISCREPANCY, FLAGGED AND NOT RESOLVED. The dispatch brief states the intake repair was proven '0 to 207 recoverable'. src/email/links.mjs:180 records the measurement as '/rc/clk/dl 357 URLs, 357 carrying a 16-hex jk, 206 DISTINCT jobs'. ONE APART. It may be 206 Indeed plus one from another source, or a transcription slip in either direction. THE ARTEFACT SAYS 206 AND THE ARTEFACT IS WHAT A FUTURE SESSION WILL READ. Recorded because an out-of-band total is the cheapest defect detector there is, and this is one.",
+      "evidence_ref": "src/email/links.mjs:179-182"
+    },
+    {
+      "summary": "WHAT WENT RIGHT, STATED AS PLAINLY AS THE FAILURES BECAUSE A REPORT THAT ONLY GRADES DOWN IS NOT A MEASUREMENT. (1) TWO APPLICATIONS OUT, both confirmed by the EMPLOYER'S OWN PAGE, both quoted, both with CV byte counts checked BEFORE the click rather than asserted after it. That was the session's stated goal and it was met. (2) TWO ADVERSARIAL REVIEWS, BOTH FAIL, BOTH ACTIONED INTO THE BYTES ACTUALLY SENT - a reviewer that returns FAIL twice and changes the product twice is earning its 29.4% of measured traffic. (3) AN INTAKE CHANNEL SILENTLY YIELDING NOTHING FOR TWENTY-FOUR DAYS was found, measured against real stored bytes, and repaired WITH THE DELIBERATE REFUSAL RECORDED BESIDE THE RULE: /pagead/clk is left UNMATCHED AND COUNTED, with the reason written down ('there is no offline way to reduce one to a stable job... a rule for them could only invent identity from a per-send tracking token'), rather than widened into a duplicate storm. (4) THE PRIOR-WORK MODULE ENCODES BOTH FAILURE DIRECTIONS and says so: 'EY once scored against Keyloop, and Apex Systems is a different company from apexanalytix. Employer alone is never a match.' (5) /careerair REFUSES TO BE A PLATFORM, in its own text: 'This is a WRAPPER over scripts that already exist. Do not build a service, a store, a register or a new screen. If you find yourself writing one, you have misread this file.' Under a standing regrowth cap that has been breached before, that is the right instinct written into the artefact rather than remembered.",
+      "evidence_ref": ".claude/commands/careerair.md:19-20,126-152; src/email/links.mjs:188-195; src/gate/prior-work.mjs:13-15; runtime/applications/LEDGER-SETTLED.tsv:132-133; Deliverables/2026-09-21-subagent-token-ledger-apps-and-opps-fork.md:19,24,29-30"
+    }
+  ],
+
+  "open_questions": [
+    "FABLE IS AUTHORISED AS A REVIEWER AND REFUSED BY NAME IN THE SCHEMA. Which moves: the authorisation, the constraint, or neither with provenance staying in prose? WARWICK'S, AND THE ONLY ONE ON THIS PAGE THAT IS.",
+    "Is scripts/build-application-ledger.mjs still live? If it is, twenty settled rows are invisible to it. If it is dead, LEDGER-SETTLED.tsv line 3 should say so. Either fix is one line; choosing between them is not the witness's.",
+    "Were prior-work.mjs and role-shape.mjs live at 2026-09-21T16:06:13Z? Not answerable without a shell, and it decides which of the two readings of the board finding is the true one.",
+    "206 or 207.",
+    "careerair.application 4 to 56 and application_event 0 to 16: NOT VERIFIED HERE. Whoever next holds a shell should re-run both counts before the figures are quoted again."
+  ],
+
+  "recommendations": [
+    "PRINT THE BLOCKER REASONS ON THE BOARD. The board finding is a RENDERING gap, not a screening gap, and the reasons already exist on the row. No new mechanism.",
+    "RE-CUT THE HEADER OF LEDGER-SETTLED.tsv to the shape twenty of its rows already use, or split the two shapes into two files. Supersede the body, or do not append.",
+    "WHEN AN ENVELOPE IS ABANDONED, COMMIT THE ABANDONED ENVELOPE. The record of a decision NOT taken costs one file and is the difference between a judgement and an absence.",
+    "DO NOT BUILD A WORK ORDER GENERATOR THAT AUTHORS ITSELF. The 26-slot cost is real and the regrowth cap applies at full force. If the number is wrong the fix is FEWER REQUIRED FIELDS, decided once by Warwick, not a tool that fills them in.",
+    "RUN A ROTATION POPULATE. The CAPAE record is twenty-six days behind the estate and every accuracy row in this payload is UNVERIFIABLE as a direct consequence."
+  ],
+
+  "unestablished": [
+    "Larry's opening context reading - not read from the instrument; the committed ledger states this at its own line 86 rather than estimating, which is the correct behaviour.",
+    "Larry's closing context reading - no health file under ~/.mypka/governor/health/C--Fusion247PKA/ carries the short id 3d400a, and the mapping between the displayed short id and the sampler's filename is itself unverified.",
+    "Total measured context movement - requires both readings above.",
+    "Host version, five-hour quota, seven-day quota, binding constraint - all read from the health sample that does not exist for this session.",
+    "Parent-channel latency and queued messages - no instrument records either.",
+    "Notification 658's content - ding-log.jsonl records bytes, never bodies.",
+    "Model used by the careerair agent - not exposed on return.",
+    "Line DELTAS for every file modified outside Git - no diff capability; whole-file counts only.",
+    "careerair.application and application_event row counts - no database access in this dispatch.",
+    "Whether prior-work.mjs and role-shape.mjs were deployed before the 17:00 board rendered.",
+    "Whether the capae-brief staleness warning actually rendered at SessionStart - the arithmetic condition is satisfied but SessionStart output is not durable.",
+    "Line ages within HOW-TO-APPLY.md - the file is not under version control.",
+    "CLARIFY-count and any refusal that did not produce an artefact - zero Work Orders means zero order files to read.",
+    "Whether an abandoned Work Order envelope was ever written to disk - nothing exists in the repository."
+  ],
+
+  "measured_by": "Pax",
+  "witness_note": "SAME MODEL, SEPARATE CONTEXT, SEPARATE DISPATCH, NO ACCESS TO LARRY'S TRANSCRIPT. This is not external verification and nothing in this payload should be read as such. Every conduct grade rests on a committed file, a plaintext Git record, a governor log or a durable artefact in the declared private surface, and where it does not, the sentence says so."
+}
