@@ -1015,3 +1015,24 @@ idempotency guard refuses a duplicate slot. **AC8 completes at the first schedul
 actually ACQUIRES an advert** (next candidates: today 12:00/17:00; realistically Monday's alert
 volume). Veritas Gate 1 stays held until then. Interim honest status unchanged: integrated,
 live-proven manually, automatic path built and boot-proven, not yet event-verified.
+
+## ⚑ AMENDMENT 8c — Larry, 2026-09-21. **AC8 PROVEN BY THE REAL PRODUCTION EVENT. VERITAS GATE 1 DISPATCHED.**
+
+**Larry's record.** Scheduled run 173 (`careerair-email:2026-09-20:17:00`, status succeeded,
+5 messages, 12 new opportunities) fired the kgraph hook without any manual involvement:
+outcome-detail rows carry `kgraph: {status: harvested, adverts: 6, nodes_created: 186,
+rels_created: 633, with_requirements: 5}` and `{harvested, 6, 201, 622, 6}`, plus a correct
+visible `no-new-adverts, kgraph_wired: true` on a duplicate message. Graph delta reconciles
+exactly: JDs 304→316 (+12 = the run's new_opportunities), nodes 2,814→3,201, rels 7,646→8,901.
+Scoring labels flowed unchanged; the run succeeded; the next morning's run processed 0 cleanly.
+**The intended-automatic test in "Nothing may live only in Larry's head" is satisfied by the real
+production event.** WO-2026-09-19-01's ACs are all evidenced; per veritas_gate: 1 the single
+internal assurance review for this Work Package boundary is dispatched this session. Completion
+remains unclaimed until its verdict: current honest status — **integrated at the machine surface
+and submitted to Veritas for assurance.**
+
+Context also recorded: GPT's Outlook→Gmail forwarding automation was repaired 2026-09-20 with a
+Gmail-receipt verification gate and sweeps at 08:30/13:30/17:30 UK (its reconciliation found two
+silent-forward losses, Cornerstone and Intelex — both independently covered by the browser lane,
+zero material loss). Open cadence proposal (collect+run at 09:00/14:00/18:00) and the Indeed
+bare-address collector match remain Warwick decisions, undecided.
