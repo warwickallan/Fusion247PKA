@@ -43,6 +43,44 @@ A recurring, cross-source-verified vocabulary cluster shows up across independen
 
 For cover letters and outbound client communication in particular — the exact category the source incident involved — the strongest 2026 signal is not punctuation at all, it is **the absence of anything a competing draft couldn't also claim**: "strong communication skills," "passion for the industry," "I believe my skills and experience make me a strong candidate," with zero concrete, specific, checkable detail underneath. This is independently corroborated by multiple recruiter-facing 2026 sources ([cvpromaker.com](https://www.cvpromaker.com/blog/ai-generated-cover-letters), [aiapply.co](https://aiapply.co/blog/can-employers-tell-if-you-use-ai-for-a-cover-letter), [liftmycv.com](https://www.liftmycv.com/blog/using-ai-for-cover-letter/)). Flawless, overly-uniform formality that never varies in register is itself a tell — genuinely human prose has texture.
 
+### 5. The Wikipedia catalogue - categories this Guideline was missing
+
+**Added 2026-09-14 on Warwick's instruction**, after he pointed out that the most comprehensive public
+catalogue of AI tells had never been cited here: [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing).
+It is maintained by editors who spend their days removing this stuff at scale, and it carries several
+categories the sections above do not. His words: *"this was supposed to be baked in at one time."*
+It was, partly. These are the gaps.
+
+- **Undue emphasis on significance.** `stands as`, `serves as`, `a testament to`, `plays a crucial /
+  pivotal / vital role`, `underscores the importance of`, `reflects a broader`, `left an indelible
+  mark`, `a key turning point`. The tell is reaching for importance the reader did not ask for.
+- **Promotional register.** `boasts`, `vibrant`, `rich`, `profound`, `nestled`, `in the heart of`,
+  `groundbreaking`, `renowned`, `a diverse array of`, `showcasing`. Marketing copy wearing a suit.
+- **Avoidance of the plain copula.** Writing `serves as` / `functions as` / `stands as` / `boasts` /
+  `features` / `maintains` where the honest word is **is** or **has**. A human writes "Concerto is a
+  CAFM platform". A model writes "Concerto serves as a comprehensive CAFM platform".
+- **Vague attribution and weasel words.** `industry reports`, `observers have cited`, `experts
+  argue`, `some critics argue`, `several sources`. Anything that attributes a claim to nobody.
+- **Superficial-analysis verbs.** `highlighting`, `emphasizing`, `ensuring`, `reflecting`,
+  `contributing to`, `fostering`, `cultivating`, `enhancing`, `valuable insights`. Words that gesture
+  at analysis without performing any.
+- **The "challenges and future" formula.** `Despite its X, it faces several challenges`, `Despite
+  these challenges`, and any section headed `Future Outlook` or `Challenges and Legacy`. In an
+  application this shows up as a paragraph conceding a weakness nobody asked about - which is also a
+  **direct violation of the NO CONCESSION PARAGRAPHS rule** in `_STANDING-FORM-VALUES.md`.
+- **Negative parallelism**, already covered at section 3, but the catalogue adds the variants
+  `not only... but also`, `no X, no Y, just Z`.
+- **Formatting tells.** Boldface scattered for emphasis rather than structure. Title Case On
+  Ordinary Headings. Curly quotes and apostrophes where the document otherwise uses straight ones -
+  a genuine paste-from-a-chat-window fingerprint. Emoji used as bullets.
+- **More vocabulary for the section 2 cluster:** `showcase`, `meticulous / meticulously`, `intricate
+  / intricacies`, `interplay`, `garner`, `bolstered`, `align with`, `enduring`, `key` used as an
+  adjective, `additionally` opening a sentence.
+
+**The catalogue's own framing is the right one and matches section 2 above: no single item convicts.**
+A cluster does. The practical use of this list is as a find-and-replace pass over a finished draft,
+not a set of words that are forbidden to exist.
+
 ## The self-check (run this, don't just read this)
 
 Before any specialist submits human-facing external prose, run this five-point pass on the actual draft, not from memory:
@@ -68,6 +106,8 @@ This Guideline is only doing its job if:
 Wiring the actual wikilink into each relevant specialist's `AGENTS.md` and SOP is deliberately **not done by this Guideline itself** — that wiring is a separate, lightweight Librarian-style pass (see the task that birthed this file). Writing the rule here and stopping is exactly the anti-pattern this file exists to name; the wiring-in is what closes the loop the source incident showed being open.
 
 ## Sources
+
+- [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) - the most comprehensive public catalogue, maintained by editors removing AI text at volume. Added 2026-09-14 on Warwick's instruction. Section 5 folds in the categories this Guideline previously lacked.
 
 Search conducted 2026-07-10. Every load-bearing claim above cites at least two independent sources except where explicitly marked single-source below.
 
