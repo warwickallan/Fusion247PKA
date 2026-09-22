@@ -123,6 +123,41 @@ only ever appear on a manual sweep.
 pull the cards out of the DOM. Do **not** use page-text extraction on the search page, because it returns the
 detail pane of the selected job, not the list.
 
+### ⛔ MEASURED BROWSER FACTS, 2026-09-22. Read before you re-derive any of this.
+
+- **`javascript_tool` is BLOCKED on LinkedIn job pages.** Any script whose result touches `href`
+  values or card data attributes returns `[BLOCKED: Cookie/query string data]`. It worked for two
+  queries and the guard then held permanently. Do not build a sweep on it.
+- **`get_page_text` on a SEARCH page is a coin toss**, which is what the warning above means in
+  practice: it returns `Source element: <main>` (the list, usable) or `Source element: <article>`
+  (the detail pane of whichever job auto-selected, useless). **Check which one you got before
+  believing a single row.** On a JOB DETAIL page it is reliable and is the right tool.
+- **ALWAYS WAIT 6 SECONDS BETWEEN `navigate` AND ANY READ.** LinkedIn is a client-side router: the
+  URL changes instantly and the list re-renders seconds later. Reading immediately returns the
+  PREVIOUS query's rows, silently and plausibly. On 2026-09-22 three consecutive terms returned
+  identical irrelevant rows this way and it was very nearly written up as LinkedIn rate-limiting.
+- **Reading one advert:** navigate → wait 6s → `find` the "more" button → click it → `get_page_text`.
+  That sequence is proven and repeatable.
+
+### ⭐ THE RELATED-JOBS RAIL BEATS THE TERM LIST. **Established 2026-09-22, and it is not close.**
+
+Every job detail page carries a **"More jobs"** rail of roughly twelve recommendations. On
+2026-09-22 the ten banked terms produced almost nothing usable, while the rails off two adverts
+produced **La Fosse Lead Implementation Manager (Manchester, GBP 90-100k, 12 hours old)**, erg group
+Software Implementation Lead (GBP 70k), Loftware Manager Implementation Services (GBP 85-110k),
+Altum Systems Implementation Lead (GBP 85-95k), Marmion SaaS Professional Services Manager
+(GBP 60-90k) and Pinpoint Enterprise Implementation Manager (GBP 70-90k) — **most of them carrying a
+published salary, which the term search rarely surfaces.**
+
+**So: open two or three well-matched adverts and harvest their rails.** LinkedIn's own recommender
+is reading the whole advert; a keyword is reading the title. **This does not replace the terms** —
+it is the step that was missing after them.
+
+⚠ **LinkedIn is retiring classic job search** ("gradually retiring classic job search starting in
+September", their own banner). The AI-search entry point was **not** present on this account's
+`/jobs` page when looked for on 2026-09-22. Expect this whole route to change and re-measure rather
+than assume.
+
 ## Step 3. Screen. **This is the step that earns the skill.**
 
 Run every candidate through all three, in order. **A list that has not been through these is not a
