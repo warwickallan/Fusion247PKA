@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=iy10SdZxCLA",
+  "video_id": "iy10SdZxCLA",
+  "captured_at": "2026-09-23T18:24:14+00:00",
+  "title": "Testing Strategy for Agentic Solutions: 5‑Layer AI Testing Pyramid | AB‑100 Exam Prep (Ep 5.2)",
+  "channel": "Coding With Chuck",
+  "published_date": "2026-05-06",
+  "duration_seconds": 906,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 338,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.8.19"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-09-23__testing-strategy-for-agentic-solutions-5layer-ai-testing-pyr__iy10SdZxCLA",
+  "files": [
+    "TubeAIR Report - testing-strategy-for-agentic-solutions-5layer-ai-testing-pyr - iy10SdZxCLA.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}
