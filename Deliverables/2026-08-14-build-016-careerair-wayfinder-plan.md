@@ -1078,3 +1078,19 @@ transcript moves to HP. Slice 1 remains COMPLETE (Gate 1 PASS, 8d); harvest hook
 across multiple unaided production runs; graph at ~330 JDs / 3,725+ nodes. Open Warwick decisions
 carried: term-extraction pass (above, frontier) · cadence alignment · Indeed bare-address match ·
 slice-2 embedding route.
+
+**8e addendum — Larry, 2026-09-24, at close. POST-CUTOVER VERIFICATION OWED ON THE HP (one
+read, no change).** The estate moved to the HP (warwick-engine) on 2026-09-23. The kgraph
+harvest wiring predates the cutover (2026-09-19) and depends on two artefacts having travelled:
+`C:\.fusion247\careerair-neo4j.env` (URI must be the HTTP form, port 7475) and the
+`--env-file-if-exists=C:/.fusion247/careerair-neo4j.env` line in
+`scripts/careerair-email-run.cmd`. **The check:** the next HP scheduled run's outcome detail
+carries a `kgraph` entry — `{status: harvested, ...}` on new adverts is healthy; a visible
+`kgraph skipped: not configured` means the env file did not travel and harvesting has stopped
+accumulating (safely, by design). If skipped: recreate the env on the HP from the credential
+source, do not improvise. The graph itself is on the CLOUD host (tailnet 100.101.240.85:7475 /
+7688, fusion247-core) — unaffected by the old machine's port closures and not to be swept up in
+them. Kill-switch remains `CAREERAIR_KGRAPH_DISABLED=1`. Also reaffirmed at close, matching the
+cutover session's flags: CareerAIR-Graph-Collect stays disabled permanently (GPT owns the
+Outlook side), and `provider_active: zapier_webhook` in runtime/ops/state.json is load-bearing —
+neither is to be "corrected".
