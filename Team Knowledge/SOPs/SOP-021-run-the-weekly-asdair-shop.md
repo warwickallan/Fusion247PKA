@@ -331,6 +331,66 @@ authentication is a one-off property of the profile, not a weekly human action.
 > was false** — see `Deliverables/2026-08-11-BLOCKER-input-truth-failure.md`. Browser capability is
 > proven. **Photo-to-list truth is not.**
 
+> ## ⛔ EIGHT MORE OPERATING FACTS — ESTABLISHED BY EXECUTION 2026-09-20/21. READ WITH THE 22 ABOVE.
+>
+> **Four consecutive shops were built collaboratively in the live browser (2026-08-31, 09-07, 09-14, 09-20).**
+> Facts 23–30 are what those runs cost. **Fact 25 is the most dangerous new one and fact 28 is the most
+> important correction.**
+>
+> **The Regulars grid is finished as a build surface**
+> 23. **⛔ THE REGULARS GRID IS UNUSABLE FOR BUILDING A BASKET.** Each checkbox toggle **blocks the renderer
+>     for 40–90 seconds**. On 2026-09-20, 31 ticks was heading for ~20 minutes of frozen page and the route
+>     was abandoned mid-run. **Build from individual product pages instead** — `https://www.asda.com/groceries/product/<id>`
+>     — which are fast (~6s), deterministic, and expose a clean `Add item … to cart` control plus `+`/`−`
+>     steppers. This supersedes the Brand A–Z traversal below as the *mechanism*; the Regulars view remains
+>     the right place to **enumerate** what the household buys and to harvest product ids.
+> 24. **THE BATCHELORS "PURCHASE LIMIT OF 3" DOES NOT EXIST.** The 4th sachet was refused from the grid on
+>     2026-09-07 and again on 2026-09-14, and was recorded **both weeks** as a per-order limit. From the
+>     product page it accepted 4 and held at 4 on the trolley. **A refusal on the grid is a grid failure, not
+>     a stock fact and not a policy fact.** Two shops were one unit short for no reason.
+>
+> **The two ways the trolley silently gains the wrong thing**
+> 25. **⛔ AN ASDA PRODUCT PAGE RENDERS A *SPONSORED* TILE WHOSE `Add item … to cart` BUTTON COMES *BEFORE*
+>     THE REAL PRODUCT'S IN DOM ORDER.** Selecting the first matching add button **adds the advert**. On
+>     2026-09-20 this put `Skinny Crunch Light Salted Caramel Bars 5 x 19g` in the trolley in place of the
+>     Twix — and **both the line count and the basket total moved plausibly**, so nothing looked wrong.
+>     **Always match the button's `aria-label` to the intended product name. Never take the first match.**
+>     Caught only by fact 17's line-by-line name check, which is why that check is mandatory.
+> 26. **`Order again` RESTORES THE LINES OF A PREVIOUS ORDER BUT RESETS EVERY QUANTITY TO 1.** On 2026-09-21
+>     it returned all 32 lines as 32 units instead of 49. This is **fact 10 in a second costume**: the lines
+>     are right, the quantities are silently wrong. **Set every quantity explicitly afterwards.**
+>
+> **Driving the steppers**
+> 27. **A QUANTITY LOOP MUST ABORT WHEN A CLICK FAILS TO MOVE THE VALUE.** On 2026-09-21 a loop matched the
+>     quantity field by product name, the `aria-label` did not carry that name, the read returned `null`, and
+>     the loop pressed **Increase against a stale value until its own guard tripped** — Cravendale reached
+>     **13** and Yazoo Chocolate **10**. **Detect the stall and stop.** Drive a stepper from the trolley card
+>     that owns it (find the `Decrease <product> quantity` button, walk up to its card, read *that* card's
+>     `input[type=number]`), and re-query the card after every click because the row re-renders.
+>
+> **Whose numbers are authoritative**
+> 28. **⭐ THE PLACED ASDA ORDER IS THE AUTHORITY FOR WHAT WAS BOUGHT — NEVER THE BASKET THAT WAS HANDED OVER.**
+>     **Warwick edits the trolley himself at checkout.** On 2026-09-20 he removed two lines and reduced a
+>     third *after* the basket was handed to him. Diffing a rebuild against the handover basket read those
+>     edits as *ASDA dropping items* and nearly re-added things he had deliberately taken out. Read the real
+>     order at **`/account/orders/detail/<orderno>`** (reachable only by clicking `View order`; the id is not
+>     a guessable URL). To rebuild a cancelled order, take the target from **that page**, never from the list
+>     or from our own record.
+> 29. **A CANCELLED DELIVERY IS NOT A BASKET FAILURE.** Order 70000074969771 (due 2026-09-21) was cancelled
+>     because the driver could not find the address. Record it as a **delivery** failure against the order, so
+>     the history does not credit the cancellation to picking, stock or the basket.
+>
+> **The durable-record hole**
+> 30. **⛔ `recordShopOutcome` WRITES NO PER-LINE ROWS AT ALL** — only `asdair.orders` and `asdair.order_events`.
+>     Shops **40 and 41 therefore carry header totals with zero line detail**, which makes 2026-09-07 and
+>     2026-09-14 invisible to every later "what did we buy / how often" question, including `previously_ordered`.
+>     **The list and its `shopping_list_items` rows must exist for the week or the week is blind.** Those two
+>     weeks were deliberately **not** backfilled: the per-line quantities were never captured, and inventing
+>     them would corrupt the frequency data. See `asdair.order_events` on order 12.
+
+> **⚠️ SUPERSEDED AS A MECHANISM 2026-09-20 BY FACT 23 — the grid is too slow to drive. The *ordering*
+> discipline below still stands; execute it against product pages rather than the Regulars grid.**
+
 **The proven add method — Brand A–Z ordered sequential traversal. Follow it, this was expensive to learn:**
 
 1. Open the appropriate ASDA **Regulars / Favourites** view.
