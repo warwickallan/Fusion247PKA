@@ -1054,3 +1054,27 @@ title-family truncation) and 4 (the parked credential-shaped file) go to the sch
 reconciliation, not to new work. Next kgraph review trigger: a material change to the promised
 outcome only. NEXT on this programme (both awaiting Warwick): the cadence alignment decision, the
 Indeed bare-address match decision; then slice 2 (embeddings) pending his embedding-route call.
+
+## ⚑ AMENDMENT 8e — Larry, 2026-09-21 (recorded at session close 2026-09-24). **REFOCUS ON THE GOAL; THE TERM-EXTRACTION DECISION IS THE FRONTIER OF THIS WORKSTREAM.**
+
+> **Warwick, verbatim:** *"This chat is purely about the RAG and specifically it was about
+> capturing jobs description terms against job titles and then building CVs that reference these
+> terms. Focus on that now."* (After correctly calling drift: assurance ceremony and harvest
+> plumbing had outpaced product value.)
+
+**Larry's record.** Established by execution the same day (full detail + prototypes:
+`C:/.fusion247/private/careerair/design/2026-09-21-term-extraction-findings-and-next-action.md`):
+the slice-1 term vocabulary (168 generic buckets) cannot drive keyword-matched CVs; upstream
+requirement rows include advert chrome; deterministic phrase mining fails on the persisted corpus
+(sidebar-dominated text); the title axis holds per-advert slugs, not families, on 104/330 JDs.
+
+**⛔ FRONTIER OF THIS WORKSTREAM — a Warwick `spend` decision, pending:** approve the per-advert
+model extraction pass (title family + verbatim load-bearing phrases) via the existing gateway,
+with a one-off backfill over the ~328 persisted adverts. Until decided, no further kgraph build
+work is useful — everything else would be more plumbing under an unfixed vocabulary.
+
+Session close 2026-09-24: this thread ("Apps and Opps" / CareerAIR RAG) banked and closed; its
+transcript moves to HP. Slice 1 remains COMPLETE (Gate 1 PASS, 8d); harvest hook live and proven
+across multiple unaided production runs; graph at ~330 JDs / 3,725+ nodes. Open Warwick decisions
+carried: term-extraction pass (above, frontier) · cadence alignment · Indeed bare-address match ·
+slice-2 embedding route.
