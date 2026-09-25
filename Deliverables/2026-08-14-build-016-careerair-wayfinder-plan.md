@@ -1135,3 +1135,9 @@ Production Brain (7474/7687) untouched; live pipeline behaviour unchanged (addit
 Graph relations stay in the retrieval path only if Set 2a shows graph mode measurably beats plain retrieval.
 Known residuals: ~6 fact entries lack a `projected_to` UUID (interim content hash; projection is
 HP Apps & Opps' lane); the answer key is silver (two-labeller agreement), per Set 1 Option B.
+
+## ⚑ AMENDMENT 8g — Larry, 2026-09-25 late. **ROWS 1–5 EXECUTED LIVE; RECORDED PARTIAL (no Veritas yet).**
+
+**Larry's record.** Evidence is in kgraph: 151 EvidenceEntry nodes, embedded with qwen3-embedding:0.6b at dim 1024. The frozen corpus is source `8e3358f8`, pinned beside the manifest. The retrieval CLI returns identical results on re-runs via a query-embedding cache. The local extraction (gemma4:26b) ran over all 229 captured adverts: 0 failures, 99.6 % of quotes verbatim. It was written to the graph as TitleFamily and ExtractedRequirement: 226 adverts, 4,170 nodes, 7,741 relationships, idempotent on re-run; 3 unmatched adverts had no JD node. Extraction was scored GO by the Eval session (requirement recall 95 %, precision 100 %).
+**Set 2a (Eval session, `eval/set2/SCORES.md`):** hybrid is best; recall@20 on near-verbatim items is 86 %. Graph mode does NOT beat plain retrieval, so graph relations stay out of the retrieval path per 8f. Paraphrase recall is weak in every mode.
+**Still FRONTIER:** new adverts are not yet extracted automatically (writeExtractionsForIds is not yet wired into hook.mjs). Evidence re-sync IS wired into the hook, but not yet proven by a real email run. **NEXT:** default the retriever to hybrid; run per-requirement queries from the extractions; add raw-ai-build-evidence-source.md and raw-agent-careerair-and-12-standing-rules.md to the corpus; then Veritas Gate 1.
