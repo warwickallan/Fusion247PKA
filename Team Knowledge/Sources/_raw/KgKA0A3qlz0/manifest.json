@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=KgKA0A3qlz0",
+  "video_id": "KgKA0A3qlz0",
+  "captured_at": "2026-09-13T23:06:28+00:00",
+  "title": "GPT 6 Astra + Fable 5.1 = GOD MODE",
+  "channel": "Chase AI",
+  "published_date": "2026-09-07",
+  "duration_seconds": 731,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 378,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-09-13__gpt-6-astra-fable-51-god-mode__KgKA0A3qlz0",
+  "files": [
+    "TubeAIR Report - gpt-6-astra-fable-51-god-mode - KgKA0A3qlz0.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}

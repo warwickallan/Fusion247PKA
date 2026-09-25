@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=YuOSyRj3sXg",
+  "video_id": "YuOSyRj3sXg",
+  "captured_at": "2026-09-23T23:56:13+00:00",
+  "title": "$30M Writer: Never write AI slop again",
+  "channel": "Greg Isenberg",
+  "published_date": "2026-09-21",
+  "duration_seconds": 4174,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "manual_captions",
+  "language": "English",
+  "language_code": "en",
+  "segment_count": 2055,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.8.19"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-09-23__30m-writer-never-write-ai-slop-again__YuOSyRj3sXg",
+  "files": [
+    "TubeAIR Report - 30m-writer-never-write-ai-slop-again - YuOSyRj3sXg.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}

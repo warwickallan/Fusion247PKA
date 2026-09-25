@@ -2218,11 +2218,45 @@ if (SELF_TEST) {
   //
   // Every mutation is IN MEMORY. public/shopping.js is never written, not even temporarily.
   {
-    const mumAnchor = '<div class="page page-pad">';
-    if (!shopOpts.template.includes(mumAnchor)) {
-      console.error('SELF-TEST FAIL — the household template anchor is missing; rewrite the mutations.');
+    // ⛔ DERIVED FROM THE TEMPLATE, NEVER A HAND-TYPED LITERAL.
+    //
+    // This was the literal '<div class="page page-pad">' — closing angle bracket included —
+    // until 51b9a3b added :data-send-state="sendState" to the household root div. The literal
+    // stopped matching and this guard did exactly what it exists to do: it REFUSED to report a
+    // pass on mutations it could no longer inject. That refusal is the control working, and
+    // nothing below may ever be weakened, skipped or try/catch'd to avoid it.
+    //
+    // Two lessons are baked in here rather than written down somewhere nobody reads:
+    //
+    // 1. A LITERAL ANCHOR IS A DEFECT GENERATOR. The same breakage is recorded at app.js:2174
+    //    with the same remedy — "the template changed. Re-derive the anchor from public/app.js".
+    //    An anchor a human must retype on every attribute change goes stale again on the next
+    //    one. So match the div STRUCTURALLY and take the template's OWN text as the anchor:
+    //    attribute churn no longer breaks it, while RENAMING or REMOVING the div still does.
+    //    That asymmetry is the point — a cosmetic change must not blind the gate, a structural
+    //    change must.
+    //
+    // 2. THE SUBSTRING TRAP. Diagnosing this, a grep for 'page page-pad' found its one
+    //    occurrence and suggested the string was present — because it is a SUBSTRING of the new
+    //    longer line. The string actually absent was the TERMINATED one. Hence [^>]*> below: the
+    //    match is anchored to the tag's own closing bracket, never to a bare fragment of it.
+    //
+    // EXACTLY ONE MATCH IS REQUIRED, and !== 1 is deliberate rather than < 1. String.replace()
+    // silently rewrites only the FIRST occurrence, so a second matching div would land every
+    // mutation below in a section nobody chose while still reporting them CAUGHT — a pass for
+    // the wrong reason, which is worse than a failure.
+    const mumAnchorMatches = [...shopOpts.template.matchAll(/<div class="page page-pad"[^>]*>/g)].map((m) => m[0]);
+    if (mumAnchorMatches.length !== 1) {
+      console.error('SELF-TEST FAIL — the household template anchor resolved to '
+        + mumAnchorMatches.length + ' match(es) in the compiled household template; exactly 1 is '
+        + 'required. RE-DERIVE it from public/shopping.js — do NOT relax this check.');
+      console.error('  WARNING — SECTIONS NOT EXECUTED because of this abort: the 7 household '
+        + 'vocabulary mutations, the household false-positive control, the dirty check and the '
+        + 'clean-control run all sit BELOW this exit. A stale anchor makes roughly a third of '
+        + 'this self-test DARK, not merely red.');
       process.exit(1);
     }
+    const mumAnchor = mumAnchorMatches[0];
     const mumCases = {
       'household: the word COCKPIT reaches her screen':
         (t) => t.replace(mumAnchor, mumAnchor + '<p>Back to the Cockpit</p>'),

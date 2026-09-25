@@ -1,0 +1,41 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=EXL8mMUXs88",
+  "video_id": "EXL8mMUXs88",
+  "captured_at": "2026-09-20T21:12:26+00:00",
+  "title": "Your Remote Desktop SUCKS!! Try this instead (FREE + Open Source)",
+  "channel": "NetworkChuck",
+  "published_date": "2025-02-04",
+  "duration_seconds": 1349,
+  "user_note": "BUILD-002 WP2 auto-detect",
+  "transcript_status": "extracted",
+  "transcript_source": "auto_captions",
+  "language": "English (auto-generated)",
+  "language_code": "en",
+  "segment_count": 725,
+  "error_category": null,
+  "error_detail": null,
+  "retry_recommendation": null,
+  "tool_versions": {
+    "python": "3.13.6",
+    "youtube-transcript-api": "1.2.4",
+    "yt-dlp": "2026.7.4"
+  },
+  "routing": {
+    "fusion_review_status": "pending_cairn",
+    "assigned_agent": "youtubair",
+    "next_agent": "cairn",
+    "legacy_review_status": "pending_categorisair",
+    "legacy_next_agent": "categorisair",
+    "note": "Cairn has absorbed the legacy CategorisAIr role; legacy_* are aliases only."
+  },
+  "handoff": null,
+  "output_dir": "out\\auto\\2026-09-20__your-remote-desktop-sucks-try-this-instead-free-open-source__EXL8mMUXs88",
+  "files": [
+    "TubeAIR Report - your-remote-desktop-sucks-try-this-instead-free-open-source - EXL8mMUXs88.md",
+    "manifest.json"
+  ],
+  "idea": "IDEA-013",
+  "project_id": "F247-YT-INGRESS-001",
+  "build": "TubeAIR",
+  "schema_version": 2
+}

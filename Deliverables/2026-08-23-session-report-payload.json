@@ -1,0 +1,340 @@
+{
+  "session_date": "2026-08-23",
+  "branch": "wo/2026-08-23-cockpit-grid",
+  "closing_head": "38f3b6d6a817838c6e13454bba5f53cab9485d66",
+  "map_path": "Deliverables/2026-08-14-build-016-careerair-wayfinder-plan.md",
+  "deliverable_path": "Deliverables/2026-08-23-session-report-careerair-collaborative.md",
+
+  "host": "claude-code",
+  "host_version": "2.1.227",
+  "elapsed_minutes": 1838,
+
+  "total_subagent_tokens": 2604089,
+  "total_context_tokens_in": 361705,
+  "total_context_tokens_out": 241,
+
+  "parent_channel_available": true,
+  "queued_messages": 0,
+
+  "wo_total": 2,
+  "wo_first_dispatch_success": 0,
+  "wo_amendments": null,
+  "wo_refusals": 0,
+
+  "doc_lines_changed": null,
+  "product_lines_changed": null,
+
+  "allocation_product_pct": 82.34,
+  "allocation_evidence_pct": 6.27,
+  "allocation_rework_pct": null,
+  "allocation_admin_pct": 0.0,
+  "allocation_waiting_pct": 0.0,
+
+  "closing_head_declared_by_larry": "38f3b6dc",
+  "closing_head_declaration_defect": "THE DECLARED CLOSING HEAD DOES NOT EXIST. The Work Order commissioning this report, and the map as first written, both named 38f3b6dc. The real head is 38f3b6d6a817838c6e13454bba5f53cab9485d66 (.git/logs/refs/heads/wo/2026-08-23-cockpit-grid line 5). The EIGHTH CHARACTER is wrong - c versus 6 - and 38f3b6dc names no object that has ever existed in this repository. A repo-wide search returns exactly ONE occurrence: the map's own correction of it. Larry's read-back CAUGHT it and corrected forward, which is the estate working. The recorded CAUSE is wrong: the map says 'a map that writes its own closing SHA is self-referential: committing the line moves the head it just claimed', which explains DRIFT (a real SHA superseded) and cannot explain a WRONG CHARACTER. The adopted remedy - name a tip, let the continuity packet carry the literal SHA - closes the class for maps but does not reach the Work Order surface the same wrong value also went into.",
+
+  "git_stat_larry_measured": {
+    "key_name_note": "Key name retained for tool compatibility only. Measured by PAX, not by Larry - see measured_by.",
+    "session_start_hook_utc": "2026-08-23T15:16:25.134Z",
+    "session_start_source": "~/.mypka/governor/capae-opening.json snapshot_at - THIS IS THE POST-COMPACTION RESUME, not the original SessionStart, which is UNESTABLISHED because the file is overwritten on every SessionStart including a compaction resume",
+    "session_opening_commit": "2d19ded7bec7277d212c990f1c25ca91eaaa3653",
+    "session_opening_commit_utc": "2026-08-22T11:11:47Z",
+    "second_commit": "045c7c26c8955ffcd7d7ed0690e138f5019bb4d6",
+    "second_commit_utc": "2026-08-22T11:24:20Z",
+    "branch_cut_utc": "2026-08-23T16:13:34Z",
+    "branch_renamed_utc": "2026-08-23T16:21:10Z",
+    "product_commit_1": "18634098cc0f31a157345f18f0bbd6a2957158c2",
+    "product_commit_1_utc": "2026-08-23T16:38:54Z",
+    "product_commit_2": "724f19fa504d552d5dc7066f6fc03c6653051850",
+    "product_commit_2_utc": "2026-08-23T17:03:32Z",
+    "closing_head": "38f3b6d6a817838c6e13454bba5f53cab9485d66",
+    "closing_head_utc": "2026-08-23T17:47:51Z",
+    "head_at_report_authoring": "2bd2d0697ac9ab1bc060fe3515c6d4b0a7f27078",
+    "head_at_report_authoring_utc": "2026-08-23T17:49:30Z",
+    "declared_closing_head_drift_commits": 1,
+    "drift_note": "Drift +1 at minimum (2bd2d069, 99 seconds after the declared head), AND the working tree already carried map text postdating that commit when the witness read it. Two consecutive zero-drift rotations are broken, and broken in a worse way than drift: the declared head is not a superseded SHA, it is a SHA that never existed.",
+    "elapsed_seconds_first_commit_to_closing_head": 110164,
+    "elapsed_minutes_first_commit_to_closing_head": 1836.07,
+    "elapsed_minutes_first_commit_to_last_instrument_reading": 1838.48,
+    "elapsed_minutes_post_compaction_resume_to_closing_head": 151.43,
+    "elapsed_minutes_branch_cut_to_closing_head": 94.28,
+    "working_span_minutes_git_observable": 108.48,
+    "working_span_segments": 2,
+    "working_span_gap_threshold_minutes": 30,
+    "git_silent_minutes": 1729.23,
+    "git_silent_blocks": 1,
+    "largest_git_silent_gap_utc": "2026-08-22T11:24:20Z -> 2026-08-23T16:13:34Z (1729.23 min = 28h49m14s). NOT IDLE AND NOT LABELLED SO. This ONE block contains the entire product output of the session: all 13 careerair dispatches, the security review, at least part of the engineering, NINE of the session's thirteen FusionDevBot notifications, and every one of the four base CVs and nine tailored forks - none of which is in Git, by design, because the private tree is outside Git entirely (map section 8).",
+    "subagent_wall_time_minutes_concurrent": 174.38,
+    "git_is_a_blind_instrument_note": "THE STRUCTURAL FINDING OF THE TIME SECTION. Git-observable span fell 59.2% (265.90 -> 108.48 min) while the session produced its best product outcome in the series. The cause is not reduced activity: it is that the product of this session - 4 cluster base CVs, 9 tailored forks, FORK-NOTES for each, an INDEX and a durable route file - was written into a NON-GIT PRIVATE STORE. Every ratio derived from commit counts this session measures the thin public shell of a session whose substance is invisible to the instrument. NO documentation-to-product ratio is computed from commit counts, because an arithmetically defensible number would still be a false statement about the session.",
+    "commits_this_session_total": 5,
+    "commits_product": 2,
+    "commits_documentation_record": 3,
+    "commits_note": "2 product (18634098 grid, 724f19fa security fixes) : >=3 documentation (38f3b6d6 amendment 2 + ledger, 2bd2d069 report pointer, and at least one further head-naming correction visible in the working tree but not in the reflog at the moment of reading). LINE-LEVEL FIGURES ARE UNESTABLISHED - no shell, no git binary.",
+    "pushes_to_origin": 0,
+    "force_pushes": 0,
+    "branch_pushed": false,
+    "convergence_note": "NOTHING IS PUSHED, DELIBERATELY. AMENDMENT 2: 'Two commits sit on a local branch by decision, not by accident.' The privacy decision C-P2 blocks pushing anything. CONSEQUENCE, RECORDED AND NOT ESCALATED: the session's product commits are recoverable from exactly one disk. Under the DURABLE definition in root CLAUDE.md this is not durable; it is also not a defect, because it is a consequence of an OPEN WARWICK DECISION that the map names in its NEXT row. Warwick's to schedule.",
+    "lines_changed": null,
+    "measured_by": "Pax, read directly from .git/logs/HEAD (lines 1193-1201), .git/logs/refs/heads/main (line 600) and .git/logs/refs/heads/wo/2026-08-23-cockpit-grid (lines 1-5). Unix seconds converted against the anchor 2026-08-17T00:00:00Z = 1786924800, carried forward from and consistent with the previous two reports.",
+    "note": "FIFTH CONSECUTIVE ROTATION IN WHICH THE SESSION WITNESS WAS DISPATCHED WITHOUT A SHELL. Grant was Read, Write, Grep, Glob, WebFetch, WebSearch. No git show --stat was possible. Every line-level figure is UNESTABLISHED and is labelled so rather than estimated."
+  },
+
+  "allocation_full": {
+    "denominator_note": "Shares of SUBAGENT TOKEN TRAFFIC (Total A = 2,604,089 deduplicated), not of wall clock and not of total session effort. Larry's own context is a LEVEL and is never added to this FLOW. THE PRE-COMPACTION PORTION IS UNMEASURED, NOT ZERO - the ledger names five dispatches from it by purpose whose usage blocks did not survive the window roll - so every figure here is a FLOOR for the post-compaction portion only.",
+    "product_content_production": { "agents": 13, "dispatches": 13, "tokens": 1620070, "pct": 62.21, "what": "13 careerair agents: three cluster bases (base 2, 3, 4), nine tailored forks, and one applying two banked rulings. THIS IS THE SESSION'S PRODUCT, not overhead. Verified against the disk: runtime/bases/ holds four base-cv.md files under four cluster directories; runtime/applications/ holds nine <id>-<slug>/ directories each carrying both a cv.md and a FORK-NOTES.md, beside HOW-TO-APPLY.md and INDEX.md. AMENDMENT 2's claim of 'four cluster base CVs and nine tailored forks' is CONFIRMED BY ENUMERATION." },
+    "product_implementation": { "agents": 2, "dispatches": 5, "tokens": 524186, "pct": 20.13, "what": "Two Keel agents: the cockpit grid (read-back + build + 4 fix rounds, 3 dispatches, 324,562) and the origin boundary (read-back + build, 2 dispatches, 199,624)." },
+    "activation_and_deployment": { "agents": 3, "dispatches": 3, "tokens": 296594, "pct": 11.39, "what": "Three Mack dispatches: first live + config, restart for fixes, restart closing the leak. 138 tool uses. NO PRIOR SESSION IN THIS SERIES HAS A DISTINCT ACTIVATION LINE AT THIS WEIGHT, and it is the direct reason built-tested-never-activated grades clean." },
+    "assurance_and_evidence": { "agents": 1, "dispatches": 1, "tokens": 163239, "pct": 6.27, "what": "One Vex security review of the new route. Returned GREEN, mutation-tested the traversal control by REMOVING it, and executed the renderer against a recording DOM rather than reading it. THE BUILDER THEN FALSIFIED PART OF IT BY EXECUTION - see findings." },
+    "work_order_admin": { "agents": 0, "dispatches": 0, "tokens": 0, "pct": 0.0, "what": "ZERO dispatched Work Order or governance work. Larry generated the two envelopes himself; no specialist dispatch is attributable to order administration." },
+    "operating_the_product": { "agents": 0, "dispatches": 0, "tokens": 0, "pct": 0.0, "what": "ZERO for the second consecutive session. Larry did not operate a runtime as a rescue." },
+    "corrective_rework": { "agents": null, "dispatches": null, "tokens": null, "pct": null, "what": "NOT ZERO AND NOT SEPARABLE. The cockpit-grid Keel agent's three dispatches are described in the ledger as 'read-back + build + 4 FIXES'. Four corrective rounds sit inside one cumulative counter of 324,562 and cannot be isolated from it. A token figure is UNESTABLISHED." },
+    "waiting_on_warwick": { "bound_minutes": 0, "pct_bound": 0.0, "what": "ZERO MEASURED, AND IT IS THE CLEANEST SUCH ROW IN THE SERIES. Warwick sent nothing between '20 mins go go go' and /rotate. No message required a response; no dispatch waited on one; queued messages 0." },
+    "delivery_tax_assurance_to_product": "163,239 : 2,144,256 = 0.076 : 1. Previous 0.30:1; before that 0.64:1 and 1.18:1. THE LOWEST EVER RECORDED IN THIS SERIES - AND IT IS NOT AN EFFICIENCY RESULT. The number is low because almost no assurance was commissioned: ONE security review ran and ZERO Veritas gates were taken. AMENDMENT 2 declares this itself and correctly refuses to claim PASS. THE RATIO MUST NEVER BE QUOTED AS PRODUCTIVITY. Counting activation as overhead too: 459,833 : 2,144,256 = 0.214:1.",
+    "occupancy_to_traffic_ratio": "361,705 (LEVEL, post-compaction) : 2,604,089 (FLOW, post-compaction floor) = 1 : 7.20. Previous session 1 : 5.42. BOTH SIDES OF THIS SESSION'S RATIO ARE POST-COMPACTION VALUES, so the comparison is recorded and not relied on.",
+    "burn_rate_tokens_per_git_observable_minute": 24004.9,
+    "burn_rate_tokens_per_subagent_wall_minute": 14933.1,
+    "burn_rate_tokens_per_wall_clock_minute": 1416.4,
+    "burn_rate_note": "Three bases, and the FIRST is the misleading one: the denominator collapsed 59.2% while the numerator is a floor, so 24,005/min is not an efficiency claim and should not be quoted as one. The honest per-minute-of-agent-work figure is 14,933 (previous 8,974, x1.66). Mean traffic per measured dispatch is 118,369 against the previous session's 123,747 - the shape did not change; the volume did.",
+    "cost_to_work_shape": "The 13 writing agents consumed 62.2% of traffic for 345 tool uses; the 5 engineering dispatches consumed 20.1% for 200. WRITING IS TOKEN-HEAVY AND TOOL-LIGHT; ENGINEERING IS THE REVERSE. That is the expected shape and must not be read as inefficiency in the writing half - it is what producing four base CVs and nine forks costs."
+  },
+
+  "quota_and_context": {
+    "closing_context_used_pct": 36,
+    "closing_context_remaining_pct": 64,
+    "closing_context_input_tokens": 361705,
+    "closing_context_output_tokens": 241,
+    "closing_context_window": 1000000,
+    "closing_context_source": "~/.mypka/governor/health/C--Fusion247PKA/04e59550-02ee-4268-809c-80493fbd1d44.json, sampled_at 2026-08-23T17:50:15.526Z, source statusLine",
+    "closing_context_note": "36% AFTER A 30-HOUR SESSION BECAUSE THE CONTEXT WAS COMPACTED. This is the post-compaction occupancy. PRE-COMPACTION PEAK IS UNESTABLISHED - the sampler keeps one file per session id and overwrites it on every refresh. total_output_tokens 241 is the last refresh's figure, never a session total.",
+    "opening_context_reading": null,
+    "opening_context_note": "UNESTABLISHED, structurally, for the FIFTH report running. Verified by enumerating health/C--Fusion247PKA/** - 78 files, one per session id, none carrying history.",
+    "total_measured_context_movement": null,
+    "total_measured_quota_movement_seven_day_points": null,
+    "quota_movement_note": "UNESTABLISHED, AND FOR A NEW REASON THAT MUST BE RECORDED SO IT IS NOT RE-DERIVED: THE SEVEN-DAY BUCKET RESET MID-SESSION. The previous report recorded resets_at 1787500800 = 2026-08-23T16:00:00Z. The branch was cut at 16:13:34Z, THIRTEEN MINUTES AND THIRTY-FOUR SECONDS AFTER THE RESET. The closing reading of 2% therefore covers only 16:00Z-17:50Z and says nothing about the 28 hours before it. CROSS-SOURCE CONFIRMATION WORTH KEEPING: the previous report predicted the reset instant from one sampler file, and this session's sampler shows a fresh bucket at 2% with resets_at 1788105600 = 2026-08-30T16:00:00Z, exactly seven days on. THE INSTRUMENT IS TRUSTWORTHY; THE MEASUREMENT WINDOW STRADDLED ITS RESET. Cheap sequencing lesson: a rotation landing within hours of a quota reset should record the pre-reset reading before it is destroyed.",
+    "five_hour_at_close_pct": 12,
+    "five_hour_resets_utc": "2026-08-23T19:30:00Z",
+    "seven_day_at_close_pct": 2,
+    "seven_day_resets_utc": "2026-08-30T16:00:00Z",
+    "binding_constraint": "NEITHER CONTEXT NOR QUOTA, WHICH IS A FIRST IN THIS SERIES - 36% occupancy against a 12% five-hour bucket and a 2% week. The binding constraints were Warwick's own 20-minute window and the open privacy decision."
+  },
+
+  "specialists": [
+    { "specialist": "careerair - cluster base 2", "dispatches": 1, "tokens": 164897, "tool_uses": 32, "wall_minutes": 10.02, "notes": "One of three cluster bases produced post-compaction. The fourth base predates the window and is UNMEASURED, not zero." },
+    { "specialist": "careerair - cluster base 4", "dispatches": 1, "tokens": 163635, "tool_uses": 31, "wall_minutes": 10.1, "notes": "Cluster base." },
+    { "specialist": "careerair - cluster base 3", "dispatches": 1, "tokens": 156478, "tool_uses": 33, "wall_minutes": 8.99, "notes": "Cluster base." },
+    { "specialist": "careerair - apply two banked rulings", "dispatches": 1, "tokens": 187774, "tool_uses": 74, "wall_minutes": 16.76, "notes": "Largest single careerair agent, and the highest tool-use count of the writing half. Applied two rulings across the existing estate rather than producing new content." },
+    { "specialist": "careerair - fork (x9 agents)", "dispatches": 9, "tokens": 947286, "tool_uses": 175, "wall_minutes": 49.55, "notes": "NINE SEPARATE AGENTS, one per opportunity, 89,684 to 124,310 tokens each (mean 105,254). Verified against the disk: nine <id>-<slug>/ directories under runtime/applications/, each with cv.md AND FORK-NOTES.md. THE FORK DISCIPLINE WAS MEASURED, per AMENDMENT 2: one fork's entire content was verbatim from its base with ZERO novel lines; another changed four lines and dropped two bullets. That is what makes volume honest rather than generative." },
+    { "specialist": "keel - cockpit grid (read-back + build + 4 fixes)", "dispatches": 3, "tokens": 324562, "tool_uses": 146, "wall_minutes": 27.41, "notes": "LARGEST FINAL FOOTPRINT OF THE SESSION and the source of the report's best control finding. The check it produced, services/cockpit/careerair-check.mjs, refuses to pass having asserted nothing (exit 2 on zero executed, exit 3 on zero LIVE executed), refuses to pass without its ground (NOT RUN and exit 3 when the database is unreachable), collects skipped assertions and prints them loudly rather than counting them, asserts the public-tree property BEHAVIOURALLY by digest, and carries an over-correction guard in the opposite direction. IT ALSO FOUND A VACUITY IN ITS OWN FIXTURE BY MUTATION - see findings. FOUR FIX ROUNDS sit inside this cumulative total and cannot be separated from it." },
+    { "specialist": "keel - origin boundary (read-back + build)", "dispatches": 2, "tokens": 199624, "tool_uses": 54, "wall_minutes": 16.58, "notes": "The origin allowlist boundary. Both dispatches monotonic on subagent_tokens (133,497 -> 199,624)." },
+    { "specialist": "vex - security review", "dispatches": 1, "tokens": 163239, "tool_uses": 45, "wall_minutes": 13.79, "notes": "THE ONLY ASSURANCE DISPATCH OF THE SESSION. Returned GREEN and VERIFIED rather than accepted the builder's claims - mutation-testing the traversal control by REMOVING it, and executing the renderer against a recording DOM rather than reading it. THE BUILDER THEN FALSIFIED PART OF IT BY EXECUTION: the suggested containment fix does not reach a hard link, because realpath returns the path you hand it. A SECOND, DIFFERENT DEFENCE (nlink > 1) SHIPPED ALONGSIDE THE FIRST. careerair.mjs:185-192 records the whole exchange in the source: 'Established by execution, not reasoned about - a planted hard link reported nlink=2 with realpath equal to its own path, while every genuine CV in the store reported nlink=1.' THAT IS THE CORRECT HANDLING OF A REVIEW FINDING and the opposite of the failure mode this estate usually pays for." },
+    { "specialist": "mack - first live + config", "dispatches": 1, "tokens": 97331, "tool_uses": 53, "wall_minutes": 9.01, "notes": "Placed the private-root environment variable and brought the route live. Mack owns the VALUE; Keel owns the variable's shape and validation - the split is documented in careerair.mjs:24-28." },
+    { "specialist": "mack - restart for fixes", "dispatches": 1, "tokens": 99508, "tool_uses": 41, "wall_minutes": 5.41, "notes": "REMEDIAL RESTART. The change was made and then found not live. The rule already existed in the same README for two other modules." },
+    { "specialist": "mack - restart closing the leak", "dispatches": 1, "tokens": 99755, "tool_uses": 44, "wall_minutes": 6.8, "notes": "REMEDIAL RESTART, second occurrence of the same pattern. The activation itself was achieved through the SCHEDULED TASK rather than a shell, which is the canonical production-event test satisfied deliberately." }
+  ],
+
+  "ledger_verification": {
+    "verdict": "NO DEFECT FOUND. SECOND CONSECUTIVE LEDGER TO CROSS-FOOT ON EVERY DECLARED TOTAL.",
+    "total_a_declared": 2604089,
+    "total_a_recomputed": 2604089,
+    "dispatches_declared": 22,
+    "dispatches_recomputed": 22,
+    "agents_declared": 19,
+    "agents_recomputed": 19,
+    "tool_uses_declared": 728,
+    "tool_uses_recomputed": 728,
+    "per_specialist_splits_recomputed": "careerair 1,620,070 / keel 524,186 / vex 163,239 / mack 296,594 - ALL FOUR EXACT",
+    "wall_minutes_derived_by_pax": 174.38,
+    "wall_minutes_note": "10,462,907 ms summed across 22 dispatches = 174.38 min = 2h54m23s. THE LEDGER DOES NOT STATE THIS TOTAL; it is derived here so the next witness has the baseline.",
+    "cumulative_vs_per_dispatch": "RE-TESTED RATHER THAN INHERITED, which /rotate 5b requires, and the ledger shows its working. subagent_tokens monotonic on both multi-dispatch agents (123,547 -> 281,863 -> 324,562 and 133,497 -> 199,624); tool_uses demonstrably NOT (30 -> 87 -> 29, which cannot be cumulative). Summing every return would have produced 3,142,996 against a true 2,604,089 - a 20.7% overstatement. Last rotation the same error was worth 101%.",
+    "uncertainties_carried": "ALL FIVE, none smoothed over: Larry-transcribed and NOT instrumented, so a missed return is invisible to it; the PRE-COMPACTION PORTION IS UNMEASURED AND NOT ZERO (the ledger names five dispatches from it by purpose - Gmail collector, link filter, false-gap fix, board rules, ATS extraction); subagent_tokens semantics are INFERRED from monotonicity rather than documented; any agent emitting no usage block is unmeasured, not zero; wall time is CONCURRENT and is never a session duration.",
+    "ledger_declared_closing_head": "724f19fa504d552d5dc7066f6fc03c6653051850",
+    "ledger_head_note": "The ledger declares 724f19fa as the closing head. That was correct at the moment it was written - it was committed AT 38f3b6d6, whose message is 'amendment 2 + ledger' - but it is not the session's closing head. Minor and recorded, not a finding."
+  },
+
+  "notifications": [
+    { "message_id": 569, "ts": "2026-08-22T12:12:11.597Z", "bytes": 1578, "outcome": "sent", "exit": 0, "nearest_event": "47m after 045c7c2, the frontier pivot commit", "content": "UNESTABLISHED - the ding log records bytes, never bodies" },
+    { "message_id": 570, "ts": "2026-08-22T12:38:52.843Z", "bytes": 1670, "outcome": "sent", "exit": 0, "nearest_event": "+26m", "content": "UNESTABLISHED" },
+    { "message_id": 571, "ts": "2026-08-22T13:54:06.866Z", "bytes": 2170, "outcome": "sent", "exit": 0, "nearest_event": "+75m", "content": "UNESTABLISHED" },
+    { "message_id": 572, "ts": "2026-08-22T14:08:49.665Z", "bytes": 2133, "outcome": "sent", "exit": 0, "nearest_event": "+15m", "content": "UNESTABLISHED" },
+    { "message_id": 573, "ts": "2026-08-22T16:48:52.414Z", "bytes": 1807, "outcome": "sent", "exit": 0, "nearest_event": "+160m", "content": "UNESTABLISHED" },
+    { "message_id": 574, "ts": "2026-08-22T16:59:28.865Z", "bytes": 1403, "outcome": "sent", "exit": 0, "nearest_event": "+11m", "content": "UNESTABLISHED" },
+    { "message_id": 575, "ts": "2026-08-22T17:15:29.262Z", "bytes": 1894, "outcome": "sent", "exit": 0, "nearest_event": "+16m", "content": "UNESTABLISHED" },
+    { "message_id": 576, "ts": "2026-08-22T18:13:29.818Z", "bytes": 1976, "outcome": "sent", "exit": 0, "nearest_event": "last send of 22 August; an 18h32m gap follows", "content": "UNESTABLISHED" },
+    { "message_id": 577, "ts": "2026-08-23T12:45:42.368Z", "bytes": 1828, "outcome": "sent", "exit": 0, "nearest_event": "first send of 23 August, 2h31m BEFORE the compaction resume", "content": "UNESTABLISHED" },
+    { "message_id": 578, "ts": "2026-08-23T16:19:48.964Z", "bytes": 1198, "outcome": "sent", "exit": 0, "nearest_event": "+6m14s after the branch was cut; 19m before the first commit. THE ONLY ROUTINE-NARRATION CANDIDATE, and its content is UNESTABLISHED so no violation is graded on a byte count.", "content": "UNESTABLISHED" },
+    { "message_id": 579, "ts": "2026-08-23T16:50:20.417Z", "bytes": 819, "outcome": "sent", "exit": 0, "nearest_event": "+11m26s after 18634098. SMALLEST OF THE SESSION.", "content": "UNESTABLISHED" },
+    { "message_id": 580, "ts": "2026-08-23T17:10:47.873Z", "bytes": 1338, "outcome": "sent", "exit": 0, "nearest_event": "+7m15s after 724f19fa, the commit closing the containment gap and the path leak. OWED under Rule 4a - a significant failure and its recovery are both named criteria.", "content": "UNESTABLISHED" },
+    { "message_id": 581, "ts": "2026-08-23T17:39:35.888Z", "bytes": 1310, "outcome": "sent", "exit": 0, "nearest_event": "8m16s BEFORE the rotation commit 38f3b6d6. OWED - rotation, plus an open product-decision. ORDERING CORRECT: send precedes the post.", "content": "UNESTABLISHED" }
+  ],
+
+  "notification_findings": {
+    "sent_total_in_session_window": 13,
+    "sent_reported_in_the_work_order": 4,
+    "understatement": 9,
+    "verdict": "THE BRIEF THIS WITNESS WAS GIVEN UNDERSTATED THE NOTIFICATION COUNT BY NINE. The Work Order stated 'four FusionDevBot dings were sent (message_ids 578, 579, 580, 581)'. ~/.mypka/governor/ding-log.jsonl lines 231-243 record THIRTEEN sends inside the session window (569-581), every one outcome:sent, exit:0. Larry wrote the correct caveat - 'the pre-compaction portion is UNMEASURED, NOT ZERO' - into the same Work Order, for TOKENS, and did not carry it to the one metric where the durable log survives compaction completely intact. He measured his transcript, which merely correlates with the outcome, instead of the file that IS the outcome. He was two directory levels from the answer. GRADED AS AN INSTANCE OF control-cannot-reach-what-it-checks OPERATING ON LARRY HIMSELF.",
+    "transport_available": true,
+    "transport_evidence": "13 sends, 13 x exit 0, zero failures across a 30-hour session. Availability was demonstrable throughout.",
+    "ordering_rule": "SATISFIED AT THE OBSERVABLE LEVEL. Ding 581 precedes the rotation commit by 8m16s; 579 and 580 follow their commits closely. SEND-then-post holds wherever it can be checked.",
+    "owed_and_not_sent": "NO VERDICT CAN BE PROVED AND NONE IS MANUFACTURED. The ding log records bytes, never bodies, so content is UNESTABLISHED for all thirteen. The two unambiguously owed moments - the live privacy leak's discovery-and-closure, and the open privacy product-decision - each have a ding within eight minutes. ON TIMING BOTH ARE COVERED; ON CONTENT NEITHER IS VERIFIED. Confidence: Medium.",
+    "the_one_to_check": "THE ONLY GENUINE 'OWED AND NOT SENT' CANDIDATE: the map records the privacy decision C-P2 as blocking every push, which means the session ends with two product commits existing on exactly ONE DISK. If ding 581 did not carry that, Warwick has rotated without being told the work is not off the machine. Larry can settle this with one glance at the Telegram thread; the witness cannot.",
+    "possible_gap": "No send exists between 16:19:48Z and 16:50:20Z. If '20 mins go go go' described Warwick's own availability rather than an instruction, a one-line notification at the 20-minute mark (approximately 16:33Z) was owed and did not occur. WHICH READING IS CORRECT IS UNESTABLISHED."
+  },
+
+  "parent_channel": {
+    "warwick_messages_after_go_go_go": 0,
+    "queued_messages": 0,
+    "response_latency": null,
+    "response_latency_note": "N/A - no Warwick message required a response. Waiting-on-Warwick is 0 measured minutes, the cleanest such row in the series.",
+    "autonomous_stretch_verdict": "CONTINUING WAS CORRECT AND IT IS NOT CLOSE. Rule 4a's default is to continue autonomously unless one of the seven named reasons applies; 'go go go' is affirmative direction, not a boundary; and none of the seven arose - no spend, no irreversible live action, no unsafe repository state, no permission wall. Continuing was the contract and stopping would have been the defect.",
+    "qualification_a_elapsed": "THE 20 MINUTES BECAME 96. Branch cut 16:13:34Z; last commit 17:49:30Z. Whether '20 mins' named a window Warwick HAD or an instruction he GAVE is UNESTABLISHED from any artefact. Recorded factually. Not a violation - but if he meant 'I have 20 minutes', a one-line notification at the mark was owed and none exists in that interval.",
+    "qualification_b_authority": "THE SHARPEST JUDGEMENT CALL OF THE SESSION, AND BOTH HALVES MATTER. (1) ON THE LIVE FIX: fixing a live privacy leak in a loopback/tailnet-bound local service is reversible, in scope and in the safe direction; the hobby-brain rule's own default for low-consequence findings is 'fix opportunistically if trivial and already in scope'. THE ACTION WAS RIGHT. What a worker correctly refused was the ROUTE - challenging it as 'notification, not authorisation'. THE WORKER WAS RIGHT ON THE PRINCIPLE: a notification states that something happened; it is not a grant. The estate's own banked lesson says it in one line - 'an authority supplied in a dispatch message does not exist'. THE CHALLENGE IS THE CONTROL THAT FIRED, and it fired because a worker was given room to refuse. (2) ON THE TWO CV DECISIONS: these are NOT 'ordinary technical choices' or 'harmless defaults'. They are claims made in Warwick's name to an employer. The private tree's own rules exist precisely because a wrong claim on a CV has real-world consequences - the base READMEs carry binding non-claims lists and the route file carries an absolute prohibition on one class of fork. READING A TWO-WORD 'do it' AS COVERING TWO SUCH DECISIONS IS THIN AUTHORITY. (3) AND THE REASON IT DID NO HARM IS THE DESIGN, NOT LUCK: nothing has been sent; AMENDMENT 2's FRONTIER is 'Warwick reads the tailored documents and decides which go out'; and FOUR SEPARATE WORKERS independently refused to improvise a ledger write for an application that has not gone out - 'If a document goes out, the record is opened BEFORE the irreversible act.' The irreversibility never materialised because the collaborative design keeps his judgement in front of the send. THAT IS THE RULING WORKING AS INTENDED.",
+    "grade": "CORRECT OUTCOMES, THIN AUTHORITY, AND THE SAFETY CAME FROM THE PRODUCT DESIGN RATHER THAN FROM THE DECISION PROCEDURE. Not a Work Order. Worth one sentence to Warwick so he knows which two decisions were taken under his two words."
+  },
+
+  "assurance": {
+    "veritas_gates_this_session": 0,
+    "veritas_receipts_this_session": 0,
+    "vex_reviews_this_session": 1,
+    "codex_runs_this_session": 0,
+    "prs_opened_this_session": 0,
+    "vex_verdict": "GREEN, with the builder falsifying part of it by execution and shipping a second defence. See specialists.",
+    "declaration_quality": "EXEMPLARY. AMENDMENT 2's 'Honest limits at this boundary' states: 'No Veritas gate has been taken on any of this. The work is builder-evidenced and security-reviewed; it is NOT internally assured, and nothing here may be reported as PASS, complete or accepted.' It also names the recommended next target - 'the live boundary plus its executable gate, which re-runs independently rather than being read back'. NAMED-AND-OWED IS THE BAR AND IT IS MET.",
+    "is_it_a_breach": "NO, AND I SAY SO PLAINLY. Nothing merged to main, nothing was pushed, and no completion, PASS or readiness claim was made anywhere I could find. The Codex gate cannot be owed on state that has not reached a merge boundary.",
+    "estate_level_position": "STATED ONCE BECAUSE NO SINGLE SESSION'S REPORT SAYS IT. BUILD-015 closed on 2026-08-19 with executable state on main two days and six branch merges beyond its last assured boundary, and was then PARKED at 2d19ded WITH THAT DEBT INTACT. BUILD-016 is now adding to it on a separate, unpushed branch. Neither is a violation. THE CUMULATIVE PICTURE IS THAT THE ESTATE HAS NOT HAD AN EXTERNAL GATE SINCE 2026-08-15, and nobody is currently scheduled to notice that except a rotation report.",
+    "delivery_tax_warning": "THE 0.076:1 DELIVERY TAX IS THE LOWEST EVER RECORDED IN THIS SERIES AND WILL FLATTER WHOEVER QUOTES IT. It is low because one security review ran and zero Veritas gates were taken. RECORDED SO NOBODY READS THE RATIO AS PRODUCTIVITY."
+  },
+
+  "capae_opening_brief": {
+    "path": "~/.mypka/governor/capae-opening.json",
+    "present_and_readable": true,
+    "snapshot_at": "2026-08-23T15:16:25.134Z",
+    "content_written_at": "2026-08-19T12:22:00.677Z",
+    "staleness_at_snapshot": "4 days 2h 54m 24s",
+    "families_carried": 4,
+    "previous_rotation_populate_at": "2026-08-19T12:21:54.309Z",
+    "previous_rotation_capae_sync_at": "2026-08-19T12:22:00.677Z",
+    "ordering_gap_seconds": 0,
+    "brief_accuracy": [
+      { "family": "work-order-not-generated", "brief_said": "occurrences 6, clean 2", "capae_active_says": "occurrences 6, clean 2", "direction": "ACCURATE" },
+      { "family": "control-cannot-reach-what-it-checks", "brief_said": "occurrences 6, clean 0", "capae_active_says": "occurrences 6, clean 0", "direction": "ACCURATE" },
+      { "family": "built-tested-never-activated", "brief_said": "occurrences 9, clean 0", "capae_active_says": "occurrences 9, clean 0", "direction": "ACCURATE" },
+      { "family": "record-amended-body-not-recut", "brief_said": "occurrences 8, clean 0", "capae_active_says": "occurrences 8, clean 0", "direction": "ACCURATE" }
+    ],
+    "note": "FOR THE FIRST TIME IN FOUR ROTATIONS THE BRIEF WAS RIGHT. capae-opening.json and capae-active.json carry IDENTICAL family content - same written_at, same four slugs, same occurrence counts (6/6/9/8), same clean counts (2/0/0/0). session-report-populate.jsonl:29 records the last populate at 2026-08-19T12:21:54.309Z, 6.4 SECONDS before that sync, and no rotation has populated since. NO ORDERING GAP COULD EXIST. Larry was graded this session against numbers that were true; three consecutive reports could not say that. IT IS A REPRIEVE, NOT A FIX: capae-brief.mjs's STALE_AFTER_DAYS = 14 against a brief 4.12 days old again did not fire, the guard remains untested against the defect it was recommended for, and the previous report's finding stands unchanged - THE DEFECT IS ORDINAL, NOT TEMPORAL, and no day-counter at any threshold detects 'one sync behind'. THE HAZARD RETURNS INTACT AT THE NEXT ROTATION, because steps 7b and 7c are DEFERRED WITH THIS REPORT (AMENDMENT 2 says so explicitly) and will therefore populate close to a SessionStart."
+  },
+
+  "work_orders": [
+    { "id": "UNKNOWN - not recorded in any surviving artefact", "package": "the link-filter change (two files)", "envelope_generated": true, "generated_at": null, "governance_head": null, "committed_as_order_file": false, "verdict": "CLARIFY at read-back. The map records that this cycle 'would have shipped a silent regression across five job boards' - A REAL DEFECT PREVENTED.", "first_dispatch_substantive": false, "worker": "UNESTABLISHED" },
+    { "id": "UNKNOWN - not recorded in any surviving artefact", "package": "UNESTABLISHED", "envelope_generated": true, "generated_at": null, "governance_head": null, "committed_as_order_file": false, "verdict": "CLARIFY at read-back. Whether it prevented a defect is UNESTABLISHED.", "first_dispatch_substantive": false, "worker": "UNESTABLISHED" }
+  ],
+
+  "work_order_discipline": {
+    "dispatches_measured": 22,
+    "envelopes_generated": 2,
+    "dispatches_without_a_generated_envelope": 20,
+    "pct_without_envelope": 90.9,
+    "order_files_committed": 0,
+    "evidence_of_zero_order_files": "A repo-wide search for 'GENERATED by tools/wo/envelope.mjs' returns 40 files, NONE dated 2026-08-22 or 2026-08-23. A glob for **/*wo-2026-08-2* returns NO FILES ANYWHERE ON DISK. THIS IS THE FIRST SESSION SINCE AT LEAST 13 AUGUST WITH ZERO COMMITTED ORDER FILES; the previous eleven-order session committed all eleven.",
+    "consequence": "Every read-back, every CLARIFY challenge, every private_surface declaration, every live_authority field and every governance head from this session existed ONLY IN A TRANSCRIPT, and the /clear has taken them. The single surviving trace is one sentence of Larry's own prose on the map.",
+    "the_two_orders_rest_on": "LARRY'S ACCOUNT PLUS ONE SENTENCE OF HIS OWN PROSE ON THE MAP. No order artefact exists. SINGLE-SOURCE, FLAGGED.",
+    "counter_evidence_recorded_in_full": "Wayfinder lines 402-411, in Larry's own voice, AGAINST HIS OWN INTEREST: 'The measurable fact from this session: a two-file link-filter change consumed TWO FULL Work Order generation-and-CLARIFY cycles before a line was written. Both refusals caught something real - one would have shipped a silent regression across five job boards. Both things are true at once, and the map records both rather than picking the flattering one.' THAT IS HONEST REPORTING OF A COST AND A BENEFIT IN THE SAME PARAGRAPH."
+  },
+
+  "findings": [
+    {
+      "family": "work-order-not-generated",
+      "exposure": "recurrence",
+      "summary": "RECURRENCE, AND WORSE THAN A LAPSE: A FOURTH EXEMPTION CLASS WAS CREATED IN WRITING, UNDER WARWICK'S NAME, IN THE SAME SESSION THE BRIEF WARNED ABOUT EXEMPTIONS. Told: occurrences 6, MONITORING, clean 2 of 5; cause 'the generation route is treated as exempt for orders that feel small, amendment-shaped, or urgent - the control exists, is known, and is skipped at the moment of dispatch'; must 'Generate the envelope, read it back, then issue. NO EXEMPTION for small or amendment-shaped orders.' EVIDENCE: 22 measured dispatches, 2 generated envelopes, 20 (90.9%) with none, and ZERO order files anywhere in the repository or on disk - the first such session since at least 13 August. AND THE EXEMPTION WAS WRITTEN DOWN, at Wayfinder lines 413-415 in AMENDMENT 1, added this session: 'The collaborative half does not carry Work Order ceremony. Working together in session is the route Warwick has chosen for it, and imposing dispatch machinery on a conversation would be the productivity prevention he is naming.' THREE THINGS ARE WRONG WITH THAT SENTENCE, IN ASCENDING ORDER OF SERIOUSNESS. (i) IT IS UNDER A HEADING ASSERTING WARWICK'S PROVENANCE - the block is headed 'AMENDMENT 1 - Warwick, 2026-08-22', and root CLAUDE.md is unambiguous that such a heading asserts provenance for everything under it and that Larry's conclusions must be labelled as his. LARRY APPLIED THAT RULE CORRECTLY TWO SECTIONS EARLIER ('What this SUPERSEDES on this map - Larry's reading, labelled as such') AND DID NOT APPLY IT HERE. He knew the rule; he used it; he omitted it on the paragraph that removes a control. (ii) NONE OF THE THREE QUOTED SENTENCES MENTIONS WORK ORDERS, ENVELOPES OR DISPATCH - they concern building auto apps, working together on plumbing, and automating opportunity scanning. The nearest support is a separate general complaint about 'excessive governance and productivity prevention department'. (iii) IT CREATES A FOURTH EXEMPTION CLASS ON THE ONE FAMILY WHOSE RECORDED CAUSE IS EXEMPTION CREATION, and nothing on the map, in the commit messages or in AMENDMENT 2 records that collision - though it was in Larry's opening context at SessionStart. Prevention held: NO. Comparison: DEGRADED, sharply - 11 of 11 generated and committed, to 2 of 22 generated and 0 committed. Question 6: YES, and it is not the control being forgotten at the moment of dispatch; it is the control being formally exempted. FAIRNESS NOTE, NOT A HEDGE: the 13 collaborative-half dispatches produced the best product outcome in the series, and Warwick's complaint about governance cost is real, quoted and his to make. THE FINDING IS NOT 'LARRY SHOULD HAVE RUN 22 ENVELOPES'. It is that a standing control was retired by inference, attributed to Warwick, and left unaudited - and that is a product-decision he has never actually been asked.",
+      "evidence_ref": "Deliverables/2026-08-14-build-016-careerair-wayfinder-plan.md:348-360,368-369,402-415; repo-wide search for 'GENERATED by tools/wo/envelope.mjs' (40 files, none 2026-08-2x); glob **/*wo-2026-08-2* (no matches); ~/.mypka/governor/capae-opening.json families[0]",
+      "recommended_disposition": "Larry states the exemption in his own voice, or asks Warwick to rule on it as a product-decision. RECOMMENDATION ONLY - the disposition is Warwick's. NOT A WORK ORDER."
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "clean",
+      "summary": "CLEAN - THE FIRST CLEAN THIS FAMILY HAS RECORDED IN THE SERIES, on a family carried as CHALLENGED with zero cleans in six occurrences. Told: 'Before trusting a control, make it fail on purpose. A check no test can fail is not a check.' FOURTEEN INSTANCES OF THE MUST EXECUTED PROPERLY, all read from services/cockpit/careerair-check.mjs at the closing head rather than from Larry's account. THE HEADLINE: THE AUTHOR MUTATION-TESTED HIS OWN FIXTURE AND FOUND IT VACUOUS - ':174-179' records 'A single shared canary couples the two tests: creating the hard link raises the TARGET's link count to 2, and statSync follows a symlink - so the symlink case was being caught by the nlink check rather than by the containment check, and REMOVING CONTAINMENT ALTOGETHER STILL PASSED. Mutation testing found it; reading the file would not have.' The repair is PINNED at :208-209 by asserting the symlink target's nlink === 1 'so ONLY containment can refuse it'. STRUCTURAL VACUITY GUARDS: zero executed exits 2, zero LIVE executed exits 3 (:459-460); an unreachable database prints NOT RUN and exits 3 (:368-374); offline and live counts are kept separate and both printed (:11-19,:457); skipped assertions are collected and printed loudly and NEVER counted as passes (:42-43,:198,:215-218,:458); the public-tree property is asserted BEHAVIOURALLY by digest because 'a rule that only reads the source would pass the moment somebody added a cache that writes' (:262-275); an over-correction guard runs in the opposite direction because 'a containment rule that refuses everything would pass every assertion above and break the entire feature' (:222-225); linkVectorsExercised > 0 (:220). AND THE MOST INSTRUCTIVE INSTANCE: AN ASSERTION WAS WRITTEN AND THEN DELETED BECAUSE ITS CAUSAL STORY WAS FALSIFIED (:337-352). One blank render was 'fixed' by renaming a shadowed parameter; isolating four arms (neither / anchor only / button only / both) produced FOUR PASSES, six further runs passed, and the assertion was removed with the reasoning left in the source: 'it encoded a causal story the evidence had already falsified, and it fired on working pre-existing code. A CHECK THAT ASSERTS THE WRONG PROPERTY IS WORSE THAN NO CHECK, BECAUSE IT WILL BE BELIEVED.' That is the estate's own SPLIT THE ARMS lesson applied by the builder to his own work, with the outcome being to DELETE a check rather than keep one that felt protective. TWO RESIDUALS, BOTH REAL: (1) ONE VACUOUS ASSERTION SHIPPED AT THE CLOSING HEAD - careerair-check.mjs:403 reads ok('rows with no title anywhere are still present, with title null', untitled.length >= 0), and untitled.length >= 0 is TRUE FOR EVERY POSSIBLE ARRAY; it cannot fail under any mutation, any data or any defect. Low consequence, since it neighbours two assertions at :404-405 that do carry weight, but it is exactly what the must prohibits and its own author's mutation discipline would have caught it. (2) THE FAMILY OPERATING ON LARRY HIMSELF - the ding-count understatement, graded separately below. Prevention held: YES decisively on every load-bearing product control; NO on two named minor instances, neither in a product control. Comparison: IMPROVED, and it is the largest reversal in this report - ten instances graded recurrence last rotation, to a first clean. Question 6: PARTIALLY - twice, both minor.",
+      "evidence_ref": "services/cockpit/careerair-check.mjs:11-19,42-43,174-179,195-199,208-220,222-225,238-241,247-250,262-275,288-292,298-300,337-352,354-361,368-374,381-399,403,441-447,457-460; services/cockpit/careerair.mjs:185-192",
+      "recommended_disposition": "Delete careerair-check.mjs:403 or give it a predicate that can fail. One line. NOT A WORK ORDER."
+    },
+    {
+      "family": "control-cannot-reach-what-it-checks",
+      "exposure": "clean",
+      "summary": "SECOND INSTANCE, GRADED SEPARATELY BECAUSE IT OPERATES ON LARRY RATHER THAN ON A TEST, AND IT IS THE SECOND CONSECUTIVE ROTATION IN WHICH THE WITNESS'S OWN INPUTS CONTAINED AN AVOIDABLE UNDERSTATEMENT. Larry briefed his own witness that 'four FusionDevBot dings were sent (message_ids 578, 579, 580, 581)'. ~/.mypka/governor/ding-log.jsonl lines 231-243 record THIRTEEN sends inside the session window (569-581), every one outcome:sent, exit:0, spanning 2026-08-22T12:12:11.597Z to 2026-08-23T17:39:35.888Z. HE MEASURED HIS TRANSCRIPT - WHICH MERELY CORRELATES WITH THE OUTCOME - RATHER THAN THE DURABLE LOG, WHICH IS THE OUTCOME, on the one metric that survives compaction completely intact. He had already written the correct caveat about unmeasured pre-compaction data into the SAME Work Order, for tokens, and did not carry it to the place where the instrument would have answered him. He was two directory levels from the answer. THE CORRECTION IS NOT A MECHANISM: it is one Read of ding-log.jsonl before writing the brief. THE REGROWTH CAP APPLIES AT FULL FORCE.",
+      "evidence_ref": "~/.mypka/governor/ding-log.jsonl:231-243; the Work Order commissioning this report",
+      "recommended_disposition": "Read ding-log.jsonl before briefing the next witness. NOT A WORK ORDER."
+    },
+    {
+      "family": "built-tested-never-activated",
+      "exposure": "clean",
+      "summary": "CLEAN, THROUGH THE PRODUCTION START PATH. Told: occurrences 9, MONITORING, clean 0 of 5; must 'Do not report an integration done until the thing it was built to do has actually happened once.' ACTIVATION WAS OWNED, NOT ASSUMED: three separate Mack dispatches - first live + config, restart for fixes, restart closing the leak - consuming 296,594 tokens and 138 tool uses, 11.4% of all measured traffic, spent on making the thing actually run. NO PRIOR SESSION IN THIS SERIES HAS A DISTINCT ACTIVATION LINE AT THAT WEIGHT. AND IT WAS ACTIVATED THROUGH THE REAL PRODUCTION EVENT: AMENDMENT 2 records 'Live and proven through Warwick's own URL, RESTARTED VIA THE SCHEDULED TASK RATHER THAN A SHELL, so the configuration arrives from the production start path and not from a session.' That is the canonical test in root CLAUDE.md section 'Nothing may live only in Larry's head' - 'acceptance must exercise the real production event, not manually invoke the underlying script' - satisfied explicitly and deliberately, and the phrasing shows it was satisfied on purpose. THE ACTIVATION RULE WAS THEN WRITTEN INTO THE OPERATOR SURFACE BY MODULE NAME: services/cockpit/README.md:216-220 states which new files are live on save and which need a restart, and :236-237 adds the failure mode - 'Read that line on every restart. An unset root and a mistyped one both serve exactly nothing, so without it a typo is indistinguishable from the feature being switched off.' The check asserts the private root arrives by environment and that the module names the variable it reads (:298-300), so a hard-coded path cannot pass. A SEPARATE INSTANCE OF THE SAME CLAUSE WAS CAUGHT AND CLOSED IN-SESSION, IN LARRY'S OWN WORDS AND AGAINST HIMSELF - HOW-TO-APPLY.md:3-5 in the private tree: 'Written 2026-08-23 because the route existed only in Larry's dispatch messages. TWICE IN ONE AFTERNOON a base CV was built from material that lived nowhere durable. This file is the third fix.' He named the recurrence count, named himself as the location of the missing knowledge, and wrote the durable route rather than a note about it. QUALIFICATIONS, NAMED SO THE CLEAN IS NOT OVER-READ: two of the three restarts were REMEDIAL - the change was made, then found not live, and the rule already existed in the same README for two other modules, so recovery is reliable while anticipation is not yet automatic. And the two product commits are UNPUSHED, which is a durability question rather than this family, is deliberate, and is declared on the map - but 'live on exactly one disk' is one step from this family, and it is blocked by an open Warwick decision rather than by anything Larry can resolve. Prevention held: YES. Comparison: IMPROVED - previous was recurrence through the day discharged once at the close by a single production event; this was activated correctly throughout, through the production start path, with the activation surface owned by a named specialist. Question 6: NO.",
+      "evidence_ref": "services/cockpit/README.md:15-19,210-220,236-237; services/cockpit/careerair-check.mjs:298-300; Deliverables/2026-08-14-build-016-careerair-wayfinder-plan.md:448-454; C:/.fusion247/private/careerair/runtime/applications/HOW-TO-APPLY.md:3-5; ledger rows 17-19",
+      "recommended_disposition": "None. Residual recorded only."
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "recurrence",
+      "summary": "RECURRENCE, AND IT IS BLOCKING UNDER THE MATERIAL-EFFECT TEST IN ROOT CLAUDE.md SECTION 'Finding disposition'. Told: occurrences 8, MONITORING, clean 0 of 5; cause 'Amendment-by-append with no reconciliation step. WRITING THE AMENDMENT FEELS LIKE COMPLETING THE CHANGE, so the rows describing the phase are never revisited'; must 'Supersede the body, or do not append the amendment.' EVIDENCE AGAINST, ON TWO SURFACES THAT BOTH DIRECT A FRESH SESSION. (1) THE MAP'S TOP BLOCK STILL POINTS THE FRONTIER AT WORK AMENDMENT 1 RETIRES. Lines 22-31, inside the block headed 'THIS MAP IS THE ACTIVE FRONTIER' and the first prose any fresh session reads, carry NO supersession banner and read: 'This map's own frontier is the same defect, in its own words: The product works. NOTHING IN PRODUCTION CALLS IT... The diagnosis is already made and it is already correct. WIRE ONE REAL PRODUCTION EVENT AND PROVE IT FIRED.' AMENDMENT 1, in the same file at lines 370-374, says: 'THE 2026-08-14 FRONTIER IS RETIRED... WIRING IT TO FIRE UNATTENDED IS NOW THE WRONG WORK.' AMENDMENT 2 (this session) did not touch it. A documentation defect is BLOCKING where it points the active frontier at the wrong work; this does exactly that, at the top of the map, and it is the second consecutive session it has stood. (2) SECTION 14 RESUMABLE STATE IS WHOLLY STALE AND WAS NOT RE-CUT. Lines 334-344, the section the START/RESUME contract directs a resuming session to read, still say 'Frontier: the Warwick decision at the top of this map, then the measurement task' and 'Last CareerAIR development activity: 2026-08-06 - commit bd11f96. EIGHT DAYS IDLE BY DESIGN, parked deliberately, not drifted.' Development occurred on 22 AND 23 AUGUST and the frontier is now ACCEPT. Neither line was touched by either amendment. THREE COMPETING 'START HERE' SURFACES NOW EXIST IN ONE FILE - the top block (line 7), 'THE ONE CURRENT DIRECTIVE BLOCK - START HERE. Nothing else on this map directs anything' (line 64), and AMENDMENT 2's WORK CLASSIFICATION (line 429) - and ONLY THE MIDDLE ONE CARRIES A SUPERSESSION BANNER. EVIDENCE FOR, AND IT IS GENUINE, WHICH IS WHY THIS GRADES AS A RECURRENCE ON TWO SURFACES RATHER THAN A COLLAPSE: line 101-102 is the discipline done properly, on 2026-08-22, in this session - 'SUPERSEDED 2026-08-22 - THE FRONTIER BELOW IS NO LONGER THE ROUTE', with the reason, a pointer to the amendment, and the former frontier RETAINED AS RECORD at line 104 rather than deleted; AMENDMENT 1's 'Larry's reading, labelled as such' applies the attribution rule correctly; the closing-head correction supersedes rather than appends, quotes the wrong value and states the rule going forward (lines 489-496); and AMENDMENT 2 carries a full WORK CLASSIFICATION block with exactly one FRONTIER, as the template requires. Prevention held: NO on the two surfaces that direct a fresh session; YES on the one it re-cut. Comparison: UNCHANGED - recurrence then, recurrence now. WHAT IS DIFFERENT IS THAT LAST TIME A REVIEWER GRADED IT BLOCKING AND FORCED THE REPAIR WITHIN 26 MINUTES; THIS SESSION NO REVIEWER LOOKED, SO IT IS STILL STANDING. That is the practical case for the assurance gate. Question 6: YES.",
+      "evidence_ref": "Deliverables/2026-08-14-build-016-careerair-wayfinder-plan.md:7,22-36,64,101-104,334-344,370-374,419,429-439,489-496",
+      "recommended_disposition": "Re-cut both surfaces in the next commit that touches the map. This is what 'fix the map first' already means and it is minutes of work. NOT A WORK ORDER."
+    },
+    {
+      "family": "record-amended-body-not-recut",
+      "exposure": "recurrence",
+      "summary": "PROPOSED FAMILY rotation-close-cannot-name-its-own-closing-head - FILED UNDER record-amended-body-not-recut BECAUSE THE SAME PREVENTION ADDRESSES BOTH: a record must be corrected at the surface that carries it, not annotated beside it. RECURRED, SELF-CAUGHT, AND THE RECORDED CAUSE IS WRONG. The Work Order commissioning this report, and the map as first written, both declared the closing head as 38f3b6dc. The real head, at .git/logs/refs/heads/wo/2026-08-23-cockpit-grid line 5, is 38f3b6d6a817838c6e13454bba5f53cab9485d66. THE EIGHTH CHARACTER IS WRONG - c versus 6 - and 38f3b6dc is not a truncation, not a prefix, and names no object that has ever existed in this repository; a repo-wide search returns EXACTLY ONE occurrence, the map's own correction of it. THE CORRECTION IS EXEMPLARY AND IS RECORDED FIRST: Larry's read-back caught it, and the map now supersedes rather than annotates, quotes the wrong value, states the remedy and lists the full ancestry so anyone can reconstruct - 'A map that writes its own closing SHA is self-referential... THE PACKET IS THE PLACE FOR A LITERAL HEAD; A MAP IS NOT.' The remedy closes the class for maps. BUT THE RECORDED CAUSE DOES NOT FIT THE EVIDENCE, AND THIS MATTERS. Self-reference explains DRIFT - a REAL SHA superseded by the commit that wrote it. IT CANNOT EXPLAIN A SHA THAT NEVER EXISTED. Had self-reference been the whole defect, the map would have named 38f3b6d6 and been merely superseded. TWO DIFFERENT FAILURES ARE BEING COLLAPSED INTO ONE, AND THE ADOPTED REMEDY ONLY COVERS THE ONE THAT DID NOT HAPPEN. Concretely: the same wrong SHA also went into the Work Order commissioning this report, a surface that 'a map should not name a literal SHA' does not reach at all. The estate's own banked lesson names an unverified causal story written confidently into a commit, a dispatch and a report as a standing failure; THIS IS A SMALL, LIVE INSTANCE OF IT, IN THE PARAGRAPH CORRECTING A DIFFERENT ERROR. Drift at the moment the witness began: +1 minimum (2bd2d069, 99 seconds after the declared head), and the map on disk already carried text postdating that commit. Comparison: DEGRADED - two consecutive zero-drift rotations, to a head that does not exist.",
+      "evidence_ref": ".git/logs/refs/heads/wo/2026-08-23-cockpit-grid:5; .git/logs/HEAD:1200-1201; Deliverables/2026-08-14-build-016-careerair-wayfinder-plan.md:487-496; repo-wide search for 38f3b6dc (one occurrence)",
+      "recommended_disposition": "None beyond what Larry already did, except to record that the cause was transcription rather than self-reference, so the remedy is not mistaken for complete cover. NOT A WORK ORDER."
+    }
+  ],
+
+  "capae_not_recurred": [
+    {
+      "family": "capae-brief-snapshot-taken-before-sync",
+      "exposure": "none-this-session",
+      "summary": "PROPOSED FAMILY. CLEARED FOR THE FIRST TIME IN FOUR ROTATIONS - AND IT IS A REPRIEVE, NOT A FIX. The defect requires a capae-sync to land between the previous rotation's populate and this session's SessionStart snapshot. NONE DID: populate.mjs last ran 2026-08-19T12:21:54.309Z, capae-sync wrote 6.4 seconds later at 12:22:00.677Z, and the snapshot froze 4 days 2h54m24s after that with nothing in between. Both files are identical. THE GUARD STILL DID NOT FIRE AND STILL CANNOT: capae-brief.mjs's STALE_AFTER_DAYS = 14 against a brief 4.12 days old. Correct behaviour this time; the guard remains untested against the defect it was recommended for; and the previous report's finding stands unchanged - THE DEFECT IS ORDINAL, NOT TEMPORAL, and no day-counter at any threshold detects 'one sync behind'. THE HAZARD RETURNS INTACT AT THE NEXT ROTATION, because steps 7b and 7c are DEFERRED WITH THIS REPORT and will therefore populate close to a SessionStart."
+    }
+  ],
+
+  "privacy_constraint_assessment": {
+    "complied": true,
+    "note": "NO EMPLOYER, ROLE, RECRUITER OR OPPORTUNITY IS NAMED IN THE REPORT OR IN THIS PAYLOAD. The private tree's directory names, base-CV READMEs and route file all carry such names; the witness read them and reproduced none.",
+    "constraint_is_correct": "YES. This repository is public and the map currently names zero. The routing of every specific to the private store is right.",
+    "self_disclosure": "LARRY DISCLOSED A FINDING AGAINST HIMSELF THAT THE WITNESS CANNOT INDEPENDENTLY VERIFY. The Work Order states 'Larry recorded two privacy findings into a tracked public file before a worker caught it.' The CORRECTIVE STATE is verified - the public map names nothing, AMENDMENT 2 carries an explicit privacy banner, and the leak specifics are routed to the private findings file - but with no shell the removed content cannot be diffed. THE ORIGINAL DEFECT RESTS ON LARRY'S OWN DISCLOSURE. SINGLE-SOURCE, FLAGGED. It is nonetheless the behaviour the estate wants: a self-reported failure is worth more than an unreported clean.",
+    "leak_fix_corroboration": "THE SHIPPED CONTROLS CORROBORATE THE FIX DIRECTION INDEPENDENTLY: the 500 branch is asserted to carry no absolute path and no fragment of the private root (careerair-check.mjs:238-241), and the served response is asserted never to carry a filesystem path (:247-250). CONFIDENCE IN THE FIX: HIGH. CONFIDENCE IN THE ORIGINAL TWO FINDINGS: LOW - Larry's word only.",
+    "hobby_brain_grade": "ESCALATION WAS CORRECT, AND THE WITNESS SAYS SO AGAINST HIS OWN INSTINCT TO PARK SECURITY FINDINGS. This touches 'public exposure of something intended to remain private' and 'personal privacy Warwick actually cares about', on a PUBLIC repository, in a job search. THAT IS A NAMED ESCALATE CASE, NOT A PARK CASE.",
+    "open_item": "The privacy decision C-P2 blocks every push, so the session's product commits are recoverable from exactly one disk. RECORDED; WARWICK'S TO SCHEDULE."
+  },
+
+  "product_verification": {
+    "claim": "AMENDMENT 2: 'Four cluster base CVs and nine tailored forks, produced by forking rather than rewriting.'",
+    "verdict": "BOTH HALVES CONFIRMED BY ENUMERATION. runtime/bases/ holds FOUR base-cv.md files under four distinct cluster directories. runtime/applications/ holds NINE <id>-<slug>/ directories, EACH carrying both a cv.md and a FORK-NOTES.md, beside a HOW-TO-APPLY.md and an INDEX.md. Confidence: HIGH. No name from that tree appears in this report.",
+    "route_file": "HOW-TO-APPLY.md documents the whole route (354 scored opportunities -> 4 cluster bases -> one fork per opportunity -> Warwick reads -> sent), the rules that stop a fork going wrong, and a binding prohibition on one class of fork. IT ALSO OPENS BY NAMING ITS OWN CAUSE AGAINST LARRY: 'Written 2026-08-23 because the route existed only in Larry's dispatch messages.'"
+  },
+
+  "unestablished": [
+    "Opening context reading - structurally unavailable for the fifth report running; the sampler keeps one file per session id and overwrites it.",
+    "Pre-compaction peak context occupancy - the same overwrite, plus a compaction inside the window.",
+    "Total measured context movement - no opening reading and an intervening compaction.",
+    "Total measured quota movement - the seven-day bucket RESET at 2026-08-23T16:00:00Z, thirteen minutes before the branch was cut.",
+    "All line-level, diffstat and convergence figures - fifth consecutive rotation with no shell and no git binary.",
+    "The content of all thirteen notifications - ding-log.jsonl records bytes, never bodies. Every Rule 4a judgement is made on timing and proximity, and none is stated as proven.",
+    "Whether any notification was OWED and NOT sent - no verdict can be proved from the available instrument and none is manufactured.",
+    "The identity, package, governance head, generated_at and worker of both Work Orders - no order artefact exists anywhere on disk.",
+    "Work Order amendment count.",
+    "Corrective rework token cost - four fix rounds sit inside one cumulative agent counter and cannot be separated from it.",
+    "Whether the original two privacy findings were committed or caught pre-commit - single-source on Larry's disclosure.",
+    "Whether the 2026-08-22 commits belong to this host session - INFERRED from the absence of any other sampler file in the window; confidence Medium-High, not proven.",
+    "Whether '20 mins go go go' described Warwick's availability or his instruction - the elapsed fact (96 minutes) is measured; the interpretation is not.",
+    "The pre-compaction dispatch count, token cost, tool uses and wall time - UNMEASURED, NOT ZERO. The ledger names five such dispatches by purpose."
+  ],
+
+  "recommendations": [
+    "Re-cut the map's top block (lines 22-31) and section 14 RESUMABLE STATE in the next commit that touches the map. Blocking finding, minutes of work, Larry's to do.",
+    "Restate the Work Order exemption in Larry's own voice, or put it to Warwick as a product-decision. The current form asserts his authorship for a control he was never asked about. Recommendation only - the disposition is his.",
+    "Read ding-log.jsonl before briefing the next witness. One Read, no mechanism.",
+    "Delete careerair-check.mjs:403 or give it a predicate that can fail.",
+    "Settle whether ding 581 carried the privacy decision. One glance at the Telegram thread. If it did not, Warwick has rotated without knowing the work is on one disk.",
+    "Record the pre-reset quota reading when a rotation lands near a bucket boundary. A sequencing habit, not a control.",
+    "BUILD NOTHING IN RESPONSE TO THIS REPORT. The regrowth cap applies at full force. Every recommendation above is a read, an edit or a question."
+  ],
+
+  "witness_note": "Same-model review - independent of the session and its context, not of the model. Not externally verified. Pax held Read, Write, Grep, Glob, WebFetch and WebSearch; no Bash, no PowerShell, no git binary. FIFTH CONSECUTIVE ROTATION IN WHICH THE SESSION WITNESS WAS DISPATCHED WITHOUT A SHELL."
+}

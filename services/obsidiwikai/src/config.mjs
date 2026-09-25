@@ -2,7 +2,7 @@
 // Secrets come from process.env (load via: node --env-file lightrag.env --env-file neo4j.env
 // --env-file honcho.env --env-file fusion-capture-gateway.env ...). No secret values live in this repo.
 
-const BOX = process.env.FUSION_CORE_TAILNET || '100.101.240.85';
+const BOX = process.env.FUSION_CORE_TAILNET || '100.122.133.68';
 
 export const endpoints = {
   lightrag: process.env.LIGHTRAG_URL || `http://${BOX}:9621`,
