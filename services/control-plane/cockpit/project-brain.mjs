@@ -8,8 +8,8 @@
 //   node --env-file=C:/.fusion247/fusion-capture-gateway.env services/control-plane/cockpit/project-brain.mjs
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 
-const REPORT = process.env.REPORT_URL || 'http://100.101.240.85:8701';
-const GRAPH = process.env.GRAPH_URL || 'http://100.101.240.85:8700';
+const REPORT = process.env.REPORT_URL || 'http://100.122.133.68:8701';
+const GRAPH = process.env.GRAPH_URL || 'http://100.122.133.68:8700';
 const c = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
 

@@ -9,7 +9,7 @@ import { q } from '../clients/db.mjs';
 import { buildLens, lensSummary } from './lens.mjs';
 import { generateJSON } from './llm.mjs';
 
-const REPORT_URL = process.env.FUSION_REPORT_URL || `http://${process.env.FUSION_CORE_TAILNET || '100.101.240.85'}:8701`;
+const REPORT_URL = process.env.FUSION_REPORT_URL || `http://${process.env.FUSION_CORE_TAILNET || '100.122.133.68'}:8701`;
 
 export const SYSTEM_TARGETS = new Set([
   'larry', 'mypka', 'cairn', 'tubeair', 'lightrag', 'neo4j', 'directus', 'fusion247', 'workflow',

@@ -3,8 +3,8 @@
    lanes, decision lifecycle (accept/decline/defer + Archive + Later), readable outputs. No build step. */
 const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
-const REPORT = 'http://100.101.240.85:8701';
-const GRAPH = 'http://100.101.240.85:8700';
+const REPORT = 'http://100.122.133.68:8701';
+const GRAPH = 'http://100.122.133.68:8700';
 const AREAS = [
   { key: 'home', label: 'Home', icon: '🏠' },
   { key: 'apps', label: 'Apps', icon: '🧩' },

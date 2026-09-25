@@ -8,7 +8,7 @@ import { buildLens } from './lens.mjs';
 import { generateJSON } from './llm.mjs';
 import { compareLensDelta } from './lensDelta.mjs';
 
-const REPORT = process.env.REPORT_URL || 'http://100.101.240.85:8701';
+const REPORT = process.env.REPORT_URL || 'http://100.122.133.68:8701';
 
 async function sourceData(sourceId) {
   const r = await fetch(`${REPORT}/api/source/${encodeURIComponent(sourceId)}`);

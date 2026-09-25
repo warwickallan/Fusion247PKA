@@ -7,7 +7,7 @@
 //        services/control-plane/cockpit/brain-command-worker.mjs
 import pg from 'file:///C:/Fusion247PKA/services/control-plane/node_modules/pg/lib/index.js';
 
-const LIGHTRAG = process.env.LIGHTRAG_URL || `http://${process.env.FUSION_CORE_TAILNET || '100.101.240.85'}:9621`;
+const LIGHTRAG = process.env.LIGHTRAG_URL || `http://${process.env.FUSION_CORE_TAILNET || '100.122.133.68'}:9621`;
 const KEY = process.env.LIGHTRAG_API_KEY;
 
 async function mergeEntities(sources, target) {
