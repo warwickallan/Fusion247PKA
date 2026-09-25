@@ -1094,3 +1094,44 @@ them. Kill-switch remains `CAREERAIR_KGRAPH_DISABLED=1`. Also reaffirmed at clos
 cutover session's flags: CareerAIR-Graph-Collect stays disabled permanently (GPT owns the
 Outlook side), and `provider_active: zapier_webhook` in runtime/ops/state.json is load-bearing —
 neither is to be "corrected".
+
+# ⚑ AMENDMENT 8f — session of 2026-09-25 (HP Careerair RAG). **ACTIVE SESSION WORK PACKAGE, authorised by Warwick.**
+
+> **Warwick, verbatim (2026-09-25), on the kgraph/RAG next-steps plan relayed via HP Apps & Opps:**
+> *"I authrise all to complete"*
+
+**Larry's record (not Warwick's words).** This supersedes 8e's frontier. The term-extraction `spend`
+decision is resolved differently from how 8e framed it: the pass runs on the **free local models** on
+the Beast (Ollama, `gemma4:26b`), not the paid gateway. The authorised plan lives in the session's
+cross-session report to HP Apps & Opps; its substance is restated below so the map carries it.
+
+**Contradiction, resolved by live check 2026-09-25:** 8e's addendum places kgraph on the cloud host.
+It moved to THIS HP on 2026-09-25 (Hetzner server deleted, snapshot kept): container
+`careerair-careerair-neo4j-1` on 127.0.0.1:7475/7688, verified running by `docker ps`. 8e's location
+line is stale; the kill-switch and the env-file dependency stand.
+
+## ⚑ WORK CLASSIFICATION — this amendment
+
+| Slot | Class | Item |
+|---|---|---|
+| **FRONTIER** | BUILD | Evidence into kgraph + retrieval CLI (rows 1–3 below) |
+| **NEXT** | BUILD | Local extraction pass, sample then backfill (rows 4–5) |
+| **SIDECAR** | ACCEPT | Set 2a retrieval eval — owned by the HP Careerair LLM Eval session, not this map |
+| **PARKED** | — | n8n workflow and Paperclip board: deferred until row 5 works (recommended; Warwick's call when raised) |
+
+## ACTIVE SESSION WORK PACKAGE — Warwick, 2026-09-25
+
+Private surface: `C:\.fusion247\private\careerair\**` only. No employer or role data in this repo.
+Production Brain (7474/7687) untouched; live pipeline behaviour unchanged (additive only, kill-switch kept).
+
+| # | Functional requirement | Acceptance evidence |
+|---|---|---|
+| 1 | The lost 2026-09-21 term-extraction findings and prototypes are recovered into `careerair/design/` | Files present, content traced to the transcript lines |
+| 2 | Every atomic evidence entry of the tier-1 source is in kgraph as an `EvidenceEntry` (separate label; masters' `EvidenceBullet` untouched), keyed by `projected_to` UUID or `src:`+sha256[:16], carrying date/class/confidence/status/not_to_claim; controls marked `kind=control`; a manifest pinned to the source SHA is published | Manifest + node counts reconcile to the source's entry count |
+| 3 | `retrieve --jd <file> --k N --mode keyword|vector|hybrid|graph` returns deterministic JSON `[{entry_id, score}]` plus a metadata line; keyword arm = the existing `src/evidence/retrieve.mjs`, unmodified; vectors from `qwen3-embedding:0.6b` on the Beast in a native Neo4j vector index | Same input twice → same output; the Eval session can run it blind |
+| 4 | Local extraction: per advert, title family + requirements, each with a verbatim quote that a deterministic substring check verifies; schema-validated; scored by Eval on ~30 adverts against the paid pass | Eval's score on the sample |
+| 5 | If row 4 holds, backfill all ~330 adverts and rebuild Title families / Terms from it | Title axis holds families, not slugs; node counts |
+
+Graph relations stay in the retrieval path only if Set 2a shows graph mode measurably beats plain retrieval.
+Known residuals: ~6 fact entries lack a `projected_to` UUID (interim content hash; projection is
+HP Apps & Opps' lane); the answer key is silver (two-labeller agreement), per Set 1 Option B.
