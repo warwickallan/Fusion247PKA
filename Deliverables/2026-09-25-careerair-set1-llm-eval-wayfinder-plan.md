@@ -23,8 +23,8 @@
 
 | | Work type | Outcome | Owner | Model / effort | Blocks what | Done when |
 |---|---|---|---|---|---|---|
-| **FRONTIER** | BUILD | Set 1 frozen: model inputs + a separate answer key with gold (human-settled) and silver (two-model consensus) tiers, hashed | Larry (HP Careerair LLM Eval) | Opus 5.5 / medium | Phases 4–5 | `set1-inputs.jsonl`, `answer-key.jsonl` and `SHA256SUMS` exist; no input record carries a label or an application ID; every silver label has two independent agreeing labellers |
-| **NEXT** | BUILD | One model-neutral runner that scores every contestant on the same frozen inputs | Keel (Work Order) | Opus 5.5 / medium | Phase 5 | A dry run on 5 items against gemma4:26b writes a results file with tag, digest, prompt hash, options and Ollama version per call |
+| **FRONTIER** | ACCEPT | Warwick reads the Set 1 verdict; Veritas assures the Phase 5 outcome if a PASS is wanted | Larry (HP Careerair LLM Eval) | Opus 5.5 / medium | Phase 6 | Warwick has read the results table and verdict, and a Veritas receipt exists for Phase 5 (or Warwick waives the PASS) |
+| **NEXT** | BUILD | gemma4:26b behind the CareerAIR gateway for email triage, rules as the floor, Claude for escalation | Keel (Work Order) | Opus 5.5 / medium | — | Needs Warwick's separate approval first; done when a real forwarded status email is classified through the production path |
 | **SIDECAR / NON-BLOCKING** | ADMIN | Dated CPMAI project log and honest CV lines | Larry | — | — | — |
 | **PARKED** | BUILD | Stream B (n8n Outlook intake, Paperclip Scout agent, Copilot Studio variant) | Larry | — | — | — |
 
@@ -104,8 +104,14 @@ DSN. The runner writes only under `eval/set1/`. Nothing is deleted or overwritte
 | Phase | Status | Model | Evidence |
 |---|---|---|---|
 | 1 | PARTIAL: decisions taken; targets provisional | Opus 5.5 | private `PROJECT-LOG.md` |
-| 2 | PARTIAL: profiled; gold about 16 | Opus 5.5 | private `work/ledger-matches.tsv` |
-| 3–6 | ⬜ NOT STARTED | | — |
+| 2 | PARTIAL: profiled; gold 15 after review | Opus 5.5 | private `work/ledger-matches.tsv` |
+| 3 | PARTIAL: frozen, 146 items, gold 15 + silver 130, leak check passed | Opus 5.5 + gpt-5.6-terra | private `inputs/SHA256SUMS`, `key/answer-key.jsonl` |
+| 4 | PARTIAL: runner built by Larry (route change from Keel, small-work exception); dry runs OK | Opus 5.5 | private `tools/run-contestant.mjs` |
+| 5 | PARTIAL: all contestants measured 2026-09-25; awaiting Warwick's read + Veritas | Opus 5.5 | private `results/SCORES.md`, log §Phase 5 |
+| 6 | ⬜ NOT STARTED: separate approval | | — |
+
+Results are not in Git. They live in the approved non-Git private store
+`C:\.fusion247\private\careerair\eval\set1\`.
 
 ## SHIT TO DO — parked tangents
 
